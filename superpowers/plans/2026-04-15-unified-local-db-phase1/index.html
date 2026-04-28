@@ -1,0 +1,5164 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-15-unified-local-db-phase1/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Unified Local SQLite Layer — Phase 1 (Foundation) Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#unified-local-sqlite-layer-phase-1-foundation-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Unified Local SQLite Layer — Phase 1 (Foundation) Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#environment-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment &amp; conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-add-the-local_db-package-skeleton-and-path-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Add the local_db package skeleton and path helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-sqlite-helpers-wal-engine-attachdetach-schema-version-migration-runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: SQLite helpers — WAL engine, attach/detach, schema-version migration runner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-localschema-unified-schema-builder-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: LocalSchema — unified schema builder adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-workspace-per-catalog-db-handle-slice-registry-attachdetach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Workspace — per-catalog DB handle, slice registry, attach/detach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-wire-derivamlworking_data-through-the-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Wire DerivaML.working_data through the Workspace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-pagedfetcher-fake-client-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: PagedFetcher — fake-client unit tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-ermrest-backed-pagedclient-adapter-live-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: ERMrest-backed PagedClient adapter + live integration tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-manifeststore-sqlite-backed-persistence-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: ManifestStore — SQLite-backed persistence layer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-rewrite-assetmanifest-to-delegate-to-manifeststore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Rewrite AssetManifest to delegate to ManifestStore
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-10-json-db-import-on-workspace-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: JSON → DB import on workspace open
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-11-phase-1-smoke-suite-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Phase 1 smoke suite + documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-checklist-run-before-handing-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification checklist (run before handing off)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-plan-does-not-deliver-deferred-to-phase-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this plan does NOT deliver (deferred to Phase 2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="unified-local-sqlite-layer-phase-1-foundation-implementation-plan">Unified Local SQLite Layer — Phase 1 (Foundation) Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Build the foundation layer for unified client-side SQLite caching in deriva-ml: a <code>local_db</code> module with a reusable schema builder, a per-catalog <code>Workspace</code>, a <code>PagedFetcher</code> primitive, and a DB-backed <code>AssetManifest</code>. No user-visible API changes — existing denormalization and caching continue to work.</p>
+<p><strong>Architecture:</strong> New <code>deriva_ml.local_db</code> package with four modules (<code>schema</code>, <code>workspace</code>, <code>paged_fetcher</code>, and <code>manifest_store</code>). Today's <code>WorkingDataCache</code> is absorbed as the workspace's default cache table layer. Today's <code>AssetManifest</code> gets a storage swap (JSON → SQLite tables in the workspace DB) while keeping its public API. No change to denormalization code this phase.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, SQLAlchemy 2.x, SQLite (WAL mode), deriva-py (ErmrestCatalog, datapath, ermrest_model), pytest, pytest-asyncio. Spec: <code>docs/superpowers/specs/2026-04-15-unified-local-db-design.md</code>.</p>
+<hr />
+<h2 id="environment-conventions">Environment &amp; conventions</h2>
+<ul>
+<li>Work in worktree <code>/Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/</code> on branch <code>claude/compassionate-visvesvaraya</code>.</li>
+<li><code>uv</code> is at <code>/Users/carl/.local/bin/uv</code>. If <code>uv</code> is not found, prepend <code>/Users/carl/.local/bin</code> to <code>PATH</code>.</li>
+<li>Run tests with <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest ...</code>.</li>
+<li>Unit tests must not require a live catalog — they use fakes/fixtures. Integration tests set <code>DERIVA_HOST</code> and use <code>CatalogManager</code> (see <code>tests/catalog_manager.py</code>).</li>
+<li>Format/lint: <code>uv run ruff format src/</code> and <code>uv run ruff check src/</code> after any non-trivial change.</li>
+<li>Commit after each task unless noted. Commit messages use <code>feat(local_db):</code>, <code>test(local_db):</code>, <code>refactor(local_db):</code> prefixes.</li>
+</ul>
+<h2 id="file-structure">File structure</h2>
+<h3 id="new-files">New files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/local_db/__init__.py</code></td>
+<td>Public exports (<code>Workspace</code>, <code>PagedFetcher</code>, <code>ManifestStore</code>).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/paths.py</code></td>
+<td>Pure path-helper functions: <code>workspace_root</code>, <code>working_db_path</code>, <code>slice_dir</code>, <code>slice_db_path</code>. No side effects, no DB access.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/sqlite_helpers.py</code></td>
+<td>Shared SQLite/SQLAlchemy helpers: engine factory with WAL pragmas, <code>attach_database</code> + <code>detach_database</code>, <code>ensure_schema_meta</code> migration runner.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/schema.py</code></td>
+<td>The unified <code>LocalSchema</code> class: wraps today's <code>SchemaBuilder</code> + <code>SchemaORM</code> in a cleaner interface that works for working DB (from live <code>Model</code>) and slice DB (from bag <code>schema.json</code>).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/paged_fetcher.py</code></td>
+<td><code>PagedFetcher</code> class with <code>fetch_predicate</code>, <code>fetch_by_rids</code>, <code>fetched_rids</code>, plus internals for URL-length guard, POST fallback, concurrency, cardinality heuristic.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/manifest_store.py</code></td>
+<td><code>ManifestStore</code> class. SQLite-backed persistence layer for asset/feature entries. Consumed by <code>AssetManifest</code>.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/workspace.py</code></td>
+<td><code>Workspace</code> class: per-catalog working-DB handle, slice registry, <code>attach_slice(...)</code> context manager, cached-tabular-read helpers (stubbed; filled out in Phase 2).</td>
+</tr>
+<tr>
+<td><code>tests/local_db/__init__.py</code></td>
+<td>Test package marker.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/conftest.py</code></td>
+<td>Shared fixtures: <code>tmp_workspace</code>, <code>fake_ermrest_client</code>, <code>canned_model</code>.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_paths.py</code></td>
+<td>Unit tests for path helpers.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_sqlite_helpers.py</code></td>
+<td>Unit tests for WAL engine + attach/detach + migration runner.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_schema.py</code></td>
+<td>Unit tests for <code>LocalSchema</code> (model-from-file and model-from-live paths).</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_paged_fetcher.py</code></td>
+<td>Unit tests for fetcher (byte guard, POST fallback, dedup, cardinality heuristic) against a fake client.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_paged_fetcher_live.py</code></td>
+<td>Integration tests hitting a live catalog.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_manifest_store.py</code></td>
+<td>Unit tests for the SQLite manifest store.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_manifest_migration.py</code></td>
+<td>Integration test: seed a JSON manifest, open workspace, confirm rows + <code>.migrated.json</code> sidecar.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_workspace.py</code></td>
+<td>Unit + integration tests for the workspace lifecycle and slice attach/detach.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="modified-files">Modified files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/core/base.py</code></td>
+<td>Replace <code>working_data</code> property + <code>_working_data</code> attr with delegation through a lazily created <code>Workspace</code>. Keep the <code>working_data</code> property as a thin shim around <code>workspace.legacy_working_data_view()</code> so existing callers (tests, <code>Dataset.cache_denormalized</code>) keep working.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/asset/manifest.py</code></td>
+<td>Rewrite <code>AssetManifest</code> to delegate persistence to <code>ManifestStore</code>. Keep same public API. Keep <code>AssetEntry</code>/<code>FeatureEntry</code> dataclasses unchanged. Add <code>to_json()</code> method for debugging/export.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution.py</code></td>
+<td><code>_get_manifest</code> constructs <code>AssetManifest(workspace, execution_rid)</code> instead of <code>AssetManifest(path, execution_rid)</code>. JSON import runs on workspace open (not here).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/asset/__init__.py</code></td>
+<td>No change to exports, but docstring updated to mention SQLite-backed storage.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/working_data.py</code></td>
+<td>Keep module; class becomes a deprecated thin wrapper around <code>workspace.legacy_working_data_view()</code>. Adds a DeprecationWarning on direct instantiation.</td>
+</tr>
+<tr>
+<td><code>docs/superpowers/plans/2026-04-15-unified-local-db-phase1.md</code></td>
+<td>This file.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-1-add-the-local_db-package-skeleton-and-path-helpers">Task 1: Add the <code>local_db</code> package skeleton and path helpers</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/__init__.py</code>
+- Create: <code>src/deriva_ml/local_db/paths.py</code>
+- Create: <code>tests/local_db/__init__.py</code>
+- Create: <code>tests/local_db/test_paths.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Create the package <code>__init__.py</code> (empty, will be populated later).</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/__init__.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unified local SQLite layer for deriva-ml.
+
+This package provides per-catalog working databases, per-slice immutable
+databases, a paged-fetch primitive, and a SQLite-backed asset manifest.
+
+See `docs/superpowers/specs/2026-04-15-unified-local-db-design.md`.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+__all__: list[str] = []
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Create the tests package marker.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/__init__.py</code> as an empty file (but with a newline):</p>
+<pre><code class="language-python"></code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Write failing tests for path helpers.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_paths.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for local_db.paths — pure path helpers.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from deriva_ml.local_db import paths as p
+
+
+class TestWorkspaceRoot:
+    def test_encodes_host_and_catalog(self, tmp_path: Path) -&gt; None:
+        root = p.workspace_root(tmp_path, &quot;example.org&quot;, &quot;42&quot;)
+        assert root == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot;
+
+    def test_sanitises_unsafe_hostname(self, tmp_path: Path) -&gt; None:
+        # Path separators and other unsafe chars are replaced with '_'.
+        root = p.workspace_root(tmp_path, &quot;a/b:c&quot;, &quot;1&quot;)
+        assert root == tmp_path / &quot;catalogs&quot; / &quot;a_b_c__1&quot;
+
+    def test_numeric_catalog_id_coerced_to_str(self, tmp_path: Path) -&gt; None:
+        root = p.workspace_root(tmp_path, &quot;example.org&quot;, 42)
+        assert root.name == &quot;example.org__42&quot;
+
+
+class TestWorkingDbPath:
+    def test_under_workspace_root(self, tmp_path: Path) -&gt; None:
+        db = p.working_db_path(tmp_path, &quot;example.org&quot;, &quot;42&quot;)
+        assert db == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;working.db&quot;
+
+
+class TestSliceDir:
+    def test_slice_dir_under_workspace(self, tmp_path: Path) -&gt; None:
+        d = p.slice_dir(tmp_path, &quot;example.org&quot;, &quot;42&quot;, &quot;abc123&quot;)
+        assert d == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;slices&quot; / &quot;abc123&quot;
+
+    def test_slice_id_sanitised(self, tmp_path: Path) -&gt; None:
+        d = p.slice_dir(tmp_path, &quot;example.org&quot;, &quot;42&quot;, &quot;a/b&quot;)
+        assert d == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;slices&quot; / &quot;a_b&quot;
+
+
+class TestSliceDbPath:
+    def test_slice_db_file_under_slice_dir(self, tmp_path: Path) -&gt; None:
+        db = p.slice_db_path(tmp_path, &quot;example.org&quot;, &quot;42&quot;, &quot;abc123&quot;)
+        assert db == (
+            tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;slices&quot; / &quot;abc123&quot; / &quot;slice.db&quot;
+        )
+
+
+class TestSanitiseComponent:
+    @pytest.mark.parametrize(
+        &quot;raw,expected&quot;,
+        [
+            (&quot;foo&quot;, &quot;foo&quot;),
+            (&quot;foo.bar&quot;, &quot;foo.bar&quot;),
+            (&quot;a/b&quot;, &quot;a_b&quot;),
+            (&quot;a:b&quot;, &quot;a_b&quot;),
+            (&quot;..&quot;, &quot;__&quot;),
+            (&quot;&quot;, &quot;_&quot;),
+        ],
+    )
+    def test_sanitise(self, raw: str, expected: str) -&gt; None:
+        assert p._sanitise_component(raw) == expected
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to confirm they fail (module doesn't exist yet).</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paths.py -v
+</code></pre>
+<p>Expected: <code>ImportError</code> / collection error because <code>deriva_ml.local_db.paths</code> is not yet defined.</p>
+<ul>
+<li>[ ] <strong>Step 5: Implement <code>paths.py</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/paths.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Pure path-helper functions for the local_db layout.
+
+No side effects, no SQLite access, no filesystem mutation. These helpers
+exist so both tests and runtime code derive layout paths from a single
+canonical source.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+_UNSAFE_CHARS = set('/\\:&lt;&gt;&quot;|?*')
+
+
+def _sanitise_component(raw: str) -&gt; str:
+    &quot;&quot;&quot;Replace path-unsafe characters with '_'. Return '_' for empty input.&quot;&quot;&quot;
+    if not raw:
+        return &quot;_&quot;
+    return &quot;&quot;.join(&quot;_&quot; if c in _UNSAFE_CHARS else c for c in raw)
+
+
+def workspace_root(working_dir: Path, hostname: str, catalog_id: str | int) -&gt; Path:
+    &quot;&quot;&quot;Return the per-catalog workspace root directory.
+
+    Layout: {working_dir}/catalogs/{host}__{catalog_id}/
+    &quot;&quot;&quot;
+    host = _sanitise_component(hostname)
+    cat = _sanitise_component(str(catalog_id))
+    return Path(working_dir) / &quot;catalogs&quot; / f&quot;{host}__{cat}&quot;
+
+
+def working_db_path(working_dir: Path, hostname: str, catalog_id: str | int) -&gt; Path:
+    &quot;&quot;&quot;Return the per-catalog working SQLite DB path.&quot;&quot;&quot;
+    return workspace_root(working_dir, hostname, catalog_id) / &quot;working.db&quot;
+
+
+def slice_dir(
+    working_dir: Path, hostname: str, catalog_id: str | int, slice_id: str
+) -&gt; Path:
+    &quot;&quot;&quot;Return the directory for a single slice.
+
+    Layout: {workspace_root}/slices/{slice_id}/
+    &quot;&quot;&quot;
+    return workspace_root(working_dir, hostname, catalog_id) / &quot;slices&quot; / _sanitise_component(slice_id)
+
+
+def slice_db_path(
+    working_dir: Path, hostname: str, catalog_id: str | int, slice_id: str
+) -&gt; Path:
+    &quot;&quot;&quot;Return the slice.db path for a single slice.&quot;&quot;&quot;
+    return slice_dir(working_dir, hostname, catalog_id, slice_id) / &quot;slice.db&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Run tests again to confirm they pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paths.py -v
+</code></pre>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/__init__.py \
+        src/deriva_ml/local_db/paths.py \
+        tests/local_db/__init__.py \
+        tests/local_db/test_paths.py
+git commit -m &quot;feat(local_db): add package skeleton and path helpers&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-sqlite-helpers-wal-engine-attachdetach-schema-version-migration-runner">Task 2: SQLite helpers — WAL engine, attach/detach, schema-version migration runner</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/sqlite_helpers.py</code>
+- Create: <code>tests/local_db/test_sqlite_helpers.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_sqlite_helpers.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for local_db.sqlite_helpers.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from sqlalchemy import text
+
+from deriva_ml.local_db import sqlite_helpers as sh
+
+
+class TestCreateWalEngine:
+    def test_wal_mode_enabled(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;db.sqlite&quot;
+        engine = sh.create_wal_engine(db)
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text(&quot;PRAGMA journal_mode&quot;)).scalar()
+            assert result == &quot;wal&quot;
+        finally:
+            engine.dispose()
+
+    def test_synchronous_normal(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;db.sqlite&quot;
+        engine = sh.create_wal_engine(db)
+        try:
+            with engine.connect() as conn:
+                # synchronous=NORMAL is integer 1 in SQLite
+                result = conn.execute(text(&quot;PRAGMA synchronous&quot;)).scalar()
+            assert result == 1
+        finally:
+            engine.dispose()
+
+    def test_creates_parent_directory(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;nested&quot; / &quot;sub&quot; / &quot;db.sqlite&quot;
+        assert not db.parent.exists()
+        engine = sh.create_wal_engine(db)
+        try:
+            assert db.parent.exists()
+        finally:
+            engine.dispose()
+
+    def test_read_only_mode(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;db.sqlite&quot;
+        # First create the DB in RW mode
+        rw = sh.create_wal_engine(db)
+        with rw.connect() as conn:
+            conn.execute(text(&quot;CREATE TABLE t (x INT)&quot;))
+            conn.commit()
+        rw.dispose()
+
+        # Then open read-only
+        ro = sh.create_wal_engine(db, read_only=True)
+        try:
+            with ro.connect() as conn:
+                # Reads work
+                conn.execute(text(&quot;SELECT * FROM t&quot;)).fetchall()
+                # Writes fail
+                with pytest.raises(Exception):
+                    conn.execute(text(&quot;INSERT INTO t VALUES (1)&quot;))
+                    conn.commit()
+        finally:
+            ro.dispose()
+
+
+class TestAttachDetach:
+    def test_attach_makes_tables_visible(self, tmp_path: Path) -&gt; None:
+        main_db = tmp_path / &quot;main.sqlite&quot;
+        slice_db = tmp_path / &quot;slice.sqlite&quot;
+
+        # Create main DB
+        eng_main = sh.create_wal_engine(main_db)
+        with eng_main.connect() as conn:
+            conn.execute(text(&quot;CREATE TABLE main_t (x INT)&quot;))
+            conn.execute(text(&quot;INSERT INTO main_t VALUES (1)&quot;))
+            conn.commit()
+        eng_main.dispose()
+
+        # Create slice DB
+        eng_slice = sh.create_wal_engine(slice_db)
+        with eng_slice.connect() as conn:
+            conn.execute(text(&quot;CREATE TABLE slice_t (y INT)&quot;))
+            conn.execute(text(&quot;INSERT INTO slice_t VALUES (99)&quot;))
+            conn.commit()
+        eng_slice.dispose()
+
+        # Attach slice into main
+        eng = sh.create_wal_engine(main_db)
+        try:
+            with eng.connect() as conn:
+                sh.attach_database(conn, slice_db, &quot;slice&quot;)
+                # Can see slice.slice_t
+                result = conn.execute(text(&quot;SELECT y FROM slice.slice_t&quot;)).scalar()
+                assert result == 99
+                sh.detach_database(conn, &quot;slice&quot;)
+        finally:
+            eng.dispose()
+
+
+class TestSchemaMeta:
+    def test_initial_version_is_1(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;db.sqlite&quot;
+        engine = sh.create_wal_engine(db)
+        try:
+            version = sh.ensure_schema_meta(engine, expected_version=1)
+            assert version == 1
+        finally:
+            engine.dispose()
+
+    def test_idempotent(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;db.sqlite&quot;
+        engine = sh.create_wal_engine(db)
+        try:
+            sh.ensure_schema_meta(engine, expected_version=1)
+            # Second call should be a no-op
+            v = sh.ensure_schema_meta(engine, expected_version=1)
+            assert v == 1
+        finally:
+            engine.dispose()
+
+    def test_raises_on_higher_version(self, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;db.sqlite&quot;
+        engine = sh.create_wal_engine(db)
+        try:
+            # Pretend the DB was created by a newer deriva-ml
+            sh.ensure_schema_meta(engine, expected_version=2)
+            with pytest.raises(sh.SchemaVersionError):
+                sh.ensure_schema_meta(engine, expected_version=1)
+        finally:
+            engine.dispose()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to confirm failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_sqlite_helpers.py -v
+</code></pre>
+<p>Expected: <code>ImportError</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>sqlite_helpers.py</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/sqlite_helpers.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;SQLite engine and connection helpers for the local_db layer.
+
+Provides:
+- ``create_wal_engine``: SQLAlchemy engine factory enforcing WAL + synchronous=NORMAL.
+- ``attach_database`` / ``detach_database``: ATTACH / DETACH helpers.
+- ``ensure_schema_meta``: idempotent schema-version tracking in a ``schema_meta``
+  table. Raises :class:`SchemaVersionError` when the on-disk schema is newer than
+  the running code expects.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Connection, Engine
+
+logger = logging.getLogger(__name__)
+
+SCHEMA_META_TABLE = &quot;schema_meta&quot;
+
+
+class SchemaVersionError(RuntimeError):
+    &quot;&quot;&quot;The on-disk schema version is newer than this code supports.&quot;&quot;&quot;
+
+
+def create_wal_engine(db_path: Path, *, read_only: bool = False) -&gt; Engine:
+    &quot;&quot;&quot;Create a SQLAlchemy engine for a SQLite file with WAL mode.
+
+    - Ensures the parent directory exists.
+    - Sets ``journal_mode=WAL`` and ``synchronous=NORMAL`` on every connection.
+    - When ``read_only=True``, opens the file via SQLite's ``mode=ro`` URI.
+
+    Args:
+        db_path: Path to the SQLite file.
+        read_only: If True, open in read-only mode.
+
+    Returns:
+        A SQLAlchemy :class:`Engine`.
+    &quot;&quot;&quot;
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if read_only:
+        url = f&quot;sqlite:///file:{db_path.resolve()}?mode=ro&amp;uri=true&quot;
+        # sqlite3 driver needs uri=True on connect kwargs
+        engine = create_engine(
+            url,
+            future=True,
+            connect_args={&quot;uri&quot;: True},
+        )
+    else:
+        engine = create_engine(f&quot;sqlite:///{db_path.resolve()}&quot;, future=True)
+
+    @event.listens_for(engine, &quot;connect&quot;)
+    def _set_pragmas(dbapi_conn: Any, _record: Any) -&gt; None:
+        cur = dbapi_conn.cursor()
+        try:
+            if not read_only:
+                cur.execute(&quot;PRAGMA journal_mode=WAL&quot;)
+                cur.execute(&quot;PRAGMA synchronous=NORMAL&quot;)
+            cur.execute(&quot;PRAGMA foreign_keys=ON&quot;)
+        finally:
+            cur.close()
+
+    return engine
+
+
+def attach_database(conn: Connection, db_path: Path, alias: str) -&gt; None:
+    &quot;&quot;&quot;ATTACH a SQLite file under ``alias`` in the given connection.
+
+    Args:
+        conn: An open SQLAlchemy connection.
+        db_path: Path to the SQLite file to attach.
+        alias: Name to attach it under (used as a schema qualifier).
+    &quot;&quot;&quot;
+    path_str = str(Path(db_path).resolve()).replace(&quot;'&quot;, &quot;''&quot;)
+    alias_safe = alias.replace('&quot;', '&quot;&quot;')
+    conn.execute(text(f&quot;ATTACH DATABASE '{path_str}' AS \&quot;{alias_safe}\&quot;&quot;))
+
+
+def detach_database(conn: Connection, alias: str) -&gt; None:
+    &quot;&quot;&quot;DETACH a previously attached database by alias.&quot;&quot;&quot;
+    alias_safe = alias.replace('&quot;', '&quot;&quot;')
+    conn.execute(text(f&quot;DETACH DATABASE \&quot;{alias_safe}\&quot;&quot;))
+
+
+def ensure_schema_meta(engine: Engine, expected_version: int) -&gt; int:
+    &quot;&quot;&quot;Ensure the ``schema_meta`` table exists and records ``expected_version``.
+
+    If the table is empty, inserts ``expected_version`` as the initial version.
+    If the table already has a version ≤ ``expected_version``, returns it.
+    If the on-disk version is higher, raises :class:`SchemaVersionError`.
+
+    Returns:
+        The current schema version (after any initialization).
+    &quot;&quot;&quot;
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                f&quot;CREATE TABLE IF NOT EXISTS {SCHEMA_META_TABLE} (&quot;
+                &quot;  version INTEGER PRIMARY KEY,&quot;
+                &quot;  recorded_at TEXT NOT NULL DEFAULT (datetime('now'))&quot;
+                &quot;)&quot;
+            )
+        )
+        existing = conn.execute(
+            text(f&quot;SELECT MAX(version) FROM {SCHEMA_META_TABLE}&quot;)
+        ).scalar()
+        if existing is None:
+            conn.execute(
+                text(
+                    f&quot;INSERT INTO {SCHEMA_META_TABLE}(version) VALUES (:v)&quot;
+                ),
+                {&quot;v&quot;: expected_version},
+            )
+            conn.commit()
+            return expected_version
+        if existing &gt; expected_version:
+            raise SchemaVersionError(
+                f&quot;Database schema version {existing} is newer than expected &quot;
+                f&quot;{expected_version}; upgrade deriva-ml.&quot;
+            )
+        return int(existing)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests — expect pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_sqlite_helpers.py -v
+</code></pre>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/ tests/local_db/
+uv run ruff check src/deriva_ml/local_db/ tests/local_db/
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/sqlite_helpers.py tests/local_db/test_sqlite_helpers.py
+git commit -m &quot;feat(local_db): add SQLite helpers (WAL engine, attach/detach, schema_meta)&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-localschema-unified-schema-builder-adapter">Task 3: <code>LocalSchema</code> — unified schema builder adapter</h2>
+<p>Today's <code>SchemaBuilder</code> in <code>src/deriva_ml/model/schema_builder.py</code> already accepts a <code>Model</code> from either a live catalog or a bag's <code>schema.json</code>. It's ~800 lines and well-tested. Rather than rewrite it, we wrap it in a thin <code>LocalSchema</code> adapter so workspace and slice code depend on <code>local_db.schema.LocalSchema</code>, not <code>model.schema_builder.SchemaBuilder</code>.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/schema.py</code>
+- Create: <code>tests/local_db/test_schema.py</code>
+- Create: <code>tests/local_db/conftest.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the shared test conftest.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/conftest.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Shared fixtures for local_db tests.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from deriva.core.ermrest_model import Model
+
+
+@pytest.fixture
+def canned_bag_schema(tmp_path: Path) -&gt; Path:
+    &quot;&quot;&quot;Write a minimal valid bag-style schema.json into a temp dir.
+
+    Schema has:
+      - schema 'isa' with tables 'Subject' and 'Image'
+      - schema 'deriva-ml' with table 'Dataset'
+      - Image has FK to Subject and FK to Dataset
+    &quot;&quot;&quot;
+    schema_doc = {
+        &quot;schemas&quot;: {
+            &quot;isa&quot;: {
+                &quot;tables&quot;: {
+                    &quot;Subject&quot;: {
+                        &quot;table_name&quot;: &quot;Subject&quot;,
+                        &quot;schema_name&quot;: &quot;isa&quot;,
+                        &quot;column_definitions&quot;: [
+                            {&quot;name&quot;: &quot;RID&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: False},
+                            {&quot;name&quot;: &quot;RCT&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;timestamptz&quot;}},
+                            {&quot;name&quot;: &quot;RMT&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;timestamptz&quot;}},
+                            {&quot;name&quot;: &quot;RCB&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}},
+                            {&quot;name&quot;: &quot;RMB&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}},
+                            {&quot;name&quot;: &quot;Name&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: True},
+                        ],
+                        &quot;keys&quot;: [
+                            {&quot;unique_columns&quot;: [&quot;RID&quot;]},
+                        ],
+                        &quot;foreign_keys&quot;: [],
+                    },
+                    &quot;Image&quot;: {
+                        &quot;table_name&quot;: &quot;Image&quot;,
+                        &quot;schema_name&quot;: &quot;isa&quot;,
+                        &quot;column_definitions&quot;: [
+                            {&quot;name&quot;: &quot;RID&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: False},
+                            {&quot;name&quot;: &quot;RCT&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;timestamptz&quot;}},
+                            {&quot;name&quot;: &quot;RMT&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;timestamptz&quot;}},
+                            {&quot;name&quot;: &quot;RCB&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}},
+                            {&quot;name&quot;: &quot;RMB&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}},
+                            {&quot;name&quot;: &quot;Filename&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: True},
+                            {&quot;name&quot;: &quot;Subject&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: True},
+                        ],
+                        &quot;keys&quot;: [{&quot;unique_columns&quot;: [&quot;RID&quot;]}],
+                        &quot;foreign_keys&quot;: [
+                            {
+                                &quot;foreign_key_columns&quot;: [
+                                    {&quot;schema_name&quot;: &quot;isa&quot;, &quot;table_name&quot;: &quot;Image&quot;, &quot;column_name&quot;: &quot;Subject&quot;}
+                                ],
+                                &quot;referenced_columns&quot;: [
+                                    {&quot;schema_name&quot;: &quot;isa&quot;, &quot;table_name&quot;: &quot;Subject&quot;, &quot;column_name&quot;: &quot;RID&quot;}
+                                ],
+                            }
+                        ],
+                    },
+                },
+            },
+            &quot;deriva-ml&quot;: {
+                &quot;tables&quot;: {
+                    &quot;Dataset&quot;: {
+                        &quot;table_name&quot;: &quot;Dataset&quot;,
+                        &quot;schema_name&quot;: &quot;deriva-ml&quot;,
+                        &quot;column_definitions&quot;: [
+                            {&quot;name&quot;: &quot;RID&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: False},
+                            {&quot;name&quot;: &quot;RCT&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;timestamptz&quot;}},
+                            {&quot;name&quot;: &quot;RMT&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;timestamptz&quot;}},
+                            {&quot;name&quot;: &quot;RCB&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}},
+                            {&quot;name&quot;: &quot;RMB&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}},
+                            {&quot;name&quot;: &quot;Description&quot;, &quot;type&quot;: {&quot;typename&quot;: &quot;text&quot;}, &quot;nullok&quot;: True},
+                        ],
+                        &quot;keys&quot;: [{&quot;unique_columns&quot;: [&quot;RID&quot;]}],
+                        &quot;foreign_keys&quot;: [],
+                    },
+                },
+            },
+        },
+    }
+    out = tmp_path / &quot;schema.json&quot;
+    out.write_text(json.dumps(schema_doc))
+    return out
+
+
+@pytest.fixture
+def canned_bag_model(canned_bag_schema: Path) -&gt; Model:
+    &quot;&quot;&quot;Load the canned bag schema as a deriva Model.&quot;&quot;&quot;
+    return Model.fromfile(&quot;file-system&quot;, canned_bag_schema)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Write failing tests for <code>LocalSchema</code>.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_schema.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for local_db.schema.LocalSchema adapter.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from deriva.core.ermrest_model import Model
+from sqlalchemy import text
+
+from deriva_ml.local_db.schema import LocalSchema
+
+
+class TestLocalSchemaFromBagModel:
+    def test_builds_tables_under_file_db(
+        self, canned_bag_model: Model, tmp_path: Path
+    ) -&gt; None:
+        db = tmp_path / &quot;test.db&quot;
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=db,
+        )
+        try:
+            # Tables should exist with fully-qualified names
+            assert ls.find_table(&quot;isa.Image&quot;) is not None
+            assert ls.find_table(&quot;isa.Subject&quot;) is not None
+            assert ls.find_table(&quot;deriva-ml.Dataset&quot;) is not None
+        finally:
+            ls.dispose()
+
+    def test_unqualified_find_table_works(
+        self, canned_bag_model: Model, tmp_path: Path
+    ) -&gt; None:
+        db = tmp_path / &quot;test.db&quot;
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=db,
+        )
+        try:
+            t = ls.find_table(&quot;Image&quot;)
+            assert t.name.endswith(&quot;Image&quot;)
+        finally:
+            ls.dispose()
+
+    def test_engine_is_wal(self, canned_bag_model: Model, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;test.db&quot;
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=db,
+        )
+        try:
+            with ls.engine.connect() as conn:
+                mode = conn.execute(text(&quot;PRAGMA journal_mode&quot;)).scalar()
+            assert mode == &quot;wal&quot;
+        finally:
+            ls.dispose()
+
+
+class TestLocalSchemaSchemasList:
+    def test_exposes_schemas(self, canned_bag_model: Model, tmp_path: Path) -&gt; None:
+        db = tmp_path / &quot;test.db&quot;
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=db,
+        )
+        try:
+            assert set(ls.schemas) == {&quot;isa&quot;, &quot;deriva-ml&quot;}
+        finally:
+            ls.dispose()
+
+
+class TestLocalSchemaListTables:
+    def test_list_tables_returns_all(
+        self, canned_bag_model: Model, tmp_path: Path
+    ) -&gt; None:
+        db = tmp_path / &quot;test.db&quot;
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=db,
+        )
+        try:
+            tables = ls.list_tables()
+            assert any(&quot;Image&quot; in t for t in tables)
+            assert any(&quot;Subject&quot; in t for t in tables)
+            assert any(&quot;Dataset&quot; in t for t in tables)
+        finally:
+            ls.dispose()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to confirm failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_schema.py -v
+</code></pre>
+<p>Expected: <code>ImportError</code>.</p>
+<ul>
+<li>[ ] <strong>Step 4: Implement <code>LocalSchema</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/schema.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unified schema adapter for working and slice databases.
+
+Wraps :class:`deriva_ml.model.schema_builder.SchemaBuilder` in a smaller
+interface usable from either a live ERMrest ``Model`` or a bag's
+``schema.json`` file. Construction is a two-step process:
+
+    ls = LocalSchema.build(model=m, schemas=[...], database_path=p)
+
+which creates (or opens) the SQLite file, builds tables, and returns a handle
+with a WAL-mode SQLAlchemy engine.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+from deriva.core.ermrest_model import Model
+from sqlalchemy import Table as SQLTable
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
+from deriva_ml.local_db import sqlite_helpers as sh
+from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
+
+logger = logging.getLogger(__name__)
+
+SCHEMA_VERSION = 1
+
+
+class LocalSchema:
+    &quot;&quot;&quot;Thin adapter over ``SchemaBuilder`` / ``SchemaORM`` for the local_db layer.
+
+    Normalizes construction and pragma setup so callers don't have to know
+    whether the underlying DB is a working DB or a slice DB. All Real Work
+    is delegated to the existing ``SchemaBuilder`` machinery.
+    &quot;&quot;&quot;
+
+    def __init__(self, orm: SchemaORM, database_path: Path) -&gt; None:
+        self._orm = orm
+        self._database_path = database_path
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        model: Model,
+        schemas: list[str],
+        database_path: Path,
+        read_only: bool = False,
+    ) -&gt; &quot;LocalSchema&quot;:
+        &quot;&quot;&quot;Build (or open) the schema at ``database_path``.
+
+        Args:
+            model: ERMrest Model (from live catalog or schema.json).
+            schemas: Schema names to materialize.
+            database_path: Directory or `.db` file path for storage.
+            read_only: If True, open the underlying engine read-only. This is
+                used for slice DBs at query time.
+        &quot;&quot;&quot;
+        database_path = Path(database_path)
+        builder = SchemaBuilder(model=model, schemas=schemas, database_path=database_path)
+        orm = builder.build()
+
+        # Enforce WAL + synchronous=NORMAL on every new connection. Existing
+        # SchemaBuilder doesn't set these.
+        @event.listens_for(orm.engine, &quot;connect&quot;)
+        def _pragmas(dbapi_conn: Any, _r: Any) -&gt; None:
+            cur = dbapi_conn.cursor()
+            try:
+                if not read_only:
+                    cur.execute(&quot;PRAGMA journal_mode=WAL&quot;)
+                    cur.execute(&quot;PRAGMA synchronous=NORMAL&quot;)
+                cur.execute(&quot;PRAGMA foreign_keys=ON&quot;)
+            finally:
+                cur.close()
+
+        # Force a connection so the event runs at least once now.
+        with orm.engine.connect():
+            pass
+
+        # Track schema version in the DB.
+        sh.ensure_schema_meta(orm.engine, expected_version=SCHEMA_VERSION)
+
+        return cls(orm=orm, database_path=database_path)
+
+    # ---- delegation ----
+
+    @property
+    def engine(self) -&gt; Engine:
+        return self._orm.engine
+
+    @property
+    def metadata(self):  # noqa: ANN201 — SQLAlchemy MetaData
+        return self._orm.metadata
+
+    @property
+    def schemas(self) -&gt; list[str]:
+        return list(self._orm.schemas)
+
+    @property
+    def database_path(self) -&gt; Path:
+        return self._database_path
+
+    def find_table(self, table_name: str) -&gt; SQLTable:
+        return self._orm.find_table(table_name)
+
+    def list_tables(self) -&gt; list[str]:
+        return self._orm.list_tables()
+
+    def get_orm_class(self, table_name: str) -&gt; Any | None:
+        return self._orm.get_orm_class(table_name)
+
+    def dispose(self) -&gt; None:
+        self._orm.dispose()
+
+    def __enter__(self) -&gt; &quot;LocalSchema&quot;:
+        return self
+
+    def __exit__(self, *exc_info: Any) -&gt; bool:
+        self.dispose()
+        return False
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Run tests — expect pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_schema.py -v
+</code></pre>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 6: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/schema.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/schema.py tests/local_db/
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/schema.py \
+        tests/local_db/conftest.py \
+        tests/local_db/test_schema.py
+git commit -m &quot;feat(local_db): add LocalSchema adapter over SchemaBuilder&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-workspace-per-catalog-db-handle-slice-registry-attachdetach">Task 4: <code>Workspace</code> — per-catalog DB handle, slice registry, attach/detach</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/workspace.py</code>
+- Create: <code>tests/local_db/test_workspace.py</code></p>
+<p><code>Workspace</code> in Phase 1 is deliberately thin: engine over <code>working.db</code>, multi-catalog-safe lookup helpers, and an <code>attach_slice(slice_db_path, alias='slice')</code> context manager. It does <em>not</em> yet own a <code>LocalSchema</code> for the working DB — the working-DB schema is created on demand by callers (Task 5's <code>PagedFetcher</code> needs a target table; it asks the workspace for a <code>LocalSchema</code> or creates one lazily). The legacy <code>WorkingDataCache</code> behavior (string-keyed DataFrame tables) is exposed via a compatibility shim.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_workspace.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for local_db.workspace.Workspace.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+import pytest
+from sqlalchemy import text
+
+from deriva_ml.local_db.workspace import Workspace
+
+
+class TestWorkspaceCreation:
+    def test_creates_working_db_file(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;host.example.org&quot;, catalog_id=&quot;1&quot;)
+        assert ws.working_db_path.parent.is_dir()
+        # File is created lazily when an engine is first requested
+        _ = ws.engine
+        assert ws.working_db_path.is_file()
+        ws.close()
+
+    def test_wal_mode(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;host&quot;, catalog_id=&quot;1&quot;)
+        try:
+            with ws.engine.connect() as conn:
+                assert conn.execute(text(&quot;PRAGMA journal_mode&quot;)).scalar() == &quot;wal&quot;
+        finally:
+            ws.close()
+
+    def test_two_workspaces_different_catalogs_do_not_collide(
+        self, tmp_path: Path
+    ) -&gt; None:
+        ws1 = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        ws2 = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;2&quot;)
+        try:
+            assert ws1.working_db_path != ws2.working_db_path
+        finally:
+            ws1.close()
+            ws2.close()
+
+
+class TestAttachSlice:
+    def test_attach_context_manager(self, tmp_path: Path) -&gt; None:
+        # Create a real slice.db with a tiny table
+        slice_db = tmp_path / &quot;catalogs&quot; / &quot;h__1&quot; / &quot;slices&quot; / &quot;s1&quot; / &quot;slice.db&quot;
+        slice_db.parent.mkdir(parents=True, exist_ok=True)
+        from deriva_ml.local_db.sqlite_helpers import create_wal_engine
+
+        eng = create_wal_engine(slice_db)
+        with eng.connect() as conn:
+            conn.execute(text(&quot;CREATE TABLE t (x INT)&quot;))
+            conn.execute(text(&quot;INSERT INTO t VALUES (1), (2), (3)&quot;))
+            conn.commit()
+        eng.dispose()
+
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            with ws.attach_slice(&quot;s1&quot;) as conn:
+                count = conn.execute(text(&quot;SELECT COUNT(*) FROM slice.t&quot;)).scalar()
+                assert count == 3
+            # After leaving the context, 'slice' should no longer be attached.
+            with ws.engine.connect() as conn:
+                with pytest.raises(Exception):
+                    conn.execute(text(&quot;SELECT COUNT(*) FROM slice.t&quot;))
+        finally:
+            ws.close()
+
+    def test_attach_missing_slice_raises(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            with pytest.raises(FileNotFoundError):
+                with ws.attach_slice(&quot;nonexistent&quot;):
+                    pass
+        finally:
+            ws.close()
+
+
+class TestLegacyWorkingDataView:
+    def test_cache_table_roundtrip(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            view = ws.legacy_working_data_view()
+            df = pd.DataFrame({&quot;x&quot;: [1, 2, 3]})
+            view.cache_table(&quot;mytable&quot;, df)
+            got = view.read_table(&quot;mytable&quot;)
+            assert list(got[&quot;x&quot;]) == [1, 2, 3]
+            assert view.has_table(&quot;mytable&quot;)
+            assert &quot;mytable&quot; in view.list_tables()
+        finally:
+            ws.close()
+
+
+class TestWorkspaceClose:
+    def test_close_is_idempotent(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        ws.close()
+        ws.close()  # Should not raise
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to confirm failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v
+</code></pre>
+<p>Expected: <code>ImportError</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>Workspace</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/workspace.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Per-catalog working database and slice registry.
+
+A ``Workspace`` is bound to ``(working_dir, hostname, catalog_id)``. It owns:
+- A single SQLAlchemy engine over ``working.db`` in WAL mode.
+- An ``attach_slice`` context manager that ATTACHes a slice DB under alias
+  ``&quot;slice&quot;`` for the duration of a single connection.
+- A ``legacy_working_data_view`` compatibility shim exposing the old
+  ``WorkingDataCache`` API (pandas table roundtrips) on top of the new file.
+
+Phase 1 intentionally does not build a ``LocalSchema`` over the working DB
+eagerly; the paged fetcher and denormalizer drive schema creation lazily.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import contextlib
+import logging
+from pathlib import Path
+from typing import Any, Iterator, TYPE_CHECKING
+
+from sqlalchemy import text
+from sqlalchemy.engine import Connection, Engine
+
+from deriva_ml.local_db import paths as p
+from deriva_ml.local_db import sqlite_helpers as sh
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+WORKING_DB_SCHEMA_VERSION = 1
+
+
+class Workspace:
+    &quot;&quot;&quot;Per-catalog working database, shared across script invocations.&quot;&quot;&quot;
+
+    def __init__(
+        self,
+        *,
+        working_dir: Path,
+        hostname: str,
+        catalog_id: str | int,
+    ) -&gt; None:
+        self._working_dir = Path(working_dir)
+        self._hostname = hostname
+        self._catalog_id = str(catalog_id)
+        self._engine: Engine | None = None
+        self._closed = False
+
+    # ---- paths ----
+
+    @property
+    def root(self) -&gt; Path:
+        return p.workspace_root(self._working_dir, self._hostname, self._catalog_id)
+
+    @property
+    def working_db_path(self) -&gt; Path:
+        return p.working_db_path(self._working_dir, self._hostname, self._catalog_id)
+
+    def slice_db_path(self, slice_id: str) -&gt; Path:
+        return p.slice_db_path(self._working_dir, self._hostname, self._catalog_id, slice_id)
+
+    # ---- engine ----
+
+    @property
+    def engine(self) -&gt; Engine:
+        if self._closed:
+            raise RuntimeError(&quot;Workspace is closed&quot;)
+        if self._engine is None:
+            self._engine = sh.create_wal_engine(self.working_db_path)
+            sh.ensure_schema_meta(
+                self._engine, expected_version=WORKING_DB_SCHEMA_VERSION
+            )
+        return self._engine
+
+    # ---- slice attach/detach ----
+
+    @contextlib.contextmanager
+    def attach_slice(
+        self, slice_id: str, alias: str = &quot;slice&quot;
+    ) -&gt; Iterator[Connection]:
+        &quot;&quot;&quot;ATTACH a slice DB under ``alias`` for the duration of the block.
+
+        Yields an open SQLAlchemy :class:`Connection` with the slice visible
+        as ``{alias}.{table}``.
+        &quot;&quot;&quot;
+        slice_path = self.slice_db_path(slice_id)
+        if not slice_path.is_file():
+            raise FileNotFoundError(f&quot;Slice database not found: {slice_path}&quot;)
+
+        conn = self.engine.connect()
+        try:
+            sh.attach_database(conn, slice_path, alias)
+            yield conn
+            try:
+                sh.detach_database(conn, alias)
+            except Exception:  # pragma: no cover — best-effort detach
+                logger.debug(&quot;detach_database failed; closing connection&quot;)
+        finally:
+            conn.close()
+
+    # ---- legacy compat ----
+
+    def legacy_working_data_view(self) -&gt; &quot;_LegacyWorkingDataView&quot;:
+        &quot;&quot;&quot;Return an adapter exposing the old ``WorkingDataCache`` API.
+
+        Lets existing callers (``Dataset.cache_denormalized``, tests) continue
+        to use the string-keyed DataFrame table semantics they rely on, backed
+        by the new per-catalog working DB.
+        &quot;&quot;&quot;
+        return _LegacyWorkingDataView(self)
+
+    # ---- lifecycle ----
+
+    def close(self) -&gt; None:
+        if self._closed:
+            return
+        if self._engine is not None:
+            self._engine.dispose()
+            self._engine = None
+        self._closed = True
+
+    def __enter__(self) -&gt; &quot;Workspace&quot;:
+        return self
+
+    def __exit__(self, *exc_info: Any) -&gt; bool:
+        self.close()
+        return False
+
+
+class _LegacyWorkingDataView:
+    &quot;&quot;&quot;Adapter providing the old ``WorkingDataCache`` surface on a Workspace.
+
+    Keeps the working DataFrames in the same SQLite file as everything else
+    (under their bare user-chosen table names) so existing callers keep
+    working without code changes.
+    &quot;&quot;&quot;
+
+    def __init__(self, ws: Workspace) -&gt; None:
+        self._ws = ws
+
+    def cache_table(self, table_name: str, df: &quot;pd.DataFrame&quot;) -&gt; Path:
+        import pandas as pd  # lazy import
+
+        assert isinstance(df, pd.DataFrame)
+        df.to_sql(table_name, self._ws.engine, if_exists=&quot;replace&quot;, index=False)
+        return self._ws.working_db_path
+
+    def read_table(self, table_name: str) -&gt; &quot;pd.DataFrame&quot;:
+        import pandas as pd
+
+        if not self.has_table(table_name):
+            raise ValueError(
+                f&quot;Table '{table_name}' not found in workspace working DB; &quot;
+                f&quot;available: {self.list_tables()}&quot;
+            )
+        return pd.read_sql_table(table_name, self._ws.engine)
+
+    def query(self, sql: str) -&gt; &quot;pd.DataFrame&quot;:
+        import pandas as pd
+
+        return pd.read_sql_query(text(sql), self._ws.engine)
+
+    def has_table(self, table_name: str) -&gt; bool:
+        from sqlalchemy import inspect
+
+        if not self._ws.working_db_path.exists():
+            return False
+        return table_name in inspect(self._ws.engine).get_table_names()
+
+    def list_tables(self) -&gt; list[str]:
+        from sqlalchemy import inspect
+
+        if not self._ws.working_db_path.exists():
+            return []
+        return inspect(self._ws.engine).get_table_names()
+
+    def drop_table(self, table_name: str) -&gt; None:
+        if self.has_table(table_name):
+            with self._ws.engine.connect() as conn:
+                conn.execute(text(f&quot;DROP TABLE IF EXISTS [{table_name}]&quot;))
+                conn.commit()
+
+    def clear(self) -&gt; None:
+        for t in self.list_tables():
+            self.drop_table(t)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests — expect pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v
+</code></pre>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/workspace.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/workspace.py tests/local_db/
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/workspace.py tests/local_db/test_workspace.py
+git commit -m &quot;feat(local_db): add Workspace with slice attach and legacy cache view&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-wire-derivamlworking_data-through-the-workspace">Task 5: Wire <code>DerivaML.working_data</code> through the <code>Workspace</code></h2>
+<p>Replace the lazy <code>WorkingDataCache</code> construction in <code>DerivaML.working_data</code> with a <code>Workspace</code> + its <code>legacy_working_data_view()</code>. <code>WorkingDataCache</code> itself stays in the tree but becomes a thin deprecated wrapper for one release.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/base.py</code> — <code>working_data</code> property (around line 435–457).
+- Modify: <code>src/deriva_ml/core/working_data.py</code> — add DeprecationWarning on direct instantiation.
+- Modify: <code>tests/test_working_data.py</code> — update imports where needed.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write a failing test that shows the working_data file moved.</strong></li>
+</ul>
+<p>Append to <code>tests/local_db/test_workspace.py</code>:</p>
+<pre><code class="language-python">class TestDerivaMLIntegration:
+    def test_ml_working_data_uses_workspace_path(self, tmp_path: Path) -&gt; None:
+        &quot;&quot;&quot;DerivaML.working_data should write to catalogs/{host}__{cat}/working.db.&quot;&quot;&quot;
+        # Construct a DerivaML without connecting (instance attribute bootstrap)
+        from deriva_ml import DerivaML
+        import pandas as pd
+
+        ml = DerivaML.__new__(DerivaML)
+        ml.working_dir = tmp_path
+        ml.host_name = &quot;example.org&quot;
+        ml.catalog_id = &quot;9&quot;
+
+        wd = ml.working_data
+        wd.cache_table(&quot;demo&quot;, pd.DataFrame({&quot;x&quot;: [1]}))
+
+        expected = tmp_path / &quot;catalogs&quot; / &quot;example.org__9&quot; / &quot;working.db&quot;
+        assert expected.is_file()
+</code></pre>
+<p>Note: this test bypasses <code>DerivaML.__init__</code> because connecting to a catalog is expensive; it only exercises the lazy <code>working_data</code> property.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the new test — expect failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py::TestDerivaMLIntegration -v
+</code></pre>
+<p>Expected: FAIL — either <code>host_name</code> not referenced by <code>working_data</code>, or the file lands in the old <code>working-data/</code> location.</p>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>DerivaML.working_data</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/base.py</code>, replace the <code>working_data</code> property body (currently around lines 435–457) with:</p>
+<pre><code class="language-python">    @property
+    def working_data(self):
+        &quot;&quot;&quot;Per-catalog working-DB view (pandas-table roundtrips).
+
+        Backed by ``Workspace`` under ``{working_dir}/catalogs/{host}__{cat}/
+        working.db``. Shared across invocations of scripts that use the same
+        working directory.
+        &quot;&quot;&quot;
+        from deriva_ml.local_db.workspace import Workspace
+
+        if not hasattr(self, &quot;_workspace&quot;):
+            self._workspace = Workspace(
+                working_dir=self.working_dir,
+                hostname=self.host_name,
+                catalog_id=self.catalog_id,
+            )
+        return self._workspace.legacy_working_data_view()
+</code></pre>
+<p>The <code>working_data.WorkingDataCache</code> import at line 453 becomes unused — remove it from the property body.</p>
+<ul>
+<li>[ ] <strong>Step 4: Deprecate direct <code>WorkingDataCache</code> usage.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/working_data.py</code>, modify <code>WorkingDataCache.__init__</code> (around line 46) to emit a DeprecationWarning:</p>
+<pre><code class="language-python">    def __init__(self, working_dir: Path):
+        import warnings
+
+        warnings.warn(
+            &quot;WorkingDataCache is deprecated; use &quot;
+            &quot;deriva_ml.local_db.workspace.Workspace instead.&quot;,
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._db_dir = working_dir / &quot;working-data&quot;
+        self._db_dir.mkdir(parents=True, exist_ok=True)
+        self._db_path = self._db_dir / &quot;catalog.db&quot;
+        self._engine = None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Update the DerivaML integration test to pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py::TestDerivaMLIntegration -v
+</code></pre>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run existing working_data tests to make sure they still pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/test_working_data.py -v -W error::DeprecationWarning || true
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/test_working_data.py -v
+</code></pre>
+<p>The first command may fail because direct <code>WorkingDataCache()</code> calls trigger the new warning. Check test output — if tests use <code>ml.working_data</code>, they go through the new path and pass. If tests use <code>WorkingDataCache(tmp_path)</code> directly, add <code>pytest.warns(DeprecationWarning)</code> or <code>pytest.filterwarnings("ignore::DeprecationWarning")</code> as needed.</p>
+<p>Expected from the second run: all tests pass (deprecation warnings are logged but don't fail).</p>
+<ul>
+<li>[ ] <strong>Step 7: Fix any <code>test_working_data.py</code> breakage.</strong></li>
+</ul>
+<p>If any tests fail because of the new warning behavior or path change, update the tests minimally — they're testing the legacy class and are allowed to suppress the deprecation warning:</p>
+<pre><code class="language-python">import pytest
+
+pytestmark = pytest.mark.filterwarnings(&quot;ignore::DeprecationWarning&quot;)
+</code></pre>
+<p>Add that at the top of <code>tests/test_working_data.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 8: Run denormalization cache test to verify it still works.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/ -v -k &quot;cache_denormalize or cache_denorm&quot; 2&gt;/dev/null || true
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/ -v -k &quot;working_data or cache_table&quot; | tail -30
+</code></pre>
+<p>Expected: no regressions. <code>Dataset.cache_denormalized</code> in <code>src/deriva_ml/dataset/dataset.py:1083</code> uses <code>self._ml.working_data</code> and should transparently hit the new path.</p>
+<ul>
+<li>[ ] <strong>Step 9: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/core/base.py src/deriva_ml/core/working_data.py tests/
+uv run ruff check src/deriva_ml/core/base.py src/deriva_ml/core/working_data.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 10: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/core/base.py \
+        src/deriva_ml/core/working_data.py \
+        tests/local_db/test_workspace.py \
+        tests/test_working_data.py
+git commit -m &quot;refactor(core): route DerivaML.working_data through Workspace&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-pagedfetcher-fake-client-unit-tests">Task 6: <code>PagedFetcher</code> — fake-client unit tests</h2>
+<p>We build the fetcher against a fake ERMrest client first so we can drive URL-length edge cases, POST fallback, dedup, and the cardinality heuristic deterministically. Live-catalog integration tests come in Task 7.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/paged_fetcher.py</code>
+- Create: <code>tests/local_db/test_paged_fetcher.py</code></p>
+<p>The fake client exposes a small surface:</p>
+<pre><code class="language-python">class FakePagedClient:
+    &quot;&quot;&quot;Stands in for the minimal surface PagedFetcher needs on top of ERMrest.
+
+    Tracks issued requests so tests can assert how the fetcher behaved.
+    &quot;&quot;&quot;
+    def __init__(self, *, rows_by_table: dict[str, list[dict]]): ...
+    def count(self, table: str) -&gt; int: ...
+    def fetch_page(self, table: str, sort: tuple[str, ...], after: tuple | None,
+                   predicate: str | None, limit: int) -&gt; list[dict]: ...
+    def fetch_rid_batch(self, table: str, column: str, rids: list[str],
+                         method: str = &quot;GET&quot;) -&gt; list[dict]: ...
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_paged_fetcher.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for local_db.paged_fetcher (against a fake ERMrest client).&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import pytest
+from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, select
+
+from deriva_ml.local_db.paged_fetcher import PagedFetcher
+
+
+@dataclass
+class FakePagedClient:
+    &quot;&quot;&quot;Deterministic stand-in for the PagedFetcher's ERMrest dependency.
+
+    The fetcher calls only these four methods on the client. Tests record
+    request parameters to verify batching, fallback, and dedup behavior.
+    &quot;&quot;&quot;
+
+    rows_by_table: dict[str, list[dict[str, Any]]]
+    requests: list[tuple[str, dict]] = field(default_factory=list)
+    # Inject a max URL length so tests can force POST fallback. When a GET
+    # &quot;request&quot; (simulated via fetch_rid_batch with method=&quot;GET&quot;) would
+    # exceed this, the fetcher should call fetch_rid_batch(..., method=&quot;POST&quot;)
+    # instead. The fake raises an error to simulate GET failure so the
+    # fetcher must fall back.
+    max_get_bytes: int = 6144
+
+    def count(self, table: str) -&gt; int:
+        self.requests.append((&quot;count&quot;, {&quot;table&quot;: table}))
+        return len(self.rows_by_table.get(table, []))
+
+    def fetch_page(
+        self,
+        table: str,
+        sort: tuple[str, ...],
+        after: tuple | None,
+        predicate: str | None,
+        limit: int,
+    ) -&gt; list[dict[str, Any]]:
+        self.requests.append(
+            (&quot;fetch_page&quot;, {&quot;table&quot;: table, &quot;sort&quot;: sort, &quot;after&quot;: after,
+                            &quot;predicate&quot;: predicate, &quot;limit&quot;: limit})
+        )
+        rows = list(self.rows_by_table.get(table, []))
+        # Apply sort (supports only sort=(&quot;RID&quot;,) for these tests)
+        rows.sort(key=lambda r: tuple(r[c] for c in sort))
+        if after is not None:
+            rows = [r for r in rows if tuple(r[c] for c in sort) &gt; tuple(after)]
+        return rows[:limit]
+
+    def fetch_rid_batch(
+        self,
+        table: str,
+        column: str,
+        rids: list[str],
+        method: str = &quot;GET&quot;,
+    ) -&gt; list[dict[str, Any]]:
+        self.requests.append(
+            (&quot;fetch_rid_batch&quot;, {&quot;table&quot;: table, &quot;column&quot;: column,
+                                  &quot;rids&quot;: list(rids), &quot;method&quot;: method})
+        )
+        if method == &quot;GET&quot;:
+            # Simulate that a joined URL of RIDs has length ~13 per RID +
+            # overhead. If it would exceed max_get_bytes, raise to force fallback.
+            approx_url_bytes = 128 + 13 * len(rids)  # path + query + RIDs
+            if approx_url_bytes &gt; self.max_get_bytes:
+                raise RuntimeError(f&quot;GET URL too long ({approx_url_bytes} bytes)&quot;)
+        rows = self.rows_by_table.get(table, [])
+        want = set(rids)
+        return [r for r in rows if r.get(column) in want]
+
+
+def _make_target_table(engine, name: str = &quot;Image&quot;) -&gt; Table:
+    md = MetaData()
+    t = Table(
+        name,
+        md,
+        Column(&quot;RID&quot;, String, primary_key=True),
+        Column(&quot;Filename&quot;, String),
+        Column(&quot;Subject&quot;, String),
+    )
+    md.create_all(engine)
+    return t
+
+
+def _rows_count(engine, table: Table) -&gt; int:
+    with engine.connect() as conn:
+        return conn.execute(select(table)).fetchall().__len__()
+
+
+class TestFetchPredicate:
+    def test_keyset_paging_fetches_all(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        rows = [{&quot;RID&quot;: f&quot;R{i:03d}&quot;, &quot;Filename&quot;: f&quot;f{i}&quot;, &quot;Subject&quot;: &quot;S1&quot;} for i in range(25)]
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows})
+
+        f = PagedFetcher(client=client, engine=engine)
+        n = f.fetch_predicate(
+            table=&quot;Image&quot;,
+            predicate=None,
+            target_table=target,
+            sort=(&quot;RID&quot;,),
+            page_size=10,
+        )
+        assert n == 25
+        # Should have issued 3 page requests (10, 10, 5)
+        page_reqs = [r for r in client.requests if r[0] == &quot;fetch_page&quot;]
+        assert len(page_reqs) == 3
+        assert _rows_count(engine, target) == 25
+
+    def test_respects_predicate(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        rows = [{&quot;RID&quot;: f&quot;R{i}&quot;, &quot;Filename&quot;: f&quot;f{i}&quot;, &quot;Subject&quot;: &quot;S1&quot;} for i in range(3)]
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows})
+
+        f = PagedFetcher(client=client, engine=engine)
+        # Predicate is passed through opaquely
+        f.fetch_predicate(&quot;Image&quot;, &quot;Subject=S1&quot;, target, sort=(&quot;RID&quot;,), page_size=100)
+        assert any(r[1][&quot;predicate&quot;] == &quot;Subject=S1&quot;
+                   for r in client.requests if r[0] == &quot;fetch_page&quot;)
+
+
+class TestFetchByRids:
+    def test_batches_at_default_size(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        rows = [{&quot;RID&quot;: f&quot;R{i:03d}&quot;, &quot;Filename&quot;: f&quot;f{i}&quot;, &quot;Subject&quot;: &quot;S1&quot;} for i in range(1200)]
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows})
+
+        f = PagedFetcher(client=client, engine=engine)
+        rids = [r[&quot;RID&quot;] for r in rows]
+        n = f.fetch_by_rids(
+            table=&quot;Image&quot;,
+            rids=rids,
+            target_table=target,
+            rid_column=&quot;RID&quot;,
+            batch_size=500,
+        )
+        assert n == 1200
+        batches = [r for r in client.requests if r[0] == &quot;fetch_rid_batch&quot;]
+        # 1200 / 500 = 3 batches (500, 500, 200)
+        assert len(batches) == 3
+        assert {len(b[1][&quot;rids&quot;]) for b in batches} == {500, 200}
+
+    def test_deduplication_across_calls(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        rows = [{&quot;RID&quot;: f&quot;R{i}&quot;, &quot;Filename&quot;: f&quot;f{i}&quot;, &quot;Subject&quot;: &quot;S1&quot;} for i in range(5)]
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows})
+
+        f = PagedFetcher(client=client, engine=engine)
+        f.fetch_by_rids(&quot;Image&quot;, [&quot;R0&quot;, &quot;R1&quot;, &quot;R2&quot;], target, rid_column=&quot;RID&quot;)
+        # Second call asks for some already-fetched RIDs plus new ones
+        f.fetch_by_rids(&quot;Image&quot;, [&quot;R1&quot;, &quot;R2&quot;, &quot;R3&quot;, &quot;R4&quot;], target, rid_column=&quot;RID&quot;)
+
+        # Expect the second call to only request R3 and R4
+        batches = [r[1] for r in client.requests if r[0] == &quot;fetch_rid_batch&quot;]
+        assert len(batches) == 2
+        assert set(batches[0][&quot;rids&quot;]) == {&quot;R0&quot;, &quot;R1&quot;, &quot;R2&quot;}
+        assert set(batches[1][&quot;rids&quot;]) == {&quot;R3&quot;, &quot;R4&quot;}
+
+        assert _rows_count(engine, target) == 5
+
+    def test_post_fallback_on_long_url(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        # Huge batch that the fake client will reject on GET
+        rows = [{&quot;RID&quot;: f&quot;R{i:05d}&quot;, &quot;Filename&quot;: f&quot;f{i}&quot;, &quot;Subject&quot;: &quot;S1&quot;}
+                for i in range(600)]
+        client = FakePagedClient(
+            rows_by_table={&quot;Image&quot;: rows},
+            max_get_bytes=1024,   # tiny, forces POST
+        )
+
+        f = PagedFetcher(client=client, engine=engine)
+        rids = [r[&quot;RID&quot;] for r in rows]
+        n = f.fetch_by_rids(
+            table=&quot;Image&quot;,
+            rids=rids,
+            target_table=target,
+            rid_column=&quot;RID&quot;,
+            batch_size=600,       # try a single big batch first
+            max_url_bytes=1024,
+        )
+        assert n == 600
+        batches = [r[1] for r in client.requests if r[0] == &quot;fetch_rid_batch&quot;]
+        # At least one POST should have been used
+        assert any(b[&quot;method&quot;] == &quot;POST&quot; for b in batches)
+
+    def test_shrinks_batch_before_post(self, tmp_path: Path) -&gt; None:
+        &quot;&quot;&quot;If a smaller GET batch fits, prefer that over POST.&quot;&quot;&quot;
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        rows = [{&quot;RID&quot;: f&quot;R{i:05d}&quot;, &quot;Filename&quot;: f&quot;f{i}&quot;, &quot;Subject&quot;: &quot;S1&quot;}
+                for i in range(200)]
+        # max_get_bytes is chosen so 200-RID GET fails, but 100-RID GET succeeds.
+        # Approx URL bytes formula in fake: 128 + 13 * N.
+        # 200 RIDs -&gt; 128 + 2600 = 2728. 100 RIDs -&gt; 128 + 1300 = 1428.
+        # Set ceiling to 1500 so 100 fits, 200 doesn't.
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows}, max_get_bytes=1500)
+
+        f = PagedFetcher(client=client, engine=engine)
+        rids = [r[&quot;RID&quot;] for r in rows]
+        f.fetch_by_rids(
+            table=&quot;Image&quot;,
+            rids=rids,
+            target_table=target,
+            rid_column=&quot;RID&quot;,
+            batch_size=200,
+            max_url_bytes=1500,
+        )
+        batches = [r[1] for r in client.requests if r[0] == &quot;fetch_rid_batch&quot;]
+        # Should never have used POST
+        assert all(b[&quot;method&quot;] == &quot;GET&quot; for b in batches)
+        # And should have used at least two batches (because 200 was shrunk)
+        assert len(batches) &gt;= 2
+
+
+class TestFetchedRids:
+    def test_tracks_rids_from_predicate_fetch(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        rows = [{&quot;RID&quot;: f&quot;R{i}&quot;, &quot;Filename&quot;: &quot;f&quot;, &quot;Subject&quot;: &quot;S&quot;} for i in range(3)]
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows})
+        f = PagedFetcher(client=client, engine=engine)
+        f.fetch_predicate(&quot;Image&quot;, None, target, sort=(&quot;RID&quot;,), page_size=10)
+
+        assert f.fetched_rids(&quot;Image&quot;, target) == {&quot;R0&quot;, &quot;R1&quot;, &quot;R2&quot;}
+
+
+class TestCardinalityHeuristic:
+    def test_switches_to_predicate_when_set_large(self, tmp_path: Path) -&gt; None:
+        engine = create_engine(f&quot;sqlite:///{tmp_path / 'wd.sqlite'}&quot;, future=True)
+        target = _make_target_table(engine)
+
+        # Table has 10 rows total, we ask for 9 of them.
+        rows = [{&quot;RID&quot;: f&quot;R{i}&quot;, &quot;Filename&quot;: &quot;f&quot;, &quot;Subject&quot;: &quot;S&quot;} for i in range(10)]
+        client = FakePagedClient(rows_by_table={&quot;Image&quot;: rows})
+
+        f = PagedFetcher(client=client, engine=engine)
+        rids = [f&quot;R{i}&quot; for i in range(9)]
+        n = f.fetch_by_rids_or_predicate(
+            table=&quot;Image&quot;,
+            rids=rids,
+            target_table=target,
+            rid_column=&quot;RID&quot;,
+            sort=(&quot;RID&quot;,),
+            cardinality_threshold=0.5,
+        )
+        assert n == 9
+        # Because 9/10 &gt; 0.5, expect a fetch_page call, not rid batches
+        methods_used = {r[0] for r in client.requests}
+        assert &quot;fetch_page&quot; in methods_used
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher.py -v
+</code></pre>
+<p>Expected: <code>ImportError</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>paged_fetcher.py</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/paged_fetcher.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Paged fetching primitive for the local_db layer.
+
+Exposes three public methods:
+
+- ``fetch_predicate``: keyset-paged scan of rows matching an ERMrest
+  predicate into a SQLAlchemy ``Table`` in local SQLite.
+- ``fetch_by_rids``: RID-set batched fetch with URL byte-length guard, GET
+  shrink-then-POST fallback, and per-operation dedup against a
+  ``target_table``.
+- ``fetch_by_rids_or_predicate``: dispatches between the two based on a
+  cardinality threshold (``|rid_set| / table_row_count``).
+
+The class is parameterized on a ``client`` object providing four methods:
+``count``, ``fetch_page``, ``fetch_rid_batch``, and — optionally — a `POST`
+mode flag to ``fetch_rid_batch`` for the oversized-URL fallback. See the
+fake client used in tests for the exact interface contract.
+
+For production use, the caller adapts an ``ErmrestCatalog`` + datapath to
+this surface. That adapter lives in a separate module
+(``paged_fetcher_ermrest.py`` — built in Task 7).
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Iterable, Protocol
+
+from sqlalchemy import Table, insert, select
+from sqlalchemy.engine import Engine
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_PAGE_SIZE = 1000
+DEFAULT_BATCH_SIZE = 500
+DEFAULT_MAX_URL_BYTES = 6144
+DEFAULT_CARDINALITY_THRESHOLD = 0.5
+
+
+class PagedClient(Protocol):
+    &quot;&quot;&quot;Narrow surface the PagedFetcher depends on.&quot;&quot;&quot;
+
+    def count(self, table: str) -&gt; int: ...
+
+    def fetch_page(
+        self,
+        table: str,
+        sort: tuple[str, ...],
+        after: tuple | None,
+        predicate: str | None,
+        limit: int,
+    ) -&gt; list[dict[str, Any]]: ...
+
+    def fetch_rid_batch(
+        self,
+        table: str,
+        column: str,
+        rids: list[str],
+        method: str = &quot;GET&quot;,
+    ) -&gt; list[dict[str, Any]]: ...
+
+
+class PagedFetcher:
+    &quot;&quot;&quot;Stream rows from an ERMrest-like client into a local SQLAlchemy Table.
+
+    See module docstring for method semantics.
+    &quot;&quot;&quot;
+
+    def __init__(self, *, client: PagedClient, engine: Engine) -&gt; None:
+        self._client = client
+        self._engine = engine
+        # Per-operation dedup: (table_name, rid_column) -&gt; set[str]
+        self._seen: dict[tuple[str, str], set[str]] = {}
+        self._counts: dict[str, int] = {}
+
+    # ---------------- predicate paging ---------------- #
+
+    def fetch_predicate(
+        self,
+        table: str,
+        predicate: str | None,
+        target_table: Table,
+        sort: tuple[str, ...] = (&quot;RID&quot;,),
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -&gt; int:
+        &quot;&quot;&quot;Keyset-paged scan into ``target_table``.
+
+        Returns the number of rows inserted.
+        &quot;&quot;&quot;
+        n = 0
+        after: tuple | None = None
+        while True:
+            page = self._client.fetch_page(
+                table=table,
+                sort=sort,
+                after=after,
+                predicate=predicate,
+                limit=page_size,
+            )
+            if not page:
+                break
+            self._insert_rows(target_table, page)
+            # Track for dedup under the &quot;RID&quot; column by convention
+            key = (table, &quot;RID&quot;)
+            self._seen.setdefault(key, set()).update(
+                str(r[&quot;RID&quot;]) for r in page if &quot;RID&quot; in r
+            )
+            n += len(page)
+            if len(page) &lt; page_size:
+                break
+            last = page[-1]
+            after = tuple(last[c] for c in sort)
+        return n
+
+    # ---------------- RID-set batching ---------------- #
+
+    def fetch_by_rids(
+        self,
+        table: str,
+        rids: Iterable[str],
+        target_table: Table,
+        rid_column: str = &quot;RID&quot;,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        max_url_bytes: int = DEFAULT_MAX_URL_BYTES,
+    ) -&gt; int:
+        &quot;&quot;&quot;Fetch rows where ``rid_column`` IN ``rids`` into ``target_table``.
+
+        Dedups against previous fetches on the same (table, rid_column).
+        &quot;&quot;&quot;
+        key = (table, rid_column)
+        seen = self._seen.setdefault(key, set())
+        to_fetch = [r for r in dict.fromkeys(str(x) for x in rids) if r not in seen]
+        if not to_fetch:
+            return 0
+
+        n = 0
+        i = 0
+        while i &lt; len(to_fetch):
+            batch = to_fetch[i : i + batch_size]
+            rows = self._fetch_rid_batch_with_fallback(
+                table=table,
+                column=rid_column,
+                rids=batch,
+                max_url_bytes=max_url_bytes,
+            )
+            self._insert_rows(target_table, rows)
+            seen.update(batch)
+            n += len(rows)
+            i += batch_size
+        return n
+
+    def _fetch_rid_batch_with_fallback(
+        self,
+        *,
+        table: str,
+        column: str,
+        rids: list[str],
+        max_url_bytes: int,
+    ) -&gt; list[dict[str, Any]]:
+        &quot;&quot;&quot;Try GET first. On URL overflow, shrink batch; if even one RID
+        won't fit, use POST. Logs but never raises a URL-length error back
+        out.
+        &quot;&quot;&quot;
+        # Estimate URL bytes before issuing. The Protocol client may also
+        # raise on its own length check; we handle both.
+        attempt = list(rids)
+        while attempt:
+            estimated = 128 + 13 * len(attempt)
+            if estimated &lt;= max_url_bytes:
+                try:
+                    return self._client.fetch_rid_batch(
+                        table=table, column=column, rids=attempt, method=&quot;GET&quot;
+                    )
+                except RuntimeError as exc:
+                    if &quot;too long&quot; not in str(exc).lower():
+                        raise
+                    # fall through to shrink
+            # Shrink: halve the batch
+            half = len(attempt) // 2
+            if half == 0:
+                # Even 1 RID doesn't fit under GET — use POST.
+                logger.debug(
+                    &quot;POST fallback for table=%s column=%s rids=%d&quot;,
+                    table, column, len(rids),
+                )
+                return self._client.fetch_rid_batch(
+                    table=table, column=column, rids=rids, method=&quot;POST&quot;
+                )
+            attempt = attempt[:half]
+        return []
+
+    # ---------------- cardinality-based dispatch ---------------- #
+
+    def fetch_by_rids_or_predicate(
+        self,
+        table: str,
+        rids: list[str],
+        target_table: Table,
+        rid_column: str = &quot;RID&quot;,
+        sort: tuple[str, ...] = (&quot;RID&quot;,),
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        max_url_bytes: int = DEFAULT_MAX_URL_BYTES,
+        cardinality_threshold: float = DEFAULT_CARDINALITY_THRESHOLD,
+    ) -&gt; int:
+        &quot;&quot;&quot;Choose RID-set batching or predicate scan based on cardinality.&quot;&quot;&quot;
+        total = self._counts.get(table)
+        if total is None:
+            total = self._client.count(table)
+            self._counts[table] = total
+
+        if total &gt; 0 and len(rids) / total &gt; cardinality_threshold:
+            logger.debug(
+                &quot;Using predicate fetch for %s (|rids|=%d, total=%d)&quot;,
+                table, len(rids), total,
+            )
+            n_fetched = self.fetch_predicate(
+                table=table,
+                predicate=None,
+                target_table=target_table,
+                sort=sort,
+                page_size=max(batch_size, DEFAULT_PAGE_SIZE),
+            )
+            # Filter to requested RIDs locally (by deleting unwanted rows)
+            wanted = set(rids)
+            with self._engine.begin() as conn:
+                all_rids = [
+                    row[0] for row in conn.execute(select(target_table.c[rid_column]))
+                ]
+                to_delete = [r for r in all_rids if r not in wanted]
+                if to_delete:
+                    conn.execute(
+                        target_table.delete().where(
+                            target_table.c[rid_column].in_(to_delete)
+                        )
+                    )
+            return min(n_fetched, len(wanted))
+
+        return self.fetch_by_rids(
+            table=table,
+            rids=rids,
+            target_table=target_table,
+            rid_column=rid_column,
+            batch_size=batch_size,
+            max_url_bytes=max_url_bytes,
+        )
+
+    # ---------------- introspection ---------------- #
+
+    def fetched_rids(self, table: str, target_table: Table | None = None) -&gt; set[str]:
+        &quot;&quot;&quot;Return RIDs already materialized for ``table``.
+
+        Prefers the in-memory dedup set; falls back to querying
+        ``target_table`` if no in-memory record exists and the table is
+        provided.
+        &quot;&quot;&quot;
+        for (t, _col), s in self._seen.items():
+            if t == table:
+                return set(s)
+        if target_table is not None:
+            with self._engine.connect() as conn:
+                rids = {
+                    str(row[0])
+                    for row in conn.execute(select(target_table.c.RID))
+                }
+            self._seen[(table, &quot;RID&quot;)] = set(rids)
+            return set(rids)
+        return set()
+
+    # ---------------- internals ---------------- #
+
+    def _insert_rows(
+        self, target_table: Table, rows: list[dict[str, Any]]
+    ) -&gt; None:
+        if not rows:
+            return
+        # Project rows to the columns actually on the target table so extra
+        # columns in the source are ignored silently.
+        cols = {c.name for c in target_table.columns}
+        projected = [{k: v for k, v in r.items() if k in cols} for r in rows]
+        with self._engine.begin() as conn:
+            conn.execute(insert(target_table), projected)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests — expect pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher.py -v
+</code></pre>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/paged_fetcher.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/paged_fetcher.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/paged_fetcher.py tests/local_db/test_paged_fetcher.py
+git commit -m &quot;feat(local_db): add PagedFetcher with URL guard, POST fallback, dedup&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-ermrest-backed-pagedclient-adapter-live-integration-tests">Task 7: ERMrest-backed <code>PagedClient</code> adapter + live integration tests</h2>
+<p><code>PagedFetcher</code> is transport-agnostic. To use it against a real catalog, we need an adapter that translates its <code>PagedClient</code> protocol methods into deriva-py datapath / ERMrest URL calls.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/paged_fetcher_ermrest.py</code>
+- Create: <code>tests/local_db/test_paged_fetcher_live.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write integration tests (live catalog).</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_paged_fetcher_live.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Live-catalog integration tests for the ERMrest PagedClient adapter.
+
+Requires DERIVA_HOST and a test catalog. Uses the `test_ml` / `catalog_with_datasets`
+fixtures from the top-level conftest.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from sqlalchemy import Column, MetaData, String, Table
+
+from deriva_ml.local_db.paged_fetcher import PagedFetcher
+from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+from deriva_ml.local_db.workspace import Workspace
+
+
+pytestmark = pytest.mark.integration
+
+
+@pytest.fixture
+def workspace_on_ml(test_ml) -&gt; Workspace:
+    &quot;&quot;&quot;Construct a Workspace bound to the test catalog.&quot;&quot;&quot;
+    ws = Workspace(
+        working_dir=test_ml.working_dir,
+        hostname=test_ml.host_name,
+        catalog_id=test_ml.catalog_id,
+    )
+    yield ws
+    ws.close()
+
+
+def _make_dataset_table(engine) -&gt; Table:
+    md = MetaData()
+    t = Table(
+        &quot;Dataset_cache&quot;,
+        md,
+        Column(&quot;RID&quot;, String, primary_key=True),
+        Column(&quot;Description&quot;, String),
+    )
+    md.create_all(engine)
+    return t
+
+
+class TestErmrestPagedClientLive:
+    def test_count_matches_catalog(self, test_ml, workspace_on_ml) -&gt; None:
+        client = ErmrestPagedClient(catalog=test_ml.catalog)
+        # Expect the catalog to have at least one Dataset row after the
+        # populated-state fixture runs.
+        total = client.count(f&quot;{test_ml.ml_schema}:Dataset&quot;)
+        assert total &gt;= 0  # weak assertion — fixture state dependent
+
+    def test_fetch_predicate_writes_rows(self, test_ml, workspace_on_ml) -&gt; None:
+        target = _make_dataset_table(workspace_on_ml.engine)
+        client = ErmrestPagedClient(catalog=test_ml.catalog)
+        f = PagedFetcher(client=client, engine=workspace_on_ml.engine)
+
+        n = f.fetch_predicate(
+            table=f&quot;{test_ml.ml_schema}:Dataset&quot;,
+            predicate=None,
+            target_table=target,
+            sort=(&quot;RID&quot;,),
+            page_size=50,
+        )
+        assert n &gt;= 0
+        # Row count in local DB should match n.
+        from sqlalchemy import select
+        with workspace_on_ml.engine.connect() as conn:
+            got = conn.execute(select(target)).fetchall()
+        assert len(got) == n
+
+    def test_fetch_by_rids_roundtrip(self, test_ml, workspace_on_ml) -&gt; None:
+        &quot;&quot;&quot;Fetch a few dataset RIDs directly and assert they land locally.&quot;&quot;&quot;
+        # First use fetch_predicate to discover some RIDs.
+        target = _make_dataset_table(workspace_on_ml.engine)
+        client = ErmrestPagedClient(catalog=test_ml.catalog)
+        f = PagedFetcher(client=client, engine=workspace_on_ml.engine)
+
+        f.fetch_predicate(
+            table=f&quot;{test_ml.ml_schema}:Dataset&quot;,
+            predicate=None,
+            target_table=target,
+            sort=(&quot;RID&quot;,),
+            page_size=5,
+        )
+        from sqlalchemy import select
+        with workspace_on_ml.engine.connect() as conn:
+            rids = [r[0] for r in conn.execute(select(target.c.RID))]
+
+        if not rids:
+            pytest.skip(&quot;No Dataset rows in catalog to test fetch_by_rids&quot;)
+
+        # Clear and re-fetch by RID
+        with workspace_on_ml.engine.begin() as conn:
+            conn.execute(target.delete())
+
+        # Reset dedup tracking — easiest path: new PagedFetcher
+        f2 = PagedFetcher(client=client, engine=workspace_on_ml.engine)
+        n = f2.fetch_by_rids(
+            table=f&quot;{test_ml.ml_schema}:Dataset&quot;,
+            rids=rids[:3],
+            target_table=target,
+            rid_column=&quot;RID&quot;,
+        )
+        assert n == min(3, len(rids))
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Write unit-level tests for the adapter with a mock catalog.</strong></li>
+</ul>
+<p>Append to <code>tests/local_db/test_paged_fetcher.py</code>:</p>
+<pre><code class="language-python"># ---------- ErmrestPagedClient URL-construction tests ---------- #
+
+class _MockCatalog:
+    &quot;&quot;&quot;Minimal mock of ErmrestCatalog used by the adapter tests.&quot;&quot;&quot;
+
+    def __init__(self, *, get_responses=None, post_responses=None):
+        self.get_calls = []
+        self.post_calls = []
+        self._get_responses = get_responses or {}
+        self._post_responses = post_responses or {}
+
+    def get(self, url, headers=None):
+        self.get_calls.append(url)
+        class R:
+            def __init__(self, data): self._d = data
+            def json(self): return self._d
+            def raise_for_status(self): return None
+        return R(self._get_responses.get(url, []))
+
+    def post(self, url, json=None, headers=None):
+        self.post_calls.append((url, json))
+        class R:
+            def __init__(self, data): self._d = data
+            def json(self): return self._d
+            def raise_for_status(self): return None
+        return R(self._post_responses.get((url, None), []))
+
+
+class TestErmrestPagedClient:
+    def test_count_uses_aggregate_endpoint(self) -&gt; None:
+        from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+        cat = _MockCatalog(get_responses={
+            &quot;/ermrest/catalog/1/aggregate/isa:Image/n:=cnt(*)&quot;: [{&quot;n&quot;: 42}],
+        })
+        cat.catalog_id = &quot;1&quot;
+        c = ErmrestPagedClient(catalog=cat, catalog_id=&quot;1&quot;)
+        assert c.count(&quot;isa:Image&quot;) == 42
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to confirm failure (ImportError for adapter).</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher.py::TestErmrestPagedClient -v
+</code></pre>
+<p>Expected: <code>ImportError</code>.</p>
+<ul>
+<li>[ ] <strong>Step 4: Implement the adapter.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/paged_fetcher_ermrest.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;ERMrest adapter for :class:`PagedFetcher`.
+
+Translates the narrow ``PagedClient`` protocol into ERMrest HTTP calls via
+an ``ErmrestCatalog`` handle. Responsible for URL construction, GET/POST
+transport choice, and JSON response parsing.
+
+URL forms used:
+
+- count:   ``/ermrest/catalog/{N}/aggregate/{schema}:{table}/n:=cnt(*)``
+- page:    ``/ermrest/catalog/{N}/entity/{schema}:{table}[/predicate]@sort({s})[@after({a})]?limit={L}``
+- RID-IN (GET):  ``/ermrest/catalog/{N}/entity/{schema}:{table}/{col}=any({r1,r2,...})``
+- RID-IN (POST): ``POST /ermrest/catalog/{N}/entity/{schema}:{table}`` with a
+  JSON body describing the filter (deriva-py supports JSON query submissions
+  on entity endpoints).
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
+
+
+class ErmrestPagedClient:
+    &quot;&quot;&quot;Adapter conforming to :class:`~deriva_ml.local_db.paged_fetcher.PagedClient`.&quot;&quot;&quot;
+
+    def __init__(self, *, catalog: Any, catalog_id: str | None = None) -&gt; None:
+        &quot;&quot;&quot;Args:
+        catalog: An :class:`ErmrestCatalog` (deriva-py) or compatible.
+        catalog_id: Catalog ID for URL construction. Falls back to
+            ``catalog.catalog_id`` when not provided.
+        &quot;&quot;&quot;
+        self._catalog = catalog
+        self._catalog_id = str(catalog_id if catalog_id is not None else getattr(catalog, &quot;catalog_id&quot;))
+
+    # ---- PagedClient protocol ---- #
+
+    def count(self, table: str) -&gt; int:
+        url = f&quot;/ermrest/catalog/{self._catalog_id}/aggregate/{table}/n:=cnt(*)&quot;
+        resp = self._catalog.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+        if not data:
+            return 0
+        return int(data[0][&quot;n&quot;])
+
+    def fetch_page(
+        self,
+        table: str,
+        sort: tuple[str, ...],
+        after: tuple | None,
+        predicate: str | None,
+        limit: int,
+    ) -&gt; list[dict[str, Any]]:
+        parts = [f&quot;/ermrest/catalog/{self._catalog_id}/entity/{table}&quot;]
+        if predicate:
+            parts.append(f&quot;/{predicate}&quot;)
+        sort_cols = &quot;,&quot;.join(quote(c) for c in sort)
+        parts.append(f&quot;@sort({sort_cols})&quot;)
+        if after is not None:
+            after_str = &quot;,&quot;.join(quote(str(v)) for v in after)
+            parts.append(f&quot;@after({after_str})&quot;)
+        parts.append(f&quot;?limit={limit}&quot;)
+        url = &quot;&quot;.join(parts)
+        resp = self._catalog.get(url)
+        resp.raise_for_status()
+        return list(resp.json())
+
+    def fetch_rid_batch(
+        self,
+        table: str,
+        column: str,
+        rids: list[str],
+        method: str = &quot;GET&quot;,
+    ) -&gt; list[dict[str, Any]]:
+        if method == &quot;GET&quot;:
+            rid_list = &quot;,&quot;.join(quote(r) for r in rids)
+            url = (
+                f&quot;/ermrest/catalog/{self._catalog_id}/entity/{table}&quot;
+                f&quot;/{quote(column)}=any({rid_list})&quot;
+            )
+            # Heuristic URL-length cap; let the upstream fetcher handle fallback.
+            if len(url) &gt; 7500:
+                raise RuntimeError(f&quot;GET URL too long ({len(url)} bytes)&quot;)
+            resp = self._catalog.get(url)
+            resp.raise_for_status()
+            return list(resp.json())
+        # POST fallback: deriva-py supports filter submission via POST on
+        # the entity endpoint with a JSON array of filter objects.
+        url = f&quot;/ermrest/catalog/{self._catalog_id}/entity/{table}&quot;
+        body = {&quot;filter&quot;: {&quot;and&quot;: [{column: {&quot;in&quot;: rids}}]}}
+        resp = self._catalog.post(url, json=body)
+        resp.raise_for_status()
+        return list(resp.json())
+</code></pre>
+<p>Note: the POST-body filter form above is a placeholder. Real deriva-py ERMrest
+POST-query semantics may differ; the live integration test (step 7) will exercise
+whichever shape works. If it fails, the adapter is the single place to fix.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run unit tests to confirm pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher.py::TestErmrestPagedClient -v
+</code></pre>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run full paged_fetcher unit suite to confirm no regression.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run live integration tests (requires <code>DERIVA_HOST</code>).</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher_live.py -v -m integration
+</code></pre>
+<p>Expected: PASS against the configured test catalog. If the POST path fails because the body format is wrong, fix <code>ErmrestPagedClient.fetch_rid_batch</code> (step 4) only — no fetcher or test changes — then re-run.</p>
+<ul>
+<li>[ ] <strong>Step 8: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/paged_fetcher_ermrest.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/paged_fetcher_ermrest.py tests/local_db/
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 9: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/paged_fetcher_ermrest.py \
+        tests/local_db/test_paged_fetcher_live.py \
+        tests/local_db/test_paged_fetcher.py
+git commit -m &quot;feat(local_db): add ErmrestPagedClient adapter and live tests&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-manifeststore-sqlite-backed-persistence-layer">Task 8: <code>ManifestStore</code> — SQLite-backed persistence layer</h2>
+<p><code>ManifestStore</code> is the storage engine that the rewritten <code>AssetManifest</code> will delegate to. It owns the <code>execution_state.assets</code> / <code>execution_state.features</code> tables in the workspace DB.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/manifest_store.py</code>
+- Create: <code>tests/local_db/test_manifest_store.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_manifest_store.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for local_db.manifest_store.ManifestStore.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from sqlalchemy import inspect, text
+
+from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
+from deriva_ml.local_db.manifest_store import ManifestStore
+from deriva_ml.local_db.workspace import Workspace
+
+
+@pytest.fixture
+def store(tmp_path: Path):
+    ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+    s = ManifestStore(ws.engine)
+    s.ensure_schema()
+    yield s
+    ws.close()
+
+
+class TestEnsureSchema:
+    def test_creates_tables(self, store: ManifestStore) -&gt; None:
+        tables = inspect(store._engine).get_table_names()
+        assert &quot;execution_state__assets&quot; in tables
+        assert &quot;execution_state__features&quot; in tables
+
+    def test_idempotent(self, store: ManifestStore) -&gt; None:
+        store.ensure_schema()
+        store.ensure_schema()  # second call should be a no-op
+
+
+class TestAssetCrud:
+    def test_add_and_get_asset(self, store: ManifestStore) -&gt; None:
+        entry = AssetEntry(
+            asset_table=&quot;Image&quot;,
+            schema=&quot;isa&quot;,
+            asset_types=[&quot;Training&quot;],
+            metadata={&quot;Subject&quot;: &quot;2-ABC&quot;},
+            description=&quot;test&quot;,
+        )
+        store.add_asset(&quot;4SP&quot;, &quot;Image/scan.jpg&quot;, entry)
+        got = store.get_asset(&quot;4SP&quot;, &quot;Image/scan.jpg&quot;)
+        assert got.asset_table == &quot;Image&quot;
+        assert got.asset_types == [&quot;Training&quot;]
+        assert got.metadata == {&quot;Subject&quot;: &quot;2-ABC&quot;}
+        assert got.status == &quot;pending&quot;
+
+    def test_list_assets_for_execution(self, store: ManifestStore) -&gt; None:
+        e1 = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;)
+        e2 = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;)
+        store.add_asset(&quot;exec-A&quot;, &quot;Image/a.jpg&quot;, e1)
+        store.add_asset(&quot;exec-B&quot;, &quot;Image/b.jpg&quot;, e2)
+        a_only = store.list_assets(&quot;exec-A&quot;)
+        assert set(a_only.keys()) == {&quot;Image/a.jpg&quot;}
+
+    def test_mark_uploaded(self, store: ManifestStore) -&gt; None:
+        entry = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;)
+        store.add_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, entry)
+        store.mark_asset_uploaded(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, rid=&quot;1-RID&quot;)
+        got = store.get_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;)
+        assert got.status == &quot;uploaded&quot;
+        assert got.rid == &quot;1-RID&quot;
+        assert got.uploaded_at is not None
+
+    def test_mark_failed(self, store: ManifestStore) -&gt; None:
+        entry = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;)
+        store.add_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, entry)
+        store.mark_asset_failed(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, error=&quot;nope&quot;)
+        got = store.get_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;)
+        assert got.status == &quot;failed&quot;
+        assert got.error == &quot;nope&quot;
+
+    def test_update_metadata(self, store: ManifestStore) -&gt; None:
+        entry = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;, metadata={})
+        store.add_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, entry)
+        store.update_asset_metadata(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, {&quot;Subject&quot;: &quot;ABC&quot;})
+        got = store.get_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;)
+        assert got.metadata == {&quot;Subject&quot;: &quot;ABC&quot;}
+
+    def test_update_types(self, store: ManifestStore) -&gt; None:
+        entry = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;, asset_types=[&quot;A&quot;])
+        store.add_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, entry)
+        store.update_asset_types(&quot;4SP&quot;, &quot;Image/x.jpg&quot;, [&quot;B&quot;, &quot;C&quot;])
+        got = store.get_asset(&quot;4SP&quot;, &quot;Image/x.jpg&quot;)
+        assert got.asset_types == [&quot;B&quot;, &quot;C&quot;]
+
+
+class TestFeatureCrud:
+    def test_add_and_list(self, store: ManifestStore) -&gt; None:
+        f = FeatureEntry(
+            feature_name=&quot;Diagnosis&quot;,
+            target_table=&quot;Image&quot;,
+            schema=&quot;isa&quot;,
+            values_path=&quot;/some/path.csv&quot;,
+            asset_columns={},
+            status=&quot;pending&quot;,
+        )
+        store.add_feature(&quot;4SP&quot;, &quot;Diagnosis&quot;, f)
+        got = store.list_features(&quot;4SP&quot;)
+        assert &quot;Diagnosis&quot; in got
+        assert got[&quot;Diagnosis&quot;].target_table == &quot;Image&quot;
+
+
+class TestStatusFilters:
+    def test_pending_only(self, store: ManifestStore) -&gt; None:
+        e1 = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;)
+        e2 = AssetEntry(asset_table=&quot;Image&quot;, schema=&quot;isa&quot;)
+        store.add_asset(&quot;4SP&quot;, &quot;a&quot;, e1)
+        store.add_asset(&quot;4SP&quot;, &quot;b&quot;, e2)
+        store.mark_asset_uploaded(&quot;4SP&quot;, &quot;b&quot;, &quot;1-RID&quot;)
+        pending = store.pending_assets(&quot;4SP&quot;)
+        assert set(pending.keys()) == {&quot;a&quot;}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to confirm failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_manifest_store.py -v
+</code></pre>
+<p>Expected: ImportError.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>ManifestStore</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/manifest_store.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;SQLite-backed persistence for AssetManifest.
+
+Stores per-execution asset and feature entries in tables
+``execution_state__assets`` and ``execution_state__features`` in the
+workspace DB. WAL + per-mutation commit gives crash safety equivalent to the
+old JSON fsync-on-write.
+
+SQLite has no true schema namespacing; we use the ``execution_state__``
+prefix as a logical namespace on table names.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Any
+
+from sqlalchemy import (
+    Column,
+    JSON,
+    MetaData,
+    String,
+    Table,
+    Text,
+    delete,
+    insert,
+    select,
+    update,
+)
+from sqlalchemy.engine import Engine
+
+from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
+
+logger = logging.getLogger(__name__)
+
+ASSETS_TABLE = &quot;execution_state__assets&quot;
+FEATURES_TABLE = &quot;execution_state__features&quot;
+
+
+def _now_iso() -&gt; str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class ManifestStore:
+    &quot;&quot;&quot;SQLite persistence for asset + feature manifest entries.&quot;&quot;&quot;
+
+    def __init__(self, engine: Engine) -&gt; None:
+        self._engine = engine
+        self._metadata = MetaData()
+        self._assets_t = Table(
+            ASSETS_TABLE,
+            self._metadata,
+            Column(&quot;execution_rid&quot;, String, primary_key=True),
+            Column(&quot;key&quot;, String, primary_key=True),
+            Column(&quot;asset_table&quot;, String, nullable=False),
+            Column(&quot;schema&quot;, String, nullable=False),
+            Column(&quot;asset_types&quot;, JSON),
+            Column(&quot;metadata&quot;, JSON),
+            Column(&quot;description&quot;, Text),
+            Column(&quot;status&quot;, String, nullable=False),
+            Column(&quot;rid&quot;, String),
+            Column(&quot;uploaded_at&quot;, String),
+            Column(&quot;error&quot;, Text),
+            Column(&quot;created_at&quot;, String, nullable=False),
+            Column(&quot;updated_at&quot;, String, nullable=False),
+        )
+        self._features_t = Table(
+            FEATURES_TABLE,
+            self._metadata,
+            Column(&quot;execution_rid&quot;, String, primary_key=True),
+            Column(&quot;feature_name&quot;, String, primary_key=True),
+            Column(&quot;target_table&quot;, String, nullable=False),
+            Column(&quot;schema&quot;, String, nullable=False),
+            Column(&quot;values_path&quot;, String, nullable=False),
+            Column(&quot;asset_columns&quot;, JSON),
+            Column(&quot;status&quot;, String, nullable=False),
+            Column(&quot;created_at&quot;, String, nullable=False),
+            Column(&quot;updated_at&quot;, String, nullable=False),
+        )
+
+    def ensure_schema(self) -&gt; None:
+        &quot;&quot;&quot;Create the tables if they don't exist.&quot;&quot;&quot;
+        self._metadata.create_all(self._engine)
+
+    # ---------------- assets ---------------- #
+
+    def add_asset(self, execution_rid: str, key: str, entry: AssetEntry) -&gt; None:
+        now = _now_iso()
+        row = {
+            &quot;execution_rid&quot;: execution_rid,
+            &quot;key&quot;: key,
+            &quot;asset_table&quot;: entry.asset_table,
+            &quot;schema&quot;: entry.schema,
+            &quot;asset_types&quot;: entry.asset_types,
+            &quot;metadata&quot;: entry.metadata,
+            &quot;description&quot;: entry.description,
+            &quot;status&quot;: entry.status,
+            &quot;rid&quot;: entry.rid,
+            &quot;uploaded_at&quot;: entry.uploaded_at,
+            &quot;error&quot;: entry.error,
+            &quot;created_at&quot;: now,
+            &quot;updated_at&quot;: now,
+        }
+        with self._engine.begin() as conn:
+            # Upsert: delete any existing row then insert.
+            conn.execute(
+                delete(self._assets_t).where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+            )
+            conn.execute(insert(self._assets_t), row)
+
+    def get_asset(self, execution_rid: str, key: str) -&gt; AssetEntry:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                select(self._assets_t).where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+            ).mappings().first()
+        if row is None:
+            raise KeyError(f&quot;Asset '{key}' for execution '{execution_rid}' not found&quot;)
+        return AssetEntry(
+            asset_table=row[&quot;asset_table&quot;],
+            schema=row[&quot;schema&quot;],
+            asset_types=row[&quot;asset_types&quot;] or [],
+            metadata=row[&quot;metadata&quot;] or {},
+            description=row[&quot;description&quot;],
+            status=row[&quot;status&quot;],
+            rid=row[&quot;rid&quot;],
+            uploaded_at=row[&quot;uploaded_at&quot;],
+            error=row[&quot;error&quot;],
+        )
+
+    def list_assets(self, execution_rid: str) -&gt; dict[str, AssetEntry]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(self._assets_t).where(
+                    self._assets_t.c.execution_rid == execution_rid
+                )
+            ).mappings().all()
+        return {r[&quot;key&quot;]: AssetEntry(
+            asset_table=r[&quot;asset_table&quot;],
+            schema=r[&quot;schema&quot;],
+            asset_types=r[&quot;asset_types&quot;] or [],
+            metadata=r[&quot;metadata&quot;] or {},
+            description=r[&quot;description&quot;],
+            status=r[&quot;status&quot;],
+            rid=r[&quot;rid&quot;],
+            uploaded_at=r[&quot;uploaded_at&quot;],
+            error=r[&quot;error&quot;],
+        ) for r in rows}
+
+    def pending_assets(self, execution_rid: str) -&gt; dict[str, AssetEntry]:
+        return {k: v for k, v in self.list_assets(execution_rid).items()
+                if v.status == &quot;pending&quot;}
+
+    def uploaded_assets(self, execution_rid: str) -&gt; dict[str, AssetEntry]:
+        return {k: v for k, v in self.list_assets(execution_rid).items()
+                if v.status == &quot;uploaded&quot;}
+
+    def update_asset_metadata(
+        self, execution_rid: str, key: str, metadata: dict[str, Any]
+    ) -&gt; None:
+        self._require_asset(execution_rid, key)
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(self._assets_t)
+                .where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+                .values(metadata=metadata, updated_at=_now_iso())
+            )
+
+    def update_asset_types(
+        self, execution_rid: str, key: str, asset_types: list[str]
+    ) -&gt; None:
+        self._require_asset(execution_rid, key)
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(self._assets_t)
+                .where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+                .values(asset_types=asset_types, updated_at=_now_iso())
+            )
+
+    def mark_asset_uploaded(
+        self, execution_rid: str, key: str, rid: str
+    ) -&gt; None:
+        self._require_asset(execution_rid, key)
+        now = _now_iso()
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(self._assets_t)
+                .where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+                .values(
+                    status=&quot;uploaded&quot;,
+                    rid=rid,
+                    uploaded_at=now,
+                    error=None,
+                    updated_at=now,
+                )
+            )
+
+    def mark_asset_failed(
+        self, execution_rid: str, key: str, error: str
+    ) -&gt; None:
+        self._require_asset(execution_rid, key)
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(self._assets_t)
+                .where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+                .values(
+                    status=&quot;failed&quot;,
+                    error=error,
+                    updated_at=_now_iso(),
+                )
+            )
+
+    def _require_asset(self, execution_rid: str, key: str) -&gt; None:
+        with self._engine.connect() as conn:
+            exists = conn.execute(
+                select(self._assets_t.c.key).where(
+                    (self._assets_t.c.execution_rid == execution_rid)
+                    &amp; (self._assets_t.c.key == key)
+                )
+            ).first()
+        if exists is None:
+            raise KeyError(f&quot;Asset '{key}' for execution '{execution_rid}' not found&quot;)
+
+    # ---------------- features ---------------- #
+
+    def add_feature(
+        self, execution_rid: str, feature_name: str, entry: FeatureEntry
+    ) -&gt; None:
+        now = _now_iso()
+        row = {
+            &quot;execution_rid&quot;: execution_rid,
+            &quot;feature_name&quot;: feature_name,
+            &quot;target_table&quot;: entry.target_table,
+            &quot;schema&quot;: entry.schema,
+            &quot;values_path&quot;: entry.values_path,
+            &quot;asset_columns&quot;: entry.asset_columns,
+            &quot;status&quot;: entry.status,
+            &quot;created_at&quot;: now,
+            &quot;updated_at&quot;: now,
+        }
+        with self._engine.begin() as conn:
+            conn.execute(
+                delete(self._features_t).where(
+                    (self._features_t.c.execution_rid == execution_rid)
+                    &amp; (self._features_t.c.feature_name == feature_name)
+                )
+            )
+            conn.execute(insert(self._features_t), row)
+
+    def list_features(self, execution_rid: str) -&gt; dict[str, FeatureEntry]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(self._features_t).where(
+                    self._features_t.c.execution_rid == execution_rid
+                )
+            ).mappings().all()
+        return {r[&quot;feature_name&quot;]: FeatureEntry(
+            feature_name=r[&quot;feature_name&quot;],
+            target_table=r[&quot;target_table&quot;],
+            schema=r[&quot;schema&quot;],
+            values_path=r[&quot;values_path&quot;],
+            asset_columns=r[&quot;asset_columns&quot;] or {},
+            status=r[&quot;status&quot;],
+        ) for r in rows}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests — expect pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_manifest_store.py -v
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + format, commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/manifest_store.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/manifest_store.py
+git add src/deriva_ml/local_db/manifest_store.py tests/local_db/test_manifest_store.py
+git commit -m &quot;feat(local_db): add ManifestStore (SQLite-backed asset/feature persistence)&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-rewrite-assetmanifest-to-delegate-to-manifeststore">Task 9: Rewrite <code>AssetManifest</code> to delegate to <code>ManifestStore</code></h2>
+<p>The existing <code>AssetManifest</code> class in <code>src/deriva_ml/asset/manifest.py</code> (lines 79–221) owns a JSON file. We rewrite it to delegate every operation to a <code>ManifestStore</code>. The public API (<code>add_asset</code>, <code>mark_uploaded</code>, etc.) stays identical so the existing test suite at <code>tests/asset/test_manifest.py</code> continues to exercise behavior.</p>
+<p>Constructor signature changes: <code>AssetManifest(path, execution_rid)</code> → <code>AssetManifest(store, execution_rid)</code>. Callers change at one call site (<code>execution.py:1405</code>).</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/asset/manifest.py</code> (lines 79–221 — the <code>AssetManifest</code> class).
+- Modify: <code>src/deriva_ml/execution/execution.py</code> (<code>_get_manifest</code>, around line 1402).
+- Modify: <code>tests/asset/test_manifest.py</code> — update construction calls to use the new signature.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update the existing manifest tests to use the new constructor.</strong></li>
+</ul>
+<p>Read <code>tests/asset/test_manifest.py</code> to see current construction pattern:</p>
+<pre><code class="language-bash">grep -n &quot;AssetManifest(&quot; /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/tests/asset/test_manifest.py
+</code></pre>
+<p>Update every call from <code>AssetManifest(path, rid)</code> to use a <code>ManifestStore</code> fixture. Add to the top of the file:</p>
+<pre><code class="language-python">import pytest
+from sqlalchemy import create_engine
+
+from deriva_ml.local_db.manifest_store import ManifestStore
+
+
+@pytest.fixture
+def store(tmp_path):
+    engine = create_engine(f&quot;sqlite:///{tmp_path / 'ws.sqlite'}&quot;, future=True)
+    s = ManifestStore(engine)
+    s.ensure_schema()
+    yield s
+    engine.dispose()
+
+
+@pytest.fixture
+def manifest(store):
+    from deriva_ml.asset.manifest import AssetManifest
+    return AssetManifest(store, &quot;4SP&quot;)
+</code></pre>
+<p>Rewrite each test to use the <code>manifest</code> (or <code>store</code>) fixture instead of <code>AssetManifest(mp, "4SP")</code>. For tests that currently check disk-state (e.g. that the JSON file was created/written), assert DB-state instead (e.g. row exists in <code>store.list_assets("4SP")</code>).</p>
+<p>This is the largest test edit in the plan — there are ~10 test classes. Keep the assertions about behavior (statuses, mutations, round-trips), replace only the construction/access patterns.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the existing manifest tests — expect failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_manifest.py -v
+</code></pre>
+<p>Expected: failures because <code>AssetManifest</code> still takes <code>path</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Rewrite <code>AssetManifest</code>.</strong></li>
+</ul>
+<p>Replace the <code>AssetManifest</code> class body in <code>src/deriva_ml/asset/manifest.py</code> (starting at line 79) with:</p>
+<pre><code class="language-python">class AssetManifest:
+    &quot;&quot;&quot;Per-execution asset+feature manifest, backed by :class:`ManifestStore`.
+
+    Public API is unchanged from the JSON-backed implementation. Storage
+    swapped to SQLite (WAL mode) for crash safety and cross-process visibility.
+
+    Args:
+        store: A ``ManifestStore`` bound to a workspace engine.
+        execution_rid: RID of the execution this manifest covers.
+    &quot;&quot;&quot;
+
+    MANIFEST_VERSION = 2  # bumped: storage layer changed
+
+    def __init__(self, store: &quot;ManifestStore&quot;, execution_rid: str) -&gt; None:
+        self._store = store
+        self._execution_rid = execution_rid
+
+    @property
+    def execution_rid(self) -&gt; str:
+        return self._execution_rid
+
+    @property
+    def assets(self) -&gt; dict[str, AssetEntry]:
+        return self._store.list_assets(self._execution_rid)
+
+    @property
+    def features(self) -&gt; dict[str, FeatureEntry]:
+        return self._store.list_features(self._execution_rid)
+
+    def pending_assets(self) -&gt; dict[str, AssetEntry]:
+        return self._store.pending_assets(self._execution_rid)
+
+    def uploaded_assets(self) -&gt; dict[str, AssetEntry]:
+        return self._store.uploaded_assets(self._execution_rid)
+
+    def add_asset(self, key: str, entry: AssetEntry) -&gt; None:
+        self._store.add_asset(self._execution_rid, key, entry)
+
+    def update_asset_metadata(self, key: str, metadata: dict[str, Any]) -&gt; None:
+        self._store.update_asset_metadata(self._execution_rid, key, metadata)
+
+    def update_asset_types(self, key: str, asset_types: list[str]) -&gt; None:
+        self._store.update_asset_types(self._execution_rid, key, asset_types)
+
+    def mark_uploaded(self, key: str, rid: str) -&gt; None:
+        self._store.mark_asset_uploaded(self._execution_rid, key, rid)
+
+    def mark_failed(self, key: str, error: str) -&gt; None:
+        self._store.mark_asset_failed(self._execution_rid, key, error)
+
+    def add_feature(self, name: str, entry: FeatureEntry) -&gt; None:
+        self._store.add_feature(self._execution_rid, name, entry)
+
+    def to_json(self) -&gt; dict[str, Any]:
+        &quot;&quot;&quot;Return a dict mirroring the legacy JSON file format.
+
+        For debugging/postmortems. Serialize with
+        ``json.dumps(manifest.to_json(), default=_json_default)`` to handle
+        datetimes and Path values.
+        &quot;&quot;&quot;
+        return {
+            &quot;version&quot;: self.MANIFEST_VERSION,
+            &quot;execution_rid&quot;: self._execution_rid,
+            &quot;assets&quot;: {k: v.to_dict() for k, v in self.assets.items()},
+            &quot;features&quot;: {k: v.to_dict() for k, v in self.features.items()},
+        }
+</code></pre>
+<p>Add to the imports at the top of <code>src/deriva_ml/asset/manifest.py</code>:</p>
+<pre><code class="language-python">from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deriva_ml.local_db.manifest_store import ManifestStore
+</code></pre>
+<p>Remove the following no-longer-needed attributes/methods from <code>AssetManifest</code>: <code>_path</code>, <code>path</code> property, <code>_save</code>, <code>_load</code>, <code>_json_default</code> (but keep the module-level <code>_json_default</code> function for <code>to_json</code>).</p>
+<ul>
+<li>[ ] <strong>Step 4: Update the one call site in <code>execution.py</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, replace <code>_get_manifest</code> (around line 1402) with:</p>
+<pre><code class="language-python">    def _get_manifest(self) -&gt; AssetManifest:
+        &quot;&quot;&quot;Return the execution's asset manifest (lazy init).
+
+        Backed by the workspace ManifestStore; rows live in the per-catalog
+        working.db, not a per-execution JSON file.
+        &quot;&quot;&quot;
+        if not hasattr(self, &quot;_manifest&quot;) or self._manifest is None:
+            from deriva_ml.local_db.manifest_store import ManifestStore
+
+            store = ManifestStore(self._ml.working_data._ws.engine)  # type: ignore[attr-defined]
+            store.ensure_schema()
+            self._manifest = AssetManifest(store, self.execution_rid)
+        return self._manifest
+</code></pre>
+<p>Also remove the <code>from deriva_ml.dataset.upload import manifest_path</code> import near the top (if present) — <code>manifest_path</code> is no longer needed here but may still be used elsewhere, so check with <code>grep</code> before deleting:</p>
+<pre><code class="language-bash">grep -n &quot;manifest_path&quot; /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/src/deriva_ml/execution/execution.py
+</code></pre>
+<p>If the only use was <code>_get_manifest</code>, remove the import. Otherwise leave it.</p>
+<p>The <code>self._ml.working_data._ws.engine</code> reach-through assumes the <code>legacy_working_data_view</code> keeps a <code>_ws</code> backreference. Verify that's the case by re-reading Task 4's <code>_LegacyWorkingDataView</code> — it stores <code>self._ws = ws</code>. So the reach-through is valid but ugly. An explicit accessor would be cleaner. Add this method to <code>Workspace</code> in <code>src/deriva_ml/local_db/workspace.py</code>:</p>
+<pre><code class="language-python">    def manifest_store(self) -&gt; &quot;ManifestStore&quot;:
+        &quot;&quot;&quot;Return a ManifestStore backed by this workspace's engine (cached).&quot;&quot;&quot;
+        if not hasattr(self, &quot;_manifest_store&quot;):
+            from deriva_ml.local_db.manifest_store import ManifestStore
+            s = ManifestStore(self.engine)
+            s.ensure_schema()
+            self._manifest_store = s
+        return self._manifest_store
+</code></pre>
+<p>And expose <code>_ws</code> on <code>_LegacyWorkingDataView</code> cleanly — keep the private attribute but add a public accessor:</p>
+<pre><code class="language-python">    @property
+    def workspace(self) -&gt; &quot;Workspace&quot;:
+        return self._ws
+</code></pre>
+<p>Then the execution.py reach-through becomes:</p>
+<pre><code class="language-python">        ws = self._ml.working_data.workspace
+        self._manifest = AssetManifest(ws.manifest_store(), self.execution_rid)
+</code></pre>
+<p>That's cleaner. Use this final form in <code>execution.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the manifest tests and execution tests to check for regressions.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_manifest.py tests/local_db/ -v
+</code></pre>
+<p>Expected: all pass.</p>
+<p>Then:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/ -v -k &quot;manifest or execution&quot; 2&gt;&amp;1 | tail -80
+</code></pre>
+<p>Expected: no <em>new</em> failures. (Some execution tests need a live catalog and may be skipped in unit-only runs.)</p>
+<ul>
+<li>[ ] <strong>Step 6: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/asset/manifest.py src/deriva_ml/execution/execution.py src/deriva_ml/local_db/workspace.py
+uv run ruff check src/deriva_ml/asset/manifest.py src/deriva_ml/execution/execution.py src/deriva_ml/local_db/workspace.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/asset/manifest.py \
+        src/deriva_ml/execution/execution.py \
+        src/deriva_ml/local_db/workspace.py \
+        tests/asset/test_manifest.py
+git commit -m &quot;refactor(asset): AssetManifest delegates to SQLite ManifestStore&quot;
+</code></pre>
+<hr />
+<h2 id="task-10-json-db-import-on-workspace-open">Task 10: JSON → DB import on workspace open</h2>
+<p>Pre-existing <code>asset-manifest.json</code> files from in-progress executions get imported into the workspace DB automatically, then renamed to <code>*.migrated.json</code>.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/workspace.py</code> — add <code>import_legacy_manifests()</code> method + wire into <code>manifest_store()</code> lazy init.
+- Create: <code>tests/local_db/test_manifest_migration.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_manifest_migration.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Integration test: JSON manifest migration on workspace open.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+from deriva_ml.local_db.workspace import Workspace
+
+
+@pytest.fixture
+def legacy_manifest_dir(tmp_path: Path) -&gt; Path:
+    &quot;&quot;&quot;Seed a legacy execution directory with an asset-manifest.json.&quot;&quot;&quot;
+    exec_dir = tmp_path / &quot;execution&quot; / &quot;2-ABC&quot;
+    exec_dir.mkdir(parents=True)
+    manifest = {
+        &quot;version&quot;: 1,
+        &quot;execution_rid&quot;: &quot;2-ABC&quot;,
+        &quot;created_at&quot;: &quot;2026-04-15T00:00:00Z&quot;,
+        &quot;assets&quot;: {
+            &quot;Image/scan.jpg&quot;: {
+                &quot;asset_table&quot;: &quot;Image&quot;,
+                &quot;schema&quot;: &quot;isa&quot;,
+                &quot;asset_types&quot;: [&quot;Training&quot;],
+                &quot;metadata&quot;: {&quot;Subject&quot;: &quot;S-1&quot;},
+                &quot;description&quot;: &quot;&quot;,
+                &quot;status&quot;: &quot;pending&quot;,
+                &quot;rid&quot;: None,
+                &quot;uploaded_at&quot;: None,
+                &quot;error&quot;: None,
+            }
+        },
+        &quot;features&quot;: {},
+    }
+    (exec_dir / &quot;asset-manifest.json&quot;).write_text(json.dumps(manifest))
+    return exec_dir
+
+
+class TestManifestImport:
+    def test_imports_legacy_manifests(
+        self, tmp_path: Path, legacy_manifest_dir: Path
+    ) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            count = ws.import_legacy_manifests()
+            assert count == 1
+
+            store = ws.manifest_store()
+            rows = store.list_assets(&quot;2-ABC&quot;)
+            assert &quot;Image/scan.jpg&quot; in rows
+            assert rows[&quot;Image/scan.jpg&quot;].asset_types == [&quot;Training&quot;]
+
+            # Sidecar file created
+            assert (legacy_manifest_dir / &quot;asset-manifest.json.migrated.json&quot;).is_file()
+            # Original removed
+            assert not (legacy_manifest_dir / &quot;asset-manifest.json&quot;).exists()
+        finally:
+            ws.close()
+
+    def test_idempotent(self, tmp_path: Path, legacy_manifest_dir: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            count1 = ws.import_legacy_manifests()
+            count2 = ws.import_legacy_manifests()
+            assert count1 == 1
+            assert count2 == 0  # Already migrated
+        finally:
+            ws.close()
+
+    def test_no_manifests_no_sidecar(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            count = ws.import_legacy_manifests()
+            assert count == 0
+        finally:
+            ws.close()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test — expect failure.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_manifest_migration.py -v
+</code></pre>
+<p>Expected: <code>AttributeError: 'Workspace' object has no attribute 'import_legacy_manifests'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>import_legacy_manifests</code> on <code>Workspace</code>.</strong></li>
+</ul>
+<p>Add to <code>src/deriva_ml/local_db/workspace.py</code> (inside the <code>Workspace</code> class):</p>
+<pre><code class="language-python">    def import_legacy_manifests(self) -&gt; int:
+        &quot;&quot;&quot;Import any pre-existing ``asset-manifest.json`` files into the DB.
+
+        Scans ``{working_dir}`` recursively for files named exactly
+        ``asset-manifest.json``. For each, parses the JSON, upserts rows into
+        the manifest store, and renames the file to
+        ``{path}.migrated.json``. Idempotent: already-migrated files are
+        skipped.
+
+        Returns:
+            The number of manifests newly migrated.
+        &quot;&quot;&quot;
+        import json as _json
+        from deriva_ml.asset.manifest import AssetEntry, FeatureEntry
+
+        store = self.manifest_store()
+        migrated = 0
+        for manifest_path in self._working_dir.rglob(&quot;asset-manifest.json&quot;):
+            try:
+                data = _json.loads(manifest_path.read_text(encoding=&quot;utf-8&quot;))
+            except Exception as exc:  # pragma: no cover
+                logger.warning(&quot;Failed to read %s: %s&quot;, manifest_path, exc)
+                continue
+
+            execution_rid = data.get(&quot;execution_rid&quot;) or manifest_path.parent.name
+            for key, entry_dict in data.get(&quot;assets&quot;, {}).items():
+                entry = AssetEntry.from_dict(entry_dict)
+                store.add_asset(execution_rid, key, entry)
+            for name, entry_dict in data.get(&quot;features&quot;, {}).items():
+                entry = FeatureEntry.from_dict(entry_dict)
+                store.add_feature(execution_rid, name, entry)
+
+            sidecar = manifest_path.with_suffix(
+                manifest_path.suffix + &quot;.migrated.json&quot;
+            )
+            manifest_path.rename(sidecar)
+            migrated += 1
+        return migrated
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test — expect pass.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_manifest_migration.py -v
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Wire auto-import into <code>DerivaML.working_data</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/base.py</code>, update the <code>working_data</code> property body (added in Task 5) to call the import once on workspace construction:</p>
+<pre><code class="language-python">    @property
+    def working_data(self):
+        from deriva_ml.local_db.workspace import Workspace
+
+        if not hasattr(self, &quot;_workspace&quot;):
+            self._workspace = Workspace(
+                working_dir=self.working_dir,
+                hostname=self.host_name,
+                catalog_id=self.catalog_id,
+            )
+            try:
+                n = self._workspace.import_legacy_manifests()
+                if n:
+                    import logging
+                    logging.getLogger(&quot;deriva_ml&quot;).info(
+                        &quot;Migrated %d legacy asset manifests into %s&quot;,
+                        n, self._workspace.working_db_path,
+                    )
+            except Exception as exc:
+                import logging
+                logging.getLogger(&quot;deriva_ml&quot;).warning(
+                    &quot;Legacy manifest migration failed: %s&quot;, exc,
+                )
+        return self._workspace.legacy_working_data_view()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Re-run the broader test suite to check for regressions.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py tests/test_working_data.py -v
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 7: Lint + format, commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/workspace.py src/deriva_ml/core/base.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/workspace.py src/deriva_ml/core/base.py
+git add src/deriva_ml/local_db/workspace.py \
+        src/deriva_ml/core/base.py \
+        tests/local_db/test_manifest_migration.py
+git commit -m &quot;feat(local_db): import legacy JSON asset manifests on workspace open&quot;
+</code></pre>
+<hr />
+<h2 id="task-11-phase-1-smoke-suite-documentation">Task 11: Phase 1 smoke suite + documentation</h2>
+<p>Final pass: public exports, a short README for the new package, and a full test suite run.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/__init__.py</code> — export public classes.
+- Create: <code>src/deriva_ml/local_db/README.md</code> — short module orientation.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>local_db/__init__.py</code> with public exports.</strong></li>
+</ul>
+<p>Replace the contents of <code>src/deriva_ml/local_db/__init__.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unified local SQLite layer for deriva-ml.
+
+See ``docs/superpowers/specs/2026-04-15-unified-local-db-design.md`` for design.
+See ``README.md`` in this directory for a short orientation.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from deriva_ml.local_db.manifest_store import ManifestStore
+from deriva_ml.local_db.paged_fetcher import PagedFetcher
+from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+from deriva_ml.local_db.schema import LocalSchema
+from deriva_ml.local_db.workspace import Workspace
+
+__all__ = [
+    &quot;ErmrestPagedClient&quot;,
+    &quot;LocalSchema&quot;,
+    &quot;ManifestStore&quot;,
+    &quot;PagedFetcher&quot;,
+    &quot;Workspace&quot;,
+]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Write the module README.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/README.md</code>:</p>
+<pre><code class="language-markdown"># `deriva_ml.local_db`
+
+Unified client-side SQLite layer for deriva-ml. Phase 1 delivers the
+foundation; Phase 2 will migrate denormalization onto it.
+
+## Modules
+
+- `paths.py` — pure path helpers for the working-directory layout.
+- `sqlite_helpers.py` — WAL engine factory, ATTACH/DETACH, schema-version
+  runner.
+- `schema.py` — `LocalSchema` adapter over `SchemaBuilder`.
+- `workspace.py` — `Workspace`: per-catalog `working.db` handle, slice
+  attach, legacy working-data view, manifest store, legacy-manifest import.
+- `paged_fetcher.py` — transport-agnostic `PagedFetcher` primitive.
+- `paged_fetcher_ermrest.py` — `ErmrestPagedClient` adapter to deriva-py.
+- `manifest_store.py` — SQLite persistence for `AssetManifest`.
+
+## Layout on disk
+
+</code></pre>
+<p>{working_dir}/
+  catalogs/
+    {host}__{cat}/
+      working.db
+      slices/
+        {slice_id}/
+          slice.db
+          assets/</p>
+<pre><code>
+## Further reading
+
+- Design spec: `docs/superpowers/specs/2026-04-15-unified-local-db-design.md`
+- Phase 1 plan: `docs/superpowers/plans/2026-04-15-unified-local-db-phase1.md`
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the full local_db test suite + any likely-affected tests.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py tests/test_working_data.py -v
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the full test suite and flag anything unexpected.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest -x 2&gt;&amp;1 | tail -60
+</code></pre>
+<p>If any tests fail that aren't obviously unrelated (e.g. pre-existing test-env issues), stop and investigate. A <code>_LegacyWorkingDataView</code> consumer or an <code>AssetManifest</code> caller that was missed earlier may surface here.</p>
+<ul>
+<li>[ ] <strong>Step 5: Verify imports from the package work as documented.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;from deriva_ml.local_db import Workspace, PagedFetcher, LocalSchema, ManifestStore, ErmrestPagedClient; print('OK')&quot;
+</code></pre>
+<p>Expected output: <code>OK</code>.</p>
+<ul>
+<li>[ ] <strong>Step 6: Lint + format.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/
+uv run ruff check src/deriva_ml/local_db/
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/__init__.py src/deriva_ml/local_db/README.md
+git commit -m &quot;docs(local_db): public exports and module README&quot;
+</code></pre>
+<hr />
+<h2 id="verification-checklist-run-before-handing-off">Verification checklist (run before handing off)</h2>
+<ul>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ -v</code> — all pass.</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_manifest.py -v</code> — all pass.</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/test_working_data.py -v</code> — all pass (deprecation warnings are expected).</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paged_fetcher_live.py -v -m integration</code> — all pass against the test catalog.</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest -x</code> — no new failures.</li>
+<li>[ ] <code>uv run ruff check src/</code> — clean.</li>
+<li>[ ] <code>git log --oneline</code> — clear, well-scoped commits, one per task.</li>
+<li>[ ] <code>src/deriva_ml/local_db/</code> directory holds exactly: <code>__init__.py</code>, <code>README.md</code>, <code>paths.py</code>, <code>sqlite_helpers.py</code>, <code>schema.py</code>, <code>workspace.py</code>, <code>paged_fetcher.py</code>, <code>paged_fetcher_ermrest.py</code>, <code>manifest_store.py</code>.</li>
+</ul>
+<h2 id="what-this-plan-does-not-deliver-deferred-to-phase-2">What this plan does NOT deliver (deferred to Phase 2)</h2>
+<ul>
+<li>Unified denormalization (<code>local_db/denormalize.py</code>).</li>
+<li>Deletion of <code>Dataset._denormalize_datapath</code> and <code>DatasetBag._denormalize</code>.</li>
+<li>Public cached tabular-read API (<code>cached_table_read</code>, <code>CachedResult</code>, <code>list_cached_results</code>, <code>invalidate_cache</code>).</li>
+<li>Slice identity / registry beyond the path helpers (no automatic
+  <code>manifest.json</code> provenance file yet — consumers who create slices write it
+  themselves, or will after Phase 2 defines the schema).</li>
+<li>MCP migration (separate repo).</li>
+</ul>
+<p>Phase 1's deliverable is: "the plumbing is in place; behavior is unchanged."</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

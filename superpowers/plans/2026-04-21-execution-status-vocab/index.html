@@ -1,0 +1,2624 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-21-execution-status-vocab/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Execution_Status Vocabulary Implementation Plan (S1b) - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#execution_status-vocabulary-implementation-plan-s1b" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Execution_Status Vocabulary Implementation Plan (S1b)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#conventions-referenced-throughout-this-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conventions referenced throughout this plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-a-audit-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group A — Audit test
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group A — Audit test">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-a1-vocab-fk-audit-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task A1: Vocab-FK audit test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-b-execution_status-vocab-table-fk-seed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group B — Execution_Status vocab table + FK + seed
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group B — Execution_Status vocab table + FK + seed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-b1-add-execution_status-vocabularytabledef-to-the-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task B1: Add Execution_Status VocabularyTableDef to the schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-b2-add-fk-from-executionstatus-to-execution_statusname" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task B2: Add FK from Execution.Status to Execution_Status.Name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-b3-seed-execution_status-vocabulary-with-the-7-canonical-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task B3: Seed Execution_Status vocabulary with the 7 canonical terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-c-schema-doc-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group C — Schema-doc updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group C — Schema-doc updates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-c1-add-conventions-section-execution_status-doc-entry-update-execution-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task C1: Add Conventions section + Execution_Status doc entry; update Execution entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-c2-verify-s0-structure-tests-still-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task C2: Verify S0 structure tests still pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-d-changelog-final-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group D — CHANGELOG + final review
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group D — CHANGELOG + final review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-d1-changelog-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task D1: CHANGELOG entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-d2-final-review-finish-branch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task D2: Final review + finish branch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-s1b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-S1b
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="execution_status-vocabulary-implementation-plan-s1b">Execution_Status Vocabulary Implementation Plan (S1b)</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Add <code>Execution_Status</code> as a controlled vocabulary table with an FK from <code>Execution.Status</code> → <code>Execution_Status.Name</code>, seeded with the 7 canonical lifecycle terms, documented in the S0 schema doc, and protected by an audit test that enforces the library-wide "FKs to vocabulary tables reference Name, not RID" rule.</p>
+<p><strong>Architecture:</strong> Small schema-doc-first change. Single session. No helper wrappers — deriva-py's <code>Table.define_association</code> default heuristic already picks <code>Name</code> for vocabulary targets (audit of the current schema confirms 100% compliance with zero violations). Two code changes in <code>create_schema.py</code> (add vocab table + add FK to Execution), three doc changes in <code>docs/reference/schema.md</code> (add Conventions section, add <code>Execution_Status</code> section, update <code>Execution</code> section), one new seed call in <code>initialize_ml_schema</code>, one new test asserting the rule. The S0 validator catches any doc ↔ code drift.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, deriva-py (Table.define_association, VocabularyTableDef, ForeignKeyDef), pytest, PyYAML (already a dep).</p>
+<p><strong>Parent specs:</strong>
+- Phase 1: <code>docs/superpowers/specs/2026-04-18-sqlite-execution-state-design.md</code>
+- S1a (status-enum migration): <code>docs/superpowers/specs/2026-04-21-status-enum-reconciliation-design.md</code>
+- S0 (schema-doc source of truth): <code>docs/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design.md</code></p>
+<hr />
+<h2 id="conventions-referenced-throughout-this-plan">Conventions referenced throughout this plan</h2>
+<ul>
+<li><strong>Worktree root:</strong> <code>/Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab/</code>. All paths below are relative to it.</li>
+<li><strong>Environment:</strong> <code>export PATH="/Users/carl/.local/bin:$PATH"</code> if <code>uv</code> not found. <code>DERIVA_ML_ALLOW_DIRTY=true</code> for tests. Live catalog tests need <code>DERIVA_HOST=localhost</code>.</li>
+<li><strong>Doc-first rule (from S0):</strong> every change to <code>src/deriva_ml/schema/create_schema.py</code> requires a matching change to <code>docs/reference/schema.md</code>. CI validator (<code>deriva-ml-validate-schema</code>) enforces.</li>
+<li><strong>Canonical ExecutionStatus values:</strong> <code>Created</code>, <code>Running</code>, <code>Stopped</code>, <code>Failed</code>, <code>Pending_Upload</code>, <code>Uploaded</code>, <code>Aborted</code>. Exact match between the enum in <code>src/deriva_ml/execution/state_store.py</code> and the terms seeded in <code>Execution_Status</code>.</li>
+<li><strong>The vocabulary-FK convention:</strong> "In the <code>deriva-ml</code> schema, every FK that references a vocabulary table references the vocabulary's <code>Name</code> column, not <code>RID</code>." Already universally followed by existing FKs (audit confirmed); this plan documents it and adds a test that will catch future violations.</li>
+</ul>
+<hr />
+<h2 id="task-group-overview">Task Group overview</h2>
+<p>Four task groups, ordered so each produces a working increment.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Scope</th>
+<th>Tasks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td>Audit test (captures current compliance as an assertion)</td>
+<td>1 task</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td><code>Execution_Status</code> vocab table + FK + seed terms</td>
+<td>3 tasks</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>Schema-doc updates + Conventions section</td>
+<td>2 tasks</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>CHANGELOG + final review + finish</td>
+<td>2 tasks</td>
+</tr>
+</tbody>
+</table>
+<p>Total: ~8 tasks.</p>
+<hr />
+<h2 id="task-group-a-audit-test">Task Group A — Audit test</h2>
+<p>Captures the current "all vocab FKs target Name" state as a running test. If a future contributor adds a vocab FK targeting RID, this test fails.</p>
+<h3 id="task-a1-vocab-fk-audit-test">Task A1: Vocab-FK audit test</h3>
+<p><strong>Files:</strong>
+- Create: <code>tests/schema/test_vocab_fk_convention.py</code>
+- Create: <code>tests/schema/__init__.py</code> (if not already present)</p>
+<ul>
+<li>[ ] <strong>Step 1: Ensure <code>tests/schema/</code> exists</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; ls tests/schema 2&gt;&amp;1 | head
+</code></pre>
+<p>If <code>tests/schema/</code> doesn't exist, create it with an empty <code>__init__.py</code>:</p>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; mkdir -p tests/schema &amp;&amp; touch tests/schema/__init__.py
+</code></pre>
+<p>(Note: several tests/ subdirs already have <code>__init__.py</code> files — match that pattern.)</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/schema/test_vocab_fk_convention.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Live-catalog audit: every FK targeting a vocabulary table references Name.
+
+Creates a fresh catalog via create_ml_catalog, introspects the deriva-ml schema,
+and asserts that every FK whose target table is a vocabulary (has a unique Name
+key) references the Name column — never RID or another column.
+
+This test captures the library-wide convention: 'FKs to vocabulary tables
+reference Name, not RID.' Requires DERIVA_HOST.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import pytest
+
+
+def _is_vocabulary_table(table) -&gt; bool:
+    &quot;&quot;&quot;A vocabulary table has a unique Name key (per VocabularyTableDef).&quot;&quot;&quot;
+    cols = {c.name for c in table.column_definitions}
+    if not {&quot;Name&quot;, &quot;ID&quot;, &quot;URI&quot;}.issubset(cols):
+        return False
+    for k in table.keys:
+        kcols = {c.name for c in k.unique_columns}
+        if kcols == {&quot;Name&quot;}:
+            return True
+    return False
+
+
+@pytest.mark.integration
+def test_all_vocab_fks_reference_name():
+    &quot;&quot;&quot;Create a fresh catalog and verify every vocab-targeting FK is on Name.&quot;&quot;&quot;
+    from deriva_ml.schema.create_schema import create_ml_catalog
+
+    catalog = create_ml_catalog(
+        hostname=&quot;localhost&quot;, project_name=&quot;s1b_audit_test&quot;,
+    )
+    try:
+        model = catalog.getCatalogModel()
+        schema = model.schemas[&quot;deriva-ml&quot;]
+
+        vocab_tables = {
+            t.name for t in schema.tables.values() if _is_vocabulary_table(t)
+        }
+        assert vocab_tables, &quot;No vocabulary tables found in deriva-ml schema&quot;
+
+        violations: list[str] = []
+        for t in schema.tables.values():
+            for fk in t.foreign_keys:
+                tgt_cols = [c.name for c in fk.referenced_columns]
+                tgt_table = fk.referenced_columns[0].table.name
+                if tgt_table in vocab_tables and tgt_cols != [&quot;Name&quot;]:
+                    src_cols = [c.name for c in fk.foreign_key_columns]
+                    violations.append(
+                        f&quot;{t.name}({','.join(src_cols)}) → &quot;
+                        f&quot;{tgt_table}({','.join(tgt_cols)}) &quot;
+                        f&quot;(expected target Name)&quot;
+                    )
+
+        assert not violations, (
+            f&quot;Vocabulary-FK convention violated:\n&quot;
+            + &quot;\n&quot;.join(f&quot;  - {v}&quot; for v in violations)
+        )
+    finally:
+        catalog.delete_ermrest_catalog(really=True)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the test</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/schema/test_vocab_fk_convention.py -v --timeout=600
+</code></pre>
+<p>Expected: PASS. The audit we ran during planning showed zero violations, so the test should pass against the current codebase unmodified. If it fails, investigate before proceeding — something in the audit assumptions is off.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; git add tests/schema/ &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+test(schema): vocab-FK-on-Name convention — live-catalog audit
+
+Creates a fresh catalog via create_ml_catalog, introspects the deriva-ml
+schema, and asserts every FK targeting a vocabulary table references
+Name (not RID or another column).
+
+Captures the current 100%-compliant state as a living assertion.
+Catches future violations before they ship.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-b-execution_status-vocab-table-fk-seed">Task Group B — Execution_Status vocab table + FK + seed</h2>
+<h3 id="task-b1-add-execution_status-vocabularytabledef-to-the-schema">Task B1: Add Execution_Status VocabularyTableDef to the schema</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/enums.py</code> — add <code>execution_status</code> to <code>MLVocab</code> enum
+- Modify: <code>src/deriva_ml/schema/create_schema.py</code> — add <code>Execution_Status</code> vocab table creation inside <code>create_ml_schema</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>execution_status</code> member to MLVocab</strong></li>
+</ul>
+<p>Find the <code>MLVocab</code> StrEnum in <code>src/deriva_ml/core/enums.py</code> (around line 80):</p>
+<pre><code class="language-python">class MLVocab(StrEnum):
+    ...
+    dataset_type = &quot;Dataset_Type&quot;
+    workflow_type = &quot;Workflow_Type&quot;
+    asset_type = &quot;Asset_Type&quot;
+    asset_role = &quot;Asset_Role&quot;
+    feature_name = &quot;Feature_Name&quot;
+</code></pre>
+<p>Add a new member (alphabetically after <code>asset_role</code> to match the existing convention for schema-canonical names):</p>
+<pre><code class="language-python">class MLVocab(StrEnum):
+    ...
+    dataset_type = &quot;Dataset_Type&quot;
+    workflow_type = &quot;Workflow_Type&quot;
+    asset_type = &quot;Asset_Type&quot;
+    asset_role = &quot;Asset_Role&quot;
+    execution_status = &quot;Execution_Status&quot;
+    feature_name = &quot;Feature_Name&quot;
+</code></pre>
+<p>Update the class docstring if it enumerates the members explicitly (check first — at worktree-creation time the docstring may not do this).</p>
+<ul>
+<li>[ ] <strong>Step 2: Verify the MLVocab change is reflected correctly</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;
+from deriva_ml.core.enums import MLVocab
+assert MLVocab.execution_status == 'Execution_Status'
+print('OK: MLVocab.execution_status =', repr(MLVocab.execution_status.value))
+&quot;
+</code></pre>
+<p>Expected: <code>OK: MLVocab.execution_status = 'Execution_Status'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add the VocabularyTableDef in create_ml_schema</strong></li>
+</ul>
+<p>Find <code>create_ml_schema</code> in <code>src/deriva_ml/schema/create_schema.py</code> (around line 274). Locate the block that creates existing vocabulary tables:</p>
+<pre><code class="language-python">    schema.create_table(
+        VocabularyTableDef(name=MLVocab.feature_name, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+    asset_type_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.asset_type, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+    asset_role_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.asset_role, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+</code></pre>
+<p>Add a new <code>Execution_Status</code> vocab table creation alongside the others. Since it will be referenced by an FK from <code>Execution.Status</code>, it must be created BEFORE <code>create_execution_table</code> is called. Place the creation immediately after <code>asset_role_table</code>:</p>
+<pre><code class="language-python">    schema.create_table(
+        VocabularyTableDef(name=MLVocab.feature_name, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+    asset_type_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.asset_type, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+    asset_role_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.asset_role, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+    execution_status_table = schema.create_table(
+        VocabularyTableDef(name=MLVocab.execution_status, curie_template=f&quot;{project_name}:{{RID}}&quot;)
+    )
+</code></pre>
+<p>We keep the handle in <code>execution_status_table</code> for reference even though the FK is specified via table-name string (not via the Table object), because future code may need the handle.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the audit test from A1 to verify nothing regressed</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/schema/test_vocab_fk_convention.py -v --timeout=600
+</code></pre>
+<p>Expected: PASS (new Execution_Status table is a vocab table but has NO incoming FKs yet — no violations possible; the A1 audit only checks <em>outgoing</em> FKs from non-vocab tables).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; git add src/deriva_ml/core/enums.py src/deriva_ml/schema/create_schema.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(schema): add Execution_Status vocabulary table
+
+New vocabulary table in the deriva-ml schema for controlled Execution
+lifecycle status values. Standard VocabularyTableDef shape (Name+ID+URI
++Description+Synonyms). Created alongside the other 5 ML vocabulary
+tables.
+
+MLVocab.execution_status = &quot;Execution_Status&quot; added for canonical
+access. FK from Execution.Status → Execution_Status.Name and seed
+terms come in B2 and B3.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-b2-add-fk-from-executionstatus-to-execution_statusname">Task B2: Add FK from Execution.Status to Execution_Status.Name</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/schema/create_schema.py</code> — extend <code>create_execution_table</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Extend the Execution TableDef with the new FK</strong></li>
+</ul>
+<p>Find <code>create_execution_table</code> in <code>src/deriva_ml/schema/create_schema.py</code> (around line 131). The current state after S1a:</p>
+<pre><code class="language-python">    execution = schema.create_table(
+        TableDef(
+            name=MLTable.execution,
+            columns=[
+                ColumnDef(&quot;Workflow&quot;, BuiltinType.text),
+                ColumnDef(&quot;Description&quot;, BuiltinType.markdown),
+                ColumnDef(&quot;Duration&quot;, BuiltinType.text),
+                ColumnDef(&quot;Status&quot;, BuiltinType.text),
+                ColumnDef(&quot;Status_Detail&quot;, BuiltinType.text),
+            ],
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=[&quot;Workflow&quot;],
+                    referenced_schema=schema.name,
+                    referenced_table=&quot;Workflow&quot;,
+                    referenced_columns=[&quot;RID&quot;],
+                )
+            ],
+            annotations=annotation,
+        )
+    )
+</code></pre>
+<p>Add a second <code>ForeignKeyDef</code> inside <code>foreign_keys=[...]</code> pointing Status → Execution_Status.Name:</p>
+<pre><code class="language-python">    execution = schema.create_table(
+        TableDef(
+            name=MLTable.execution,
+            columns=[
+                ColumnDef(&quot;Workflow&quot;, BuiltinType.text),
+                ColumnDef(&quot;Description&quot;, BuiltinType.markdown),
+                ColumnDef(&quot;Duration&quot;, BuiltinType.text),
+                ColumnDef(&quot;Status&quot;, BuiltinType.text),
+                ColumnDef(&quot;Status_Detail&quot;, BuiltinType.text),
+            ],
+            foreign_keys=[
+                ForeignKeyDef(
+                    columns=[&quot;Workflow&quot;],
+                    referenced_schema=schema.name,
+                    referenced_table=&quot;Workflow&quot;,
+                    referenced_columns=[&quot;RID&quot;],
+                ),
+                ForeignKeyDef(
+                    columns=[&quot;Status&quot;],
+                    referenced_schema=schema.name,
+                    referenced_table=MLVocab.execution_status,
+                    referenced_columns=[&quot;Name&quot;],
+                ),
+            ],
+            annotations=annotation,
+        )
+    )
+</code></pre>
+<p>Notes on the choices:
+- <code>referenced_table=MLVocab.execution_status</code> (the StrEnum value is <code>"Execution_Status"</code>). Prefer the enum reference for consistency with other vocab references in the file.
+- <code>referenced_columns=["Name"]</code> is the library-wide convention (FK to vocab → Name, not RID).</p>
+<ul>
+<li>[ ] <strong>Step 2: Verify schema creation still works end-to-end</strong></li>
+</ul>
+<p>A fresh catalog must build cleanly. Run a targeted live check:</p>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run python &lt;&lt;'PYEOF'
+&quot;&quot;&quot;Smoke: create a catalog, verify Execution.Status FK targets Execution_Status.Name.&quot;&quot;&quot;
+from deriva_ml.schema.create_schema import create_ml_catalog
+catalog = create_ml_catalog(hostname=&quot;localhost&quot;, project_name=&quot;s1b_b2_smoke&quot;)
+try:
+    model = catalog.getCatalogModel()
+    execution = model.schemas[&quot;deriva-ml&quot;].tables[&quot;Execution&quot;]
+    fks_to_exec_status = [
+        fk for fk in execution.foreign_keys
+        if fk.referenced_columns[0].table.name == &quot;Execution_Status&quot;
+    ]
+    assert len(fks_to_exec_status) == 1, f&quot;expected 1 FK to Execution_Status, found {len(fks_to_exec_status)}&quot;
+    fk = fks_to_exec_status[0]
+    src_cols = [c.name for c in fk.foreign_key_columns]
+    tgt_cols = [c.name for c in fk.referenced_columns]
+    assert src_cols == [&quot;Status&quot;], f&quot;bad source cols: {src_cols}&quot;
+    assert tgt_cols == [&quot;Name&quot;], f&quot;bad target cols: {tgt_cols}&quot;
+    print(&quot;OK: Execution.Status FK correctly targets Execution_Status.Name&quot;)
+finally:
+    catalog.delete_ermrest_catalog(really=True)
+PYEOF
+</code></pre>
+<p>Expected: <code>OK: Execution.Status FK correctly targets Execution_Status.Name</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run the audit test — it MUST still pass</strong></li>
+</ul>
+<p>The audit test from A1 must still pass because the new FK is itself compliant (targets Name). Running it is a safety check that we didn't break the rule with our own addition.</p>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/schema/test_vocab_fk_convention.py -v --timeout=600
+</code></pre>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the Phase-1 + S1a test suites — no regression</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_status_migration.py tests/execution/test_update_status.py tests/test_migration_complete.py -q --timeout=300
+</code></pre>
+<p>Expected: all pass (the enum + update_status API are unchanged by S1b).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; git add src/deriva_ml/schema/create_schema.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(schema): Execution.Status → Execution_Status.Name FK
+
+Constrains Execution.Status to the controlled vocabulary. Per the
+library-wide rule, the FK targets the vocabulary's Name column (not
+RID), which lets existing ExecutionStatus(row[&quot;Status&quot;]) parses keep
+working unchanged.
+
+After this change a fresh catalog rejects any Execution insert where
+Status isn't one of the 7 canonical terms (seeded in B3).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-b3-seed-execution_status-vocabulary-with-the-7-canonical-terms">Task B3: Seed Execution_Status vocabulary with the 7 canonical terms</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/schema/create_schema.py</code> — extend <code>initialize_ml_schema</code>'s <code>_ensure_terms</code> calls</p>
+<ul>
+<li>[ ] <strong>Step 1: Verify current seed calls</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; grep -n &quot;_ensure_terms\|MLVocab\.&quot; src/deriva_ml/schema/create_schema.py | head -20
+</code></pre>
+<p>Expected hits include:
+- <code>_ensure_terms(MLVocab.asset_type, [...])</code>
+- <code>_ensure_terms(MLVocab.asset_role, [...])</code>
+- <code>_ensure_terms(MLVocab.dataset_type, [...])</code>
+- <code>_ensure_terms(MLVocab.workflow_type, [...])</code></p>
+<p>Feature_Name is intentionally unseeded (extensible per-project).</p>
+<ul>
+<li>[ ] <strong>Step 2: Add the Execution_Status seed call</strong></li>
+</ul>
+<p>In <code>initialize_ml_schema</code>, after the existing <code>_ensure_terms</code> calls, add:</p>
+<pre><code class="language-python">    _ensure_terms(MLVocab.execution_status, [
+        {&quot;Name&quot;: &quot;Created&quot;, &quot;Description&quot;: &quot;Execution row has been created; work has not started.&quot;},
+        {&quot;Name&quot;: &quot;Running&quot;, &quot;Description&quot;: &quot;Execution algorithm is actively running.&quot;},
+        {&quot;Name&quot;: &quot;Stopped&quot;, &quot;Description&quot;: &quot;Algorithm finished successfully; output assets not yet uploaded.&quot;},
+        {&quot;Name&quot;: &quot;Failed&quot;, &quot;Description&quot;: &quot;Execution encountered an unrecoverable error.&quot;},
+        {&quot;Name&quot;: &quot;Pending_Upload&quot;, &quot;Description&quot;: &quot;Algorithm succeeded; asset upload to the catalog is in progress.&quot;},
+        {&quot;Name&quot;: &quot;Uploaded&quot;, &quot;Description&quot;: &quot;Execution ran to success and all outputs are persisted to the catalog.&quot;},
+        {&quot;Name&quot;: &quot;Aborted&quot;, &quot;Description&quot;: &quot;Execution was canceled by the user before reaching a terminal state.&quot;},
+    ])
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: End-to-end smoke — a fresh Execution can be inserted with Status="Created"</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run python &lt;&lt;'PYEOF'
+&quot;&quot;&quot;Smoke: after catalog creation, we can insert an Execution row with Status='Created'.&quot;&quot;&quot;
+from deriva_ml.schema.create_schema import create_ml_catalog
+catalog = create_ml_catalog(hostname=&quot;localhost&quot;, project_name=&quot;s1b_b3_smoke&quot;)
+try:
+    pb = catalog.getPathBuilder()
+    exec_table = pb.schemas[&quot;deriva-ml&quot;].tables[&quot;Execution&quot;]
+    # Minimal Execution insert referencing the new Execution_Status.Name FK.
+    result = exec_table.insert([
+        {&quot;Description&quot;: &quot;b3 smoke&quot;, &quot;Workflow&quot;: None, &quot;Status&quot;: &quot;Created&quot;}
+    ])
+    rid = result[0][&quot;RID&quot;]
+    print(f&quot;OK: inserted Execution {rid} with Status='Created'&quot;)
+    # And invalid status SHOULD be rejected.
+    try:
+        exec_table.insert([
+            {&quot;Description&quot;: &quot;b3 bogus&quot;, &quot;Workflow&quot;: None, &quot;Status&quot;: &quot;NotAValidStatus&quot;}
+        ])
+        print(&quot;FAIL: invalid Status was accepted (expected FK rejection)&quot;)
+    except Exception as exc:
+        print(f&quot;OK: invalid Status rejected ({type(exc).__name__})&quot;)
+finally:
+    catalog.delete_ermrest_catalog(really=True)
+PYEOF
+</code></pre>
+<p>Expected output:</p>
+<pre><code>OK: inserted Execution &lt;RID&gt; with Status='Created'
+OK: invalid Status rejected (&lt;SomeException&gt;)
+</code></pre>
+<p>If the invalid-Status insert succeeds, the FK isn't being enforced — investigate (ERMrest may need FK enforcement enabled, or the schema may need tweaks).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run the audit + ExecutionStatus tests</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/schema/test_vocab_fk_convention.py tests/execution/test_status_migration.py tests/execution/test_update_status.py -q --timeout=600
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the broader test suite to catch any indirect breakage</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q --timeout=600
+</code></pre>
+<p>Expected: 259+ pass (the S1a baseline plus anything new). No regressions.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; git add src/deriva_ml/schema/create_schema.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(schema): seed Execution_Status vocabulary with 7 canonical terms
+
+Seeds Created, Running, Stopped, Failed, Pending_Upload, Uploaded,
+Aborted — exactly matching the ExecutionStatus StrEnum from S1a.
+
+After seeding + the B2 FK, any Execution insert with a Status value
+outside this canonical set is rejected by the catalog's FK constraint.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-c-schema-doc-updates">Task Group C — Schema-doc updates</h2>
+<p>The S0 validator requires <code>docs/reference/schema.md</code> to agree with <code>src/deriva_ml/schema/create_schema.py</code>. After Group B, running the validator will report mismatches. Group C resolves them.</p>
+<h3 id="task-c1-add-conventions-section-execution_status-doc-entry-update-execution-entry">Task C1: Add Conventions section + Execution_Status doc entry; update Execution entry</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/reference/schema.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Run the validator to see what's missing</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run deriva-ml-validate-schema 2&gt;&amp;1 | head -40
+</code></pre>
+<p>Expected output: something like</p>
+<pre><code>deriva-ml-validate-schema: schema.md and create_schema.py disagree.
+
+MISSING FROM CODE:
+  (none)
+
+EXTRA IN CODE:
+  - table 'Execution_Status' is in the code but not in the doc.
+
+COLUMN MISMATCH:
+  (none)
+
+FOREIGN KEY MISMATCH:
+  - FK on ['Status'] in code but not in doc
+...
+</code></pre>
+<p>Exit code: 1.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add the Conventions section at the top of schema.md</strong></li>
+</ul>
+<p>Near the top of <code>docs/reference/schema.md</code> — right after the "What is and isn't validated" section — add a new section:</p>
+<pre><code class="language-markdown">## Conventions
+
+### Foreign keys to vocabulary tables reference `Name`, not `RID`
+
+In the `deriva-ml` schema, every FK that references a vocabulary table
+references the vocabulary's `Name` column — never `RID` or another column.
+This applies to both explicit `ForeignKeyDef` call sites (e.g.
+`Execution.Status` → `Execution_Status.Name`) and to FKs generated by
+`Table.define_association` when one of the endpoints is a vocabulary
+table (e.g. `Dataset_Dataset_Type(Dataset_Type)` → `Dataset_Type.Name`).
+
+**Rationale.** A `Name`-valued FK stores a human-readable string, not an
+opaque RID. Raw catalog exports are self-describing; `EnumClass(row[&quot;Col&quot;])`
+parses directly; migration from a plain-text column to an FK'd column
+requires no data conversion.
+
+**Enforcement.** `tests/schema/test_vocab_fk_convention.py` creates a fresh
+catalog via `create_ml_catalog`, introspects every FK in the `deriva-ml`
+schema, and fails if any vocabulary-targeting FK references a column
+other than `Name`. Deriva-py's `Table.define_association` default
+heuristic already picks `Name` for vocabulary endpoints; this convention
+makes that implicit behavior explicit and enforces it for new explicit
+FKs.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add the Execution_Status section</strong></li>
+</ul>
+<p>In <code>docs/reference/schema.md</code>, find the <strong>Vocabularies</strong> group (other vocab sections: Dataset_Type, Workflow_Type, Feature_Name, Asset_Type, Asset_Role). Add a new section between Asset_Role and Asset_Type (alphabetical ordering isn't strict but lifecycle-ordering puts Execution_Status near Execution-related tables):</p>
+<pre><code class="language-markdown">## Execution_Status
+
+Controlled vocabulary for the `Execution.Status` column — the lifecycle state of an `Execution` row. Seeded with the 7 canonical values matching the `ExecutionStatus` StrEnum in `src/deriva_ml/execution/state_store.py`. New terms should NOT be added without updating that enum in tandem.
+
+```yaml
+table: Execution_Status
+kind: vocabulary
+description: Controlled vocabulary for Execution lifecycle state.
+terms:
+  - name: Created
+  - name: Running
+  - name: Stopped
+  - name: Failed
+  - name: Pending_Upload
+  - name: Uploaded
+  - name: Aborted
+```
+</code></pre>
+<p>Also update the top-of-doc Table of Contents to include <code>Execution_Status</code> under Vocabularies. Example (current doc likely has a ToC list):</p>
+<pre><code class="language-markdown">**Vocabularies**: [Dataset_Type](#dataset_type), [Workflow_Type](#workflow_type), [Feature_Name](#feature_name), [Asset_Type](#asset_type), [Asset_Role](#asset_role), [Execution_Status](#execution_status)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Update the Execution section to include the new FK</strong></li>
+</ul>
+<p>Find the existing <code>## Execution</code> section in <code>docs/reference/schema.md</code>. Its YAML block currently has one FK:</p>
+<pre><code class="language-yaml">table: Execution
+kind: table
+description: Per-execution lifecycle row.
+columns:
+- name: Workflow
+  type: text
+- name: Description
+  type: markdown
+- name: Duration
+  type: text
+- name: Status
+  type: text
+- name: Status_Detail
+  type: text
+foreign_keys:
+- columns: [Workflow]
+  referenced_schema: deriva-ml
+  referenced_table: Workflow
+  referenced_columns: [RID]
+</code></pre>
+<p>Add a second FK entry to <code>foreign_keys</code> for Status → Execution_Status.Name:</p>
+<pre><code class="language-yaml">table: Execution
+kind: table
+description: Per-execution lifecycle row.
+columns:
+- name: Workflow
+  type: text
+- name: Description
+  type: markdown
+- name: Duration
+  type: text
+- name: Status
+  type: text
+- name: Status_Detail
+  type: text
+foreign_keys:
+- columns: [Workflow]
+  referenced_schema: deriva-ml
+  referenced_table: Workflow
+  referenced_columns: [RID]
+- columns: [Status]
+  referenced_schema: deriva-ml
+  referenced_table: Execution_Status
+  referenced_columns: [Name]
+</code></pre>
+<p>Also update the prose above the YAML block to mention the new FK briefly, e.g.:</p>
+<pre><code class="language-markdown">## Execution
+
+Per-execution lifecycle row. The `Status` column is FK-constrained to the
+`Execution_Status` vocabulary (7 canonical lifecycle values, seeded at
+schema creation); invalid status writes are rejected by the catalog.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Re-run the validator</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run deriva-ml-validate-schema 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: <code>deriva-ml-validate-schema: schema.md and create_schema.py agree.</code> Exit code 0.</p>
+<p>If it reports mismatches, the YAML edits don't match the code. Common slips:
+- Missing <code>referenced_columns: [Name]</code> → validator reports FK mismatch
+- Term list order differs from the seed order → validator reports VOCAB_TERMS_MISMATCH (term order shouldn't matter to the validator, but if ordering matters, match the seed order literally)</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; git add docs/reference/schema.md &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(reference): Execution_Status vocab + Conventions section
+
+- New ## Conventions section documents the library-wide rule: FKs
+  to vocabulary tables reference Name, not RID. Explains rationale
+  (self-describing exports, direct enum parse, simpler migration)
+  and points at the audit test for enforcement.
+- New ## Execution_Status section describes the vocabulary (kind,
+  description, 7 canonical terms).
+- Updated ## Execution section to include the new FK
+  (Status → Execution_Status.Name) in its foreign_keys list.
+- Updated table of contents to include Execution_Status.
+
+Validator reports doc and code agree.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-c2-verify-s0-structure-tests-still-pass">Task C2: Verify S0 structure tests still pass</h3>
+<p><strong>Files:</strong> none (verification)</p>
+<ul>
+<li>[ ] <strong>Step 1: Run the S0 structure-check test</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_schema_doc_structure.py -v
+</code></pre>
+<p>Expected: all pass. This test iterates over every member of <code>MLTable</code> and <code>MLVocab</code> and asserts a matching doc section exists. Because we added <code>MLVocab.execution_status</code> in B1 and a doc section in C1, the test should cleanly pick up the new entry.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the S0 integration test (full doc-vs-code comparison)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc_integration.py -v
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 3: No commit</strong> (verification only).</li>
+</ul>
+<hr />
+<h2 id="task-group-d-changelog-final-review">Task Group D — CHANGELOG + final review</h2>
+<h3 id="task-d1-changelog-entry">Task D1: CHANGELOG entry</h3>
+<p><strong>Files:</strong>
+- Modify: <code>CHANGELOG.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Add S1b entry at the top of CHANGELOG.md</strong></li>
+</ul>
+<p>Insert immediately after <code># Changelog ...</code> intro, above the S1a entry:</p>
+<pre><code class="language-markdown">## Unreleased — Phase 2 Subsystem 1b: Execution_Status vocabulary
+
+### New
+
+- **`Execution_Status` vocabulary table** in the `deriva-ml` schema. Seeded with 7 canonical terms (Created, Running, Stopped, Failed, Pending_Upload, Uploaded, Aborted) matching the `ExecutionStatus` StrEnum from S1a.
+- **FK on `Execution.Status` → `Execution_Status.Name`.** Catalog now rejects any `Execution` insert whose `Status` value isn't one of the seeded canonical terms.
+- **`MLVocab.execution_status`** enum member for canonical access to the new vocabulary-table name.
+- **`tests/schema/test_vocab_fk_convention.py`** — live-catalog audit test that asserts every FK targeting a vocabulary table in the `deriva-ml` schema references the `Name` column.
+- **Conventions section in `docs/reference/schema.md`** documenting the vocabulary-FK-on-Name rule, its rationale, and the enforcing test.
+
+### Audit notes
+
+- Audit of the pre-S1b schema found **zero violations** of the Name-not-RID rule. Deriva-py's `Table.define_association` default `key_column_search_order = ['Name', 'name', 'ID', 'id']` already picks `Name` for vocabulary targets and falls back to `RID` only for entity targets. The new convention makes this implicit behavior explicit and test-enforced.
+
+### Migration notes
+
+- Existing deployed catalogs MAY need a one-time migration to add the `Execution_Status` vocabulary table + FK if they were created before S1b. A separate cleanup task (outside S1b scope) verifies compliance on any live deployments. New catalogs created via `create_ml_catalog` have everything set up.
+- Historical `Execution` rows whose `Status` value was `&quot;Initializing&quot;` or `&quot;Pending&quot;` (pre-S1a) will violate the new FK constraint if the catalog is migrated to include the FK. Users should clean those rows via `gc_executions` or manual updates.
+
+---
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/github/deriva-ml/.claude/worktrees/phase2-s1b-execution-status-vocab &amp;&amp; git add CHANGELOG.md &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(changelog): Phase 2 Subsystem 1b — Execution_Status vocabulary
+
+Documents the new vocab table, the FK constraint on Execution.Status,
+the Name-not-RID rule + audit test, and the zero-violation audit
+finding on the pre-S1b schema.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-d2-final-review-finish-branch">Task D2: Final review + finish branch</h3>
+<p><strong>Files:</strong> none (process task)</p>
+<ul>
+<li>[ ] <strong>Step 1: Dispatch a <code>superpowers:code-reviewer</code> subagent</strong></li>
+</ul>
+<p>Per <code>superpowers:subagent-driven-development</code>, review the full S1b delivery (commits from Task A1 through D1):</p>
+<pre><code>Subagent: superpowers:code-reviewer
+Task: review Phase 2 Subsystem 1b — Execution_Status vocabulary + FK +
+convention audit — against the S1b plan
+(docs/superpowers/plans/2026-04-21-execution-status-vocab.md).
+
+Check: every task commit corresponds to a plan task; vocab-FK convention
+documented in schema.md; FK actually enforces at ERMrest layer (B3 smoke
+should have confirmed); S0 validator agrees.
+
+Report blocker / important / nit items. Implementer addresses blockers
+and important issues before merge.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Address reviewer findings</strong></li>
+</ul>
+<p>Fix any blocker/important items via targeted edits. Re-run the full test suite plus the validator after fixes.</p>
+<ul>
+<li>[ ] <strong>Step 3: Finish branch</strong></li>
+</ul>
+<p>Once approved, invoke <code>superpowers:finishing-a-development-branch</code> to push, open PR, merge, and clean up.</p>
+<hr />
+<p><em>(End of S1b.)</em></p>
+<hr />
+<h2 id="post-s1b">Post-S1b</h2>
+<p>After S1b merges to <code>origin/main</code>, remaining Phase 2 work (per CHANGELOG tracking):</p>
+<ol>
+<li><strong>One-time migration check</strong> for the live deployed catalog: verify it has <code>Execution_Status</code> + the FK + the seeded terms; if not, run <code>initialize_ml_schema</code> against it (idempotent for the seed; the vocab table + FK require <code>create_execution_table</code> / model edits).</li>
+<li><strong>Subsystem 3</strong> — Upload engine completions: real <code>_invoke_deriva_py_uploader</code>, <code>parallel_files</code> / <code>bandwidth_limit_mbps</code> plumbing, <code>UploadJob</code> real cancellation.</li>
+<li><strong>Subsystem 4</strong> — Hygiene bundle: offline-mode <code>DerivaML.__init__</code> network-skip, distutils-shim test flake, docstring misc.</li>
+<li><strong>Subsystem 2</strong> — Feature-consistency follow-on ("the real Phase 2"). Requires its own brainstorming session.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

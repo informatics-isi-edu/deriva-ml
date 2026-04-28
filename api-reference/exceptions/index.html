@@ -1,0 +1,6094 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/api-reference/exceptions/">
+      
+      
+        <link rel="prev" href="../deriva_definitions/">
+      
+      
+        <link rel="next" href="../upload/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Exceptions - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#exceptions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Exceptions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exceptions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLAuthenticationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLAuthenticationError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLConfigurationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLConfigurationError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLCycleError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLCycleError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDataError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDataError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDatasetNotFound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDatasetNotFound
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeAmbiguousPath
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeDownstreamLeaf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeDownstreamLeaf
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeMultiLeaf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeMultiLeaf
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeNoSink" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeNoSink
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeUnrelatedAnchor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeUnrelatedAnchor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDirtyWorkflowError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDirtyWorkflowError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLException" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLException
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLExecutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLExecutionError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLInvalidTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLInvalidTerm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLMaterializeLimitExceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLMaterializeLimitExceeded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLNoExecutionContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLNoExecutionContext
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLNotFoundError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLNotFoundError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLOfflineError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLOfflineError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLReadOnlyError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLReadOnlyError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLSchemaError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLSchemaError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLSchemaPinned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLSchemaPinned
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLSchemaRefreshBlocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLSchemaRefreshBlocked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLStateInconsistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLStateInconsistency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLTableNotFound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLTableNotFound
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLTableTypeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLTableTypeError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLUploadError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLUploadError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLValidationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLValidationError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLWorkflowError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLWorkflowError
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exceptions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLAuthenticationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLAuthenticationError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLConfigurationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLConfigurationError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLCycleError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLCycleError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDataError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDataError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDatasetNotFound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDatasetNotFound
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeAmbiguousPath
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeDownstreamLeaf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeDownstreamLeaf
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeMultiLeaf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeMultiLeaf
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeNoSink" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeNoSink
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDenormalizeUnrelatedAnchor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDenormalizeUnrelatedAnchor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLDirtyWorkflowError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLDirtyWorkflowError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLException" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLException
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLExecutionError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLExecutionError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLInvalidTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLInvalidTerm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLMaterializeLimitExceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLMaterializeLimitExceeded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLNoExecutionContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLNoExecutionContext
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLNotFoundError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLNotFoundError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLOfflineError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLOfflineError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLReadOnlyError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLReadOnlyError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLSchemaError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLSchemaError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLSchemaPinned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLSchemaPinned
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLSchemaRefreshBlocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLSchemaRefreshBlocked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLStateInconsistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLStateInconsistency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLTableNotFound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLTableNotFound
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLTableTypeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLTableTypeError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLUploadError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLUploadError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLValidationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLValidationError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deriva_ml.core.exceptions.DerivaMLWorkflowError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLWorkflowError
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="exceptions">Exceptions</h1>
+<p>DerivaML defines custom exceptions to provide clear error messages for common
+error conditions when working with catalogs, datasets, and executions.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="deriva_ml.core.exceptions"></a>
+    <div class="doc doc-contents first">
+
+        <p>Custom exceptions for the DerivaML package.</p>
+<p>This module defines the exception hierarchy for DerivaML. All DerivaML-specific
+exceptions inherit from DerivaMLException, making it easy to catch all library
+errors with a single except clause.</p>
+
+
+<details class="exception-hierarchy" open>
+  <summary>Exception Hierarchy</summary>
+  <p>DerivaMLException (base class for all DerivaML errors)
+│
+├── DerivaMLConfigurationError (configuration and initialization)
+│   ├── DerivaMLSchemaError (schema/catalog structure issues)
+│   ├── DerivaMLAuthenticationError (authentication failures)
+│   ├── DerivaMLOfflineError (online-only operation in offline mode)
+│   └── DerivaMLNoExecutionContext (write attempted on read-only handle)
+│
+├── DerivaMLDataError (data access and validation)
+│   ├── DerivaMLNotFoundError (entity not found)
+│   │   ├── DerivaMLDatasetNotFound (dataset lookup failures)
+│   │   ├── DerivaMLTableNotFound (table lookup failures)
+│   │   └── DerivaMLInvalidTerm (vocabulary term not found)
+│   ├── DerivaMLTableTypeError (wrong table type)
+│   ├── DerivaMLValidationError (data validation failures)
+│   ├── DerivaMLCycleError (cycle detected in relationships)
+│   └── DerivaMLStateInconsistency (SQLite/catalog state disagreement)
+│
+├── DerivaMLExecutionError (execution lifecycle)
+│   ├── DerivaMLWorkflowError (workflow issues)
+│   │   └── DerivaMLDirtyWorkflowError (uncommitted changes)
+│   └── DerivaMLUploadError (asset upload failures)
+│
+├── DerivaMLReadOnlyError (write operation on read-only resource)
+│
+└── DerivaMLDenormalizeError (denormalization planning errors)
+    ├── DerivaMLDenormalizeMultiLeaf
+    ├── DerivaMLDenormalizeNoSink
+    ├── DerivaMLDenormalizeDownstreamLeaf
+    ├── DerivaMLDenormalizeAmbiguousPath
+    └── DerivaMLDenormalizeUnrelatedAnchor</p>
+</details>
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>from deriva_ml.core.exceptions import DerivaMLException, DerivaMLNotFoundError
+try:  # doctest: +SKIP
+...     dataset = ml.lookup_dataset("invalid_rid")
+... except DerivaMLDatasetNotFound as e:
+...     print(f"Dataset not found: {e}")
+... except DerivaMLNotFoundError as e:
+...     print(f"Entity not found: {e}")
+... except DerivaMLException as e:
+...     print(f"DerivaML error: {e}")</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLAuthenticationError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLAuthenticationError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLConfigurationError (deriva_ml.core.exceptions.DerivaMLConfigurationError)" href="#deriva_ml.core.exceptions.DerivaMLConfigurationError">DerivaMLConfigurationError</a></code></p>
+
+
+
+        <p>Exception raised for authentication failures.</p>
+<p>Raised when authentication with the catalog fails or credentials are invalid.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLAuthenticationError("Failed to authenticate with catalog")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLAuthenticationError</span><span class="p">(</span><span class="n">DerivaMLConfigurationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for authentication failures.</span>
+
+<span class="sd">    Raised when authentication with the catalog fails or credentials are invalid.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLAuthenticationError(&quot;Failed to authenticate with catalog&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLConfigurationError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLConfigurationError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLException (deriva_ml.core.exceptions.DerivaMLException)" href="#deriva_ml.core.exceptions.DerivaMLException">DerivaMLException</a></code></p>
+
+
+
+        <p>Exception raised for configuration and initialization errors.</p>
+<p>Raised when there are issues with DerivaML configuration, catalog
+initialization, or schema setup.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLConfigurationError("Invalid catalog configuration")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLConfigurationError</span><span class="p">(</span><span class="n">DerivaMLException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for configuration and initialization errors.</span>
+
+<span class="sd">    Raised when there are issues with DerivaML configuration, catalog</span>
+<span class="sd">    initialization, or schema setup.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLConfigurationError(&quot;Invalid catalog configuration&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLCycleError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLCycleError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDataError (deriva_ml.core.exceptions.DerivaMLDataError)" href="#deriva_ml.core.exceptions.DerivaMLDataError">DerivaMLDataError</a></code></p>
+
+
+
+        <p>Exception raised when a cycle is detected in relationships.</p>
+<p>Raised when creating dataset hierarchies or other relationships that
+would result in a circular dependency.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>cycle_nodes</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of nodes involved in the cycle.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>msg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional context. Defaults to "Cycle detected".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;Cycle detected&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLCycleError(["Dataset1", "Dataset2", "Dataset1"])  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLCycleError</span><span class="p">(</span><span class="n">DerivaMLDataError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when a cycle is detected in relationships.</span>
+
+<span class="sd">    Raised when creating dataset hierarchies or other relationships that</span>
+<span class="sd">    would result in a circular dependency.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cycle_nodes: List of nodes involved in the cycle.</span>
+<span class="sd">        msg: Additional context. Defaults to &quot;Cycle detected&quot;.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLCycleError([&quot;Dataset1&quot;, &quot;Dataset2&quot;, &quot;Dataset1&quot;])  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cycle_nodes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Cycle detected&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cycle_nodes</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cycle_nodes</span> <span class="o">=</span> <span class="n">cycle_nodes</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDataError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDataError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLException (deriva_ml.core.exceptions.DerivaMLException)" href="#deriva_ml.core.exceptions.DerivaMLException">DerivaMLException</a></code></p>
+
+
+
+        <p>Exception raised for data access and validation issues.</p>
+<p>Base class for errors related to data lookup, validation, and integrity.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLDataError("Invalid data format")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDataError</span><span class="p">(</span><span class="n">DerivaMLException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for data access and validation issues.</span>
+
+<span class="sd">    Base class for errors related to data lookup, validation, and integrity.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLDataError(&quot;Invalid data format&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDatasetNotFound" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDatasetNotFound</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLNotFoundError (deriva_ml.core.exceptions.DerivaMLNotFoundError)" href="#deriva_ml.core.exceptions.DerivaMLNotFoundError">DerivaMLNotFoundError</a></code></p>
+
+
+
+        <p>Exception raised when a dataset cannot be found.</p>
+<p>Raised when attempting to look up a dataset that doesn't exist in the
+catalog or downloaded bag.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>dataset_rid</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The RID of the dataset that was not found.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>msg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional context. Defaults to "Dataset not found".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;Dataset not found&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLDatasetNotFound("1-ABC")  # doctest: +SKIP
+DerivaMLDatasetNotFound: Dataset 1-ABC not found</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDatasetNotFound</span><span class="p">(</span><span class="n">DerivaMLNotFoundError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when a dataset cannot be found.</span>
+
+<span class="sd">    Raised when attempting to look up a dataset that doesn&#39;t exist in the</span>
+<span class="sd">    catalog or downloaded bag.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset_rid: The RID of the dataset that was not found.</span>
+<span class="sd">        msg: Additional context. Defaults to &quot;Dataset not found&quot;.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLDatasetNotFound(&quot;1-ABC&quot;)  # doctest: +SKIP</span>
+<span class="sd">        DerivaMLDatasetNotFound: Dataset 1-ABC not found</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset_rid</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Dataset not found&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">dataset_rid</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dataset_rid</span> <span class="o">=</span> <span class="n">dataset_rid</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDenormalizeAmbiguousPath</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDenormalizeError (deriva_ml.core.exceptions.DerivaMLDenormalizeError)" href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError">DerivaMLDenormalizeError</a></code></p>
+
+
+
+        <p>Multiple FK paths between two requested tables — can't silently choose.</p>
+<p>Raised when Rule 6 detects two or more distinct FK paths between
+<code>row_per</code> and another requested / via table. Silent path selection
+is rejected by design — the result shape would be materially
+different depending on which path is chosen, and callers should be
+explicit. Disambiguate by adding intermediates to <code>include_tables</code>
+(their columns are included) or to <code>via=</code> (path-only, columns
+excluded).</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath.from_table">from_table</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the <code>row_per</code> table name (the "anchor" of the
+ambiguity).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath.to_table">to_table</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the requested table with multiple paths.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath.paths">paths</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>list of path descriptions — each is a list of table
+names from <code>from_table</code> to <code>to_table</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeAmbiguousPath.suggested_intermediates">suggested_intermediates</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>tables that appear in at least one
+path but not in <code>include_tables</code> — any of these could be
+named in <code>include_tables</code> or <code>via</code> to force a choice.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>try:  # doctest: +SKIP
+...     d.as_dataframe(["Image", "Subject"])  # diamond schema
+... except DerivaMLDenormalizeAmbiguousPath as e:
+...     for p in e.paths:
+...         print(" → ".join(p))
+...     # Retry routing explicitly through Observation:
+...     df = d.as_dataframe(
+...         ["Image", "Subject"], via=e.suggested_intermediates[:1]
+...     )</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDenormalizeAmbiguousPath</span><span class="p">(</span><span class="n">DerivaMLDenormalizeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Multiple FK paths between two requested tables — can&#39;t silently choose.</span>
+
+<span class="sd">    Raised when Rule 6 detects two or more distinct FK paths between</span>
+<span class="sd">    ``row_per`` and another requested / via table. Silent path selection</span>
+<span class="sd">    is rejected by design — the result shape would be materially</span>
+<span class="sd">    different depending on which path is chosen, and callers should be</span>
+<span class="sd">    explicit. Disambiguate by adding intermediates to ``include_tables``</span>
+<span class="sd">    (their columns are included) or to ``via=`` (path-only, columns</span>
+<span class="sd">    excluded).</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        from_table: the ``row_per`` table name (the &quot;anchor&quot; of the</span>
+<span class="sd">            ambiguity).</span>
+<span class="sd">        to_table: the requested table with multiple paths.</span>
+<span class="sd">        paths: list of path descriptions — each is a list of table</span>
+<span class="sd">            names from ``from_table`` to ``to_table``.</span>
+<span class="sd">        suggested_intermediates: tables that appear in at least one</span>
+<span class="sd">            path but not in ``include_tables`` — any of these could be</span>
+<span class="sd">            named in ``include_tables`` or ``via`` to force a choice.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; try:  # doctest: +SKIP</span>
+<span class="sd">        ...     d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])  # diamond schema</span>
+<span class="sd">        ... except DerivaMLDenormalizeAmbiguousPath as e:</span>
+<span class="sd">        ...     for p in e.paths:</span>
+<span class="sd">        ...         print(&quot; → &quot;.join(p))</span>
+<span class="sd">        ...     # Retry routing explicitly through Observation:</span>
+<span class="sd">        ...     df = d.as_dataframe(</span>
+<span class="sd">        ...         [&quot;Image&quot;, &quot;Subject&quot;], via=e.suggested_intermediates[:1]</span>
+<span class="sd">        ...     )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">from_table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">to_table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+        <span class="n">suggested_intermediates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">from_table</span> <span class="o">=</span> <span class="n">from_table</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">to_table</span> <span class="o">=</span> <span class="n">to_table</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">suggested_intermediates</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">suggested_intermediates</span><span class="p">)</span>
+        <span class="n">path_strs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">    &quot;</span> <span class="o">+</span> <span class="s2">&quot; → &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Multiple FK paths between </span><span class="si">{</span><span class="n">from_table</span><span class="si">!r}</span><span class="s2"> and </span><span class="si">{</span><span class="n">to_table</span><span class="si">!r}</span><span class="s2">:&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_strs</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Resolve by one of:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  • Add an intermediate to include_tables &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(its columns will be in output): </span><span class="si">{</span><span class="n">suggested_intermediates</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  • Add an intermediate to via= (path-only, no columns): &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">suggested_intermediates</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  • Narrow include_tables so only one path is valid.&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDenormalizeDownstreamLeaf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDenormalizeDownstreamLeaf</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDenormalizeError (deriva_ml.core.exceptions.DerivaMLDenormalizeError)" href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError">DerivaMLDenormalizeError</a></code></p>
+
+
+
+        <p>Explicit <code>row_per</code> conflicts with a downstream table in <code>include_tables</code>.</p>
+<p>Raised when the user specifies <code>row_per=X</code> but another table in
+<code>include_tables</code> is downstream of X via FK (would require aggregation).</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeDownstreamLeaf.row_per">row_per</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the explicit row_per value.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeDownstreamLeaf.downstream_tables">downstream_tables</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>tables downstream of row_per that can't be hoisted.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDenormalizeDownstreamLeaf</span><span class="p">(</span><span class="n">DerivaMLDenormalizeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Explicit ``row_per`` conflicts with a downstream table in ``include_tables``.</span>
+
+<span class="sd">    Raised when the user specifies ``row_per=X`` but another table in</span>
+<span class="sd">    ``include_tables`` is downstream of X via FK (would require aggregation).</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        row_per: the explicit row_per value.</span>
+<span class="sd">        downstream_tables: tables downstream of row_per that can&#39;t be hoisted.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row_per</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">downstream_tables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">row_per</span> <span class="o">=</span> <span class="n">row_per</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">downstream_tables</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">downstream_tables</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Table(s) </span><span class="si">{</span><span class="n">downstream_tables</span><span class="si">}</span><span class="s2"> are downstream of row_per=</span><span class="si">{</span><span class="n">row_per</span><span class="si">!r}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;One row per </span><span class="si">{</span><span class="n">row_per</span><span class="si">}</span><span class="s2"> would require aggregating multiple rows of &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">downstream_tables</span><span class="si">}</span><span class="s2"> — aggregation is not yet supported. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Drop row_per to get one row per </span><span class="si">{</span><span class="n">downstream_tables</span><span class="si">}</span><span class="s2">, or remove &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">downstream_tables</span><span class="si">}</span><span class="s2"> from include_tables.&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDenormalizeError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDenormalizeError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLException (deriva_ml.core.exceptions.DerivaMLException)" href="#deriva_ml.core.exceptions.DerivaMLException">DerivaMLException</a></code></p>
+
+
+
+        <p>Base class for denormalization errors.</p>
+<p>All errors raised by :class:<code>~deriva_ml.local_db.denormalizer.Denormalizer</code>
+and related planning functions are instances of this class.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLDenormalizeError("Planner failed")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDenormalizeError</span><span class="p">(</span><span class="n">DerivaMLException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for denormalization errors.</span>
+
+<span class="sd">    All errors raised by :class:`~deriva_ml.local_db.denormalizer.Denormalizer`</span>
+<span class="sd">    and related planning functions are instances of this class.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLDenormalizeError(&quot;Planner failed&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDenormalizeMultiLeaf" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDenormalizeMultiLeaf</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDenormalizeError (deriva_ml.core.exceptions.DerivaMLDenormalizeError)" href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError">DerivaMLDenormalizeError</a></code></p>
+
+
+
+        <p>Multiple candidate tables for <code>row_per</code> — ambiguous leaf.</p>
+<p>Raised when Rule 2 auto-inference finds more than one sink in
+<code>include_tables</code> — i.e., multiple tables tie for "deepest in the
+FK graph." The user must specify <code>row_per</code> explicitly to resolve.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeMultiLeaf.candidates">candidates</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>list of table names that all qualify as sinks.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeMultiLeaf.include_tables">include_tables</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the <code>include_tables</code> argument that triggered
+the ambiguity, for reference.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>try:  # doctest: +SKIP
+...     d.as_dataframe(["Dataset", "Subject"])
+... except DerivaMLDenormalizeMultiLeaf as e:
+...     print(f"Pick one of {e.candidates} as row_per")
+...     # Then retry: d.as_dataframe(..., row_per="Subject")</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDenormalizeMultiLeaf</span><span class="p">(</span><span class="n">DerivaMLDenormalizeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Multiple candidate tables for ``row_per`` — ambiguous leaf.</span>
+
+<span class="sd">    Raised when Rule 2 auto-inference finds more than one sink in</span>
+<span class="sd">    ``include_tables`` — i.e., multiple tables tie for &quot;deepest in the</span>
+<span class="sd">    FK graph.&quot; The user must specify ``row_per`` explicitly to resolve.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        candidates: list of table names that all qualify as sinks.</span>
+<span class="sd">        include_tables: the ``include_tables`` argument that triggered</span>
+<span class="sd">            the ambiguity, for reference.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; try:  # doctest: +SKIP</span>
+<span class="sd">        ...     d.as_dataframe([&quot;Dataset&quot;, &quot;Subject&quot;])</span>
+<span class="sd">        ... except DerivaMLDenormalizeMultiLeaf as e:</span>
+<span class="sd">        ...     print(f&quot;Pick one of {e.candidates} as row_per&quot;)</span>
+<span class="sd">        ...     # Then retry: d.as_dataframe(..., row_per=&quot;Subject&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">candidates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">include_tables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">candidates</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">include_tables</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">include_tables</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Multiple candidates for row_per: </span><span class="si">{</span><span class="n">candidates</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Specify row_per=... explicitly. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(include_tables=</span><span class="si">{</span><span class="n">include_tables</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDenormalizeNoSink" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDenormalizeNoSink</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDenormalizeError (deriva_ml.core.exceptions.DerivaMLDenormalizeError)" href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError">DerivaMLDenormalizeError</a></code></p>
+
+
+
+        <p>No sink found in the FK subgraph — cycle detected.</p>
+<p>Raised when every table in <code>include_tables</code> has an outbound FK to
+another table in the set, forming a cycle. Pathological — rare in
+real schemas.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>msg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Descriptive error message. Should identify the tables
+forming the cycle.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLDenormalizeNoSink(  # doctest: +SKIP
+...     "Cycle in FK graph between tables A, B, C"
+... )</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDenormalizeNoSink</span><span class="p">(</span><span class="n">DerivaMLDenormalizeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;No sink found in the FK subgraph — cycle detected.</span>
+
+<span class="sd">    Raised when every table in ``include_tables`` has an outbound FK to</span>
+<span class="sd">    another table in the set, forming a cycle. Pathological — rare in</span>
+<span class="sd">    real schemas.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        msg: Descriptive error message. Should identify the tables</span>
+<span class="sd">            forming the cycle.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLDenormalizeNoSink(  # doctest: +SKIP</span>
+<span class="sd">        ...     &quot;Cycle in FK graph between tables A, B, C&quot;</span>
+<span class="sd">        ... )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDenormalizeUnrelatedAnchor" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDenormalizeUnrelatedAnchor</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDenormalizeError (deriva_ml.core.exceptions.DerivaMLDenormalizeError)" href="#deriva_ml.core.exceptions.DerivaMLDenormalizeError">DerivaMLDenormalizeError</a></code></p>
+
+
+
+        <p>Anchor has no FK path to any table in <code>include_tables ∪ via</code>.</p>
+<p>Raised when Rule 8 detects anchors whose table has no FK
+relationship to any requested table — those anchors would
+contribute nothing to the output, which is almost always a mistake
+(wrong dataset passed, stale table name, etc.). Pass
+<code>ignore_unrelated_anchors=True</code> to silently drop them if the
+heterogeneity is intentional.</p>
+<p>Note: this is distinct from Rule 7 case 5 (table has an FK path
+into <code>include_tables ∪ via</code> but the specific anchor RIDs don't
+reach <code>row_per</code>). Case 5 anchors are silently dropped regardless
+of the flag — only case 6 (no path at all) raises this error.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeUnrelatedAnchor.unrelated_tables">unrelated_tables</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>tables of the unrelated anchors.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLDenormalizeUnrelatedAnchor.include_tables">include_tables</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the <code>include_tables</code> argument for reference.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>try:  # doctest: +SKIP
+...     d.as_dataframe(["Image", "Subject"])  # dataset has stray types
+... except DerivaMLDenormalizeUnrelatedAnchor as e:
+...     print(f"Dataset has unrelated members: {e.unrelated_tables}")
+...     # Retry, dropping them:
+...     df = d.as_dataframe(
+...         ["Image", "Subject"], ignore_unrelated_anchors=True
+...     )</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span>
+<span class="normal">627</span>
+<span class="normal">628</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span>
+<span class="normal">639</span>
+<span class="normal">640</span>
+<span class="normal">641</span>
+<span class="normal">642</span>
+<span class="normal">643</span>
+<span class="normal">644</span>
+<span class="normal">645</span>
+<span class="normal">646</span>
+<span class="normal">647</span>
+<span class="normal">648</span>
+<span class="normal">649</span>
+<span class="normal">650</span>
+<span class="normal">651</span>
+<span class="normal">652</span>
+<span class="normal">653</span>
+<span class="normal">654</span>
+<span class="normal">655</span>
+<span class="normal">656</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span>
+<span class="normal">667</span>
+<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDenormalizeUnrelatedAnchor</span><span class="p">(</span><span class="n">DerivaMLDenormalizeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Anchor has no FK path to any table in ``include_tables ∪ via``.</span>
+
+<span class="sd">    Raised when Rule 8 detects anchors whose table has no FK</span>
+<span class="sd">    relationship to any requested table — those anchors would</span>
+<span class="sd">    contribute nothing to the output, which is almost always a mistake</span>
+<span class="sd">    (wrong dataset passed, stale table name, etc.). Pass</span>
+<span class="sd">    ``ignore_unrelated_anchors=True`` to silently drop them if the</span>
+<span class="sd">    heterogeneity is intentional.</span>
+
+<span class="sd">    Note: this is distinct from Rule 7 case 5 (table has an FK path</span>
+<span class="sd">    into ``include_tables ∪ via`` but the specific anchor RIDs don&#39;t</span>
+<span class="sd">    reach ``row_per``). Case 5 anchors are silently dropped regardless</span>
+<span class="sd">    of the flag — only case 6 (no path at all) raises this error.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        unrelated_tables: tables of the unrelated anchors.</span>
+<span class="sd">        include_tables: the ``include_tables`` argument for reference.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; try:  # doctest: +SKIP</span>
+<span class="sd">        ...     d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])  # dataset has stray types</span>
+<span class="sd">        ... except DerivaMLDenormalizeUnrelatedAnchor as e:</span>
+<span class="sd">        ...     print(f&quot;Dataset has unrelated members: {e.unrelated_tables}&quot;)</span>
+<span class="sd">        ...     # Retry, dropping them:</span>
+<span class="sd">        ...     df = d.as_dataframe(</span>
+<span class="sd">        ...         [&quot;Image&quot;, &quot;Subject&quot;], ignore_unrelated_anchors=True</span>
+<span class="sd">        ...     )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">unrelated_tables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">include_tables</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unrelated_tables</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">unrelated_tables</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">include_tables</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">include_tables</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Anchors of table(s) </span><span class="si">{</span><span class="n">unrelated_tables</span><span class="si">}</span><span class="s2"> have no FK path to any &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;table in include_tables=</span><span class="si">{</span><span class="n">include_tables</span><span class="si">}</span><span class="s2">. They would contribute &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;nothing to the output.</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Options:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  • Remove these anchors from the anchor set.</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  • Add </span><span class="si">{</span><span class="n">unrelated_tables</span><span class="si">}</span><span class="s2"> (or a linking table) to include_tables.</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  • Pass ignore_unrelated_anchors=True to silently drop them.&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLDirtyWorkflowError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLDirtyWorkflowError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLWorkflowError (deriva_ml.core.exceptions.DerivaMLWorkflowError)" href="#deriva_ml.core.exceptions.DerivaMLWorkflowError">DerivaMLWorkflowError</a></code></p>
+
+
+
+        <p>Exception raised when workflow code has uncommitted changes.</p>
+<p>DerivaML requires code to be committed before execution for provenance
+tracking. Running with uncommitted changes means the execution record
+cannot reliably link back to the source code.</p>
+<p>Use <code>allow_dirty=True</code> in the API or <code>--allow-dirty</code> on the CLI
+to override this check when debugging or iterating.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the file with uncommitted changes.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLDirtyWorkflowError("src/models/train.py")  # doctest: +SKIP
+DerivaMLDirtyWorkflowError: File src/models/train.py has uncommitted changes. ...</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLDirtyWorkflowError</span><span class="p">(</span><span class="n">DerivaMLWorkflowError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when workflow code has uncommitted changes.</span>
+
+<span class="sd">    DerivaML requires code to be committed before execution for provenance</span>
+<span class="sd">    tracking. Running with uncommitted changes means the execution record</span>
+<span class="sd">    cannot reliably link back to the source code.</span>
+
+<span class="sd">    Use ``allow_dirty=True`` in the API or ``--allow-dirty`` on the CLI</span>
+<span class="sd">    to override this check when debugging or iterating.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        path: Path to the file with uncommitted changes.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLDirtyWorkflowError(&quot;src/models/train.py&quot;)  # doctest: +SKIP</span>
+<span class="sd">        DerivaMLDirtyWorkflowError: File src/models/train.py has uncommitted changes. ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> has uncommitted changes. Commit before running, or use --allow-dirty to override.&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLException" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLException</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Base exception class for all DerivaML errors.</p>
+<p>This is the root exception for all DerivaML-specific errors. Catching this
+exception will catch any error raised by the DerivaML library.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLException._msg">_msg</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The error message stored for later access.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>msg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Descriptive error message. Defaults to empty string.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLException("Failed to connect to catalog")  # doctest: +SKIP
+DerivaMLException: Failed to connect to catalog</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base exception class for all DerivaML errors.</span>
+
+<span class="sd">    This is the root exception for all DerivaML-specific errors. Catching this</span>
+<span class="sd">    exception will catch any error raised by the DerivaML library.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        _msg: The error message stored for later access.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        msg: Descriptive error message. Defaults to empty string.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLException(&quot;Failed to connect to catalog&quot;)  # doctest: +SKIP</span>
+<span class="sd">        DerivaMLException: Failed to connect to catalog</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_msg</span> <span class="o">=</span> <span class="n">msg</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLExecutionError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLExecutionError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLException (deriva_ml.core.exceptions.DerivaMLException)" href="#deriva_ml.core.exceptions.DerivaMLException">DerivaMLException</a></code></p>
+
+
+
+        <p>Exception raised for execution lifecycle issues.</p>
+<p>Base class for errors related to workflow execution, asset management,
+and provenance tracking.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLExecutionError("Execution failed to initialize")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLExecutionError</span><span class="p">(</span><span class="n">DerivaMLException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for execution lifecycle issues.</span>
+
+<span class="sd">    Base class for errors related to workflow execution, asset management,</span>
+<span class="sd">    and provenance tracking.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLExecutionError(&quot;Execution failed to initialize&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLInvalidTerm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLInvalidTerm</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLNotFoundError (deriva_ml.core.exceptions.DerivaMLNotFoundError)" href="#deriva_ml.core.exceptions.DerivaMLNotFoundError">DerivaMLNotFoundError</a></code></p>
+
+
+
+        <p>Exception raised when a vocabulary term is not found or invalid.</p>
+<p>Raised when attempting to look up or use a term that doesn't exist in
+a controlled vocabulary table, or when a term name/synonym cannot be resolved.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>vocabulary</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the vocabulary table being searched.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>term</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The term name that was not found.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>msg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional context about the error. Defaults to "Term doesn't exist".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;Term doesn&#39;t exist&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLInvalidTerm("Diagnosis", "unknown_condition")  # doctest: +SKIP
+DerivaMLInvalidTerm: Invalid term unknown_condition in vocabulary Diagnosis: Term doesn't exist.</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLInvalidTerm</span><span class="p">(</span><span class="n">DerivaMLNotFoundError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when a vocabulary term is not found or invalid.</span>
+
+<span class="sd">    Raised when attempting to look up or use a term that doesn&#39;t exist in</span>
+<span class="sd">    a controlled vocabulary table, or when a term name/synonym cannot be resolved.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        vocabulary: Name of the vocabulary table being searched.</span>
+<span class="sd">        term: The term name that was not found.</span>
+<span class="sd">        msg: Additional context about the error. Defaults to &quot;Term doesn&#39;t exist&quot;.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLInvalidTerm(&quot;Diagnosis&quot;, &quot;unknown_condition&quot;)  # doctest: +SKIP</span>
+<span class="sd">        DerivaMLInvalidTerm: Invalid term unknown_condition in vocabulary Diagnosis: Term doesn&#39;t exist.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vocabulary</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Term doesn&#39;t exist&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid term </span><span class="si">{</span><span class="n">term</span><span class="si">}</span><span class="s2"> in vocabulary </span><span class="si">{</span><span class="n">vocabulary</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vocabulary</span> <span class="o">=</span> <span class="n">vocabulary</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">term</span> <span class="o">=</span> <span class="n">term</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLMaterializeLimitExceeded" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLMaterializeLimitExceeded</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLValidationError (deriva_ml.core.exceptions.DerivaMLValidationError)" href="#deriva_ml.core.exceptions.DerivaMLValidationError">DerivaMLValidationError</a></code></p>
+
+
+
+        <p>Raised when a result set exceeds the caller-supplied <code>materialize_limit</code>.</p>
+<p>Surfaced by helpers (e.g. <code>feature_values</code>) that materialize the
+full result set into memory before reduction. Callers can either
+raise the limit, narrow their query (e.g. add an <code>execution_rids</code>
+filter), or switch to a streaming consumer.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLMaterializeLimitExceeded.actual_count">actual_count</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The actual size of the result set that triggered
+the limit.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="deriva_ml.core.exceptions.DerivaMLMaterializeLimitExceeded.limit">limit</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The <code>materialize_limit</code> the caller passed.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+exc = DerivaMLMaterializeLimitExceeded(actual_count=1500, limit=1000)
+exc.actual_count
+1500
+"exceeds materialize_limit" in str(exc)
+True</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLMaterializeLimitExceeded</span><span class="p">(</span><span class="n">DerivaMLValidationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when a result set exceeds the caller-supplied ``materialize_limit``.</span>
+
+<span class="sd">    Surfaced by helpers (e.g. ``feature_values``) that materialize the</span>
+<span class="sd">    full result set into memory before reduction. Callers can either</span>
+<span class="sd">    raise the limit, narrow their query (e.g. add an ``execution_rids``</span>
+<span class="sd">    filter), or switch to a streaming consumer.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        actual_count: The actual size of the result set that triggered</span>
+<span class="sd">            the limit.</span>
+<span class="sd">        limit: The ``materialize_limit`` the caller passed.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded</span>
+<span class="sd">        &gt;&gt;&gt; exc = DerivaMLMaterializeLimitExceeded(actual_count=1500, limit=1000)</span>
+<span class="sd">        &gt;&gt;&gt; exc.actual_count</span>
+<span class="sd">        1500</span>
+<span class="sd">        &gt;&gt;&gt; &quot;exceeds materialize_limit&quot; in str(exc)</span>
+<span class="sd">        True</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actual_count</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actual_count</span> <span class="o">=</span> <span class="n">actual_count</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">=</span> <span class="n">limit</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;feature_values result set (</span><span class="si">{</span><span class="n">actual_count</span><span class="si">}</span><span class="s2"> rows) exceeds materialize_limit (</span><span class="si">{</span><span class="n">limit</span><span class="si">}</span><span class="s2">); &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;narrow the query (e.g. pass execution_rids=...) or raise the limit.&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLNoExecutionContext" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLNoExecutionContext</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLConfigurationError (deriva_ml.core.exceptions.DerivaMLConfigurationError)" href="#deriva_ml.core.exceptions.DerivaMLConfigurationError">DerivaMLConfigurationError</a></code></p>
+
+
+
+        <p>Exception raised when an execution-scoped operation is attempted without an execution context.</p>
+<p>Handles returned by <code>ml.table(name)</code> are read-only — useful for schema
+introspection — but their <code>.insert(...)</code> and asset-file methods raise
+this exception. Use <code>exe.table(name)</code> to get a handle bound to an
+execution that permits writes.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <p>Calling a write method on a read-only handle raises this error::</p>
+<pre><code>&gt;&gt;&gt; handle = ml.table("Subject")  # doctest: +SKIP
+&gt;&gt;&gt; handle.record_class()              # OK  # doctest: +SKIP
+&gt;&gt;&gt; handle.insert({"Name": "x"})       # raises  # doctest: +SKIP
+Traceback (most recent call last):
+    ...
+DerivaMLNoExecutionContext: ml.table() handles are read-only; use exe.table() for writes
+</code></pre>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLNoExecutionContext</span><span class="p">(</span><span class="n">DerivaMLConfigurationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when an execution-scoped operation is attempted without an execution context.</span>
+
+<span class="sd">    Handles returned by ``ml.table(name)`` are read-only — useful for schema</span>
+<span class="sd">    introspection — but their ``.insert(...)`` and asset-file methods raise</span>
+<span class="sd">    this exception. Use ``exe.table(name)`` to get a handle bound to an</span>
+<span class="sd">    execution that permits writes.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Calling a write method on a read-only handle raises this error::</span>
+
+<span class="sd">            &gt;&gt;&gt; handle = ml.table(&quot;Subject&quot;)  # doctest: +SKIP</span>
+<span class="sd">            &gt;&gt;&gt; handle.record_class()              # OK  # doctest: +SKIP</span>
+<span class="sd">            &gt;&gt;&gt; handle.insert({&quot;Name&quot;: &quot;x&quot;})       # raises  # doctest: +SKIP</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">                ...</span>
+<span class="sd">            DerivaMLNoExecutionContext: ml.table() handles are read-only; use exe.table() for writes</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLNotFoundError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLNotFoundError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDataError (deriva_ml.core.exceptions.DerivaMLDataError)" href="#deriva_ml.core.exceptions.DerivaMLDataError">DerivaMLDataError</a></code></p>
+
+
+
+        <p>Exception raised when an entity cannot be found.</p>
+<p>Raised when a lookup operation fails to find the requested entity
+(dataset, table, term, etc.) in the catalog or bag.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLNotFoundError("Entity '1-ABC' not found in catalog")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLNotFoundError</span><span class="p">(</span><span class="n">DerivaMLDataError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when an entity cannot be found.</span>
+
+<span class="sd">    Raised when a lookup operation fails to find the requested entity</span>
+<span class="sd">    (dataset, table, term, etc.) in the catalog or bag.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLNotFoundError(&quot;Entity &#39;1-ABC&#39; not found in catalog&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLOfflineError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLOfflineError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLConfigurationError (deriva_ml.core.exceptions.DerivaMLConfigurationError)" href="#deriva_ml.core.exceptions.DerivaMLConfigurationError">DerivaMLConfigurationError</a></code></p>
+
+
+
+        <p>Exception raised when an online-only operation is attempted in offline mode.</p>
+<p>The DerivaML instance was constructed with <code>mode=ConnectionMode.offline</code>
+but the caller invoked an operation that requires server contact — most
+commonly <code>create_execution</code>, which needs a server-assigned Execution RID.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <p>Creating an execution requires an online mode because the
+Execution RID must be server-assigned::</p>
+<pre><code>&gt;&gt;&gt; ml = DerivaML(..., mode=ConnectionMode.offline)  # doctest: +SKIP
+&gt;&gt;&gt; ml.create_execution(config)  # doctest: +SKIP
+Traceback (most recent call last):
+    ...
+DerivaMLOfflineError: create_execution requires online mode
+</code></pre>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLOfflineError</span><span class="p">(</span><span class="n">DerivaMLConfigurationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when an online-only operation is attempted in offline mode.</span>
+
+<span class="sd">    The DerivaML instance was constructed with ``mode=ConnectionMode.offline``</span>
+<span class="sd">    but the caller invoked an operation that requires server contact — most</span>
+<span class="sd">    commonly ``create_execution``, which needs a server-assigned Execution RID.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        Creating an execution requires an online mode because the</span>
+<span class="sd">        Execution RID must be server-assigned::</span>
+
+<span class="sd">            &gt;&gt;&gt; ml = DerivaML(..., mode=ConnectionMode.offline)  # doctest: +SKIP</span>
+<span class="sd">            &gt;&gt;&gt; ml.create_execution(config)  # doctest: +SKIP</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">                ...</span>
+<span class="sd">            DerivaMLOfflineError: create_execution requires online mode</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLReadOnlyError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLReadOnlyError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLException (deriva_ml.core.exceptions.DerivaMLException)" href="#deriva_ml.core.exceptions.DerivaMLException">DerivaMLException</a></code></p>
+
+
+
+        <p>Exception raised when attempting write operations on read-only resources.</p>
+<p>Raised when attempting to modify data in a downloaded bag or other
+read-only context where write operations are not supported.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLReadOnlyError("Cannot create datasets in a downloaded bag")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLReadOnlyError</span><span class="p">(</span><span class="n">DerivaMLException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when attempting write operations on read-only resources.</span>
+
+<span class="sd">    Raised when attempting to modify data in a downloaded bag or other</span>
+<span class="sd">    read-only context where write operations are not supported.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLReadOnlyError(&quot;Cannot create datasets in a downloaded bag&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLSchemaError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLSchemaError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLConfigurationError (deriva_ml.core.exceptions.DerivaMLConfigurationError)" href="#deriva_ml.core.exceptions.DerivaMLConfigurationError">DerivaMLConfigurationError</a></code></p>
+
+
+
+        <p>Exception raised for schema or catalog structure issues.</p>
+<p>Raised when the catalog schema is invalid, missing required tables,
+or has structural problems that prevent normal operation.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLSchemaError("Ambiguous domain schema: ['Schema1', 'Schema2']")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLSchemaError</span><span class="p">(</span><span class="n">DerivaMLConfigurationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for schema or catalog structure issues.</span>
+
+<span class="sd">    Raised when the catalog schema is invalid, missing required tables,</span>
+<span class="sd">    or has structural problems that prevent normal operation.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLSchemaError(&quot;Ambiguous domain schema: [&#39;Schema1&#39;, &#39;Schema2&#39;]&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLSchemaPinned" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLSchemaPinned</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLConfigurationError (deriva_ml.core.exceptions.DerivaMLConfigurationError)" href="#deriva_ml.core.exceptions.DerivaMLConfigurationError">DerivaMLConfigurationError</a></code></p>
+
+
+
+        <p>Raised when <code>refresh_schema()</code> is called on a pinned cache.</p>
+<p>The cache has been explicitly pinned via <code>pin_schema()</code>. Call
+<code>unpin_schema()</code> first if you really want to refresh. Note:
+<code>force=True</code> does NOT bypass a pin — it only bypasses the
+pending-rows guard.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLSchemaPinned(  # doctest: +SKIP
+...     "refresh_schema refused: cache is pinned at snapshot s0"
+... )</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLSchemaPinned</span><span class="p">(</span><span class="n">DerivaMLConfigurationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when ``refresh_schema()`` is called on a pinned cache.</span>
+
+<span class="sd">    The cache has been explicitly pinned via ``pin_schema()``. Call</span>
+<span class="sd">    ``unpin_schema()`` first if you really want to refresh. Note:</span>
+<span class="sd">    ``force=True`` does NOT bypass a pin — it only bypasses the</span>
+<span class="sd">    pending-rows guard.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLSchemaPinned(  # doctest: +SKIP</span>
+<span class="sd">        ...     &quot;refresh_schema refused: cache is pinned at snapshot s0&quot;</span>
+<span class="sd">        ... )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLSchemaRefreshBlocked" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLSchemaRefreshBlocked</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLConfigurationError (deriva_ml.core.exceptions.DerivaMLConfigurationError)" href="#deriva_ml.core.exceptions.DerivaMLConfigurationError">DerivaMLConfigurationError</a></code></p>
+
+
+
+        <p>Raised when <code>refresh_schema()</code> is called with staged work in the workspace.</p>
+<p>The caller should drain the workspace first (<code>ml.upload_pending()</code>)
+or call <code>refresh_schema(force=True)</code> to discard local state.
+Draining is the safer choice — a forced refresh may leave rows
+whose metadata references columns or types no longer in the new
+schema, causing catalog-insert failures on the next upload.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLSchemaRefreshBlocked(  # doctest: +SKIP
+...     "refresh_schema requires a drained workspace; 3 pending rows"
+... )</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLSchemaRefreshBlocked</span><span class="p">(</span><span class="n">DerivaMLConfigurationError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when ``refresh_schema()`` is called with staged work in the workspace.</span>
+
+<span class="sd">    The caller should drain the workspace first (``ml.upload_pending()``)</span>
+<span class="sd">    or call ``refresh_schema(force=True)`` to discard local state.</span>
+<span class="sd">    Draining is the safer choice — a forced refresh may leave rows</span>
+<span class="sd">    whose metadata references columns or types no longer in the new</span>
+<span class="sd">    schema, causing catalog-insert failures on the next upload.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLSchemaRefreshBlocked(  # doctest: +SKIP</span>
+<span class="sd">        ...     &quot;refresh_schema requires a drained workspace; 3 pending rows&quot;</span>
+<span class="sd">        ... )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLStateInconsistency" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLStateInconsistency</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDataError (deriva_ml.core.exceptions.DerivaMLDataError)" href="#deriva_ml.core.exceptions.DerivaMLDataError">DerivaMLDataError</a></code></p>
+
+
+
+        <p>Exception raised when workspace SQLite state and catalog state disagree in an unresolvable way.</p>
+<p>The six disagreement cases enumerated in spec §2.2 are handled automatically
+by the reconciliation logic (see <code>state_machine.reconcile_with_catalog</code>);
+anything outside those rules surfaces as this exception with enough
+information for a human to intervene.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <p>A catalog-side delete of an in-flight execution produces this error::</p>
+<pre><code>&gt;&gt;&gt; exe = ml.resume_execution("EXE-A")  # doctest: +SKIP
+Traceback (most recent call last):
+    ...
+DerivaMLStateInconsistency: Execution EXE-A: SQLite status 'running' but catalog returned no Execution row
+</code></pre>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLStateInconsistency</span><span class="p">(</span><span class="n">DerivaMLDataError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when workspace SQLite state and catalog state disagree in an unresolvable way.</span>
+
+<span class="sd">    The six disagreement cases enumerated in spec §2.2 are handled automatically</span>
+<span class="sd">    by the reconciliation logic (see ``state_machine.reconcile_with_catalog``);</span>
+<span class="sd">    anything outside those rules surfaces as this exception with enough</span>
+<span class="sd">    information for a human to intervene.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        A catalog-side delete of an in-flight execution produces this error::</span>
+
+<span class="sd">            &gt;&gt;&gt; exe = ml.resume_execution(&quot;EXE-A&quot;)  # doctest: +SKIP</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">                ...</span>
+<span class="sd">            DerivaMLStateInconsistency: Execution EXE-A: SQLite status &#39;running&#39; but catalog returned no Execution row</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLTableNotFound" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLTableNotFound</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLNotFoundError (deriva_ml.core.exceptions.DerivaMLNotFoundError)" href="#deriva_ml.core.exceptions.DerivaMLNotFoundError">DerivaMLNotFoundError</a></code></p>
+
+
+
+        <p>Exception raised when a table cannot be found.</p>
+<p>Raised when attempting to access a table that doesn't exist in the
+catalog schema or downloaded bag.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>table_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the table that was not found.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>msg</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional context. Defaults to "Table not found".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;Table not found&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLTableNotFound("MyTable")  # doctest: +SKIP
+DerivaMLTableNotFound: Table not found: MyTable</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLTableNotFound</span><span class="p">(</span><span class="n">DerivaMLNotFoundError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when a table cannot be found.</span>
+
+<span class="sd">    Raised when attempting to access a table that doesn&#39;t exist in the</span>
+<span class="sd">    catalog schema or downloaded bag.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        table_name: The name of the table that was not found.</span>
+<span class="sd">        msg: Additional context. Defaults to &quot;Table not found&quot;.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLTableNotFound(&quot;MyTable&quot;)  # doctest: +SKIP</span>
+<span class="sd">        DerivaMLTableNotFound: Table not found: MyTable</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Table not found&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">table_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_name</span> <span class="o">=</span> <span class="n">table_name</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLTableTypeError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLTableTypeError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDataError (deriva_ml.core.exceptions.DerivaMLDataError)" href="#deriva_ml.core.exceptions.DerivaMLDataError">DerivaMLDataError</a></code></p>
+
+
+
+        <p>Exception raised when a RID or table is not of the expected type.</p>
+<p>Raised when an operation requires a specific table type (e.g., Dataset,
+Execution) but receives a RID or table reference of a different type.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>table_type</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The expected table type (e.g., "Dataset", "Execution").</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>table</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The actual table name or RID that was provided.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLTableTypeError("Dataset", "1-ABC123")  # doctest: +SKIP
+DerivaMLTableTypeError: Table 1-ABC123 is not of type Dataset.</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLTableTypeError</span><span class="p">(</span><span class="n">DerivaMLDataError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when a RID or table is not of the expected type.</span>
+
+<span class="sd">    Raised when an operation requires a specific table type (e.g., Dataset,</span>
+<span class="sd">    Execution) but receives a RID or table reference of a different type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        table_type: The expected table type (e.g., &quot;Dataset&quot;, &quot;Execution&quot;).</span>
+<span class="sd">        table: The actual table name or RID that was provided.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLTableTypeError(&quot;Dataset&quot;, &quot;1-ABC123&quot;)  # doctest: +SKIP</span>
+<span class="sd">        DerivaMLTableTypeError: Table 1-ABC123 is not of type Dataset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Table </span><span class="si">{</span><span class="n">table</span><span class="si">}</span><span class="s2"> is not of type </span><span class="si">{</span><span class="n">table_type</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_type</span> <span class="o">=</span> <span class="n">table_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table</span> <span class="o">=</span> <span class="n">table</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLUploadError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLUploadError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLExecutionError (deriva_ml.core.exceptions.DerivaMLExecutionError)" href="#deriva_ml.core.exceptions.DerivaMLExecutionError">DerivaMLExecutionError</a></code></p>
+
+
+
+        <p>Exception raised for asset upload failures.</p>
+<p>Raised when uploading assets to the catalog fails, including file
+uploads, metadata insertion, and provenance recording.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLUploadError("Failed to upload execution assets")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLUploadError</span><span class="p">(</span><span class="n">DerivaMLExecutionError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for asset upload failures.</span>
+
+<span class="sd">    Raised when uploading assets to the catalog fails, including file</span>
+<span class="sd">    uploads, metadata insertion, and provenance recording.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLUploadError(&quot;Failed to upload execution assets&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLValidationError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLValidationError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLDataError (deriva_ml.core.exceptions.DerivaMLDataError)" href="#deriva_ml.core.exceptions.DerivaMLDataError">DerivaMLDataError</a></code></p>
+
+
+
+        <p>Exception raised when data validation fails.</p>
+<p>Raised when input data fails validation, such as invalid RID format,
+mismatched metadata, or constraint violations.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLValidationError("Invalid RID format: ABC")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLValidationError</span><span class="p">(</span><span class="n">DerivaMLDataError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised when data validation fails.</span>
+
+<span class="sd">    Raised when input data fails validation, such as invalid RID format,</span>
+<span class="sd">    mismatched metadata, or constraint violations.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLValidationError(&quot;Invalid RID format: ABC&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="deriva_ml.core.exceptions.DerivaMLWorkflowError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">DerivaMLWorkflowError</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="DerivaMLExecutionError (deriva_ml.core.exceptions.DerivaMLExecutionError)" href="#deriva_ml.core.exceptions.DerivaMLExecutionError">DerivaMLExecutionError</a></code></p>
+
+
+
+        <p>Exception raised for workflow-related issues.</p>
+<p>Raised when there are problems with workflow lookup, creation, or
+Git integration for workflow tracking.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>raise DerivaMLWorkflowError("Not executing in a Git repository")  # doctest: +SKIP</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/deriva_ml/core/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DerivaMLWorkflowError</span><span class="p">(</span><span class="n">DerivaMLExecutionError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception raised for workflow-related issues.</span>
+
+<span class="sd">    Raised when there are problems with workflow lookup, creation, or</span>
+<span class="sd">    Git integration for workflow tracking.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; raise DerivaMLWorkflowError(&quot;Not executing in a Git repository&quot;)  # doctest: +SKIP</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../deriva_definitions/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Definitions &amp; Types">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Definitions & Types
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../upload/" class="md-footer__link md-footer__link--next" aria-label="Next: Upload">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Upload
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

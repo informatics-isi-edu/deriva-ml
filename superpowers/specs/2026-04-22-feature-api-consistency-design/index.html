@@ -1,0 +1,2661 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-22-feature-api-consistency-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Feature API Consistency — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#feature-api-consistency-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Feature API Consistency — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#three-method-read-surface-symmetric-across-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three-method read surface, symmetric across containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denormalizer-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denormalizer — unchanged
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#container-helper-list_workflow_executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container helper: list_workflow_executions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selector-factory-featurerecordselect_by_workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selector factory: FeatureRecord.select_by_workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#write-surface-execution-staged-provenance-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write surface — execution-staged, provenance-required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bag-denormalization-cache-feature-read-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bag denormalization cache — feature read path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup_feature-works-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lookup_feature works offline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retired-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retired APIs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sqlite-schema-change-8-integration-replaces-file-based-feature-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SQLite schema change (§8 integration — replaces file-based feature upload)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#read-online" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read — online
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-dataset-scoped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read — dataset-scoped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-offline-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read — offline (bag)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#write-normal-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write — normal path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#write-crash-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write — crash-resume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#write-offline-compute-online-flush" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write — offline-compute, online-flush
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Documentation requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-method-docstring-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-method docstring contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-docstring-canonical-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example docstring (canonical shape)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inline-comments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline comments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#module-level-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module-level docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-expanded-complete-coverage-live-catalog-included" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing (expanded — complete coverage, live catalog included)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing (expanded — complete coverage, live catalog included)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coverage-requirement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage requirement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-organization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test organization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-catalog-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live catalog coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#offline-unit-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline / unit coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parametrized-symmetry-suite-the-contract-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parametrized symmetry suite — the contract test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regression-guards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regression guards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coverage-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage target
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="feature-api-consistency-design">Feature API Consistency — Design</h1>
+<p><strong>Status:</strong> Draft
+<strong>Date:</strong> 2026-04-22
+<strong>Scope:</strong> S2 from the sqlite-execution-state roadmap — reframed from "add Metric/Param" to "audit + unify Feature API for consistency across online/offline containers and the new caching/denormalization layer."</p>
+<h2 id="problem">Problem</h2>
+<p>The feature-access API is divergent across the three container surfaces (<code>DerivaML</code>, <code>Dataset</code>, <code>DatasetBag</code>) and internally inconsistent. Symptoms:</p>
+<ul>
+<li>Duplicate methods: <code>fetch_table_features</code> and <code>list_feature_values</code> appear on both <code>DerivaML</code> and <code>DatasetBag</code> with partially overlapping behavior.</li>
+<li>Asymmetric surfaces: <code>Dataset</code> has <code>find_features</code> but no read method for feature values; <code>DatasetBag</code> and <code>DerivaML</code> have both but their return semantics differ in edge cases.</li>
+<li><code>ml.select_by_workflow(records, workflow)</code> is an outlier — it takes records and a workflow but is invoked as an ml-level function rather than a selector that composes with the rest of the selector ecosystem.</li>
+<li><code>ml.add_features</code> exists as a write-direct-to-catalog escape hatch that bypasses provenance, allowing feature values to be created without an execution.</li>
+<li>Bag-side feature reads do not flow through the new denormalization caching layer.</li>
+</ul>
+<p>The result is three near-duplicate APIs the user has to learn, with subtle differences, and no single answer to the three canonical ML-developer questions:</p>
+<ol>
+<li>What features exist on this table?</li>
+<li>Give me feature values shaped per target RID for model input.</li>
+<li>Let me explore feature values with their provenance.</li>
+</ol>
+<h2 id="goals">Goals</h2>
+<ul>
+<li><strong>One read surface</strong> across all three containers with identical signatures and return types for corresponding methods.</li>
+<li><strong>Three methods</strong> aligned with the three user questions above.</li>
+<li><strong>One write path</strong> that requires provenance (no escape hatches).</li>
+<li><strong>Offline parity</strong> — bags serve feature reads from the denormalization cache so online and offline return matching data.</li>
+<li><strong>No deprecation shims</strong> — retired APIs raise a clear error pointing at the replacement.</li>
+</ul>
+<h2 id="non-goals">Non-goals</h2>
+<ul>
+<li>No new concept of Metric or Param. Metrics are execution assets; parameters live in Hydra config + execution assets.</li>
+<li>No new general wide-form method. <code>Denormalizer</code> already handles general structural wide-joins and is feature-agnostic; S2 leaves it unchanged.</li>
+<li>No changes to <code>create_feature</code>, <code>FeatureRecord</code> dynamic class generation, or the vocabulary subsystem.</li>
+</ul>
+<h2 id="architecture">Architecture</h2>
+<h3 id="three-method-read-surface-symmetric-across-containers">Three-method read surface, symmetric across containers</h3>
+<p>Each of <code>DerivaML</code>, <code>Dataset</code>, <code>DatasetBag</code> exposes:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>find_features(table)</code></td>
+<td><code>list[Feature]</code></td>
+<td>Discovery — what features exist on the table</td>
+</tr>
+<tr>
+<td><code>feature_values(table, feature_name, selector=...)</code></td>
+<td><code>Iterable[FeatureRecord]</code></td>
+<td>Wide-shaped typed records per target RID (selector-reduced)</td>
+</tr>
+<tr>
+<td><code>lookup_feature(table, feature_name)</code></td>
+<td><code>Feature</code></td>
+<td>Metadata — feature definition, enables <code>feature_record_class()</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>feature_values</code> returns an iterator of <code>FeatureRecord</code> instances. Each record is already wide in shape — it has the target RID, all value columns (vocab term, asset references, metadata columns), and provenance columns (Execution, RCT) as typed attributes. The iterator is single-feature; after selector reduction, one record per target RID is yielded. Callers convert to pandas/polars/numpy as they wish — <code>pd.DataFrame(r.model_dump() for r in records)</code> is the idiomatic pandas form.</p>
+<p>Rationale for <code>Iterable[FeatureRecord]</code> over <code>pd.DataFrame</code>: pandas is a heavy optional dependency; iterator return is stream-friendly for large bags; typed attribute access catches typos at authoring time; <code>FeatureRecord</code> is already the currency of the write path so the read and write APIs share types.</p>
+<p>Single-feature only. Multi-feature wide-form is <code>Denormalizer</code>'s job; duplicating it here adds complexity without simplifying any real use case. A user who wants two features merged on target RID writes two iterations and a <code>dict</code> merge (or uses <code>Denormalizer</code>).</p>
+<h3 id="denormalizer-unchanged"><code>Denormalizer</code> — unchanged</h3>
+<p>The existing <code>Denormalizer</code> class handles general structural wide-joins via FK traversal, feature-agnostic. Feature tables participate in it like any other table:</p>
+<pre><code class="language-python">d = Denormalizer(dataset)
+df = d.as_dataframe([&quot;Image&quot;, &quot;Image_Glaucoma&quot;])
+</code></pre>
+<p>S2 adds no feature-specific code to <code>Denormalizer</code>. Selector-style multi-value reduction stays on <code>feature_values</code>, where it is feature-aware.</p>
+<h3 id="container-helper-list_workflow_executions">Container helper: <code>list_workflow_executions</code></h3>
+<p>Each container exposes:</p>
+<pre><code class="language-python">container.list_workflow_executions(workflow) -&gt; list[RID]
+</code></pre>
+<p>Returns the list of execution RIDs in the container's scope that ran the given workflow. Entries are unique (a given execution runs one workflow). Consumers that need O(1) membership testing (such as <code>FeatureRecord.select_by_workflow</code>) convert to <code>set</code> at the call site.</p>
+<ul>
+<li><code>DerivaML</code>: all executions in the catalog for this workflow.</li>
+<li><code>Dataset</code>: executions in scope of the dataset.</li>
+<li><code>DatasetBag</code>: same as Dataset, read from bag SQLite.</li>
+</ul>
+<p>Public because users may want it for custom selectors. Its primary consumer is the new workflow selector factory.</p>
+<h3 id="selector-factory-featurerecordselect_by_workflow">Selector factory: <code>FeatureRecord.select_by_workflow</code></h3>
+<p><code>ml.select_by_workflow(records, workflow)</code> is retired. Replacement:</p>
+<pre><code class="language-python">selector = FeatureRecord.select_by_workflow(workflow, *, container)
+</code></pre>
+<ul>
+<li>Classmethod factory on <code>FeatureRecord</code>.</li>
+<li><code>container</code> is a <strong>required kwarg</strong> (no ambient state, no guessing).</li>
+<li>At construction, resolves the execution list once via <code>container.list_workflow_executions(workflow)</code> and converts to a <code>set</code> internally for O(1) membership tests.</li>
+<li>Returns a closure <code>(list[FeatureRecord]) -&gt; FeatureRecord | None</code> matching the existing selector signature.</li>
+<li>When no record in the group matches the workflow, returns <code>None</code>; <code>feature_values</code> treats <code>None</code> as "absent for this target RID" and omits the target from its iterator.</li>
+</ul>
+<p>Usage:</p>
+<pre><code class="language-python">selector = FeatureRecord.select_by_workflow(training_workflow, container=bag)
+for rec in bag.feature_values(&quot;Image&quot;, &quot;Glaucoma&quot;, selector=selector):
+    ...
+</code></pre>
+<p>The selector composes naturally with <code>find_features</code>-discovered features and the rest of the selector ecosystem (<code>select_newest</code>, <code>select_first</code>, <code>select_latest</code>, <code>select_by_execution</code>, <code>select_majority_vote</code>). Unknown-workflow failures surface at factory-construction time, not at selection time.</p>
+<h3 id="write-surface-execution-staged-provenance-required">Write surface — execution-staged, provenance-required</h3>
+<p><strong>One write path: <code>exe.add_features(records)</code>.</strong> <code>ml.add_features</code> is retired.</p>
+<p>Feature writes integrate with the SQLite execution-state design (§8 of <code>2026-04-18-sqlite-execution-state-design.md</code>). <code>exe.add_features(records)</code>:</p>
+<ol>
+<li>Auto-fills the <code>Execution</code> field on each record if unset.</li>
+<li>Validates records share one feature definition.</li>
+<li>Appends rows to a new <code>staged_features</code> table in the execution's SQLite with status <code>Pending</code>.</li>
+</ol>
+<p>On successful execution completion, <code>_flush_staged_features()</code> runs as part of <code>upload_execution_outputs()</code>, <strong>after</strong> staged-asset upload (so any feature row referencing an asset has the asset's catalog-side row available). Flush:</p>
+<ol>
+<li>Reads <code>Pending</code> rows, groups by feature table.</li>
+<li>Batch-inserts each group via path builder.</li>
+<li>Marks rows <code>Uploaded</code> on success, <code>Failed</code> with error populated on failure.</li>
+<li>Raises <code>DerivaMLUploadError</code> summarizing any failed groups; other groups continue.</li>
+</ol>
+<p>Crash-resume piggybacks on the §8 staged-asset mechanism — a resumed execution finds <code>Pending</code> rows and re-flushes. Durability boundary is the SQLite write-through in <code>add_features</code>.</p>
+<p>Escape hatch retirement: <code>ml.add_features</code> is removed entirely. Admin/fixup scenarios that previously used it now create a short-lived execution with an appropriate workflow (e.g., <code>Manual_Correction</code>). This is three lines more than the bypass and produces a real audit trail — the motivating reason to retire the shortcut.</p>
+<h3 id="bag-denormalization-cache-feature-read-path">Bag denormalization cache — feature read path</h3>
+<p><code>DatasetBag.feature_values</code> reads from a per-feature denormalization cache in bag SQLite. The cache:</p>
+<ul>
+<li>Is populated on first access per feature.</li>
+<li>Is immutable after population (bags are immutable).</li>
+<li>Mirrors ermrest semantics so online and offline <code>feature_values</code> return the same records (modulo RCT/RMT floating precision).</li>
+</ul>
+<p>No new tables on the live catalog — this is bag-local.</p>
+<h3 id="lookup_feature-works-offline"><code>lookup_feature</code> works offline</h3>
+<p><code>DatasetBag.lookup_feature(table, feature_name)</code> reads feature definition metadata from bag SQLite. The returned <code>Feature</code> object's <code>feature_record_class()</code> constructs a Pydantic class identical to the online form, enabling users to build <code>FeatureRecord</code> instances while offline. These records can be handed to a later <code>exe.add_features(records)</code> call when back online — the execution provides provenance at stage time; the records themselves are portable.</p>
+<h3 id="retired-apis">Retired APIs</h3>
+<p>Each raises <code>DerivaMLException</code> with a message pointing at the replacement:</p>
+<table>
+<thead>
+<tr>
+<th>Retired</th>
+<th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml.add_features(records)</code></td>
+<td><code>exe.add_features(records)</code> within an execution context</td>
+</tr>
+<tr>
+<td><code>ml.fetch_table_features(...)</code></td>
+<td><code>feature_values(table, name)</code> for single-feature; <code>Denormalizer</code> for multi-table</td>
+</tr>
+<tr>
+<td><code>bag.fetch_table_features(...)</code></td>
+<td><code>feature_values(table, name)</code> for single-feature; <code>Denormalizer</code> for multi-table</td>
+</tr>
+<tr>
+<td><code>ml.list_feature_values(...)</code></td>
+<td><code>feature_values(...)</code> — same signature, renamed</td>
+</tr>
+<tr>
+<td><code>bag.list_feature_values(...)</code></td>
+<td><code>feature_values(...)</code> — same signature, renamed</td>
+</tr>
+<tr>
+<td><code>ml.select_by_workflow(records, workflow)</code></td>
+<td><code>FeatureRecord.select_by_workflow(workflow, container=...)</code> as <code>selector=</code></td>
+</tr>
+</tbody>
+</table>
+<p>No deprecation shims. Messages are specific about the substitution.</p>
+<h2 id="components">Components</h2>
+<h3 id="new">New</h3>
+<ul>
+<li><code>src/deriva_ml/dataset/bag_feature_cache.py</code> — bag per-feature denormalization cache: populate-on-first-access, read path for <code>DatasetBag.feature_values</code> and <code>DatasetBag.lookup_feature</code>.</li>
+</ul>
+<h3 id="modified">Modified</h3>
+<ul>
+<li><code>core/mixins/feature.py</code></li>
+<li>Add: <code>feature_values(table, feature_name, selector=...)</code>, <code>list_workflow_executions(workflow)</code></li>
+<li>Remove: <code>add_features</code>, <code>fetch_table_features</code>, <code>list_feature_values</code>, <code>select_by_workflow</code></li>
+<li>Keep: <code>create_feature</code>, <code>lookup_feature</code>, <code>delete_feature</code>, <code>find_features</code></li>
+<li><code>feature.py</code></li>
+<li>Add: <code>FeatureRecord.select_by_workflow(workflow, *, container)</code> classmethod factory</li>
+<li>Keep existing selectors unchanged</li>
+<li><code>dataset/dataset.py</code></li>
+<li>Add: <code>feature_values</code>, <code>lookup_feature</code>, <code>list_workflow_executions</code> (delegates to <code>ml</code>)</li>
+<li><code>dataset/dataset_bag.py</code></li>
+<li>Rewrite feature read path through the bag cache</li>
+<li>Add: <code>lookup_feature</code>, <code>list_workflow_executions</code></li>
+<li>Remove: <code>fetch_table_features</code>, <code>list_feature_values</code></li>
+<li><code>execution/execution.py</code></li>
+<li>Change: <code>add_features(records)</code> stages to SQLite instead of write-through</li>
+<li>Add: <code>_flush_staged_features()</code> called during completion flush (after assets), incorporating the asset-column-rewrite logic migrated from <code>_update_feature_table</code></li>
+<li>Add: resume detection for <code>Pending</code> staged features (piggybacks on §8 staged-asset resume)</li>
+<li>Remove: <code>_update_feature_table</code> (logic migrated) and the <code>.jsonl</code> glob-and-parse loop</li>
+<li><code>local_db/manifest_store.py</code></li>
+<li>Add: <code>execution_state__feature_records</code> table, <code>stage_feature_record</code>, <code>list_feature_records</code>, <code>list_pending_feature_records</code>, <code>mark_feature_record_uploaded</code>, <code>mark_feature_record_failed</code>, <code>StagedFeatureRow</code> dataclass</li>
+<li>Remove: <code>FEATURES_TABLE</code> constant, <code>_features_t</code> definition and its index, <code>add_feature</code>, <code>list_features</code> (all file-based, replaced)</li>
+<li><code>asset/manifest.py</code></li>
+<li>Remove: <code>FeatureEntry</code> dataclass, <code>AssetManifest.features</code>, <code>AssetManifest.add_feature</code> (file-based, no longer needed)</li>
+<li><code>asset/__init__.py</code></li>
+<li>Remove: <code>FeatureEntry</code> export</li>
+<li><code>local_db/workspace.py</code></li>
+<li>Remove: legacy <code>FeatureEntry</code> migration path (no migration target)</li>
+<li><code>dataset/upload.py</code></li>
+<li>Remove: <code>.jsonl</code> per-feature file helpers (lines 22-35, 265, 713 — feature-specific; asset-side upload helpers stay)</li>
+<li><code>interfaces.py</code></li>
+<li>Update <code>DatasetLike</code> and related protocols to the three-method surface plus <code>lookup_feature</code> and <code>list_workflow_executions</code></li>
+</ul>
+<h3 id="sqlite-schema-change-8-integration-replaces-file-based-feature-upload">SQLite schema change (§8 integration — replaces file-based feature upload)</h3>
+<p>The pre-existing file-based feature upload (<code>FeatureEntry</code> + <code>FEATURES_TABLE</code> tracking <code>values_path</code> files) is <strong>removed</strong> as part of S2 — goal is DRY. The old path wrote each feature's values to a <code>.jsonl</code> file, then re-parsed those files at upload; the new row-per-record staging collapses both steps into SQLite JSON rows.</p>
+<pre><code class="language-sql">-- REPLACES execution_state__features (file-based FEATURES_TABLE)
+CREATE TABLE execution_state__feature_records (
+    stage_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_rid    TEXT NOT NULL,
+    feature_table    TEXT NOT NULL,        -- schema.table
+    feature_name     TEXT NOT NULL,
+    target_table     TEXT NOT NULL,        -- table the feature is on
+    record_json      TEXT NOT NULL,        -- FeatureRecord.model_dump_json()
+    created_at       TEXT NOT NULL,
+    status           TEXT NOT NULL,        -- Pending | Uploaded | Failed
+    uploaded_at      TEXT,
+    error            TEXT
+);
+CREATE INDEX ix_feature_records_exec_status
+    ON execution_state__feature_records(execution_rid, status);
+</code></pre>
+<p>The asset-column rewriting logic (remap local asset filenames to uploaded asset RIDs at flush time) that lived in <code>_update_feature_table</code> moves into the new flush path — same contract, different storage.</p>
+<h2 id="data-flow">Data flow</h2>
+<h3 id="read-online">Read — online</h3>
+<p><code>ml.feature_values("Image", "Glaucoma", selector=select_newest)</code>:</p>
+<ol>
+<li>Resolve <code>Image</code> table and <code>Glaucoma</code> feature definition.</li>
+<li>Query feature association table via path builder, producing raw <code>FeatureRecord</code> instances.</li>
+<li>Group by target RID, apply selector per group (one record per target RID surviving).</li>
+<li>Yield the surviving records.</li>
+</ol>
+<h3 id="read-dataset-scoped">Read — dataset-scoped</h3>
+<p><code>dataset.feature_values(...)</code>:</p>
+<ol>
+<li>Same as online, but the underlying query filters target RIDs to dataset members.</li>
+</ol>
+<h3 id="read-offline-bag">Read — offline (bag)</h3>
+<p><code>bag.feature_values(...)</code>:</p>
+<ol>
+<li>On first access, populate bag-local denormalization cache for this feature from bag SQLite source tables.</li>
+<li>Read records from cache table.</li>
+<li>Group, apply selector, yield — identical pipeline to online.</li>
+</ol>
+<h3 id="write-normal-path">Write — normal path</h3>
+<p><code>exe.add_features(records)</code>:</p>
+<ol>
+<li>Auto-fill <code>Execution</code> on each record if unset.</li>
+<li>Validate single feature definition across records.</li>
+<li>Write rows to <code>staged_features</code> with status <code>Pending</code>.</li>
+</ol>
+<p>On execution completion:
+1. Flush staged assets (existing §8 behavior).
+2. Flush staged features: group by feature table, batch-insert, mark <code>Uploaded</code>/<code>Failed</code>.</p>
+<h3 id="write-crash-resume">Write — crash-resume</h3>
+<ol>
+<li>Execution restarts.</li>
+<li>§8 resume path detects <code>Pending</code> rows in both staged-asset and staged-feature tables.</li>
+<li>Flush re-runs. SQLite write-through is the durability boundary.</li>
+</ol>
+<h3 id="write-offline-compute-online-flush">Write — offline-compute, online-flush</h3>
+<ol>
+<li>User constructs records via <code>bag.lookup_feature().feature_record_class()(...)</code> offline.</li>
+<li>Records are plain Pydantic objects, portable.</li>
+<li>Later, back online, <code>exe.add_features(records)</code> stages and flushes.</li>
+</ol>
+<h2 id="error-handling">Error handling</h2>
+<p><strong>Discovery / lookup:</strong> unknown table → <code>DerivaMLTableNotFound</code>; unknown feature → <code>DerivaMLNotFoundError</code>. Same messages across containers.</p>
+<p><strong>Reads:</strong>
+- Unknown table or feature → <code>DerivaMLNotFoundError</code>.
+- Selector raises → propagates unchanged.
+- Selector returns <code>None</code> → target RID omitted from iterator (documented as "feature absent for this RID").
+- Bag cache corrupt/missing → <code>DerivaMLDataError</code> with bag path and re-extract guidance.</p>
+<p><strong>Selector factory:</strong>
+- Unknown workflow → <code>DerivaMLNotFoundError</code> at factory construction.
+- Missing <code>container</code> kwarg → Python <code>TypeError</code>.
+- Wrong <code>container</code> type → <code>TypeError</code> with expected protocol.</p>
+<p><strong>Writes:</strong>
+- Mixed feature definitions → <code>DerivaMLValidationError</code> at stage time (before SQLite write).
+- Empty records list → <code>ValueError</code>.
+- SQLite staging failure → <code>DerivaMLDataError</code>, execution state <code>Failed</code>.
+- Flush failure for a group → group marked <code>Failed</code>, others continue, overall <code>DerivaMLUploadError</code> with summary; retry via resume.
+- Asset-referencing feature, referenced asset upload failed → FK rejection at insert time → <code>DerivaMLUploadError</code> identifying the offending asset RID.</p>
+<p><strong>Retired-API calls:</strong> each raises <code>DerivaMLException</code> with a message naming the replacement (table above).</p>
+<h2 id="testing">Testing</h2>
+<p><strong>Symmetry compliance suite (new, high-value):</strong> parametrized over <code>DerivaML</code>, <code>Dataset</code>, <code>DatasetBag</code>. Asserts that for a fixture feature on a fixture catalog + its downloaded bag:</p>
+<ul>
+<li><code>find_features(table)</code> returns matching metadata.</li>
+<li><code>feature_values(table, name)</code> yields matching records (modulo timestamp tolerance).</li>
+<li><code>lookup_feature(table, name).feature_record_class()</code> returns a class with matching field shape.</li>
+<li><code>list_workflow_executions(workflow)</code> returns the same list (order-independent comparison).</li>
+</ul>
+<p>This suite is the contract: any future container claiming feature capability must pass it.</p>
+<p><strong>Selector tests:</strong>
+- Existing selector tests adapted to the new <code>feature_values</code> return type.
+- New: <code>FeatureRecord.select_by_workflow</code> with each container type; unknown-workflow raises at construction.</p>
+<p><strong>Bag cache:</strong>
+- First access populates.
+- Subsequent access reads from cache (no recompute).
+- Corrupt/missing cache raises with recovery pointer.</p>
+<p><strong>Execution-staged writes:</strong>
+- Valid records stage with auto-filled Execution and status <code>Pending</code>.
+- Mixed definitions fail at stage time, nothing in SQLite.
+- Successful completion transitions all <code>Pending</code> → <code>Uploaded</code>.
+- Simulated mid-flush failure: affected group <code>Failed</code>, others <code>Uploaded</code>.
+- Crash-before-flush + resume: <code>Pending</code> rows re-flushed, no ermrest duplicates.
+- Flush-after-assets ordering: feature flush attempts occur only after asset upload completes.
+- Asset-referencing feature with pre-flushed asset succeeds; with missing asset raises clear error.</p>
+<p><strong>Offline-to-online write cycle:</strong>
+- Construct records from bag without catalog.
+- Hand to later <code>exe.add_features</code>.
+- Assert round-trip correctness.</p>
+<p><strong>Retired APIs:</strong>
+- Each retired method raises <code>DerivaMLException</code> with the expected replacement pointer.</p>
+<p><strong>Unchanged (not re-tested beyond current coverage):</strong>
+- <code>Denormalizer</code> — untouched by S2.
+- <code>create_feature</code> — untouched.
+- <code>FeatureRecord</code> dynamic class generation — untouched.</p>
+<h2 id="documentation-requirements">Documentation requirements</h2>
+<p>Every public method touched by S2 must ship with complete docstrings including runnable examples. This is a hard requirement, not a nice-to-have — the API is being redesigned, so the docstrings are the canonical reference until docs/mkdocs catch up.</p>
+<h3 id="per-method-docstring-contract">Per-method docstring contract</h3>
+<p>Every public method in the new surface (<code>find_features</code>, <code>feature_values</code>, <code>lookup_feature</code>, <code>list_workflow_executions</code>, <code>add_features</code>, <code>FeatureRecord.select_by_workflow</code>, and the retired-API shims with their error-path pointers) must include:</p>
+<ol>
+<li><strong>One-line summary.</strong></li>
+<li><strong>Extended description</strong> — what it does, when to use it, how it relates to sibling methods.</li>
+<li><strong><code>Args:</code> section</strong> — every parameter typed and described. Required vs. optional. Default value rationale. Cross-references to related methods.</li>
+<li><strong><code>Returns:</code> section</strong> — the return type and semantic meaning. For iterators, mention streaming characteristics. For writes, mention staging vs. flush.</li>
+<li><strong><code>Raises:</code> section</strong> — every exception the method can raise, keyed to the conditions in §Error handling. For retired APIs: the exact <code>DerivaMLException</code> message.</li>
+<li><strong><code>Example:</code> section</strong> — at least one runnable example, typically two:</li>
+<li>The common happy path.</li>
+<li>A second example showing an interesting variation (selector use, cross-container use, offline use, etc.).</li>
+<li><strong>Cross-container note</strong> where applicable — if the method exists on <code>DerivaML</code>, <code>Dataset</code>, and <code>DatasetBag</code> with identical signatures, the docstring says so and notes any behavior differences (e.g., bag-side cache population on first access).</li>
+</ol>
+<h3 id="example-docstring-canonical-shape">Example docstring (canonical shape)</h3>
+<pre><code class="language-python">def feature_values(
+    self,
+    table: Table | str,
+    feature_name: str,
+    selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+) -&gt; Iterable[FeatureRecord]:
+    &quot;&quot;&quot;Yield feature values for a single feature, one record per target RID.
+
+    Returns an iterator of typed ``FeatureRecord`` instances. Each record is
+    wide in shape — target RID, all value columns (vocab terms, asset
+    references, metadata columns), and provenance columns (``Execution``,
+    ``RCT``) — exposed as typed attributes.
+
+    When a ``selector`` is provided, records are grouped by target RID and
+    the selector collapses each group to a single survivor. Target RIDs
+    whose group's selector returns ``None`` are omitted. When no selector
+    is provided, every raw record is yielded — multiple records per target
+    RID are possible.
+
+    This method has identical signatures and semantics across ``DerivaML``,
+    ``Dataset``, and ``DatasetBag``. The bag implementation reads from a
+    per-feature denormalization cache populated on first access; subsequent
+    calls are cheap.
+
+    Args:
+        table: Target table the feature is defined on (name or Table).
+        feature_name: Name of the feature to read.
+        selector: Optional callable ``(list[FeatureRecord]) -&gt; FeatureRecord | None``
+            used to reduce multi-value groups. See ``FeatureRecord.select_newest``,
+            ``FeatureRecord.select_by_workflow``, etc. for built-ins.
+
+    Returns:
+        Iterator of ``FeatureRecord`` — one record per target RID after
+        selector reduction (or all raw records if no selector).
+
+    Raises:
+        DerivaMLTableNotFound: ``table`` does not exist.
+        DerivaMLNotFoundError: ``feature_name`` is not a feature on ``table``.
+        DerivaMLDataError: (bag only) the feature cache is corrupt or missing.
+
+    Example:
+        Get the newest Glaucoma label per image::
+
+            &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+            &gt;&gt;&gt; for rec in ml.feature_values(
+            ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+            ... ):
+            ...     print(f&quot;{rec.Image}: {rec.Glaucoma} (by {rec.Execution})&quot;)
+
+        Filter by a specific workflow, works identically on a downloaded bag::
+
+            &gt;&gt;&gt; workflow = ml.lookup_workflow(&quot;Glaucoma_Training_v2&quot;)
+            &gt;&gt;&gt; sel = FeatureRecord.select_by_workflow(workflow, container=bag)
+            &gt;&gt;&gt; labels = [r.Glaucoma for r in bag.feature_values(
+            ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=sel,
+            ... )]
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="inline-comments">Inline comments</h3>
+<p>For the non-trivial machinery — <code>staged_features</code> lifecycle, bag cache population, selector factory resolution, flush-after-assets ordering — inline comments explain <em>why</em>, not just <em>what</em>. Specifically:</p>
+<ul>
+<li><code>_flush_staged_features</code> — comment the ordering contract (assets first, features second) with a pointer to the §8 design.</li>
+<li><code>bag_feature_cache</code> — comment the immutability invariant and the populate-on-first-access trigger.</li>
+<li><code>FeatureRecord.select_by_workflow</code> factory body — comment that workflow resolution is eager (at construction) and why (fail-fast on unknown workflow).</li>
+<li>Retired-API error shims — comment linking to this spec as the source of truth for the replacement.</li>
+</ul>
+<h3 id="module-level-docstrings">Module-level docstrings</h3>
+<p>Any new module (<code>bag_feature_cache.py</code>, expanded sections of <code>core/mixins/feature.py</code>, etc.) gets a module-level docstring naming this spec and stating the module's responsibility in one paragraph.</p>
+<h2 id="testing-expanded-complete-coverage-live-catalog-included">Testing (expanded — complete coverage, live catalog included)</h2>
+<p>The §Testing section above names the test categories; this section states the coverage standard.</p>
+<h3 id="coverage-requirement">Coverage requirement</h3>
+<p>Every public method and every retired-API shim added, modified, or removed by S2 must have explicit test coverage. No method ships without at least one test exercising its happy path, its parameter variations, and its documented error paths.</p>
+<h3 id="test-organization">Test organization</h3>
+<p>Organized by the existing <code>tests/feature/</code>, <code>tests/execution/</code>, <code>tests/dataset/</code> structure. New modules when a category has no existing home:</p>
+<ul>
+<li><code>tests/feature/test_feature_values.py</code> — the three-container parametrized compliance suite.</li>
+<li><code>tests/feature/test_select_by_workflow.py</code> — selector factory, including unknown-workflow-at-construction.</li>
+<li><code>tests/feature/test_retired_apis.py</code> — each retired method raises the expected exception with the expected replacement pointer.</li>
+<li><code>tests/execution/test_staged_features.py</code> — staging, flush ordering, crash-resume, error paths.</li>
+<li><code>tests/dataset/test_bag_feature_cache.py</code> — first-access population, immutability, corrupt-cache error path.</li>
+</ul>
+<h3 id="live-catalog-coverage">Live catalog coverage</h3>
+<p>Integration coverage against a live Deriva catalog is <strong>required</strong>, not optional, for these flows:</p>
+<ul>
+<li><code>feature_values</code> on <code>DerivaML</code> (live ermrest query path).</li>
+<li><code>feature_values</code> on <code>Dataset</code> (live ermrest + dataset member filter).</li>
+<li><code>exe.add_features</code> stage + real flush to a live catalog (round-trip).</li>
+<li>Flush ordering: assets flush to live Hatrac + ermrest, features flush against live ermrest referencing those asset rows.</li>
+<li>Crash-resume: SQLite <code>Pending</code> rows flushed to live catalog on resume, no duplicate rows in the catalog after resume.</li>
+<li>Retired-API error path: <code>ml.add_features</code> on a live catalog raises the expected message.</li>
+<li>Offline-to-online cycle: construct records from a downloaded bag (no catalog), hand to <code>exe.add_features</code> against a live catalog, assert round-trip.</li>
+</ul>
+<p>These live tests run under the existing <code>tests/conftest.py</code> fixtures (<code>test_ml</code>, <code>catalog_with_datasets</code>, <code>execution_with_hydra_config</code>, or equivalents). They require <code>DERIVA_HOST</code> and are part of the long-run suite (see CLAUDE.md for incremental invocation).</p>
+<h3 id="offline-unit-coverage">Offline / unit coverage</h3>
+<ul>
+<li>Three-container symmetry suite covers bag-side reads without a live catalog once the bag is materialized.</li>
+<li>Selector factory with unknown workflow raises synchronously — unit-testable.</li>
+<li>SQLite <code>staged_features</code> transitions (<code>Pending</code> → <code>Uploaded</code>, <code>Pending</code> → <code>Failed</code>, resume detection) unit-testable against a temp SQLite.</li>
+<li>Retired-API shims raise synchronously — unit-testable.</li>
+</ul>
+<h3 id="parametrized-symmetry-suite-the-contract-test">Parametrized symmetry suite — the contract test</h3>
+<p><code>tests/feature/test_feature_values.py</code> contains a parametrized test class that runs the same assertions across <code>DerivaML</code>, <code>Dataset</code>, <code>DatasetBag</code>:</p>
+<pre><code class="language-python">@pytest.fixture(params=[&quot;ml&quot;, &quot;dataset&quot;, &quot;bag&quot;])
+def feature_container(request, test_ml, catalog_with_datasets, materialized_bag):
+    return {&quot;ml&quot;: test_ml, &quot;dataset&quot;: catalog_with_datasets, &quot;bag&quot;: materialized_bag}[request.param]
+
+class TestFeatureValuesSymmetry:
+    def test_find_features_matches_definition(self, feature_container): ...
+    def test_feature_values_yields_expected_records(self, feature_container): ...
+    def test_feature_values_with_selector(self, feature_container): ...
+    def test_lookup_feature_returns_usable_record_class(self, feature_container): ...
+    def test_list_workflow_executions_matches(self, feature_container): ...
+</code></pre>
+<p>Any future container claiming feature capability must pass this suite as its acceptance test.</p>
+<h3 id="regression-guards">Regression guards</h3>
+<p>Specific bugs that have bitten before in this API area get explicit regression tests:</p>
+<ul>
+<li>Auto-filled <code>Execution</code> RID on <code>exe.add_features</code> — test covers the record-with-Execution-None and record-with-Execution-set cases.</li>
+<li>Empty records list raises <code>ValueError</code> (existing behavior preserved).</li>
+<li>Bag <code>lookup_feature</code> works without a live catalog connection (offline test uses a pre-materialized bag, no <code>DERIVA_HOST</code>).</li>
+</ul>
+<h3 id="coverage-target">Coverage target</h3>
+<p>When the test suite runs with coverage enabled, every public method added or modified by S2 must show non-trivial coverage (branches for each <code>Raises:</code> path, happy path, selector-present and selector-absent). A coverage report is part of the final review gate before merging.</p>
+<h2 id="open-dependencies">Open dependencies</h2>
+<ul>
+<li><code>staged_features</code> SQLite table lives alongside the §8 staged-asset tables; the §8 design must be in place before the write-path changes can ship.</li>
+<li>Bag feature cache depends on existing bag SQLite structure (feature tables already mirrored).</li>
+<li>No changes to the live catalog schema.</li>
+</ul>
+<h2 id="migration">Migration</h2>
+<ul>
+<li>No catalog schema migration — this is an API consistency change plus a local storage replacement.</li>
+<li>Retired APIs raise at first call with a clear pointer to the replacement; there is no silent period.</li>
+<li>Client code using <code>ml.add_features</code> must move to <code>exe.add_features</code> within an execution context.</li>
+<li>Client code using <code>fetch_table_features</code> or <code>list_feature_values</code> must move to <code>feature_values</code> (renamed, same signature).</li>
+<li>Client code using <code>ml.select_by_workflow(records, workflow)</code> must move to the selector-factory form.</li>
+<li><strong>Local storage:</strong> the <code>execution_state__features</code> SQLite table is replaced by <code>execution_state__feature_records</code>. Any workspace SQLite still carrying <code>execution_state__features</code> rows predates S2 — those rows correspond to half-uploaded executions from before the cutover. The clean path is to finish flushing them on the pre-S2 code, then upgrade. No data-migration script is provided; pending pre-S2 feature uploads that have not been flushed must be flushed by the pre-S2 binary.</li>
+</ul>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>Metric or Param as first-class concepts (dropped during brainstorming).</li>
+<li>Wide-form feature DataFrame return type (kept as <code>Iterable[FeatureRecord]</code>; pandas is a caller concern).</li>
+<li>Multi-feature merged reads on <code>feature_values</code> (use <code>Denormalizer</code>).</li>
+<li>Changes to <code>Denormalizer</code>, <code>create_feature</code>, <code>FeatureRecord</code> class generation.</li>
+<li>Deprecation shims or silent fallbacks.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

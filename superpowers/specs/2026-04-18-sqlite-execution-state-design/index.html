@@ -1,0 +1,4397 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-18-sqlite-execution-state-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>SQLite-backed execution state: registry, pending rows, and stage-and-upload - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sqlite-backed-execution-state-registry-pending-rows-and-stage-and-upload" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SQLite-backed execution state: registry, pending rows, and stage-and-upload
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-design-guideline-friction-in-service-of-reproducibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Design guideline — friction in service of reproducibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-goals-and-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goals and scope
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Goals and scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-compatibility-and-deprecation-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Compatibility and deprecation posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-online-mode-vs-offline-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Online mode vs offline mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-execution-state-machine-with-catalog-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Execution state machine with catalog sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-execution-fields-as-sqlite-read-through" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Execution fields as SQLite read-through
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-workspace-sqlite-as-authoritative-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Workspace SQLite as authoritative state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-sqlite-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 SQLite schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.5 SQLite schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#251-executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5.1 executions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#252-pending_rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5.2 pending_rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#253-directory_rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5.3 directory_rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-rid-leasing-lazy-batched-crash-safe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 RID leasing (lazy, batched, crash-safe)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-public-api-derivaml-top-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 Public API — DerivaML top level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-public-api-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 Public API — Execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#29-public-api-executionrecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.9 Public API — ExecutionRecord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#210-public-api-table-handles-row-level-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10 Public API — Table handles (row-level writes)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.10 Public API — Table handles (row-level writes)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2101-tablehandle-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10.1 TableHandle surface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2102-assettablehandle-surface-extends-tablehandle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10.2 AssetTableHandle surface (extends TableHandle)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2103-assetdirectoryhandle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10.3 AssetDirectoryHandle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2104-handle-read-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10.4 Handle read properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#211-pendingsummary-and-upload-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11 PendingSummary and upload operations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.11 PendingSummary and upload operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2111-pendingsummary-dataclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11.1 PendingSummary dataclasses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2112-upload-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11.2 Upload engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2113-uploadjob-non-blocking-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11.3 UploadJob (non-blocking form)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2114-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11.4 CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#212-context-manager-exit-behavior-r63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.12 Context-manager exit behavior (R6.3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#213-implementation-sequencing-provisional-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.13 Implementation sequencing — provisional sections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#214-implementation-technology-sqlalchemy-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.14 Implementation technology — SQLAlchemy Core
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#215-documentation-requirement-for-new-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.15 Documentation requirement for new APIs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#216-implementation-dry-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.16 Implementation DRY hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#217-argument-naming-and-ordering-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17 Argument naming and ordering conventions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.17 Argument naming and ordering conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2171-argument-names-canonical-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.1 Argument names — canonical vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2172-argument-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.2 Argument ordering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2173-return-value-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.3 Return-value conventions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2174-defaults-and-nullability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.4 Defaults and Nullability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2175-existing-code-cleanup-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.5 Existing-code cleanup scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-walkthrough-three-script-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Walkthrough — three-script workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-handle-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Handle construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-tablehandleinsertrecords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 TableHandle.insert(records)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-assettablehandleasset_filefile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 AssetTableHandle.asset_file(file, ...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-lazy-rid-materialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Lazy .rid materialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-workspace-startup-lease-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Workspace startup lease reconciliation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-mlresume_executionrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 ml.resume_execution(rid)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-execution-lifecycle-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 Execution lifecycle transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Testing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-unit-tests-no-live-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Unit tests (no live catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-integration-tests-live-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Integration tests (live catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-evolution-from-earlier-revisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Evolution from earlier revisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-known-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Known limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-scoped-follow-on-feature-system-metricparam-sqlite-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Scoped follow-on: Feature system + Metric/Param + SQLite consistency
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Scoped follow-on: Feature system + Metric/Param + SQLite consistency">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-metric-and-param-as-first-class-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Metric and Param as first-class concepts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-sqlite-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 SQLite integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-readback-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Readback shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-task-deliverables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Task deliverables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="sqlite-backed-execution-state-registry-pending-rows-and-stage-and-upload">SQLite-backed execution state: registry, pending rows, and stage-and-upload</h1>
+<p><strong>Status:</strong> Draft, pending review (revision 6 — API consistency pass).
+<strong>Date:</strong> 2026-04-18.
+<strong>Scope:</strong> Design spec. Implementation plan follows separately.</p>
+<h2 id="0-design-guideline-friction-in-service-of-reproducibility">0. Design guideline — friction in service of reproducibility</h2>
+<p>Before any specific design choice, the governing principle:</p>
+<blockquote>
+<p>When ergonomics conflict with reproducibility, robustness, or provenance,
+reproducibility wins. Small amounts of user friction — declaring a metric
+before recording it, naming a dataset version explicitly, explicitly
+uploading at a moment the user chooses — are acceptable costs when they
+produce a catalog record that is unambiguous, queryable, and
+reconstructable after the fact. DerivaML is not optimizing for "fastest
+to first result"; it is optimizing for "every result is a durable,
+reviewable artifact."</p>
+</blockquote>
+<p>Concretely, this guideline means:</p>
+<ul>
+<li>Controlled vocabularies over free-form strings, even at the cost of a
+  declaration step (features, metrics, params, asset types, dataset
+  types).</li>
+<li>Explicit declaration over auto-creation, when auto-creation would admit
+  typos into the provenance record.</li>
+<li>Explicit state transitions over implicit ones (no auto-upload on
+  context-manager exit; the user decides when to commit results to the
+  catalog).</li>
+<li>Version pinning over "latest" defaults, when ambiguity would break
+  reproducibility of a past result.</li>
+<li>Named entities with provenance (datasets with RIDs, executions with
+  workflow FKs) over anonymous data.</li>
+</ul>
+<p>When proposing an ergonomic convenience, the check is: <em>does this erode
+the catalog's guarantee that any past result can be reconstructed and
+reviewed?</em> If yes, the convenience is rejected or modified until it
+doesn't.</p>
+<h2 id="1-goals-and-scope">1. Goals and scope</h2>
+<h3 id="11-goals">1.1 Goals</h3>
+<p>Make the DerivaML workspace the authoritative local source of truth for
+execution state — enabling robust offline workflows where scripts split
+across processes, machines, and network conditions still reach a
+correct upload.</p>
+<p>Four capabilities, one coherent design:</p>
+<ol>
+<li>
+<p><strong>Execution registry in SQLite.</strong> The workspace keeps a table of
+   known-local executions. Enumeration (<code>list_executions</code>,
+   <code>find_incomplete_executions</code>) and resumption
+   (<code>resume_execution(rid)</code>) read from SQLite, not from scanning the
+   filesystem tree. Status transitions are atomic SQLite writes with
+   catalog sync in online mode.</p>
+</li>
+<li>
+<p><strong>Pending-row staging in SQLite.</strong> New rows destined for the
+   catalog — both asset rows (file + metadata) and plain rows —
+   accumulate in a per-execution pending-rows table until drained.
+   RID leasing happens against <code>public:ERMrest_RID_Lease</code> so every
+   pending row carries its final RID before upload.</p>
+</li>
+<li>
+<p><strong>One write verb, two modes.</strong> <code>handle.insert(records)</code> is the
+   single write method. In online mode, rows reach the catalog by the
+   time <code>.insert()</code> returns. In offline mode, rows stage and wait for
+   upload. The user's code is identical in both modes; mode only
+   changes timing.</p>
+</li>
+<li>
+<p><strong>Upload as an async, restartable, bandwidth-aware operation.</strong>
+   Upload is a first-class long-running operation, not a terminal step.
+   Scoped forms (<code>exe.upload_outputs()</code>, <code>record.upload_outputs()</code>),
+   workspace-wide form (<code>ml.upload_pending(...)</code>), non-blocking form
+   (<code>ml.start_upload(...)</code> → <code>UploadJob</code>), and a <code>deriva-ml upload</code>
+   CLI all share one engine. Resumability is provided by the
+   combination of SQLite queue state and deriva-py's per-chunk
+   upload-state file.</p>
+</li>
+</ol>
+<p>Design principle: the code to write a row is the same whether the user
+is connected or offline, and the same whether they're in the create
+script, a compute-heavy middle script, or the final upload script.
+SQLite carries state across processes.</p>
+<h3 id="12-non-goals">1.2 Non-goals</h3>
+<ul>
+<li><strong>Updates or deletes.</strong> Insert-only. Modifying existing catalog rows
+  or deleting them is a separate future problem.</li>
+<li><strong>Creating new tables or columns.</strong> Target table must already exist
+  in the catalog schema. <code>exe.table(name)</code> / <code>ml.table(name)</code> raises
+  <code>DerivaMLTableNotFound</code> at call time if absent.</li>
+<li><strong>Full slice upload-back.</strong> The broader "sync arbitrary local
+  changes" problem remains deferred.</li>
+<li><strong>Filesystem watching.</strong> Directory registration doesn't watch for
+  file arrivals; files are surfaced via explicit <code>register(file)</code> or
+  scan-at-upload.</li>
+<li><strong>Auto-detecting connection state.</strong> Mode is explicit
+  (<code>ConnectionMode.online</code> vs <code>ConnectionMode.offline</code>). The library
+  does not silently defer writes on server timeout.</li>
+<li><strong>Cross-workspace sharing.</strong> Executions are scoped to the workspace
+  they were created in; the user copying a working directory between
+  machines is their concern to handle.</li>
+<li><strong>Separate upload provenance.</strong> Upload events are not recorded as a
+  separate catalog entity. Evidence that upload happened manifests via
+  Execution.status transitions and row creation timestamps already on
+  every Deriva row.</li>
+</ul>
+<h3 id="13-compatibility-and-deprecation-posture">1.3 Compatibility and deprecation posture</h3>
+<p>Per the project-wide deprecation policy, this refactor uses <strong>hard
+cutovers</strong> for renamed / restructured APIs. No shim layer. Breaking
+changes are enumerated in <code>CHANGELOG.md</code> under "Breaking changes" with
+replacement pointers.</p>
+<p>Renames introduced by this spec (all hard cutovers):</p>
+<table>
+<thead>
+<tr>
+<th>Removed</th>
+<th>Replaced by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml.restore_execution(rid)</code></td>
+<td><code>ml.resume_execution(rid)</code></td>
+</tr>
+<tr>
+<td><code>exe.upload_execution_outputs(...)</code></td>
+<td><code>exe.upload_outputs(...)</code></td>
+</tr>
+<tr>
+<td><code>exe.retry_failed()</code></td>
+<td><code>exe.upload_outputs(retry_failed=True)</code></td>
+</tr>
+<tr>
+<td><code>Execution.list_nested_executions()</code></td>
+<td><code>ExecutionRecord.list_execution_children(recurse=...)</code></td>
+</tr>
+<tr>
+<td><code>ExecutionRecord.list_nested_executions(recurse=...)</code></td>
+<td><code>ExecutionRecord.list_execution_children(recurse=...)</code></td>
+</tr>
+<tr>
+<td><code>ExecutionRecord.list_parent_executions(recurse=...)</code></td>
+<td><code>ExecutionRecord.list_execution_parents(recurse=...)</code></td>
+</tr>
+<tr>
+<td><code>Execution.datasets</code> as <code>list[DatasetBag]</code></td>
+<td><code>Execution.datasets</code> as <code>DatasetCollection</code> (RID-keyed mapping + iterable)</td>
+</tr>
+</tbody>
+</table>
+<p>The renamed methods mirror the dataset template
+(<code>Dataset.list_dataset_parents</code> / <code>list_dataset_children</code>) so hierarchy
+traversal reads the same across subjects. <code>add_nested_execution</code> (the
+write side) keeps its name; its MCP tool surface will be updated in a
+separate task.</p>
+<p>No migration code. Clean slate — no in-flight <code>ManifestStore</code> entries
+to preserve.</p>
+<h2 id="2-architecture">2. Architecture</h2>
+<h3 id="21-online-mode-vs-offline-mode">2.1 Online mode vs offline mode</h3>
+<p>Connection mode is an enumeration:</p>
+<pre><code class="language-python">from deriva_ml import ConnectionMode
+
+DerivaML(
+    ...,
+    mode: ConnectionMode | str = ConnectionMode.online,
+)
+# Accepts either the enum or the string literals &quot;online&quot; / &quot;offline&quot;;
+# strings are coerced. Default: ConnectionMode.online.
+</code></pre>
+<p><strong>Online mode (default).</strong> Plain-row writes go live to the catalog by
+the time <code>.insert()</code> returns — the library drains the pending entry
+inline after staging. Asset-row writes still stage and wait for upload
+(Hatrac is a two-phase pipeline; draining per file would defeat
+batching). Execution status transitions also sync to the catalog's
+Execution row atomically with the SQLite transition.</p>
+<p><strong>Offline mode.</strong> Every write stages into the workspace SQLite and
+stays there until an upload operation drains it. The server is only
+contacted for RID leases and final uploads. Status transitions update
+SQLite only, marked with <code>sync_pending=True</code>; the next time the
+workspace runs online, pending syncs flush (see §2.2).</p>
+<p><strong>Creating executions requires online mode.</strong> An Execution row has to
+be created on the server (the RID is server-assigned), which can't
+happen offline. The supported split-script workflow is:</p>
+<ol>
+<li>Script 1 (online): <code>create_execution</code> → execution RID assigned,
+   registry row written to SQLite, configuration persisted.</li>
+<li>Scripts 2..N (any mode): <code>resume_execution(rid)</code> re-hydrates from
+   SQLite; writes stage per the current mode.</li>
+<li>Final script (online): <code>resume_execution(rid)</code> +
+   <code>exe.upload_outputs()</code> drains everything.</li>
+</ol>
+<p>Any <code>create_execution</code> call while <code>mode=ConnectionMode.offline</code> raises
+<code>DerivaMLOfflineError</code> with a clear message.</p>
+<h3 id="22-execution-state-machine-with-catalog-sync">2.2 Execution state machine with catalog sync</h3>
+<p>Execution lifecycle and status live in a dedicated state-machine
+module (<code>deriva_ml/execution/state_machine.py</code>). SQLite is the
+authoritative local state; the catalog is synced in online mode and
+eventually-consistent in offline mode.</p>
+<p><strong>States:</strong></p>
+<pre><code>created → running → {stopped, failed} → {pending_upload → {uploaded, failed}}
+                                      ↘ aborted
+</code></pre>
+<p><strong>Sync rules:</strong></p>
+<ul>
+<li>
+<p><strong>Online mode.</strong> Every status transition is a single logical
+  operation: update SQLite <code>executions.status</code> and PUT the catalog's
+  Execution row in the same transition path. If the catalog PUT fails
+  (network blip, server down), the SQLite transition still commits
+  with <code>sync_pending=1</code> set. The next time a state transition or
+  reconciliation runs successfully, pending syncs flush first.</p>
+</li>
+<li>
+<p><strong>Offline mode.</strong> SQLite transitions commit with <code>sync_pending=1</code>
+  unconditionally. The catalog is never contacted.</p>
+</li>
+<li>
+<p><strong>Just-in-time reconciliation.</strong> When a workspace opens (or
+  <code>resume_execution(rid)</code> is called), the library checks for
+  disagreement between SQLite and catalog Execution state <em>only for
+  the execution in question</em>, not workspace-wide. This keeps startup
+  fast and surfaces disagreements at the moment the user is about to
+  act on them.</p>
+</li>
+</ul>
+<p><strong>Disagreement handling</strong> (six cases — rules are explicit, user is
+prompted on unexpected mismatch):</p>
+<table>
+<thead>
+<tr>
+<th>SQLite says</th>
+<th>Catalog says</th>
+<th>Interpretation</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>running</code></td>
+<td><code>aborted</code></td>
+<td>Externally aborted</td>
+<td>Set SQLite <code>aborted</code>, raise on resume</td>
+</tr>
+<tr>
+<td><code>pending_upload</code></td>
+<td><code>uploaded</code></td>
+<td>Uploaded by another process</td>
+<td>Set SQLite <code>uploaded</code>, clear pending rows</td>
+</tr>
+<tr>
+<td><code>running</code></td>
+<td><code>failed</code></td>
+<td>Externally failed</td>
+<td>Set SQLite <code>failed</code>, retain error from catalog</td>
+</tr>
+<tr>
+<td><code>stopped</code></td>
+<td><code>running</code></td>
+<td>Stale catalog (pre-crash)</td>
+<td>Set catalog <code>stopped</code> (sync forward)</td>
+</tr>
+<tr>
+<td><code>stopped</code></td>
+<td>(no row)</td>
+<td>Orphaned</td>
+<td>Raise <code>DerivaMLStateInconsistency</code> with guidance</td>
+</tr>
+<tr>
+<td>anything else</td>
+<td>anything else</td>
+<td>Unexpected</td>
+<td>Raise <code>DerivaMLStateInconsistency</code>; user intervention</td>
+</tr>
+</tbody>
+</table>
+<p>Scope for R1.1 implementation: 3–4 days.</p>
+<h3 id="23-execution-fields-as-sqlite-read-through">2.3 Execution fields as SQLite read-through</h3>
+<p>The <code>Execution</code> object's user-visible lifecycle fields — <code>status</code>,
+<code>start_time</code>, <code>stop_time</code>, <code>error</code> — become <strong>read-through properties</strong>
+backed by SQLite. Every read issues a SELECT; no in-memory caching.
+This keeps multiple processes holding the same execution RID consistent
+with each other.</p>
+<pre><code class="language-python">class Execution:
+    @property
+    def status(self) -&gt; ExecutionStatus: ...  # reads SQLite
+    @property
+    def start_time(self) -&gt; datetime | None: ...
+    @property
+    def stop_time(self) -&gt; datetime | None: ...
+    @property
+    def error(self) -&gt; str | None: ...
+</code></pre>
+<p>No setter surface: state transitions go through the state machine.</p>
+<p>Scope for R1.2 implementation: 2–4 hours.</p>
+<h3 id="24-workspace-sqlite-as-authoritative-state">2.4 Workspace SQLite as authoritative state</h3>
+<p>Everything that matters for resuming an execution lives in SQLite:</p>
+<ul>
+<li>Execution registry and configuration</li>
+<li>Pending-row entries (asset and plain)</li>
+<li>Directory-rule entries</li>
+<li>Lease tokens for crash-safe RID allocation</li>
+<li>Status for every row and every execution</li>
+<li><code>sync_pending</code> flags for catalog reconciliation</li>
+</ul>
+<p>The filesystem tree (<code>{working_dir}/deriva-ml/execution/{rid}/</code>) is a
+<strong>derived artifact</strong>: asset files live there for the uploader to
+consume, staging CSVs are materialized there at drain time, but the
+SQLite workspace is the ground truth. If the filesystem is corrupted
+or edited externally, SQLite is consulted, not the tree.</p>
+<p>This inverts today's model, where file-tree scanning (<code>os.listdir</code>)
+was the enumeration mechanism.</p>
+<h3 id="25-sqlite-schema">2.5 SQLite schema</h3>
+<p>Three tables in the workspace SQLite:</p>
+<h4 id="251-executions">2.5.1 <code>executions</code></h4>
+<p>One row per known-local execution.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rid</code></td>
+<td>PK, server-assigned Execution RID</td>
+</tr>
+<tr>
+<td><code>workflow_rid</code></td>
+<td>FK concept (server RID string); null if not set</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>from config</td>
+</tr>
+<tr>
+<td><code>config_json</code></td>
+<td>full ExecutionConfiguration, serialized</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>created \| running \| stopped \| failed \| pending_upload \| uploaded \| aborted</code></td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>online \| offline</code> — mode the execution was last active under</td>
+</tr>
+<tr>
+<td><code>working_dir_rel</code></td>
+<td>relative path to execution root</td>
+</tr>
+<tr>
+<td><code>start_time</code> / <code>stop_time</code></td>
+<td>lifecycle timestamps</td>
+</tr>
+<tr>
+<td><code>last_activity</code></td>
+<td>updated on every pending-row insert/upload</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>last error message if <code>status='failed'</code></td>
+</tr>
+<tr>
+<td><code>sync_pending</code></td>
+<td>bool; catalog hasn't caught up with SQLite</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>when the local registry knew about it</td>
+</tr>
+</tbody>
+</table>
+<p>Indexes: <code>(status)</code>, <code>(workflow_rid)</code>, <code>(last_activity)</code>,
+<code>(sync_pending) WHERE sync_pending=1</code>.</p>
+<h4 id="252-pending_rows">2.5.2 <code>pending_rows</code></h4>
+<p>One row per pending catalog-row insert, keyed to an execution.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>internal PK</td>
+</tr>
+<tr>
+<td><code>execution_rid</code></td>
+<td>FK to executions.rid</td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>auto-hash; directory entries derive from <code>rule_id + filename</code></td>
+</tr>
+<tr>
+<td><code>target_schema</code> / <code>target_table</code></td>
+<td>catalog target</td>
+</tr>
+<tr>
+<td><code>rid</code></td>
+<td>leased RID, null until leased</td>
+</tr>
+<tr>
+<td><code>lease_token</code></td>
+<td>idempotency token for crash-safe leasing</td>
+</tr>
+<tr>
+<td><code>metadata_json</code></td>
+<td>column values (serialized via <code>AssetManifest._json_default</code>)</td>
+</tr>
+<tr>
+<td><code>asset_file_path</code></td>
+<td>local file path, null for plain rows</td>
+</tr>
+<tr>
+<td><code>asset_types_json</code></td>
+<td>vocabulary terms, null for plain rows</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>optional</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>staged \| leasing \| leased \| uploading \| uploaded \| failed</code></td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>set on failure</td>
+</tr>
+<tr>
+<td><code>created_at</code> / <code>leased_at</code> / <code>uploaded_at</code></td>
+<td>timestamps</td>
+</tr>
+<tr>
+<td><code>rule_id</code></td>
+<td>FK to directory_rules.id, null if not from a directory</td>
+</tr>
+</tbody>
+</table>
+<p>Indexes: <code>(execution_rid, status)</code>, <code>(execution_rid, target_table)</code>.</p>
+<h4 id="253-directory_rules">2.5.3 <code>directory_rules</code></h4>
+<p>One row per registered asset directory.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>internal PK</td>
+</tr>
+<tr>
+<td><code>execution_rid</code></td>
+<td>FK to executions.rid</td>
+</tr>
+<tr>
+<td><code>target_schema</code> / <code>target_table</code></td>
+<td>target</td>
+</tr>
+<tr>
+<td><code>source_dir</code></td>
+<td>absolute path</td>
+</tr>
+<tr>
+<td><code>glob</code> / <code>recurse</code> / <code>copy_files</code></td>
+<td>selection params</td>
+</tr>
+<tr>
+<td><code>asset_types_json</code></td>
+<td>applied to every registered file</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>active \| closed</code></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamp</td>
+</tr>
+</tbody>
+</table>
+<h3 id="26-rid-leasing-lazy-batched-crash-safe">2.6 RID leasing (lazy, batched, crash-safe)</h3>
+<p>Pending rows eventually carry a real, server-assigned RID from
+<code>public:ERMrest_RID_Lease</code>. Leases are acquired <strong>lazily</strong> — deferred
+to the earliest of:</p>
+<ul>
+<li>An explicit <code>handle.rid</code> read.</li>
+<li>The upload drain starting.</li>
+</ul>
+<p>Until leased, <code>handle.rid == None</code> and <code>status='staged'</code>.</p>
+<p><strong>Two-phase acquisition for crash safety.</strong> Before the lease POST,
+the library writes <code>status='leasing'</code> with a UUID <code>lease_token</code>. On
+success, the response RIDs are written back. On workspace startup,
+entries still in <code>status='leasing'</code> trigger reconciliation: query
+<code>ERMrest_RID_Lease</code> by token; adopt if the lease exists, revert to
+<code>staged</code> if it doesn't.</p>
+<p>Lease POSTs are batched and chunked (<code>PENDING_ROWS_LEASE_CHUNK</code>,
+default 500).</p>
+<h3 id="27-public-api-derivaml-top-level">2.7 Public API — <code>DerivaML</code> top level</h3>
+<pre><code class="language-python">class DerivaML:
+    def __init__(self, ..., mode: ConnectionMode | str = ConnectionMode.online):
+        ...
+
+    # Connection / model
+    @property
+    def mode(self) -&gt; ConnectionMode: ...
+
+    def table(self, name: str, *, schema: str | None = None) -&gt; TableHandle | AssetTableHandle:
+        &quot;&quot;&quot;Schema-introspection sibling of exe.table(). Same return
+        types. Writes on a handle returned by ml.table() raise
+        DerivaMLNoExecutionContext — there's no execution to scope
+        them to. Supports: handle.record_class(), handle.name,
+        handle.schema, and asset-type introspection on
+        AssetTableHandle.&quot;&quot;&quot;
+
+    # Execution construction — kwargs form or config-object form (both supported)
+    def create_execution(
+        self,
+        config: ExecutionConfiguration | None = None,
+        *,
+        datasets: list[DatasetSpecConfig | str] | None = None,
+        assets: list[AssetRIDConfig | str] | None = None,
+        workflow: Workflow | str | None = None,
+        description: str | None = None,
+    ) -&gt; Execution:
+        &quot;&quot;&quot;Online-only. Kwargs form builds an ExecutionConfiguration
+        internally; string shorthand 'RID@version' is accepted for
+        datasets. Mixing `config` with kwargs raises TypeError.
+
+        In offline mode raises DerivaMLOfflineError.&quot;&quot;&quot;
+
+    # Registry
+    def list_executions(
+        self, *,
+        status: ExecutionStatus | list[ExecutionStatus] | None = None,
+        workflow_rid: RID | None = None,
+        mode: ConnectionMode | None = None,
+        since: datetime | None = None,
+    ) -&gt; list[ExecutionRecord]: ...
+
+    def find_incomplete_executions(self) -&gt; list[ExecutionRecord]: ...
+
+    def resume_execution(self, execution_rid: RID) -&gt; Execution:
+        &quot;&quot;&quot;Re-hydrate an Execution from SQLite. Works in both modes;
+        the execution's recorded mode is independent of the current
+        DerivaML instance's mode. Runs just-in-time reconciliation
+        (§2.2) for this execution before returning. Raises
+        DerivaMLException if no matching registry row exists.&quot;&quot;&quot;
+
+    def gc_executions(
+        self, *,
+        older_than: timedelta | None = None,
+        status: ExecutionStatus | list[ExecutionStatus] | None = None,
+        delete_working_dir: bool = False,
+    ) -&gt; int: ...
+
+    # Hierarchy queries live on ExecutionRecord — see §2.9. Per R2.1
+    # they are removed from Execution entirely (users needing them on a
+    # live execution go via exe.as_record().list_execution_children()).
+
+    # Pending / upload inspection
+    def pending_summary(self) -&gt; WorkspacePendingSummary:
+        &quot;&quot;&quot;Workspace-wide summary: per-execution pending row/file counts.&quot;&quot;&quot;
+
+    def list_pending_uploads(self) -&gt; list[UploadTarget]:
+        &quot;&quot;&quot;Flat list of (execution_rid, table, row_count, file_count,
+        bytes) tuples — one per (execution, table) group with pending
+        items.&quot;&quot;&quot;
+
+    # Upload operations
+    def upload_pending(
+        self, *,
+        execution_rids: list[RID] | None = None,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: int | None = None,
+        parallel_files: int = 4,
+    ) -&gt; UploadReport:
+        &quot;&quot;&quot;Blocking upload of pending state. `execution_rids=None`
+        means all pending. Runs in-process. Idempotent — safe to
+        re-run after crash; resumes via SQLite queue state and
+        deriva-py's per-chunk resume file.&quot;&quot;&quot;
+
+    def start_upload(self, **kwargs) -&gt; UploadJob:
+        &quot;&quot;&quot;Non-blocking form. Spawns a worker thread in the current
+        process, returns an UploadJob handle. Same kwargs as
+        upload_pending. The thread dies if the process exits; to
+        survive process exit, use deriva-ml upload CLI from a shell.&quot;&quot;&quot;
+
+    def get_upload_job(self, job_id: str) -&gt; UploadJob: ...
+    def list_upload_jobs(self, *, status: str | None = None) -&gt; list[UploadJob]: ...
+</code></pre>
+<h3 id="28-public-api-execution">2.8 Public API — Execution</h3>
+<pre><code class="language-python">class Execution:
+    # Identity / configuration
+    @property
+    def rid(self) -&gt; str: ...
+    @property
+    def configuration(self) -&gt; ExecutionConfiguration: ...
+    @property
+    def mode(self) -&gt; ConnectionMode: ...
+
+    # Lifecycle fields (SQLite read-through, §2.3)
+    @property
+    def status(self) -&gt; ExecutionStatus: ...
+    @property
+    def start_time(self) -&gt; datetime | None: ...
+    @property
+    def stop_time(self) -&gt; datetime | None: ...
+    @property
+    def error(self) -&gt; str | None: ...
+
+    # Context manager for the running phase
+    def execute(self) -&gt; AbstractContextManager[Execution]:
+        &quot;&quot;&quot;Enter: status → running (synced to catalog online). Exit OK:
+        status → stopped. Exit with exception: status → failed.
+        On exit, emits INFO log with pending_summary() contents if
+        anything is staged. Does NOT auto-upload (per R6.3, in service
+        of restart-safety and offline mode).&quot;&quot;&quot;
+
+    def abort(self) -&gt; None: ...
+
+    # Input datasets — RID-keyed mapping + iterable
+    @property
+    def datasets(self) -&gt; DatasetCollection:
+        &quot;&quot;&quot;Materialized input datasets, accessible by RID or by
+        iteration. DatasetCollection behaves as both a Mapping[str,
+        DatasetBag] and an Iterable[DatasetBag]:
+
+            bag = exe.datasets[&quot;1-XYZ&quot;]          # RID lookup
+            for bag in exe.datasets: ...          # iteration
+            rids = list(exe.datasets)             # RIDs
+            len(exe.datasets)                     # count
+
+        The returned objects are DatasetBag instances — fully
+        materialized, no .bag property needed. (Replaces today's
+        list[DatasetBag] surface; hard cutover per R5.1.)
+        &quot;&quot;&quot;
+
+    # Row-level writes
+    def table(self, name: str, *, schema: str | None = None) -&gt; TableHandle | AssetTableHandle:
+        &quot;&quot;&quot;Execution-scoped handle. Same class as ml.table() returns,
+        but writes are scoped to this execution and are permitted.&quot;&quot;&quot;
+
+    # Pending / upload inspection &amp; drain
+    def pending_summary(self) -&gt; PendingSummary: ...
+
+    def upload_outputs(
+        self, *,
+        retry_failed: bool = False,
+        bandwidth_limit_mbps: int | None = None,
+        parallel_files: int = 4,
+    ) -&gt; UploadReport:
+        &quot;&quot;&quot;Sugar for ml.upload_pending(execution_rids=[self.rid], ...).&quot;&quot;&quot;
+
+    # __repr__ includes pending counts (per R6.3)
+    def __repr__(self) -&gt; str:
+        # &quot;&lt;Execution EXE-A status=stopped pending=15rows/2files&gt;&quot;
+        ...
+</code></pre>
+<h3 id="29-public-api-executionrecord">2.9 Public API — <code>ExecutionRecord</code></h3>
+<p><code>ExecutionRecord</code> is the restored-from-SQLite handle — a frozen
+dataclass with the registry columns plus convenience counts derived
+from <code>pending_rows</code>:</p>
+<pre><code class="language-python">@dataclass(frozen=True)
+class ExecutionRecord:
+    rid: RID
+    workflow_rid: RID | None
+    description: str | None
+    status: ExecutionStatus
+    mode: ConnectionMode
+    working_dir_rel: str
+    start_time: datetime | None
+    stop_time: datetime | None
+    last_activity: datetime
+    error: str | None
+    sync_pending: bool
+    created_at: datetime
+    # Derived
+    pending_rows: int
+    failed_rows: int
+    pending_files: int
+    failed_files: int
+
+    def pending_summary(self) -&gt; PendingSummary: ...
+    def upload_outputs(self, **kwargs) -&gt; UploadReport:
+        &quot;&quot;&quot;Sugar for ml.upload_pending(execution_rids=[self.rid], ...).&quot;&quot;&quot;
+
+    # Hierarchy traversal — mirrors Dataset.list_dataset_parents /
+    # list_dataset_children. Single method per direction; recurse=True
+    # walks the full chain. Visited-set recursion guard prevents cycles.
+    def list_execution_parents(
+        self, *, recurse: bool = False,
+    ) -&gt; list[&quot;ExecutionRecord&quot;]:
+        &quot;&quot;&quot;Parent executions (via Execution_Execution association
+        table). recurse=True returns the full ancestor chain.&quot;&quot;&quot;
+
+    def list_execution_children(
+        self, *, recurse: bool = False,
+    ) -&gt; list[&quot;ExecutionRecord&quot;]:
+        &quot;&quot;&quot;Child (nested) executions. recurse=True returns the full
+        descendant tree.&quot;&quot;&quot;
+</code></pre>
+<h3 id="210-public-api-table-handles-row-level-writes">2.10 Public API — Table handles (row-level writes)</h3>
+<blockquote>
+<p><strong>Provisional — see §2.13.</strong> The handle class hierarchy may grow a
+feature-aware write path when the feature-consistency review (§8)
+concludes. Today's design is implementable as-is; finalization
+awaits that review.</p>
+</blockquote>
+<pre><code class="language-python">ml.table(name, schema=None) -&gt; TableHandle | AssetTableHandle       # no execution scope
+exe.table(name, schema=None) -&gt; TableHandle | AssetTableHandle      # execution-scoped
+</code></pre>
+<p>Same class hierarchy for both entry points. The only difference: handles
+returned by <code>ml.table(...)</code> have no execution to bind writes to, so
+<code>.insert(...)</code> and asset-file methods raise <code>DerivaMLNoExecutionContext</code>
+with a message pointing at <code>exe.table(...)</code>. Read-only methods
+(<code>record_class()</code>, <code>name</code>, <code>schema</code>, asset-type introspection) work on
+both.</p>
+<p>Returns <code>AssetTableHandle</code> if the table is an asset table,
+<code>TableHandle</code> otherwise. Asset-specific methods appear only on
+<code>AssetTableHandle</code>, visible via IDE tab-completion.</p>
+<p>Ambiguous <code>table_name</code> without <code>schema=</code> raises
+<code>DerivaMLTableNotFound</code> listing candidates.</p>
+<h4 id="2101-tablehandle-surface">2.10.1 <code>TableHandle</code> surface</h4>
+<pre><code class="language-python">class TableHandle:
+    name: str
+    schema: str
+
+    def record_class(self, *, include_system_columns: bool = False) -&gt; type[RowRecord]:
+        &quot;&quot;&quot;Dynamically-generated Pydantic model for this table. Fields
+        from non-nullable columns are required; nullable are Optional.
+        extra='forbid' catches typos.&quot;&quot;&quot;
+
+    def insert(
+        self,
+        records: RowRecord | dict | Iterable[RowRecord | dict] | &quot;pd.DataFrame&quot;,
+        *,
+        description: str | None = None,
+        chunk_size: int = 1000,
+        progress: Callable[[int, int], None] | None = None,
+    ) -&gt; PendingRow | list[PendingRow]:
+        &quot;&quot;&quot;Write rows. Raises DerivaMLNoExecutionContext on handles
+        obtained via ml.table(). On exe.table() handles:
+        - Online mode: rows reach the catalog by the time .insert()
+          returns.
+        - Offline mode: rows stage in workspace SQLite; upload drains
+          them at exe.upload_outputs().
+        Accepts scalar / Iterable / DataFrame; returns scalar or list
+        accordingly. Validation via self.record_class() at call time;
+        invalid records raise regardless of mode.&quot;&quot;&quot;
+
+    def pending(self, *, status: str | list[str] | None = None) -&gt; list[PendingRow]: ...
+    def discard_pending(self, *, rows: Iterable[PendingRow] | None = None,
+                        status: str | list[str] | None = None) -&gt; int: ...
+</code></pre>
+<h4 id="2102-assettablehandle-surface-extends-tablehandle">2.10.2 <code>AssetTableHandle</code> surface (extends <code>TableHandle</code>)</h4>
+<pre><code class="language-python">class AssetTableHandle(TableHandle):
+
+    def asset_file(
+        self,
+        file: str | Path,
+        metadata: RowRecord | dict | None = None,
+        *,
+        asset_types: list[str] | str | None = None,
+        copy_file: bool = False,
+        rename_file: str | None = None,
+        description: str | None = None,
+        **kwargs,
+    ) -&gt; AssetFilePath:
+        &quot;&quot;&quot;Register a single file for upload. ALWAYS DEFERRED (even in
+        online mode) because Hatrac + row insert is two-phase. Validates
+        metadata at call time. Returns AssetFilePath bound to the
+        pending entry.&quot;&quot;&quot;
+
+    def asset_directory(
+        self,
+        source_dir: str | Path,
+        *,
+        asset_types: list[str] | str | None = None,
+        glob: str = &quot;*&quot;,
+        recurse: bool = False,
+        copy_files: bool = False,
+    ) -&gt; AssetDirectoryHandle: ...
+</code></pre>
+<h4 id="2103-assetdirectoryhandle">2.10.3 <code>AssetDirectoryHandle</code></h4>
+<pre><code class="language-python">class AssetDirectoryHandle:
+    path: Path                    # source_dir
+    rule_id: int
+    table: AssetTableHandle
+
+    def register(self, file: str | Path) -&gt; AssetFilePath: ...
+    def scan(self) -&gt; list[AssetFilePath]: ...
+    def pending(self) -&gt; list[AssetFilePath]: ...
+
+    def set_metadata(
+        self, source: &quot;pd.DataFrame&quot;, *, filename_col: str = &quot;Filename&quot;,
+    ) -&gt; None: ...
+
+    def close(self) -&gt; None: ...
+</code></pre>
+<p>Deleted files between scans are not auto-removed; upload surfaces them
+as per-row failures.</p>
+<h4 id="2104-handle-read-properties">2.10.4 Handle read properties</h4>
+<p>Both <code>PendingRow</code> and <code>AssetFilePath</code> expose:</p>
+<pre><code class="language-python">handle.rid         # leased RID; None until first read (lazy lease)
+handle.status      # staged | leasing | leased | uploading | uploaded | failed
+handle.metadata    # dict; setter writes through to SQLite
+handle.error       # error message if status == 'failed'
+</code></pre>
+<p>Handles are thin stateless views over SQLite — every property read
+issues a SELECT, every write commits an UPDATE. Consistent across
+multiple handles pointing at the same entry. Bulk operations use the
+batch setters.</p>
+<h3 id="211-pendingsummary-and-upload-operations">2.11 <code>PendingSummary</code> and upload operations</h3>
+<h4 id="2111-pendingsummary-dataclasses">2.11.1 PendingSummary dataclasses</h4>
+<pre><code class="language-python">@dataclass(frozen=True)
+class PendingRowCount:
+    table: str                    # &quot;deriva-ml:Image&quot;
+    pending: int
+    failed: int
+    uploaded: int
+
+@dataclass(frozen=True)
+class PendingAssetCount:
+    table: str
+    pending_files: int
+    failed_files: int
+    uploaded_files: int
+    total_bytes_pending: int
+
+@dataclass(frozen=True)
+class PendingSummary:
+    execution_rid: RID
+    rows: list[PendingRowCount]
+    assets: list[PendingAssetCount]
+    diagnostics: list[str]
+
+    @property
+    def has_pending(self) -&gt; bool: ...
+    @property
+    def total_pending_rows(self) -&gt; int: ...
+    @property
+    def total_pending_files(self) -&gt; int: ...
+
+    def render(self) -&gt; str: ...     # human-readable multi-line
+
+@dataclass(frozen=True)
+class WorkspacePendingSummary:
+    per_execution: list[PendingSummary]
+    @property
+    def total_executions_with_pending(self) -&gt; int: ...
+    def render(self) -&gt; str: ...
+</code></pre>
+<h4 id="2112-upload-engine">2.11.2 Upload engine</h4>
+<blockquote>
+<p><strong>Step 6 is provisional — see §2.13.</strong> The generic per-level drain
+may gain a feature-specific pre-insert validation hook when the
+feature-consistency review (§8) concludes. Phase 1 implements the
+generic flow below; Phase 2 revises step 6 if the review requires.</p>
+</blockquote>
+<p>All upload surfaces (<code>exe.upload_outputs</code>, <code>ml.upload_pending</code>,
+<code>ml.start_upload</code>, CLI) drive one internal engine:</p>
+<pre><code>_upload_engine(ml, execution_rids, retry_failed, bandwidth_limit_mbps, parallel_files):
+  1. Enumerate pending items from SQLite for the selected executions:
+     - pending_rows in status staged/leasing/leased/failed-if-retry
+     - asset files in status staged/uploading/failed-if-retry
+  2. For each table, final scan of AssetDirectoryHandle rules.
+  3. Re-validate each pending row's metadata against current catalog
+     schema (catches drift between stage and upload).
+  4. Batch-lease RIDs for any status='staged' rows.
+  5. Build inter-table FK DAG; topological sort. Cycle →
+     DerivaMLCycleError.
+  6. For each topological level, in parallel (bounded by
+     parallel_files):
+     - For asset files: call deriva-py uploader (idempotent, resumable
+       at chunk granularity).
+     - For plain rows: materialize staging CSV, invoke upload pipeline.
+     - Update SQLite row status per-item with fsync.
+  7. On first level with failures, drain aborts after recording all
+     failures in that level. Execution status → uploaded (all
+     succeeded) or failed (any failed).
+</code></pre>
+<p><strong>Resumability.</strong> Deriva-py's uploader writes per-chunk state to
+<code>.deriva-upload-state-{hostname}.json</code> with fsync; killed mid-chunk,
+a re-run resumes from the next chunk. Server-side Hatrac rejects
+duplicate content by hash, so any item the client thinks needs upload
+but which is already there is a cheap HEAD + skip. The engine combines
+these with SQLite's queue-level state to make the whole pipeline
+idempotent: re-running <code>upload_pending</code> after any kind of crash
+converges to the same final state without duplication.</p>
+<h4 id="2113-uploadjob-non-blocking-form">2.11.3 UploadJob (non-blocking form)</h4>
+<pre><code class="language-python">class UploadJob:
+    id: str
+    status: Literal[&quot;running&quot;, &quot;paused&quot;, &quot;completed&quot;, &quot;failed&quot;, &quot;cancelled&quot;]
+
+    def progress(self) -&gt; UploadProgress: ...
+    def pause(self) -&gt; None: ...
+    def resume(self) -&gt; None: ...
+    def cancel(self) -&gt; None: ...     # finishes current in-flight, stops new
+    def wait(self, timeout: float | None = None) -&gt; UploadReport: ...
+
+@dataclass(frozen=True)
+class UploadProgress:
+    total_rows: int
+    uploaded_rows: int
+    total_bytes: int
+    uploaded_bytes: int
+    current_mbps: float
+    eta_seconds: float | None
+    current_file: str | None
+    failures: list[str]
+</code></pre>
+<p><code>UploadJob</code> state lives in SQLite (<code>upload_jobs</code> table); the worker
+thread updates it. If the process dies, state survives and
+<code>ml.get_upload_job(id).resume()</code> restarts work from where the queue
+left off.</p>
+<h4 id="2114-cli">2.11.4 CLI</h4>
+<pre><code>deriva-ml upload [--execution RID]... [--retry-failed]
+                 [--bandwidth-mbps N] [--parallel N]
+                 [--host HOSTNAME] [--catalog CATALOG_ID]
+</code></pre>
+<p>Wraps <code>upload_pending</code>. Ships as a console-script entry point.
+Supports shell backgrounding (<code>nohup deriva-ml upload &amp;</code>,
+launchd/systemd units) for operator-driven uploads on a
+network-managed schedule.</p>
+<h3 id="212-context-manager-exit-behavior-r63">2.12 Context-manager exit behavior (R6.3)</h3>
+<p>On <code>with exe.execute() as e:</code> exit:</p>
+<ol>
+<li>Update execution status (<code>stopped</code> on clean exit, <code>failed</code> on
+   exception).</li>
+<li>Compute <code>pending_summary()</code>; if <code>has_pending</code>, emit INFO log:</li>
+</ol>
+<p><code>INFO [Execution EXE-A] exited with pending uploads:
+     rows:    Image (12 pending, 0 failed)
+              Subject (3 pending, 0 failed)
+     assets:  Execution_Metadata (2 files, 4.2MB pending)
+     Call exe.upload_outputs() to flush, or exe.pending_summary() for details.</code></p>
+<ol>
+<li><code>Execution.__repr__</code> reflects pending counts.</li>
+</ol>
+<p><strong>No auto-upload on exit.</strong> Rationale per guideline §0: auto-upload
+at exit conflicts with two important properties:
+- <strong>Offline mode</strong> — the user may not be connected.
+- <strong>Restart after failure</strong> — an auto-upload that fails at exit
+  destroys the ability to retry from a clean state, and blocks exit
+  on a long-running operation.</p>
+<p>An opt-in <code>create_execution(upload_on_exit=True)</code> is deferred to a
+future version if usage patterns demand it. The default is explicit.</p>
+<h3 id="213-implementation-sequencing-provisional-sections">2.13 Implementation sequencing — provisional sections</h3>
+<p>Per §8, a follow-on design task reviews the existing feature system
+(and adds Metric/Param) against the SQLite staging layer. That review
+may surface changes to how row-level writes and the upload drain
+integrate with features. To avoid blocking the independent 85% of this
+spec on that review, two sections are marked <strong>provisional</strong> — stable
+enough to implement against, but subject to revision when the feature
+review concludes:</p>
+<ul>
+<li><strong>§2.10 — Table handles.</strong> The <code>TableHandle</code> / <code>AssetTableHandle</code>
+  surface may grow a feature-aware write path, or gain rules
+  prohibiting direct <code>.insert(...)</code> on feature-storage tables.
+  Today's design treats all tables uniformly; the feature review
+  decides whether that holds.</li>
+<li><strong>§2.11.2 — Upload engine step 6.</strong> The generic per-topological-level
+  drain may need a hook for feature-specific pre-insert validation
+  (e.g., target-table row existence check). Today's engine is fully
+  generic.</li>
+</ul>
+<p><strong>What is <em>not</em> provisional</strong> (implement first, no feature dependency):</p>
+<ul>
+<li>§2.1 Connection mode enum</li>
+<li>§2.2 State machine module with catalog sync and reconciliation</li>
+<li>§2.3 Read-through lifecycle properties</li>
+<li>§2.4 Workspace SQLite as authoritative state</li>
+<li>§2.5 SQLite schema (the schema is open to extension, not change)</li>
+<li>§2.6 RID leasing (lazy, batched, crash-safe)</li>
+<li>§2.7 <code>DerivaML</code> top-level API (<code>create_execution</code>, registry,
+  <code>ml.pending_summary</code>, <code>ml.upload_pending</code>, <code>ml.start_upload</code>, CLI
+  entry point)</li>
+<li>§2.8 <code>Execution</code> lifecycle surface (context manager, abort,
+  lifecycle fields)</li>
+<li>§2.9 <code>ExecutionRecord</code> (including hierarchy traversal)</li>
+<li>§2.11.1 <code>PendingSummary</code> dataclasses</li>
+<li>§2.11.3 <code>UploadJob</code> machinery</li>
+<li>§2.11.4 <code>deriva-ml upload</code> CLI</li>
+<li>§2.12 Context-manager exit behavior</li>
+</ul>
+<p><strong>Implementation plan sequencing:</strong></p>
+<p>Phase 1 implements the non-provisional sections end to end, with the
+table-handle surface stubbed at the minimum needed to exercise the
+upload engine (a plain <code>TableHandle.insert</code> is enough). Users can
+stage rows, drain uploads, resume after crash, and run offline
+workflows for plain rows and assets before the feature review lands.</p>
+<p>Phase 2 (after feature review) finalizes §2.10 and §2.11.2 step 6
+based on the feature review's conclusions. This may be a no-op (if
+the review concludes features route cleanly through the generic
+surface) or a targeted revision of handle and engine specifics.</p>
+<h3 id="214-implementation-technology-sqlalchemy-core">2.14 Implementation technology — SQLAlchemy Core</h3>
+<p>The new SQLite tables (<code>executions</code>, <code>pending_rows</code>, <code>directory_rules</code>)
+are <strong>library bookkeeping</strong> — fixed schemas defined in code, heavy
+row-level CRUD, no downstream need for object-style attribute access.
+This profile matches the codebase's existing library-bookkeeping
+modules (<code>ManifestStore</code>, <code>ResultCache</code>, <code>Workspace</code>, <code>PagedFetcher</code>),
+all of which use <strong>SQLAlchemy Core</strong> with hand-written <code>Table</code>
+definitions and explicit <code>insert()</code> / <code>update()</code> / <code>select()</code>
+statements.</p>
+<p>The codebase's use of SQLAlchemy ORM is reserved for catalog-table
+mirrors whose columns are discovered at runtime from the ERMrest model
+(<code>LocalSchema</code> / <code>SchemaBuilder</code>). That use case is not relevant here;
+our schemas are known at code-write time.</p>
+<p><strong>Rules for the new tables:</strong></p>
+<ul>
+<li>Define tables with <code>sqlalchemy.Table(...)</code> on the shared <code>MetaData</code>.</li>
+<li>Use the <code>execution_state__</code> table-name prefix (matches
+  <code>ManifestStore</code>'s <code>execution_state__assets</code> /
+  <code>execution_state__features</code> convention; SQLite has no schemas, so
+  prefix-as-namespace is the codebase idiom).</li>
+<li>Share the existing <code>Workspace</code> engine — new tables live in
+  <code>main.db</code> alongside manifest and cache tables, not a separate file.</li>
+<li>Transactions use <code>with engine.begin() as conn:</code> (auto-commit on
+  exit, rollback on exception). No ORM <code>Session</code>.</li>
+<li>WAL mode is inherited from <code>Workspace</code>; per-mutation fsync semantics
+  are already the default.</li>
+<li>No Alembic. New-table creation uses <code>CREATE TABLE IF NOT EXISTS</code>
+  in a workspace setup function, matching <code>ManifestStore._ensure_schema</code>.</li>
+</ul>
+<p><strong>Where ORM-style objects appear in the public API:</strong> classes like
+<code>Execution</code>, <code>ExecutionRecord</code>, <code>TableHandle</code>, <code>PendingRow</code>,
+<code>AssetFilePath</code>, <code>UploadJob</code> are thin Python wrappers that <em>query</em>
+the Core tables on property reads. They are not ORM-mapped; they are
+stateless views over SQLite rows. This matches the "read-through
+properties" design in §2.3 — consistent with not caching, and
+incompatible with the ORM identity map.</p>
+<h3 id="215-documentation-requirement-for-new-apis">2.15 Documentation requirement for new APIs</h3>
+<p>Documentation is explicitly written to help future contributors —
+human and LLM agent alike — understand and correctly use the code
+without spelunking through implementation bodies. Good docstrings
+reduce the cost of every subsequent read and modification; they are
+a durable investment repaid on every session that touches the code.</p>
+<p>The requirement has three tiers, scaled to the audience and the
+complexity of the function:</p>
+<p><strong>Tier 1 — Public API (methods, classes, properties):</strong></p>
+<p>Every public method, class, and property introduced by this spec
+MUST ship with a complete docstring including:</p>
+<ol>
+<li><strong>One-line summary</strong> of purpose.</li>
+<li><strong>Args section</strong> — every parameter named, with type and semantic
+   meaning (not just type-repeat; the meaning).</li>
+<li><strong>Returns section</strong> — type and meaning of the return value.</li>
+<li><strong>Raises section</strong> — every exception this method can raise, with
+   the condition that triggers it.</li>
+<li><strong>At least one runnable Example section</strong> showing realistic usage,
+   not a trivial invocation.</li>
+<li><strong>Non-obvious behavior</strong> — offline/online difference, side effects,
+   idempotency, server contact, performance characteristics when they
+   surprise — whatever a caller needs to know that isn't visible in
+   the signature.</li>
+</ol>
+<p><strong>Tier 2 — Important private methods (complex logic, non-obvious
+invariants):</strong></p>
+<p>Private methods (<code>_leading_underscore</code>) that encode complex logic,
+enforce non-obvious invariants, or participate in multi-step protocols
+get a full docstring with Args/Returns/Raises. Example is optional if
+the method is internal-only and the calling convention is obvious
+from the class context, but include one when non-obvious.</p>
+<p>Candidates that require Tier 2 docstrings in this spec's implementation:
+- State-machine transition logic (validation of allowed transitions,
+  catalog-sync ordering, <code>sync_pending</code> invariants).
+- RID-lease two-phase acquisition (token generation, status
+  transitions, crash-recovery reconciliation).
+- Upload-engine staging and topological-sort loop.
+- Disagreement resolution during just-in-time reconciliation.
+- Any method that accesses SQLite in a non-obvious order (e.g.,
+  must fsync before catalog PUT, must hold transaction across X and Y).</p>
+<p>Trivial private helpers (<code>_ensure_list</code>, one-liner accessors) do not
+need this; a one-line docstring is fine.</p>
+<p><strong>Tier 3 — Inline comments on non-obvious logic:</strong></p>
+<p>Inline comments explain the <strong>why</strong>, not the <strong>what</strong>. The what is
+usually visible in the code; the why is what saves the next reader
+time. Write inline comments for:</p>
+<ul>
+<li>Transaction ordering constraints (<code># Must commit SQLite before
+  catalog PUT: see §2.2 reconciliation</code>).</li>
+<li>Idempotency invariants (<code># Safe to re-run after crash; deriva-py
+  chunk-state resumes mid-file; Hatrac hash-dedup handles already-
+  uploaded files</code>).</li>
+<li>FK topology assumptions (<code># Topological sort relies on FK DAG
+  being acyclic; intra-table cycles are rejected at stage time</code>).</li>
+<li>Workarounds for upstream behavior (<code># pathBuilder fetch returns
+  empty list when table is empty — don't treat as error</code>).</li>
+<li>Performance-motivated choices (<code># Batched in chunks of 500 to stay
+  under ERMrest URL length limit</code>).</li>
+<li>Edge cases where the code looks wrong but is right (<code># Yes, we
+  catch and swallow here — the reconciliation step will retry</code>).</li>
+</ul>
+<p>Do NOT write inline comments for code that's self-evident from
+naming and structure. The target is non-obvious logic, not
+translation.</p>
+<p><strong>Style alignment:</strong></p>
+<p>Examples and docstrings match the project's existing style. See
+<code>Dataset.list_dataset_parents</code> in <code>src/deriva_ml/dataset/dataset.py</code>
+as the Tier-1 template. Google-style sections (<code>Args:</code>, <code>Returns:</code>,
+<code>Raises:</code>, <code>Example:</code>).</p>
+<p><strong>Code-review gates:</strong></p>
+<ul>
+<li>Tier 1 missing or incomplete: blocks spec-compliance review.</li>
+<li>Tier 2 missing on a complex method: blocks code-quality review.</li>
+<li>Tier 3: the code-quality reviewer flags non-obvious logic that
+  lacks an explanatory comment; implementer adds and re-submits.</li>
+</ul>
+<p>Tier 1 template:</p>
+<pre><code class="language-python">def example_method(self, arg1: str, *, opt: bool = False) -&gt; T:
+    &quot;&quot;&quot;One-line summary of what this method does.
+
+    Longer description if needed — why it exists, when to use it,
+    any non-obvious behavior (e.g., 'does not contact the server',
+    'holds the lease-reconciliation lock for the duration').
+
+    Args:
+        arg1: What this argument represents and any constraints.
+        opt: What turning this on changes.
+
+    Returns:
+        What the returned value represents.
+
+    Raises:
+        DerivaMLException: When &lt;specific condition&gt;.
+        ValueError: When &lt;specific condition&gt;.
+
+    Example:
+        &gt;&gt;&gt; exe = ml.resume_execution(&quot;5-ABC&quot;)
+        &gt;&gt;&gt; result = exe.example_method(&quot;Image&quot;, opt=True)
+        &gt;&gt;&gt; print(result)
+        &lt;expected output&gt;
+    &quot;&quot;&quot;
+</code></pre>
+<p>Tier 2 template (private, complex):</p>
+<pre><code class="language-python">def _acquire_leases(self, pending_ids: list[int]) -&gt; None:
+    &quot;&quot;&quot;Lease RIDs for the given pending_rows in two phases.
+
+    Writes status='leasing' + lease_token first, then POSTs to
+    ERMrest_RID_Lease, then updates rid + status='leased' on success.
+    The intermediate status enables crash recovery: entries still in
+    'leasing' after restart trigger reconciliation via lease_token
+    lookup (see _reconcile_pending_leases).
+
+    Args:
+        pending_ids: Internal IDs from pending_rows.id to lease.
+            Must all belong to the same execution (caller enforces).
+
+    Raises:
+        DerivaMLException: If the lease POST fails non-transiently.
+            Transient failures leave entries in 'leasing' status for
+            the next reconciliation pass to recover.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Tier 3 inline-comment style:</p>
+<pre><code class="language-python"># Must set status='leasing' BEFORE the POST: if we crashed after the
+# POST landed but before we wrote the returned RID, reconciliation
+# needs the lease_token to find our leases on the server.
+stmt = update(pending_rows).where(...).values(status='leasing', lease_token=token)
+conn.execute(stmt)
+conn.commit()
+
+response = catalog.post(&quot;...&quot;, json=[{&quot;ID&quot;: token} for _ in pending_ids])
+
+# ERMrest returns RIDs in the same order as the request; pair by index
+# rather than by ID-lookup, which would be O(N^2).
+for pending_id, assigned_rid in zip(pending_ids, response):
+    ...
+</code></pre>
+<p><strong>Applies to:</strong> every method signature listed in §§2.7–2.11, every
+new class (PendingRow, AssetFilePath, AssetDirectoryHandle,
+ExecutionRecord, UploadJob, PendingSummary, etc.), every non-trivial
+private method introduced by this spec's implementation, and every
+span of code that meets the Tier 3 criteria above.</p>
+<h3 id="216-implementation-dry-hierarchy">2.16 Implementation DRY hierarchy</h3>
+<p>When implementing any function in this spec, before writing new code
+the author MUST check in this order for existing implementations to
+delegate to:</p>
+<ol>
+<li><strong>Existing deriva-ml routines.</strong> Search the codebase (<code>src/deriva_ml/</code>)
+   for functions that already do what's needed. Particularly relevant
+   utility modules:</li>
+<li><code>deriva_ml.core.base</code> / <code>core.mixins</code> — catalog operations,
+     workflow/execution lifecycle, vocab, features, assets.</li>
+<li><code>deriva_ml.catalog.clone</code> / <code>localize</code> — catalog copying.</li>
+<li><code>deriva_ml.dataset.dataset</code> / <code>dataset_bag</code> / <code>catalog_graph</code> —
+     dataset ops, bag export, graph traversal.</li>
+<li><code>deriva_ml.local_db.workspace</code> / <code>manifest_store</code> /
+     <code>result_cache</code> / <code>paged_fetcher</code> — workspace and SQLite helpers.</li>
+<li><code>deriva_ml.execution.execution</code> / <code>execution_record</code> —
+     execution lifecycle, provenance.</li>
+<li>
+<p><code>deriva_ml.schema.create_schema</code> — schema definition helpers
+     (e.g., <code>Table.define_association</code>).</p>
+</li>
+<li>
+<p><strong>Existing deriva-py routines.</strong> If no deriva-ml routine exists,
+   check the installed deriva-py:</p>
+</li>
+<li><code>deriva.core.ermrest_catalog</code> / <code>ermrest_model</code> — catalog model,
+     pathBuilder.</li>
+<li><code>deriva.core.hatrac_store</code> — Hatrac operations (idempotent
+     uploads, chunked resume — see §2.11.2 resumability notes).</li>
+<li><code>deriva.transfer.upload.deriva_upload</code> — the uploader engine
+     (files, transfer-state, per-chunk resume).</li>
+<li><code>deriva.core.asyncio.*</code> — async datapath, async clone.</li>
+<li>
+<p><code>bdbag.bdbag_api</code> — bag creation, materialization, remote file
+     manifest.</p>
+</li>
+<li>
+<p><strong>Write new code</strong> only when neither (1) nor (2) has a usable
+   function. When writing new code, prefer composition of (1) and
+   (2) primitives over reinventing.</p>
+</li>
+</ol>
+<p><strong>Specifically for this spec's implementation:</strong></p>
+<ul>
+<li>Upload engine (§2.11.2) MUST drive <code>deriva-py</code>'s uploader
+  (<code>deriva.transfer.upload.deriva_upload</code>) and MUST NOT reimplement
+  chunked upload, resume, or Hatrac hash dedup — those are already
+  there. SQLite tracks queue-level state; deriva-py tracks
+  per-chunk state; Hatrac server tracks content-hash dedup.</li>
+<li>State machine (§2.2) SQLite persistence MUST use <code>Workspace</code>'s
+  shared SQLAlchemy engine, not a new engine.</li>
+<li>RID leasing (§2.6) POSTs MUST use the existing <code>pathBuilder</code>
+  interface against <code>public:ERMrest_RID_Lease</code>, not hand-rolled HTTP.</li>
+<li>Association table creation (if any needed during setup) MUST use
+  <code>Table.define_association()</code>, not hand-defined columns/FKs.</li>
+<li>Path-building queries MUST use datapath (<code>pb.schemas[...]</code>), not
+  hand-rolled ERMrest URL strings.</li>
+</ul>
+<p>Code review gate: a reviewer finding a new function that duplicates
+an existing deriva-ml or deriva-py routine blocks spec-compliance
+review. The implementer documents in the PR description which
+existing routines they evaluated and why they didn't fit, if they
+end up writing new code.</p>
+<h3 id="217-argument-naming-and-ordering-conventions">2.17 Argument naming and ordering conventions</h3>
+<p>Consistency across method signatures is a code-review gate. The
+following rules apply to every new or modified method in this spec
+and should be used as the default pattern for future DerivaML work.</p>
+<h4 id="2171-argument-names-canonical-vocabulary">2.17.1 Argument names — canonical vocabulary</h4>
+<p>RIDs use the full <code>_rid</code> suffix matching the entity name. Types are
+the <code>RID</code> typedef from <code>deriva_ml</code> (aliases <code>str</code>), not bare <code>str</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Name</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Execution identifier</td>
+<td><code>execution_rid</code></td>
+<td><code>RID</code></td>
+</tr>
+<tr>
+<td>List of execution identifiers</td>
+<td><code>execution_rids</code></td>
+<td><code>list[RID]</code></td>
+</tr>
+<tr>
+<td>Dataset identifier</td>
+<td><code>dataset_rid</code></td>
+<td><code>RID</code></td>
+</tr>
+<tr>
+<td>Workflow identifier</td>
+<td><code>workflow_rid</code></td>
+<td><code>RID</code></td>
+</tr>
+<tr>
+<td>Asset identifier</td>
+<td><code>asset_rid</code></td>
+<td><code>RID</code></td>
+</tr>
+<tr>
+<td>Any generic RID</td>
+<td><code>rid</code></td>
+<td><code>RID</code></td>
+</tr>
+</tbody>
+</table>
+<p>Do NOT use: <code>exec_rid</code>, <code>exec_id</code>, <code>execution_id</code>, <code>ExecutionRID</code>,
+or any other variant. The codebase uses <code>execution_rid</code> everywhere
+(<code>src/deriva_ml/core/mixins/execution.py</code>, <code>asset/manifest.py</code>,
+<code>interfaces.py</code>), and this spec stays consistent.</p>
+<p>Other canonical parameter names:</p>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Name</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Table name (catalog table)</td>
+<td><code>table_name</code> or <code>name</code> on handles</td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td>Schema name (catalog schema)</td>
+<td><code>schema</code></td>
+<td><code>str \| None</code></td>
+</tr>
+<tr>
+<td>Column name</td>
+<td><code>column_name</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td>Feature / metric / param name</td>
+<td><code>name</code> on the respective handle</td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td>Vocabulary term name</td>
+<td><code>term_name</code> or <code>name</code> in context</td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td>File path (local)</td>
+<td><code>file</code> or <code>file_path</code> if disambiguation needed</td>
+<td><code>Path \| str</code></td>
+</tr>
+<tr>
+<td>Directory path (local)</td>
+<td><code>source_dir</code> for inputs, <code>dest_dir</code> for outputs</td>
+<td><code>Path \| str</code></td>
+</tr>
+<tr>
+<td>Asset types (plural, vocab terms)</td>
+<td><code>asset_types</code></td>
+<td><code>list[str] \| str \| None</code></td>
+</tr>
+<tr>
+<td>Single asset type</td>
+<td><code>asset_type</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td>Status filter</td>
+<td><code>status</code></td>
+<td><code>T \| list[T] \| None</code> (T = the status enum)</td>
+</tr>
+<tr>
+<td>Recursive traversal</td>
+<td><code>recurse</code></td>
+<td><code>bool</code></td>
+</tr>
+<tr>
+<td>Time cutoff for filtering</td>
+<td><code>since</code> (lower bound) / <code>older_than</code> (delta)</td>
+<td><code>datetime</code> / <code>timedelta</code></td>
+</tr>
+<tr>
+<td>Parallelism knob (files/workers)</td>
+<td><code>parallel_files</code> / <code>parallel_workers</code></td>
+<td><code>int</code></td>
+</tr>
+<tr>
+<td>Bandwidth cap</td>
+<td><code>bandwidth_limit_mbps</code> (in API) / <code>--bandwidth-mbps</code> (in CLI)</td>
+<td><code>int \| None</code></td>
+</tr>
+<tr>
+<td>Retry-previously-failed toggle</td>
+<td><code>retry_failed</code></td>
+<td><code>bool</code></td>
+</tr>
+<tr>
+<td>Progress callback</td>
+<td><code>progress</code></td>
+<td><code>Callable[[int, int], None] \| None</code></td>
+</tr>
+<tr>
+<td>Chunk / batch size</td>
+<td><code>chunk_size</code></td>
+<td><code>int</code></td>
+</tr>
+<tr>
+<td>Descriptive text</td>
+<td><code>description</code></td>
+<td><code>str \| None</code></td>
+</tr>
+<tr>
+<td>Copy file vs symlink</td>
+<td><code>copy_file</code> (one) / <code>copy_files</code> (many)</td>
+<td><code>bool</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Mode value.</strong> Always <code>mode</code>; accepts <code>ConnectionMode | str</code>; string
+coerced. Internal attribute <code>self._mode: ConnectionMode</code>.</p>
+<p><strong>Filter plural form.</strong> When a method accepts a list of something
+for filtering, use the plural noun (<code>execution_rids</code>, <code>statuses</code>),
+never <code>rid_list</code> / <code>status_list</code>. The list is implied by the plural.</p>
+<h4 id="2172-argument-ordering">2.17.2 Argument ordering</h4>
+<p>Within any method signature, arguments appear in this order, with
+keyword-only (<code>*,</code>) separating positional from keyword:</p>
+<ol>
+<li><strong>Positional required — subject of the operation.</strong> Usually
+   one argument: the thing the verb acts on. Examples:</li>
+<li><code>insert(records)</code> — subject is <code>records</code>.</li>
+<li><code>asset_file(file, metadata=None)</code> — subject is <code>file</code>.</li>
+<li>
+<p><code>resume_execution(execution_rid)</code> — subject is the RID.</p>
+</li>
+<li>
+<p><strong>Positional optional — direct modifier of the subject.</strong>
+   Occasionally needed. Kept positional only when "obvious second
+   argument" is true (e.g., <code>asset_file(file, metadata)</code> because the
+   metadata is the direct companion to the file). When in doubt,
+   put it keyword-only.</p>
+</li>
+<li>
+<p><strong><code>*,</code> separator.</strong> Always present unless the method has ≤1
+   argument total. This protects against silent breakage when
+   reordering keyword-only arguments in a future revision.</p>
+</li>
+<li>
+<p><strong>Keyword-only — identifying / scoping arguments.</strong> Things that
+   narrow "which" or "where":</p>
+</li>
+<li>
+<p><code>schema</code>, <code>status</code>, <code>workflow_rid</code>, <code>since</code>, <code>older_than</code>,
+     <code>execution_rids</code>.</p>
+</li>
+<li>
+<p><strong>Keyword-only — behavioral options.</strong> Things that control how
+   the operation runs:</p>
+</li>
+<li>
+<p><code>recurse</code>, <code>retry_failed</code>, <code>chunk_size</code>, <code>parallel_files</code>,
+     <code>bandwidth_limit_mbps</code>, <code>progress</code>, <code>copy_file</code>.</p>
+</li>
+<li>
+<p><strong>Keyword-only — catch-all.</strong> <code>**kwargs</code> when used (e.g., for
+   metadata passthrough on <code>asset_file</code>). Appears last.</p>
+</li>
+</ol>
+<p>Example — shape that follows the convention:</p>
+<pre><code class="language-python">def asset_file(
+    self,
+    file: str | Path,                                # (1) subject
+    metadata: RowRecord | dict | None = None,        # (2) direct modifier
+    *,                                               # (3) barrier
+    asset_types: list[str] | str | None = None,     # (4) scoping
+    copy_file: bool = False,                         # (5) behavior
+    rename_file: str | None = None,                  # (5) behavior
+    description: str | None = None,                  # (5) behavior
+    **kwargs,                                        # (6) catch-all
+) -&gt; AssetFilePath: ...
+</code></pre>
+<p>Example — upload method following the convention:</p>
+<pre><code class="language-python">def upload_pending(
+    self,
+    *,                                               # no positional
+    execution_rids: list[RID] | None = None,        # (4) scoping
+    retry_failed: bool = False,                      # (5) behavior
+    bandwidth_limit_mbps: int | None = None,         # (5) behavior
+    parallel_files: int = 4,                         # (5) behavior
+    progress: Callable[[int, int], None] | None = None,  # (5) behavior
+) -&gt; UploadReport: ...
+</code></pre>
+<h4 id="2173-return-value-conventions">2.17.3 Return-value conventions</h4>
+<ul>
+<li><strong>Methods that return a single entity</strong> on success or raise — no
+  <code>Optional</code>. Use <code>raise</code> for not-found, not <code>return None</code>.
+  Example: <code>resume_execution(execution_rid) -&gt; Execution</code> (raises
+  <code>DerivaMLException</code>, doesn't return None).</li>
+<li><strong>Lookup methods where absence is legitimate</strong> — return <code>Optional</code>.
+  Example: <code>lookup_execution(execution_rid) -&gt; ExecutionRecord | None</code>
+  only if the library genuinely supports "it's fine if it's not
+  there."</li>
+<li><strong>Collection accessors (lists, dicts)</strong> — empty collection when
+  nothing matches. Not None. <code>list_executions(status="failed")</code>
+  returns <code>[]</code>, not <code>None</code>.</li>
+<li><strong>Accepts-one-or-many</strong> — mirror on return: scalar input → scalar
+  return, iterable input → list return. <code>TableHandle.insert</code> is the
+  template: <code>insert(single_record) -&gt; PendingRow</code>,
+  <code>insert(list_of_records) -&gt; list[PendingRow]</code>.</li>
+</ul>
+<h4 id="2174-defaults-and-nullability">2.17.4 Defaults and Nullability</h4>
+<ul>
+<li>Boolean options default to the safer/less-surprising value:
+  <code>recurse=False</code>, <code>retry_failed=False</code>, <code>copy_file=False</code>,
+  <code>delete_working_dir=False</code>, <code>upload_on_exit=False</code>.</li>
+<li>Numeric throttles default to the library's conservative value:
+  <code>chunk_size=1000</code>, <code>parallel_files=4</code>. <code>bandwidth_limit_mbps=None</code>
+  means unlimited.</li>
+<li><code>None</code> on optional scoping arguments means "all" (or "match any"):
+  <code>execution_rids=None</code> uploads all pending; <code>status=None</code> matches
+  any.</li>
+<li>Raise early on incompatible combinations (<code>mode=offline</code> +
+  <code>create_execution</code> → <code>DerivaMLOfflineError</code>; mixing <code>config</code> with
+  kwargs → <code>TypeError</code>). Don't silently "do what seems reasonable."</li>
+</ul>
+<h4 id="2175-existing-code-cleanup-scope">2.17.5 Existing-code cleanup scope</h4>
+<p>Where this spec introduces new methods, the conventions above are
+binding. Where this spec touches adjacent older methods that don't
+follow the conventions, the implementer fixes naming as part of the
+diff they're already writing (per R5.1 aggressive deprecation — hard
+cutover, no shims, breaking change in CHANGELOG). Methods untouched
+by this spec are not renamed preemptively; a separate cleanup pass
+can address them if needed.</p>
+<p>Code-review gate: a reviewer finding a new method whose signature
+doesn't follow §2.17 blocks code-quality review.</p>
+<h2 id="3-walkthrough-three-script-workflow">3. Walkthrough — three-script workflow</h2>
+<p>The motivating workflow: a user connects from home, creates an
+execution, downloads a dataset bag. Next day on a laptop with no
+connection, they run the model against the bag and write
+predictions + asset masks locally. The following day, reconnecting,
+they upload.</p>
+<p><strong>Script 1 — create the execution (online):</strong></p>
+<pre><code class="language-python">ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;)    # default: online
+exe = ml.create_execution(
+    datasets=[&quot;1-XYZ@1.0.0&quot;],                              # kwargs form
+    workflow=my_workflow,
+    description=&quot;Segmentation run 2026-04-18&quot;,
+)
+
+with exe.execute() as e:
+    bag = e.datasets[&quot;1-XYZ&quot;]              # DatasetBag (downloaded to workspace)
+# SQLite executions row: rid=5-ABC, status='stopped', mode='online',
+#   config_json=&lt;serialized&gt;, working_dir_rel='execution/5-ABC'.
+# Catalog Execution row synced: status='stopped'.
+</code></pre>
+<p><strong>Script 2 — offline computation:</strong></p>
+<pre><code class="language-python">ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;,
+              mode=ConnectionMode.offline)
+
+for record in ml.find_incomplete_executions():
+    print(record.rid, record.status, record.description)
+# Prints: 5-ABC  stopped  &quot;Segmentation run 2026-04-18&quot;
+
+exe = ml.resume_execution(&quot;5-ABC&quot;)   # from SQLite, no server contact
+
+with exe.execute() as e:
+    bag = e.datasets[&quot;1-XYZ&quot;]              # DatasetBag from workspace (already local)
+
+    for image_rid in bag.list_dataset_members()[&quot;Image&quot;]:
+        img = bag.get_row(&quot;Image&quot;, image_rid)
+        mask_arr, conf = my_model.predict(img.filename)
+
+        mask_path = Path(exe.working_dir) / f&quot;mask_{image_rid}.png&quot;
+        save_png(mask_arr, mask_path)
+        mask = exe.table(&quot;Segmentation_Mask&quot;).asset_file(
+            mask_path, Image=image_rid, Model_Version=&quot;v1.2&quot;,
+        )
+
+        exe.table(&quot;Prediction&quot;).insert({
+            &quot;Image&quot;: image_rid,
+            &quot;Mask&quot;: mask.rid,
+            &quot;Confidence&quot;: conf,
+        })
+# Exit INFO log:
+#   [Execution 5-ABC] exited with pending uploads:
+#     rows:    Prediction (N pending, 0 failed)
+#     assets:  Segmentation_Mask (N files, ~M MB pending)
+# SQLite state after script 2:
+#   executions.5-ABC.status = 'stopped', sync_pending=1
+#   pending_rows: 2N rows, status='staged' / 'leased'
+</code></pre>
+<p><strong>Script 3 — upload (online):</strong></p>
+<pre><code class="language-python">ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;)   # online
+
+print(ml.pending_summary().render())
+# Workspace pending summary:
+#   Execution 5-ABC (stopped):
+#     rows:    Prediction (N pending)
+#     assets:  Segmentation_Mask (N files, ~M MB pending)
+
+ml.upload_pending(execution_rids=[&quot;5-ABC&quot;])
+# Drain runs; status transitions to 'uploaded'.
+</code></pre>
+<p>Or, operator-driven from a shell (say, an overnight schedule):</p>
+<pre><code>$ deriva-ml upload --host example.org --catalog 42 --execution 5-ABC \
+                   --bandwidth-mbps 50 --parallel 4
+</code></pre>
+<p>Same engine; different driver.</p>
+<h2 id="4-algorithms">4. Algorithms</h2>
+<h3 id="41-handle-construction">4.1 Handle construction</h3>
+<pre><code>ml.table(name, schema=None) / exe.table(name, schema=None):
+  1. Resolve via model.name_to_table(name, schema=schema). Raise
+     DerivaMLTableNotFound if missing or ambiguous-without-schema.
+  2. If model.is_asset(table): return AssetTableHandle(self, table).
+     Else:                      return TableHandle(self, table).
+  Handles hold the owner (ml or exe) and table reference. No cached state.
+  ml-bound handles set .execution = None; write methods check and raise
+  DerivaMLNoExecutionContext.
+</code></pre>
+<h3 id="42-tablehandleinsertrecords">4.2 <code>TableHandle.insert(records)</code></h3>
+<pre><code>1. If self.execution is None: raise DerivaMLNoExecutionContext.
+2. Normalize records:
+   - DataFrame → list of dicts.
+   - Scalar → list of one (flag: scalar_input).
+   - Iterable → materialize in chunks.
+3. For each chunk:
+   a. For each rec:
+      - RowRecord: pass through.
+      - dict: rec = self.record_class()(**rec). Raises on failure.
+   b. Generate lease_token per row.
+   c. BEGIN TRANSACTION.
+   d. Insert N pending_rows: execution_rid, target_schema, target_table,
+      status='staged', rid=NULL.
+   e. COMMIT.
+   f. progress(done, total) if provided.
+4. Update executions.last_activity = now().
+5. If self.execution.mode == ConnectionMode.online:
+   _drain_pending(execution_rid, entry_ids=[...]).
+6. Return scalar handle or list.
+</code></pre>
+<h3 id="43-assettablehandleasset_filefile">4.3 <code>AssetTableHandle.asset_file(file, ...)</code></h3>
+<pre><code>1. If self.execution is None: raise DerivaMLNoExecutionContext.
+2. Validate file, determine staging path.
+3. Symlink/copy file to assets/{AssetTable}/.
+4. Construct metadata record via self.record_class()(**{metadata, **kwargs}).
+5. Generate lease_token.
+6. Write pending_rows with asset_file_path set, status='staged'.
+7. Update executions.last_activity.
+8. Return AssetFilePath bound to the entry. No drain.
+</code></pre>
+<h3 id="44-lazy-rid-materialization">4.4 Lazy <code>.rid</code> materialization</h3>
+<pre><code>1. If entry.rid is not null, return it.
+2. _acquire_leases(including_entries=[...]):
+   a. Find all entries in status='staged' (coalesce pending reads).
+   b. SET status='leasing' for them, commit.
+   c. POST /entity/public:ERMrest_RID_Lease with [{&quot;ID&quot;: token}, ...].
+   d. UPDATE pending_rows SET rid=&lt;assigned&gt;, status='leased' by token.
+3. Return entry.rid.
+</code></pre>
+<h3 id="45-workspace-startup-lease-reconciliation">4.5 Workspace startup lease reconciliation</h3>
+<pre><code>1. Query pending_rows WHERE status='leasing'.
+2. For each group (batched by execution):
+   a. Query ERMrest_RID_Lease by lease_tokens.
+   b. Found → rid=&lt;found&gt;, status='leased'.
+   c. Not found → status='staged' (POST never landed).
+</code></pre>
+<h3 id="46-mlresume_executionrid">4.6 <code>ml.resume_execution(rid)</code></h3>
+<pre><code>1. Query executions WHERE rid=&lt;rid&gt;.
+2. If not found: raise DerivaMLException(&quot;Execution {rid} not in workspace&quot;).
+3. Just-in-time reconciliation:
+   a. If executions.sync_pending=1 and mode=online:
+      Flush SQLite state to catalog Execution row. Clear sync_pending.
+   b. Else if mode=online:
+      GET catalog Execution row. Compare status with SQLite. Apply
+      disagreement rules (§2.2). Raise on unexpected mismatch.
+4. Load configuration from executions.config_json.
+5. Construct Execution object bound to self.
+6. Return Execution.
+</code></pre>
+<h3 id="47-execution-lifecycle-transitions">4.7 Execution lifecycle transitions</h3>
+<p>Every transition is a single call to <code>state_machine.transition(rid,
+target_status, **metadata)</code> which:
+1. Opens SQLite transaction.
+2. Validates current→target is legal.
+3. Updates SQLite row (status, timestamp, error, etc.).
+4. If online mode: PUTs catalog Execution row; on PUT failure sets
+   sync_pending=1, commits SQLite anyway.
+5. If offline mode: sets sync_pending=1, commits SQLite.
+6. Commits transaction.</p>
+<pre><code>create_execution:
+  1. Require online mode.
+  2. POST Execution row to catalog → rid=&lt;assigned&gt;.
+  3. Serialize ExecutionConfiguration to config_json.
+  4. INSERT executions row: rid, status='created', mode, config_json,
+     start_time=NULL, last_activity=now(), sync_pending=0.
+  5. Return Execution.
+
+.execute() context enter:
+  transition(rid, 'running', start_time=now())
+
+.execute() context exit OK:
+  transition(rid, 'stopped', stop_time=now())
+  + emit exit log; update __repr__ via pending_summary.
+
+.execute() context exit w/ exception:
+  transition(rid, 'failed', stop_time=now(), error=&lt;msg&gt;)
+
+upload_outputs start:
+  transition(rid, 'pending_upload')
+
+upload_outputs OK:
+  transition(rid, 'uploaded')
+
+upload_outputs w/ failures:
+  transition(rid, 'failed', error=&lt;msg&gt;)
+
+exe.abort():
+  transition(rid, 'aborted')
+</code></pre>
+<h2 id="5-testing">5. Testing</h2>
+<h3 id="51-unit-tests-no-live-catalog">5.1 Unit tests (no live catalog)</h3>
+<p>Registry + state machine:
+- <code>create_execution</code> writes SQLite row; catalog PUT mocked.
+- <code>resume_execution(rid)</code> reads from SQLite; works without server.
+- <code>resume_execution(missing_rid)</code> raises.
+- <code>list_executions()</code> with each filter combination.
+- <code>find_incomplete_executions()</code> returns expected status set.
+- <code>gc_executions(older_than=...)</code> removes matching rows.
+- Each lifecycle transition produces correct status sequence.
+- State-machine validates current→target legality; illegal raises.
+- <code>sync_pending</code> set on PUT failure; cleared on successful flush.
+- Disagreement rules: each of the six cases produces expected outcome.
+- Read-through properties: status/start_time/stop_time/error reflect
+  SQLite mutations by another process.</p>
+<p>Connection mode:
+- <code>ConnectionMode.online</code> (default), <code>ConnectionMode.offline</code> accepted.
+- String literals "online"/"offline" coerced.
+- Invalid values raise pydantic validation error.</p>
+<p>Kwargs form of create_execution:
+- <code>create_execution(config=X)</code> works.
+- <code>create_execution(datasets=[...], workflow=...)</code> works.
+- Mixing <code>config</code> with other kwargs raises TypeError.
+- String shorthand <code>"RID@version"</code> coerces to DatasetSpecConfig.</p>
+<p>Handle dispatch:
+- <code>exe.table(plain)</code> → <code>TableHandle</code>; no asset methods.
+- <code>exe.table(asset)</code> → <code>AssetTableHandle</code>; asset methods present.
+- <code>ml.table(plain).insert(...)</code> → <code>DerivaMLNoExecutionContext</code>.
+- <code>ml.table(asset).asset_file(...)</code> → <code>DerivaMLNoExecutionContext</code>.
+- <code>ml.table(plain).record_class()</code> works.
+- Ambiguous name without schema raises.</p>
+<p>Insert:
+- <code>insert(dict)</code> validates and raises on bad field.
+- <code>insert(record)</code> passes through.
+- <code>insert(df)</code> converts correctly.
+- Scalar → scalar; Iterable / DataFrame → list.
+- Empty input is a no-op.
+- Large batch is chunked with progress callbacks.
+- Offline mode: <code>insert(row)</code> returns with <code>status='staged'</code>.
+- Online mode: <code>insert(row)</code> drains inline; <code>status='uploaded'</code>.</p>
+<p>Lazy lease:
+- <code>.rid</code> read triggers batched POST; already-leased entries skipped.
+- Two-phase: <code>status='leasing'</code> written before POST; POST failure
+  reverts to <code>'staged'</code>.
+- Startup reconciliation: POST success + simulated crash → lease
+  adopted.</p>
+<p>Directory handle:
+- <code>asset_directory(dir).register(file)</code> eager.
+- <code>scan()</code> idempotent.
+- <code>set_metadata(df)</code> validates every resolved value.
+- Deleted file → not auto-removed; upload surfaces failure.</p>
+<p>PendingSummary &amp; exit behavior:
+- <code>pending_summary()</code> correct counts across tables.
+- Context-manager exit logs INFO when <code>has_pending</code>.
+- <code>__repr__</code> includes pending counts.
+- No auto-upload on exit (regression guard).</p>
+<p>Upload engine:
+- <code>upload_pending(execution_rids=[...])</code> drives engine; correct final
+  status.
+- <code>retry_failed=True</code> picks up <code>status='failed'</code> entries.
+- Crash mid-drain: re-run converges (SQLite status preserved).
+- Topological order respected; FK cycle raises <code>DerivaMLCycleError</code>.
+- Bandwidth limit honored (rate-limited egress).</p>
+<p>UploadJob:
+- <code>start_upload</code> returns running job.
+- <code>progress()</code> reports per-item counts.
+- <code>pause()</code> / <code>resume()</code> / <code>cancel()</code> transitions.
+- Process-exit + <code>get_upload_job(id).resume()</code> picks up.</p>
+<p>CLI:
+- <code>deriva-ml upload --execution RID</code> runs to completion.
+- <code>--bandwidth-mbps N</code> respected.</p>
+<h3 id="52-integration-tests-live-catalog">5.2 Integration tests (live catalog)</h3>
+<p>Online mode:
+- <code>ml.create_execution(kwargs)</code> writes SQLite + server.
+- <code>exe.table("Subject").insert({...})</code> reaches catalog before return.
+- <code>exe.table("Image").asset_file(...)</code> + <code>exe.upload_outputs()</code>:
+  file in Hatrac, row in catalog.
+- Status sync: each transition visible in catalog Execution row.</p>
+<p>Offline mode:
+- Same code with <code>mode=ConnectionMode.offline</code>: rows reach catalog at
+  <code>exe.upload_outputs()</code>, not at <code>.insert()</code> time.
+- <code>create_execution</code> with <code>mode=ConnectionMode.offline</code> raises.
+- On reconnect (online resume_execution), sync_pending flushed.</p>
+<p>Split-script workflow:
+- Script A (online): create_execution kwargs form, download bag.
+- Script B (offline): resume_execution(rid), insert rows, exit.
+- Script C (online, separate process):
+  <code>ml.upload_pending(execution_rids=[rid])</code>.
+- Verify: catalog Subject rows have correct <code>Execution</code> FK / RCB;
+  RID assigned in script B matches catalog.</p>
+<p>Separate-process upload:
+- Script A (online): create execution, stage rows.
+- Script B (subprocess <code>deriva-ml upload</code>): drains.
+- Script A sees <code>uploaded</code> status after B completes.</p>
+<p>Resumption robustness:
+- Crash mid-insert: re-open workspace → <code>find_incomplete_executions</code>
+  surfaces the execution; <code>resume_execution</code> works; pending_rows
+  intact.
+- Crash mid-upload: <code>find_incomplete_executions</code> surfaces it;
+  <code>upload_outputs(retry_failed=True)</code> completes the remaining work.
+- Corrupted configuration.json on disk: <code>resume_execution</code> still
+  works (reads from SQLite).
+- Kill during large-file upload: resume picks up at chunk boundary
+  (deriva-py state + server dedupe).</p>
+<p>Disagreement scenarios:
+- External abort of execution: SQLite says running, catalog says
+  aborted → SQLite updated, resume raises.
+- External upload completion: SQLite says pending_upload, catalog says
+  uploaded → SQLite updated, pending rows cleared.</p>
+<p>Edge cases:
+- Inter-table FK cycle raises <code>DerivaMLCycleError</code>.
+- Schema drift: add required column between stage and upload → error.
+- File deleted between register and upload: per-row failure with
+  clear message.</p>
+<h3 id="53-regression">5.3 Regression</h3>
+<p>After hard-cutover renames, all existing tests that referenced the old
+names are updated as part of the rename PR (not shim-tested).</p>
+<h2 id="6-evolution-from-earlier-revisions">6. Evolution from earlier revisions</h2>
+<p>Revision highlights:</p>
+<ul>
+<li><strong>Rev 2/3:</strong> Separate <code>stage</code> and <code>insert</code> verbs. Collapsed in rev 4.</li>
+<li><strong>Rev 3:</strong> Workspace-scoped pending rows. Dropped in rev 4;
+  everything is execution-scoped.</li>
+<li><strong>Rev 4:</strong> <code>dedupe_key</code>, <code>best_effort</code> mode, handle-as-FK coercion,
+  sidecar CSV metadata. All dropped for rev 5 simplicity.</li>
+<li><strong>Rev 5:</strong> Reached 10-concept API with single write verb.</li>
+<li><strong>Rev 6 (this revision):</strong> API-consistency pass against the
+  cross-cutting analysis:</li>
+<li><code>ConnectionMode</code> enum (stricter than string).</li>
+<li>Execution state machine as a dedicated module with catalog sync
+    and <code>sync_pending</code> reconciliation.</li>
+<li>Execution lifecycle fields as SQLite read-through.</li>
+<li>Hierarchy queries removed from <code>Execution</code>; live on
+    <code>ExecutionRecord</code> as <code>list_execution_parents</code> /
+    <code>list_execution_children</code>, mirroring the dataset pattern
+    (<code>list_dataset_parents</code> / <code>list_dataset_children</code>).</li>
+<li><code>ml.table()</code> as schema-introspection sibling of <code>exe.table()</code>.</li>
+<li><code>retry_failed</code> merged into <code>upload_outputs</code> / <code>upload_pending</code>.</li>
+<li><code>create_execution</code> kwargs form alongside config-object form.</li>
+<li>Metrics and params as first-class concepts parallel to features
+    (deferred to follow-on task, §8).</li>
+<li><code>pending_summary</code> on <code>Execution</code>, <code>ExecutionRecord</code>, and
+    workspace-level.</li>
+<li>Upload as async-capable operation with <code>ml.upload_pending</code>,
+    <code>ml.start_upload</code> / <code>UploadJob</code>, CLI, all sharing one engine.</li>
+<li>Hard deprecation policy (no shims).</li>
+<li>Reproducibility-over-ergonomics guideline (§0) captured.</li>
+<li>Implementation sequencing: §2.10 (table handles) and §2.11.2 step
+    6 (drain) marked provisional pending feature-consistency review
+    (§8). Everything else implementable as Phase 1.</li>
+<li>Implementation technology (§2.14): SQLAlchemy Core for the new
+    tables, shared with Workspace engine, <code>execution_state__</code> table
+    prefix — matches existing library-bookkeeping style
+    (ManifestStore, ResultCache).</li>
+<li>Documentation requirement (§2.15): three-tier policy — full
+    docstring + example on public API (Tier 1); full docstring on
+    important/complex private methods (Tier 2); inline "why"
+    comments on non-obvious logic (Tier 3). Explicitly sized to
+    help future contributors, including LLM agents, use the code
+    correctly without spelunking.</li>
+<li>Implementation DRY hierarchy (§2.16): use existing deriva-ml
+    routines before existing deriva-py routines before writing new
+    functions.</li>
+<li>Execution.datasets upgraded from <code>list[DatasetBag]</code> to
+    <code>DatasetCollection</code> — a RID-keyed mapping + iterable. Fixes the
+    walkthrough's <code>e.datasets["1-XYZ"]</code> access pattern. Hard cutover.</li>
+<li>Argument naming + ordering conventions (§2.17): canonical
+    vocabulary (<code>execution_rid</code>, <code>dataset_rid</code>, <code>schema</code>,
+    <code>asset_types</code>, <code>recurse</code>, <code>retry_failed</code>, <code>bandwidth_limit_mbps</code>,
+    etc.), canonical ordering (subject positional → <code>*,</code> →
+    scoping → behavior → catch-all), return-value rules,
+    defaults/nullability rules, adjacent-old-method cleanup policy.
+    Code-review gate.</li>
+</ul>
+<p>Concept count after rev 6: <strong>13</strong>.</p>
+<ol>
+<li><code>DerivaML(..., mode=ConnectionMode.online|offline)</code> — mode at
+   construction.</li>
+<li><code>ml.list_executions() / find_incomplete_executions() / resume_execution()</code> — registry.</li>
+<li><code>ml.create_execution(...)</code> — online only, kwargs or config form.</li>
+<li><code>ml.table(name)</code> — schema-introspection (read-only).</li>
+<li><code>exe.table(name)</code> — row-level entry point, execution-scoped writes.</li>
+<li><code>TableHandle / AssetTableHandle</code> — asset variant adds file methods.</li>
+<li><code>handle.record_class()</code> — typed record.</li>
+<li><code>handle.insert(records)</code> — one write verb.</li>
+<li><code>handle.pending() / discard_pending()</code> — triage.</li>
+<li><code>handle.asset_file() / asset_directory()</code> — asset-specific.</li>
+<li><code>exe.pending_summary() / ml.pending_summary()</code> — inspection.</li>
+<li><code>exe.upload_outputs() / ml.upload_pending() / ml.start_upload() +
+    UploadJob / deriva-ml upload</code> — drain.</li>
+<li><code>ExecutionRecord.list_execution_parents() / list_execution_children()</code> — hierarchy traversal, mirroring <code>Dataset.list_dataset_parents / list_dataset_children</code>.</li>
+</ol>
+<h2 id="7-known-limits">7. Known limits</h2>
+<ul>
+<li><strong>Updates / deletes:</strong> insert-only.</li>
+<li><strong>Intra-table FK cycles:</strong> unsupported. Users split into batches.</li>
+<li><strong>Binary columns (<code>bytea</code>):</strong> unsupported; <code>insert()</code> raises
+  <code>NotImplementedError</code>. Asset-table route is the supported path.</li>
+<li><strong>CSV-based insert roundtrip (§2.11.2 step 6):</strong> transitional. V2
+  can swap to direct <code>pathBuilder</code> insert without public-API change.</li>
+<li><strong>Orphaned server leases:</strong> possible only if client loses its
+  workspace state after a successful lease POST. Not reconcilable
+  from the client; server-side GC is an ERMrest concern.</li>
+<li><strong>Creating new executions offline:</strong> not supported. Execution RID
+  is server-assigned and requires an online <code>create_execution</code> call.</li>
+<li><strong>best_effort upload mode, dedupe_key, handle-FK coercion:</strong>
+  deferred. V2 can add these when users hit their absence.</li>
+<li><strong>Cross-machine workspace sync:</strong> user's concern; the library does
+  not replicate <code>workspace.db</code> between machines.</li>
+<li><strong>Upload on context-manager exit:</strong> intentionally not auto; an
+  opt-in <code>upload_on_exit=True</code> is deferred to future revision.</li>
+</ul>
+<h2 id="8-scoped-follow-on-feature-system-metricparam-sqlite-consistency">8. Scoped follow-on: Feature system + Metric/Param + SQLite consistency</h2>
+<p>Deferred to a dedicated design task after this spec lands.</p>
+<p><strong>Scope:</strong> Revisit the feature system, introduce <code>Metric</code> and <code>Param</code>
+as first-class concepts parallel to features, and ensure consistency
+of all three (features, metrics, params) against the SQLite-backed
+staging layer.</p>
+<p><strong>Specifically:</strong></p>
+<h3 id="81-metric-and-param-as-first-class-concepts">8.1 Metric and Param as first-class concepts</h3>
+<p>Row-form complement to execution metadata files. Subject is the run
+(not data rows, so not features); content is scalar and queryable
+(not files or metadata blobs).</p>
+<p><strong>Parallel to features</strong> to minimize cognitive load:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Feature</th>
+<th>Metric</th>
+<th>Param</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Declare</td>
+<td><code>ml.create_feature(target_table, name, metadata)</code></td>
+<td><code>ml.create_metric(name, unit, higher_is_better, description)</code></td>
+<td><code>ml.create_param(name, unit, description)</code></td>
+</tr>
+<tr>
+<td>Record</td>
+<td><code>exe.add_feature_value(name, target, **v)</code></td>
+<td><code>exe.record_metric(name, value, step=None)</code></td>
+<td><code>exe.record_param(name, value)</code></td>
+</tr>
+<tr>
+<td>List</td>
+<td><code>ml.list_features()</code></td>
+<td><code>ml.list_metrics()</code></td>
+<td><code>ml.list_params()</code></td>
+</tr>
+<tr>
+<td>Readback</td>
+<td><code>bag.feature_values(name)</code></td>
+<td><code>exe.metrics(name=None)</code></td>
+<td><code>exe.params()</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Schema:</strong>
+- Vocabulary tables <code>Metric_Name</code>, <code>Param_Name</code> (curated, not
+  auto-populated, parallel to <code>Feature_Name</code>).
+- Single shared data tables <code>ExecutionMetric</code>, <code>ExecutionParam</code> (FK
+  to vocabulary; fixed scalar shape for query efficiency).
+- Metric vocab carries <code>Unit</code> and <code>Higher_Is_Better</code> to enable
+  unit-aware queries and automatic best-run selection.</p>
+<p><strong>Typo safety:</strong> <code>record_metric</code> on an undeclared name raises
+<code>DerivaMLInvalidTerm</code> — same behavior as <code>add_feature_value</code> on an
+undeclared feature. Per guideline §0: the declaration step is
+acceptable friction in service of vocabulary integrity.</p>
+<h3 id="82-sqlite-integration">8.2 SQLite integration</h3>
+<p>All three (features, metrics, params) stage through SQLite
+<code>pending_rows</code> identically. Drain through the same upload engine.
+Offline-safe. Typed via <code>record_class()</code>.</p>
+<h3 id="83-readback-shapes">8.3 Readback shapes</h3>
+<p>Determine long-format vs wide-format conventions for
+<code>exe.metrics(name=None)</code>, cross-run comparison helpers
+(<code>ml.compare_metrics(...)</code>), and ensure the <code>DatasetBag</code> readback
+surface stays consistent with the live-catalog surface.</p>
+<h3 id="84-task-deliverables">8.4 Task deliverables</h3>
+<p>A separate spec at <code>docs/superpowers/specs/YYYY-MM-DD-feature-metric-param-consistency.md</code>
+covering:
+- Full schema for <code>Metric_Name</code>, <code>Param_Name</code>, <code>ExecutionMetric</code>,
+  <code>ExecutionParam</code>.
+- Full API surface (create/record/list/readback for each).
+- SQLite staging integration.
+- Cross-concept consistency review (shared naming conventions,
+  parallel error handling, shared underlying machinery).
+- Migration: no changes to existing feature API; metric/param are
+  additive.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

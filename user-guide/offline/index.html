@@ -1,0 +1,2914 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/user-guide/offline/">
+      
+      
+        <link rel="prev" href="../executions/">
+      
+      
+        <link rel="next" href="../sharing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Working offline - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#working-offline" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Working offline
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#bags-and-live-catalogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bags and live catalogs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-materialize-assets-for-offline-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to materialize assets for offline use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-inspect-bag-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to inspect bag structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-from-a-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read from a bag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-bags-cant-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What bags can't do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-construct-feature-records-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to construct feature records offline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-commit-offline-built-records-when-back-online" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to commit offline-built records when back online
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-restructure-assets-for-ml-frameworks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to restructure assets for ML frameworks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to restructure assets for ML frameworks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directory-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-features-as-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using features as targets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-multiple-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handling multiple feature values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-label-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing-label policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prediction-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prediction scenarios
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-symlinks-vs-copies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using symlinks vs copies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-conversion-with-file_transformer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format conversion with file_transformer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-feed-a-bag-to-a-training-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to feed a bag to a training framework
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to feed a bag to a training framework">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-your-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing your path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-tensorflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with TensorFlow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-keras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with Keras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-imagefolder-third-party-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with ImageFolder / third-party tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also-framework-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also (framework adapters)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#bags-and-live-catalogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bags and live catalogs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-materialize-assets-for-offline-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to materialize assets for offline use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-inspect-bag-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to inspect bag structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-from-a-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read from a bag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-bags-cant-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What bags can't do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-construct-feature-records-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to construct feature records offline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-commit-offline-built-records-when-back-online" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to commit offline-built records when back online
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-restructure-assets-for-ml-frameworks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to restructure assets for ML frameworks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to restructure assets for ML frameworks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directory-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-features-as-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using features as targets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-multiple-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handling multiple feature values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-label-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing-label policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prediction-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prediction scenarios
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-symlinks-vs-copies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using symlinks vs copies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#format-conversion-with-file_transformer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format conversion with file_transformer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-feed-a-bag-to-a-training-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to feed a bag to a training framework
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to feed a bag to a training framework">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-your-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing your path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-tensorflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with TensorFlow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-keras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with Keras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-with-imagefolder-third-party-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using with ImageFolder / third-party tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also-framework-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also (framework adapters)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="working-offline">Working offline</h1>
+<p>A downloaded bag is a self-contained, read-only snapshot of a catalog dataset that lives on your laptop and needs no network connection. By the end of this chapter you will know how to materialize asset files into a bag, read features and tables from it, organize those assets for standard ML frameworks, build new feature records offline, and commit them back to the catalog when you reconnect.</p>
+<p>This chapter builds on Chapter 2 (datasets), Chapter 3 (features), and Chapter 4 (executions). After reading it you will be able to work entirely from a bag file without a catalog connection and then upload results in a single execution when you come back online.</p>
+<h2 id="bags-and-live-catalogs">Bags and live catalogs</h2>
+<p>A live <code>Dataset</code> object talks to the server on every operation. A <code>DatasetBag</code> wraps the same data stored locally as a BDBag — a directory of CSV files, asset files, a SQLite database, and integrity manifests. The two classes implement the same <code>DatasetLike</code> protocol, so most read operations use identical method calls on either object.</p>
+<p>The key differences are scope and direction. A bag is a point-in-time snapshot: it reflects exactly the rows and files that existed when it was downloaded at a specific version. You cannot add members, increment the version, or write feature values into the bag itself. Writes go back through a live <code>Execution</code> object after you reconnect.</p>
+<h2 id="how-to-materialize-assets-for-offline-use">How to materialize assets for offline use</h2>
+<p>Chapter 2 covers downloading a bag in the context of an execution configuration. This section focuses on the <code>materialize</code> flag and what it gives you for offline work.</p>
+<p><code>materialize=True</code> (the default) tells DerivaML to fetch every asset file referenced in <code>fetch.txt</code> into <code>data/asset/</code> inside the bag directory. <code>materialize=False</code> downloads only the CSV metadata; asset files remain as remote references and cannot be read offline.</p>
+<pre><code class="language-python">from deriva_ml.dataset.aux_classes import DatasetSpec
+
+# Full offline use: download metadata + all asset files
+spec = DatasetSpec(rid=&quot;1-ABC1&quot;, version=&quot;2.0.0&quot;, materialize=True)
+bag = ml.download_dataset_bag(spec)
+
+# Metadata only: faster for cataloging, but bag.path / asset files are absent
+spec_meta_only = DatasetSpec(rid=&quot;1-ABC1&quot;, version=&quot;2.0.0&quot;, materialize=False)
+bag_meta = ml.download_dataset_bag(spec_meta_only)
+</code></pre>
+<p>Inside an execution the same <code>DatasetSpec</code> object works via <code>exe.download_dataset_bag(spec)</code>.</p>
+<p><strong>Notes</strong></p>
+<ul>
+<li>If a bag was previously downloaded and fully materialized, DerivaML reuses the cached copy rather than re-downloading. Delete the bag directory if you want a fresh download.</li>
+<li>For large datasets, set a generous read timeout: <code>DatasetSpec(rid=..., version=..., timeout=(10, 1800))</code>.</li>
+<li><code>estimate_bag_size()</code> on the live <code>Dataset</code> gives row counts and asset byte totals before you commit to a download — see Chapter 2.</li>
+</ul>
+<h2 id="how-to-inspect-bag-structure">How to inspect bag structure</h2>
+<p><code>bag.path</code> is a <code>pathlib.Path</code> pointing to the root of the materialized bag directory on disk.</p>
+<pre><code class="language-python">print(bag.path)
+# /home/user/.deriva/bags/1-ABC1/2.0.0/
+
+# Integrity manifest
+manifest = (bag.path / &quot;manifest-md5.txt&quot;).read_text()
+
+# CSV data tables
+images_csv = bag.path / &quot;data&quot; / &quot;domain&quot; / &quot;Image.csv&quot;
+
+# Materialized asset files
+asset_dir = bag.path / &quot;data&quot; / &quot;asset&quot;
+</code></pre>
+<p>The directory layout after materialization:</p>
+<pre><code>&lt;bag-root&gt;/
+  manifest-md5.txt          # BDBag integrity manifest
+  bag-info.txt              # bag metadata
+  data/
+    deriva-ml/              # core ML schema tables (CSV)
+    domain/                 # domain-schema tables (CSV)
+    asset/
+      &lt;RID&gt;/
+        &lt;Table&gt;/
+          &lt;filename&gt;        # materialized asset files
+  *.db                      # SQLite database (bag queries go here)
+  schema.json               # catalog schema snapshot
+</code></pre>
+<p>The <code>bag.path</code> property was added in PR #64 and is available on the current branch. Treat the directory contents as read-only — bags are immutable by contract.</p>
+<h2 id="how-to-read-from-a-bag">How to read from a bag</h2>
+<p><code>DatasetBag</code> mirrors the live <code>DerivaML</code> and <code>Dataset</code> APIs so you can use the same code paths offline.</p>
+<pre><code class="language-python"># List all members of the dataset, grouped by table name
+members = bag.list_dataset_members()
+for table_name, rows in members.items():
+    print(f&quot;{table_name}: {len(rows)} records&quot;)
+
+# Access a full table as a DataFrame
+df = bag.get_table_as_dataframe(&quot;Image&quot;)
+
+# Iterate feature values — same signature as ml.feature_values()
+from deriva_ml.feature import FeatureRecord
+
+for rec in bag.feature_values(&quot;Image&quot;, &quot;Glaucoma&quot;):
+    print(rec.Image, rec.Glaucoma)
+
+# Deduplicate with a selector
+records = list(bag.feature_values(
+    &quot;Image&quot;, &quot;Glaucoma&quot;,
+    selector=FeatureRecord.select_newest,
+))
+
+# Discover features on a table
+for feat in bag.find_features(&quot;Image&quot;):
+    print(feat.feature_name, feat.term_columns)
+
+# Look up a specific feature definition
+feat = bag.lookup_feature(&quot;Image&quot;, &quot;Glaucoma&quot;)
+</code></pre>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>bag.list_dataset_members()</code> returns members of this dataset only. Pass <code>recurse=True</code> to include nested datasets.</li>
+<li><code>bag.get_table_as_dataframe("Subject")</code> returns all rows in that table, not just those belonging to the dataset. For dataset-scoped rows, combine with <code>list_dataset_members()</code>.</li>
+<li>Feature cache: the first call to <code>bag.feature_values()</code> for a given <code>(table, feature)</code> pair populates a per-bag cache. Subsequent calls are fast. The cache avoids re-scanning the source CSV on subsequent calls, but every call loads all matching records into memory before yielding the first one — this is not a streaming iterator, same as the live-catalog <code>feature_values</code>.</li>
+<li><code>bag.list_workflow_executions(workflow)</code> may return an empty list if the <code>Execution</code> rows were not exported into the bag. This is a known bag-export limitation; see "What bags can't do" below.</li>
+</ul>
+<h2 id="what-bags-cant-do">What bags can't do</h2>
+<p>Bags are read-only snapshots. The following operations raise errors or return incomplete results against a bag:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Adding dataset members</td>
+<td><code>DerivaMLReadOnlyError</code></td>
+</tr>
+<tr>
+<td>Incrementing version</td>
+<td><code>DerivaMLReadOnlyError</code></td>
+</tr>
+<tr>
+<td>Uploading assets</td>
+<td>Not supported; use a live <code>Execution</code></td>
+</tr>
+<tr>
+<td><code>bag.list_workflow_executions()</code></td>
+<td>Returns empty list if <code>Execution</code> is not a dataset element type in the bag export</td>
+</tr>
+<tr>
+<td>Some workflow queries</td>
+<td>Workflow-based selectors require <code>Workflow_Workflow_Type</code> rows; these may be absent if the FK path wasn't exported</td>
+</tr>
+</tbody>
+</table>
+<p>For any write operation, create a fresh <code>Execution</code> on the live catalog when you reconnect. The offline-to-online write cycle in the next two sections covers this pattern.</p>
+<h2 id="how-to-construct-feature-records-offline">How to construct feature records offline</h2>
+<p><code>bag.lookup_feature()</code> returns a <code>Feature</code> object whose <code>feature_record_class()</code> method generates a typed Pydantic model. That method works entirely offline — no catalog connection is needed after the bag is downloaded.</p>
+<pre><code class="language-python"># Offline: no ml or catalog object required after this point
+feat = bag.lookup_feature(&quot;Image&quot;, &quot;Glaucoma&quot;)
+RecordClass = feat.feature_record_class()
+
+# Build records from bag data
+members = bag.list_dataset_members()
+image_rids = [row[&quot;RID&quot;] for row in members.get(&quot;Image&quot;, [])]
+
+pending_records = [
+    RecordClass(Image=rid, Glaucoma=&quot;Normal&quot;)
+    for rid in image_rids
+]
+</code></pre>
+<p>The <code>Execution</code> field on each record is left <code>None</code>. When you pass these records to <code>exe.add_features()</code> later, the execution fills in its own RID automatically.</p>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>feature_record_class()</code> returns a Pydantic model, so field names are typed and validated. Pass the wrong type and Pydantic raises a validation error before any catalog interaction.</li>
+<li>The model attributes match the feature definition in the bag: one attribute for the target table RID (e.g., <code>Image</code>), one for each vocabulary column (e.g., <code>Glaucoma</code>), plus <code>Feature_Name</code> and <code>Execution</code>.</li>
+</ul>
+<h2 id="how-to-commit-offline-built-records-when-back-online">How to commit offline-built records when back online</h2>
+<p>Reconnect to the catalog and create a new <code>Execution</code>. Pass the list of offline-built <code>FeatureRecord</code> objects to <code>exe.add_features()</code>. The execution records provenance for every staged value.</p>
+<pre><code class="language-python">from deriva_ml import DerivaML
+from deriva_ml.execution import ExecutionConfiguration
+
+# Back online
+ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;)
+
+workflow = ml.find_workflows()[0]
+cfg = ExecutionConfiguration(
+    description=&quot;Offline inference results&quot;,
+    workflow=workflow,
+)
+
+with ml.create_execution(cfg) as exe:
+    count = exe.add_features(pending_records)
+    print(f&quot;Staged {count} records&quot;)
+
+# Records are flushed to the catalog after the context manager exits
+exe.upload_execution_outputs()
+</code></pre>
+<p><code>exe.add_features()</code> stages records in the execution's local SQLite state. They are flushed to ERMrest in a single batch after asset upload, when the execution completes. If the process crashes before upload, call <code>ml.resume_execution(execution.execution_rid)</code> and re-run <code>upload_execution_outputs()</code>.</p>
+<p><strong>Notes</strong></p>
+<ul>
+<li>All records passed to a single <code>exe.add_features()</code> call must share the same feature definition (same table and feature name). Mixing features raises <code>DerivaMLValidationError</code>.</li>
+<li><code>exe.add_features()</code> returns the count of staged records, not a list of RIDs. RIDs are assigned when the records land in ERMrest.</li>
+<li>The offline-built records are plain Pydantic objects. You can serialize them with <code>.model_dump()</code>, write them to a file, and reload them later — the catalog does not know about them until <code>exe.add_features()</code> is called.</li>
+</ul>
+<h2 id="how-to-restructure-assets-for-ml-frameworks">How to restructure assets for ML frameworks</h2>
+<p>PyTorch <code>ImageFolder</code> and Keras <code>image_dataset_from_directory</code> both expect a <code>class/image.jpg</code> directory tree. <code>bag.restructure_assets()</code> builds that tree from a downloaded bag, using dataset types and feature labels as directory names. It shares the same <code>targets</code> / <code>target_transform</code> / <code>missing</code> vocabulary as <code>as_torch_dataset</code> / <code>as_tf_dataset</code> (below) — same label-selection semantics, different output shape.</p>
+<pre><code class="language-python">from deriva_ml.feature import FeatureRecord
+
+manifest = bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Glaucoma&quot;],
+)
+# Produces:
+# ./ml_data/training/Normal/retina_001.jpg  -&gt; symlink
+# ./ml_data/training/Severe/retina_002.jpg  -&gt; symlink
+# ./ml_data/testing/Normal/retina_099.jpg   -&gt; symlink
+</code></pre>
+<p>The method returns <code>dict[Path, Path]</code> — a manifest mapping each source path to the output path that was written. It does <strong>not</strong> return a <code>Path</code>.</p>
+<pre><code class="language-python"># Correct: manifest is a dict
+manifest = bag.restructure_assets(output_dir=&quot;./ml_data&quot;, targets=[&quot;Glaucoma&quot;])
+for src, dst in manifest.items():
+    print(f&quot;{src.name} -&gt; {dst}&quot;)
+
+# Wrong: restructure_assets does not return a Path
+output_path = bag.restructure_assets(...)  # this is a dict, not a Path
+</code></pre>
+<h3 id="full-signature">Full signature</h3>
+<pre><code class="language-python">manifest = bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    asset_table=&quot;Image&quot;,           # auto-detected if omitted and only one asset table exists
+    targets=[&quot;Glaucoma&quot;],          # feature names or column names; creates subdirectory levels
+    target_transform=None,         # callable returning str for directory naming; see below
+    missing=&quot;unknown&quot;,             # &quot;error&quot; | &quot;skip&quot; | &quot;unknown&quot; (default); unknown → `unknown/` dir
+    use_symlinks=True,             # True (default) = symlinks; False = copies
+    type_selector=None,            # callable(list[str]) -&gt; str for multi-type datasets
+    type_to_dir_map={              # map dataset type names to directory names
+        &quot;Training&quot;: &quot;training&quot;,
+        &quot;Testing&quot;: &quot;testing&quot;,
+    },
+    enforce_vocabulary=True,       # only allow vocabulary-based features in targets
+    file_transformer=None,         # callable(src: Path, dest: Path) -&gt; Path for format conversion
+)  # returns dict[Path, Path]
+</code></pre>
+<h3 id="directory-structure">Directory structure</h3>
+<p>Top-level subdirectories come from dataset types (<code>Training</code> → <code>training</code>, <code>Testing</code> → <code>testing</code>). Below that, each entry in <code>targets</code> adds one level of subdirectories named after the label value.</p>
+<pre><code>./ml_data/
+  training/
+    Normal/
+      retina_001.jpg
+    Severe/
+      retina_002.jpg
+    unknown/            # assets with no label for this feature (missing=&quot;unknown&quot; default)
+      retina_003.jpg
+  testing/
+    Normal/
+      retina_099.jpg
+</code></pre>
+<h3 id="using-features-as-targets">Using features as targets</h3>
+<p>If a name in <code>targets</code> matches a feature defined on the asset table (or a table it references via FK), <code>restructure_assets</code> reads the feature values from the bag's SQLite cache and uses the vocabulary term as the directory name.</p>
+<pre><code class="language-python"># Group by a feature defined on Image
+manifest = bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Glaucoma&quot;],          # feature name
+)
+
+# Group by a specific column of a multi-term feature (use target_transform
+# instead of the old &quot;Feature.column&quot; dotted syntax)
+manifest = bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Classification&quot;],
+    target_transform=lambda rec: rec.Label,  # return str; becomes dir name
+)
+</code></pre>
+<p>Column names on the asset record are checked first; feature names are checked if no column matches. Direct column targets do not need <code>target_transform</code> — the column value is stringified automatically.</p>
+<h3 id="handling-multiple-feature-values">Handling multiple feature values</h3>
+<p>When an asset has more than one value for the same feature (e.g., two annotators disagreed), pass a per-feature selector via the dict form of <code>targets</code>:</p>
+<pre><code class="language-python">manifest = bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets={&quot;Glaucoma&quot;: FeatureRecord.select_newest},
+)
+</code></pre>
+<p><code>FeatureRecord.select_newest</code> picks the record with the latest creation timestamp. Other built-in selectors: <code>FeatureRecord.select_first</code>. For majority voting, use <code>FeatureRecord.select_majority_vote("column_name")</code> — it is a <code>@classmethod</code> factory that takes a column name and returns a selector; pass the result as <code>targets={"Glaucoma": FeatureRecord.select_majority_vote("Glaucoma")}</code>.</p>
+<p>Set <code>enforce_vocabulary=False</code> to silently use the first value when multiple exist without raising.</p>
+<h3 id="missing-label-policy">Missing-label policy</h3>
+<p>The <code>missing</code> parameter controls what happens when an asset has no value for a requested target:</p>
+<ul>
+<li><strong><code>missing="unknown"</code></strong> (default): place the asset under <code>unknown/</code>. Matches pre-D2 behavior; existing unparameterized calls produce the same tree as before.</li>
+<li><strong><code>missing="skip"</code></strong>: omit the asset from the output tree entirely. Useful for building fully-labeled datasets when your training code cannot tolerate unlabeled samples.</li>
+<li><strong><code>missing="error"</code></strong>: raise <code>DerivaMLException</code> at construction listing the unlabeled RIDs. Matches the adapter default; use it when you want to fail loudly on incomplete labeling before committing files to disk.</li>
+</ul>
+<h3 id="prediction-scenarios">Prediction scenarios</h3>
+<p>Datasets with no type defined are treated as <code>Testing</code>. Assets with no label for a <code>targets</code> key land in <code>unknown/</code> under the default <code>missing="unknown"</code> policy. This allows <code>restructure_assets</code> to run on unlabeled inference data:</p>
+<pre><code class="language-python"># Unlabeled prediction dataset — no types, no Glaucoma labels
+manifest = bag.restructure_assets(
+    output_dir=&quot;./predictions&quot;,
+    targets=[&quot;Glaucoma&quot;],
+)
+# ./predictions/testing/unknown/retina_new_001.jpg
+</code></pre>
+<h3 id="using-symlinks-vs-copies">Using symlinks vs copies</h3>
+<p><code>use_symlinks=True</code> (the default) creates symbolic links back to the files inside the bag directory. This saves disk space but requires the bag directory to remain in place. If you need a fully portable output tree, pass <code>use_symlinks=False</code> to copy the files instead.</p>
+<h3 id="format-conversion-with-file_transformer">Format conversion with file_transformer</h3>
+<p>Pass a <code>file_transformer</code> callable to convert files during restructuring. The transformer receives the source path and the suggested destination path; it must write the output and return the actual path written (which may differ in extension).</p>
+<pre><code class="language-python">from PIL import Image as PILImage
+
+def dicom_to_png(src: Path, dest: Path) -&gt; Path:
+    img = load_dicom(str(src))
+    out = dest.with_suffix(&quot;.png&quot;)
+    PILImage.fromarray(img).save(out)
+    return out
+
+manifest = bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    group_by=[&quot;Diagnosis&quot;],
+    file_transformer=dicom_to_png,
+)
+# manifest maps: Path(&quot;.../bag/.../scan.dcm&quot;) -&gt; Path(&quot;./ml_data/training/Normal/scan.png&quot;)
+</code></pre>
+<p>When <code>file_transformer</code> is provided, <code>use_symlinks</code> is ignored.</p>
+<h2 id="how-to-feed-a-bag-to-a-training-framework">How to feed a bag to a training framework</h2>
+<p>Training a model on a <code>DatasetBag</code> used to mean writing ~35 lines of join code per project: resolve asset paths, pull feature values, encode labels, subclass your framework's dataset base class. The adapters below collapse that to a single method call. If your downstream consumer is a standard <code>torch.utils.data.DataLoader</code> or a <code>tf.data.Dataset</code> pipeline, start here.</p>
+<h3 id="choosing-your-path">Choosing your path</h3>
+<p>Three tools cover the space of framework consumers:</p>
+<ul>
+<li><strong><code>bag.as_torch_dataset(...)</code></strong> — use when your training loop is PyTorch-native, or when you are running Keras 3 on the PyTorch backend. Returns <code>torch.utils.data.Dataset</code>.</li>
+<li><strong><code>bag.as_tf_dataset(...)</code></strong> — use when your training loop is TensorFlow-native, or when you are running Keras 3 on the TensorFlow backend. Returns <code>tf.data.Dataset</code>.</li>
+<li><strong><code>bag.restructure_assets(...)</code></strong> — use when your downstream consumer expects the <code>ImageFolder</code> class-folder directory layout (e.g., RetFound fine-tuning scripts, <code>torchvision.datasets.ImageFolder</code>, <code>tf.keras.utils.image_dataset_from_directory</code>). This is the right tool for third-party trainers you cannot modify; it rewrites the bag's flat asset tree into a labeled directory structure on disk.</li>
+</ul>
+<p>All three share the same <code>targets</code>, <code>target_transform</code>, and <code>missing</code> vocabulary. A <code>target_transform</code> you write for one method transfers directly to the others with only a return-type adjustment.</p>
+<h3 id="using-with-pytorch">Using with PyTorch</h3>
+<p><code>as_torch_dataset</code> returns a <code>torch.utils.data.Dataset</code> that reads asset files lazily. Wrap it in a <code>DataLoader</code> exactly as you would any other PyTorch dataset.</p>
+<pre><code class="language-python"># doctest: +SKIP
+from pathlib import Path
+
+import PIL.Image
+import torchvision.transforms as T
+from torch.utils.data import DataLoader
+
+from deriva_ml.feature import FeatureRecord
+
+CLASS_TO_IDX = {&quot;Normal&quot;: 0, &quot;Mild&quot;: 1, &quot;Moderate&quot;: 2, &quot;Severe&quot;: 3}
+
+transform = T.Compose([
+    T.Resize(224),
+    T.CenterCrop(224),
+    T.ToTensor(),
+    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+ds = bag.as_torch_dataset(
+    &quot;Image&quot;,
+    sample_loader=lambda p, row: PIL.Image.open(p).convert(&quot;RGB&quot;),
+    transform=transform,
+    targets=[&quot;Glaucoma&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+
+loader = DataLoader(ds, batch_size=32, shuffle=True, num_workers=4)
+
+for images, labels in loader:
+    # images: (B, 3, 224, 224) tensor; labels: (B,) int tensor
+    loss = criterion(model(images), labels)
+    loss.backward()
+</code></pre>
+<p>Labels come from features. <code>targets=["Glaucoma"]</code> tells the adapter to look up the <code>Glaucoma</code> feature for each <code>Image</code> row via <code>bag.feature_values("Image", "Glaucoma")</code>. The <code>target_transform</code> receives a <code>FeatureRecord</code> and must return whatever your loss function expects — typically an integer class index. The adapter never builds its own encoder; that decision stays in your code where train/val/test consistency is your responsibility.</p>
+<p><code>sample_loader</code> is required for asset tables. It receives the absolute <code>Path</code> to the materialized file and the raw row dict; return whatever your model consumes. The error message at construction time names common loaders (<code>PIL.Image.open</code>, <code>nibabel.load</code>, <code>h5py.File</code>) if you forget to supply one.</p>
+<p><code>missing="error"</code> (the default) raises at construction if any <code>Image</code> row has no <code>Glaucoma</code> label, listing up to twenty unlabeled RIDs. Pass <code>missing="skip"</code> to drop unlabeled elements silently, or <code>missing="unknown"</code> to keep them and receive <code>None</code> in your <code>target_transform</code>.</p>
+<p><strong>Worked variations</strong></p>
+<p><em>Tabular regression — no asset file, no <code>sample_loader</code> needed:</em></p>
+<pre><code class="language-python"># doctest: +SKIP
+# MeasurementRecord is a plain row dict when sample_loader is omitted
+# for non-asset element types.
+ds = bag.as_torch_dataset(
+    &quot;Measurement&quot;,
+    targets=[&quot;IOP_Reading&quot;],
+    target_transform=lambda rec: float(rec.IOP_Value),
+)
+</code></pre>
+<p>Non-asset element types default to returning the raw row dict as the sample; no <code>sample_loader</code> is needed. Each <code>__getitem__</code> returns <code>(row_dict, target)</code>.</p>
+<p><em>Multi-target — two features become a dict target:</em></p>
+<pre><code class="language-python"># doctest: +SKIP
+ds = bag.as_torch_dataset(
+    &quot;Image&quot;,
+    sample_loader=lambda p, row: PIL.Image.open(p).convert(&quot;RGB&quot;),
+    transform=transform,
+    targets=[&quot;Glaucoma&quot;, &quot;Cup_Disc_Ratio&quot;],
+    target_transform=lambda recs: {
+        &quot;grade&quot;: CLASS_TO_IDX[recs[&quot;Glaucoma&quot;].Glaucoma],
+        &quot;cdr&quot;:   float(recs[&quot;Cup_Disc_Ratio&quot;].Cup_Disc_Ratio),
+    },
+)
+# __getitem__ returns (image_tensor, {&quot;grade&quot;: int, &quot;cdr&quot;: float})
+</code></pre>
+<p>When <code>targets</code> lists more than one feature name, <code>target_transform</code> receives <code>dict[str, FeatureRecord]</code> keyed by feature name.</p>
+<p><em>Multi-annotator resolution — selector-dict form:</em></p>
+<pre><code class="language-python"># doctest: +SKIP
+ds = bag.as_torch_dataset(
+    &quot;Image&quot;,
+    sample_loader=lambda p, row: PIL.Image.open(p).convert(&quot;RGB&quot;),
+    transform=transform,
+    targets={&quot;Glaucoma&quot;: FeatureRecord.select_newest},
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+    missing=&quot;skip&quot;,
+)
+</code></pre>
+<p>Passing a <code>dict</code> for <code>targets</code> lets you supply a per-feature selector. <code>FeatureRecord.select_newest</code> picks the annotation with the latest creation timestamp when multiple annotators labeled the same image. Other built-in selectors: <code>FeatureRecord.select_first</code>, <code>FeatureRecord.select_majority_vote("column_name")</code>.</p>
+<p><strong>Notes</strong></p>
+<ul>
+<li>Install the PyTorch extra: <code>pip install 'deriva-ml[torch]'</code>. Without it, calling <code>as_torch_dataset</code> raises <code>ImportError</code> with an install hint; every other <code>DatasetBag</code> method continues to work.</li>
+<li><code>Dataset.as_torch_dataset</code> (the live-catalog variant) is not yet available. The bag-only adapter covers the primary training workflow: download the bag offline, then train. Live-catalog streaming is a named follow-up.</li>
+</ul>
+<h3 id="using-with-tensorflow">Using with TensorFlow</h3>
+<p><code>as_tf_dataset</code> returns a <code>tf.data.Dataset</code> that wraps the bag as a generator. Chain <code>.batch()</code>, <code>.prefetch()</code>, and <code>.cache()</code> on the result exactly as you would any other <code>tf.data.Dataset</code>.</p>
+<pre><code class="language-python"># doctest: +SKIP
+import PIL.Image
+import numpy as np
+import tensorflow as tf
+import torchvision.transforms.functional as TF
+
+CLASS_TO_IDX = {&quot;Normal&quot;: 0, &quot;Mild&quot;: 1, &quot;Moderate&quot;: 2, &quot;Severe&quot;: 3}
+
+def load_image(p, row):
+    img = PIL.Image.open(p).convert(&quot;RGB&quot;).resize((224, 224))
+    return np.array(img, dtype=np.float32) / 255.0
+
+ds = bag.as_tf_dataset(
+    &quot;Image&quot;,
+    sample_loader=load_image,
+    targets=[&quot;Glaucoma&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+
+# Standard tf.data pipeline
+ds = ds.batch(32).prefetch(tf.data.AUTOTUNE)
+
+model.compile(optimizer=&quot;adam&quot;, loss=&quot;sparse_categorical_crossentropy&quot;)
+model.fit(ds, epochs=10)
+</code></pre>
+<p><strong><code>output_signature</code> — when to let it infer, when to set it explicitly</strong></p>
+<p><code>as_tf_dataset</code> builds its generator via <code>tf.data.Dataset.from_generator</code>, which requires a type/shape signature. By default (<code>output_signature=None</code>) the adapter eagerly reads the first <code>(sample, target)</code> pair at construction time, derives a <code>tf.TensorSpec</code> from it via <code>tf.type_spec_from_value</code>, and re-wraps the generator so that first sample is not skipped during iteration. This adds one extra sample load at startup — acceptable for research workflows.</p>
+<p>Pass <code>output_signature</code> explicitly in two situations:</p>
+<ol>
+<li>
+<p><strong>Production pipelines</strong> where you want deterministic startup with no eager reads:
+   <code>python
+   # doctest: +SKIP
+   import tensorflow as tf
+   sig = (
+       tf.TensorSpec(shape=(224, 224, 3), dtype=tf.float32),
+       tf.TensorSpec(shape=(),            dtype=tf.int32),
+   )
+   ds = bag.as_tf_dataset("Image", ..., output_signature=sig)</code></p>
+</li>
+<li>
+<p><strong>Variable-shape inputs</strong> (ragged tensors, variable-length sequences) where the first sample's shape is not representative:
+   <code>python
+   # doctest: +SKIP
+   sig = (
+       tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),  # variable H x W
+       tf.TensorSpec(shape=(),              dtype=tf.int32),
+   )
+   ds = bag.as_tf_dataset("Image", ..., output_signature=sig)</code></p>
+</li>
+</ol>
+<p><strong>Worked variations</strong></p>
+<p><em>Tabular regression:</em></p>
+<pre><code class="language-python"># doctest: +SKIP
+ds = bag.as_tf_dataset(
+    &quot;Measurement&quot;,
+    targets=[&quot;IOP_Reading&quot;],
+    target_transform=lambda rec: float(rec.IOP_Value),
+).batch(64).prefetch(tf.data.AUTOTUNE)
+</code></pre>
+<p><em>Multi-target:</em></p>
+<pre><code class="language-python"># doctest: +SKIP
+ds = bag.as_tf_dataset(
+    &quot;Image&quot;,
+    sample_loader=load_image,
+    targets=[&quot;Glaucoma&quot;, &quot;Cup_Disc_Ratio&quot;],
+    target_transform=lambda recs: (
+        CLASS_TO_IDX[recs[&quot;Glaucoma&quot;].Glaucoma],
+        float(recs[&quot;Cup_Disc_Ratio&quot;].Cup_Disc_Ratio),
+    ),
+)
+</code></pre>
+<p><em>Multi-annotator resolution:</em></p>
+<pre><code class="language-python"># doctest: +SKIP
+from deriva_ml.feature import FeatureRecord
+
+ds = bag.as_tf_dataset(
+    &quot;Image&quot;,
+    sample_loader=load_image,
+    targets={&quot;Glaucoma&quot;: FeatureRecord.select_newest},
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+    missing=&quot;skip&quot;,
+)
+</code></pre>
+<p><strong>Notes</strong></p>
+<ul>
+<li>Install the TensorFlow extra: <code>pip install 'deriva-ml[tf]'</code>. Without it, calling <code>as_tf_dataset</code> raises <code>ImportError</code>; other methods continue to work.</li>
+<li>On macOS (Apple Silicon) use <code>pip install tensorflow-macos</code> rather than <code>tensorflow</code>. On CUDA Linux use <code>pip install tensorflow[and-cuda]</code>. Either wheel satisfies the import guard inside <code>as_tf_dataset</code>; install deriva-ml itself without the <code>[tf]</code> extra when using a platform-specific wheel.</li>
+<li><code>Dataset.as_tf_dataset</code> (live-catalog variant) is not yet available. Same bag-only scope as the PyTorch adapter.</li>
+</ul>
+<h3 id="using-with-keras">Using with Keras</h3>
+<p>Keras 3 consumes data from either backend's native format. There is no separate <code>as_keras_dataset</code> method — Keras is a consumer of the adapters above, not a third parallel adapter. Pick the method that matches the Keras backend you have configured.</p>
+<p><strong>PyTorch backend</strong> — wrap <code>as_torch_dataset</code> in a <code>DataLoader</code> and pass it to <code>model.fit</code>:</p>
+<pre><code class="language-python"># doctest: +SKIP
+import os
+os.environ[&quot;KERAS_BACKEND&quot;] = &quot;torch&quot;
+
+import keras
+from torch.utils.data import DataLoader
+
+ds = bag.as_torch_dataset(
+    &quot;Image&quot;,
+    sample_loader=lambda p, row: PIL.Image.open(p).convert(&quot;RGB&quot;),
+    transform=transform,
+    targets=[&quot;Glaucoma&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+loader = DataLoader(ds, batch_size=32, shuffle=True, num_workers=4)
+
+model = keras.applications.ResNet50(weights=None, classes=4)
+model.compile(optimizer=&quot;adam&quot;, loss=&quot;sparse_categorical_crossentropy&quot;)
+model.fit(loader, epochs=10)
+</code></pre>
+<p>Keras on the PyTorch backend natively accepts <code>torch.utils.data.DataLoader</code> objects in <code>model.fit</code>.</p>
+<p><strong>TensorFlow backend</strong> — pass <code>as_tf_dataset</code> directly to <code>model.fit</code>:</p>
+<pre><code class="language-python"># doctest: +SKIP
+import os
+os.environ[&quot;KERAS_BACKEND&quot;] = &quot;tensorflow&quot;
+
+import keras
+import tensorflow as tf
+
+ds = bag.as_tf_dataset(
+    &quot;Image&quot;,
+    sample_loader=load_image,
+    targets=[&quot;Glaucoma&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+).batch(32).prefetch(tf.data.AUTOTUNE)
+
+model = keras.applications.ResNet50(weights=None, classes=4)
+model.compile(optimizer=&quot;adam&quot;, loss=&quot;sparse_categorical_crossentropy&quot;)
+model.fit(ds, epochs=10)
+</code></pre>
+<p><strong>JAX backend</strong> — either adapter works. Keras 3 on JAX accepts any Python iterable of <code>(x, y)</code> tuples. Pass a <code>DataLoader</code> wrapping <code>as_torch_dataset</code>, or chain <code>as_tf_dataset</code> through a generator, or materialize to NumPy arrays directly. The JAX backend does not add requirements beyond what Keras itself needs.</p>
+<p><strong>Note:</strong> Set <code>KERAS_BACKEND</code> before importing Keras — the backend is selected at import time and cannot change in the same process.</p>
+<h3 id="using-with-imagefolder-third-party-tools">Using with ImageFolder / third-party tools</h3>
+<p>When your downstream consumer expects a class-folder directory layout — <code>torchvision.datasets.ImageFolder</code>, <code>tf.keras.utils.image_dataset_from_directory</code>, RetFound fine-tuning scripts, or any other tool that walks a <code>class/image.jpg</code> tree — use <code>bag.restructure_assets()</code> instead of the adapters above. It writes (or symlinks) the bag's flat asset tree into the labeled directory structure those tools require.</p>
+<p>The <code>targets</code>, <code>target_transform</code>, and <code>missing</code> parameters on <code>restructure_assets</code> carry identical names and semantics to the ones on <code>as_torch_dataset</code> and <code>as_tf_dataset</code>. A <code>target_transform</code> you write for one method transfers directly to the other with only the return-type constraint: <code>restructure_assets</code> requires a string (used as the directory name), while the adapters accept any type.</p>
+<p><strong>These two tools are alternatives, not a pipeline.</strong> A common question is whether to call <code>restructure_assets</code> first and then feed the result to <code>as_torch_dataset</code>. The answer is no, and there is nothing to gain from doing so. <code>restructure_assets</code> writes a new directory tree by symlinking from <code>bag.path/data/assets/...</code>; <code>as_torch_dataset</code> reads directly from <code>bag.path/data/assets/...</code> regardless of what <code>restructure_assets</code> produced. Restructuring first and then calling the adapter changes nothing: the adapter still reads the unchanged bag, and the restructured tree sits unused.</p>
+<p>Pick one tool based on your downstream consumer:</p>
+<ul>
+<li>Your consumer expects <code>ImageFolder</code> layout → use <code>restructure_assets</code>.</li>
+<li>Your consumer is a <code>DataLoader</code> or <code>tf.data</code> pipeline you control → use <code>as_torch_dataset</code> or <code>as_tf_dataset</code>.</li>
+<li>You need both (e.g., a baseline comparison against <code>ImageFolder</code> and a custom adapter for your main model) → run each independently on the same bag. They do not conflict.</li>
+</ul>
+<p>See the "How to restructure assets for ML frameworks" section above for the full <code>restructure_assets</code> signature and directory-layout examples.</p>
+<h2 id="see-also-framework-adapters">See also (framework adapters)</h2>
+<ul>
+<li><a href="../features/">Defining and using features</a> — Chapter 3: <code>feature_values()</code> selectors, <code>FeatureRecord</code> record shapes, built-in selectors (<code>select_newest</code>, <code>select_majority_vote</code>).</li>
+<li><code>DatasetBag.feature_values</code> docstring — selector callable shape, multi-annotator patterns, and the <code>missing=</code> policy interaction.</li>
+<li><code>split_dataset</code> docstring — stratified train/val/test split that composes upstream of all three framework paths: split the catalog dataset, download each partition as its own bag, then call the appropriate adapter on each bag independently.</li>
+</ul>
+<h2 id="common-pitfalls">Common pitfalls</h2>
+<p>!!! warning "restructure_assets returns a dict, not a Path"
+    <code>bag.restructure_assets()</code> returns <code>dict[Path, Path]</code> — a manifest mapping source paths to output paths. It does <strong>not</strong> return the output directory as a <code>Path</code>. Iterating the result without checking will silently operate on the dict keys (source paths) rather than the directory you expect.</p>
+<p>!!! warning "materialize=False means no asset files"
+    A bag downloaded with <code>materialize=False</code> contains only CSV metadata. Calling <code>bag.path</code> succeeds, but asset files under <code>data/asset/</code> are absent. <code>restructure_assets</code> will log warnings and produce an empty manifest. If you need to read actual files offline, re-download with <code>materialize=True</code>.</p>
+<p>!!! warning "Bags are immutable snapshots"
+    If the source dataset changes in the catalog — new members added, version incremented — your bag does not update automatically. Re-download with the new version to get fresh data. Holding a stale bag while comparing feature values from a live catalog will produce silent mismatches.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../datasets/">Working with datasets</a> — Chapter 2: creating datasets, downloading bags, <code>estimate_bag_size</code>, version pinning.</li>
+<li><a href="../features/">Defining and using features</a> — Chapter 3: creating features, <code>feature_values()</code> selectors, multi-annotator patterns.</li>
+<li><a href="../executions/">Running an experiment</a> — Chapter 4: <code>ExecutionConfiguration</code>, <code>exe.add_features()</code>, <code>upload_execution_outputs()</code>.</li>
+<li><a href="../reproducibility/">Chapter 7 — Reproducibility</a>: <code>DatasetSpec</code> version pinning, catalog snapshots.</li>
+<li>API reference: <a href="../../api-reference/dataset_bag/"><code>DatasetBag</code></a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../executions/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Running an experiment">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Running an experiment
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../sharing/" class="md-footer__link md-footer__link--next" aria-label="Next: Sharing and collaboration">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Sharing and collaboration
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

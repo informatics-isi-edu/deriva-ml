@@ -1,0 +1,2744 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/user-guide/migration/">
+      
+      
+        <link rel="prev" href="../hydra-zen/">
+      
+      
+        <link rel="next" href="../../configuration/overview/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Migrating from previous versions - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#migrating-from-previous-deriva-ml-versions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Migrating from previous versions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Breaking changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#datasetbagrestructure_assets-signature-typeerror-on-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetBag.restructure_assets signature (TypeError on call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#renamed-private-methods-attributeerror-on-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed private methods (AttributeError on call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleted-methods-attributeerror-on-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleted methods (AttributeError on call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetridconfig-class-name-importerror-on-copy-paste" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssetRIDConfig class name (ImportError on copy-paste)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-recommended-patterns-additive-no-migration-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New recommended patterns (additive; no migration required)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New recommended patterns (additive; no migration required)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#training-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch-tensorflow-keras-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTorch / TensorFlow / Keras training
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sorted-find_-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sorted find_* results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subclasser-note-derivamlcatalog-datasetlike-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subclasser note: DerivaMLCatalog / DatasetLike protocols
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derivamlmaterializelimitexceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLMaterializeLimitExceeded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-and-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment and tooling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment and tooling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setuptools_use_distutils-env-var" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SETUPTOOLS_USE_DISTUTILS env var
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schemaorm__del__-shutdown-noise" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchemaORM.__del__ shutdown noise
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-performance-fixes-no-api-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal performance fixes (no API change)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-affected-code-in-your-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding affected code in your project
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Breaking changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#datasetbagrestructure_assets-signature-typeerror-on-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasetBag.restructure_assets signature (TypeError on call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#renamed-private-methods-attributeerror-on-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed private methods (AttributeError on call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleted-methods-attributeerror-on-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleted methods (AttributeError on call)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetridconfig-class-name-importerror-on-copy-paste" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssetRIDConfig class name (ImportError on copy-paste)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-recommended-patterns-additive-no-migration-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New recommended patterns (additive; no migration required)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New recommended patterns (additive; no migration required)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#training-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytorch-tensorflow-keras-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTorch / TensorFlow / Keras training
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sorted-find_-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sorted find_* results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subclasser-note-derivamlcatalog-datasetlike-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subclasser note: DerivaMLCatalog / DatasetLike protocols
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derivamlmaterializelimitexceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivaMLMaterializeLimitExceeded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-and-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment and tooling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment and tooling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setuptools_use_distutils-env-var" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SETUPTOOLS_USE_DISTUTILS env var
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schemaorm__del__-shutdown-noise" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchemaORM.__del__ shutdown noise
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-performance-fixes-no-api-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal performance fixes (no API change)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-affected-code-in-your-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding affected code in your project
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="migrating-from-previous-deriva-ml-versions">Migrating from previous deriva-ml versions</h1>
+<p>If you are upgrading from the previously-published deriva-ml version to the post-S2 release, several public methods changed signature or were renamed, and a small number of new additive methods became available. This chapter enumerates every user-visible change and shows the before/after code for each, so you can update a downstream project in one pass.</p>
+<h2 id="at-a-glance">At a glance</h2>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>What changed</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>DatasetBag.restructure_assets</code></strong></td>
+<td><code>group_by</code> → <code>targets</code>; <code>value_selector</code> merged into <code>targets</code> dict form; <code>"Feature.column"</code> dotted syntax removed</td>
+<td>Rename kwargs; <code>target_transform</code> replaces dotted syntax</td>
+</tr>
+<tr>
+<td><strong>12 private-named methods</strong></td>
+<td>Public methods that were internal helpers are now <code>_</code>-prefixed</td>
+<td>Switch to the public alternative where one exists; otherwise your calls break with <code>AttributeError</code></td>
+</tr>
+<tr>
+<td><strong>5 deleted methods</strong></td>
+<td><code>prefetch_dataset</code>, <code>list_foreign_keys</code>, <code>add_page</code>, <code>user_list</code>, <code>globus_login</code> removed</td>
+<td>Use replacements (below) or delete the calls</td>
+</tr>
+<tr>
+<td><strong><code>AssetRIDConfig</code> (doc-only)</strong></td>
+<td>The class was never actually named <code>AssetRIDConfig</code>; real name is <code>AssetSpec</code> / <code>AssetSpecConfig</code></td>
+<td>Update imports</td>
+</tr>
+<tr>
+<td><strong><code>Execution.metrics_file()</code></strong></td>
+<td>New recommended path for training-metric logs</td>
+<td>Additive; replace ad-hoc <code>asset_file_path()</code> calls for metrics if you want the cleaner API</td>
+</tr>
+<tr>
+<td><strong><code>DatasetBag.as_torch_dataset()</code> / <code>as_tf_dataset()</code></strong></td>
+<td>New framework adapters</td>
+<td>Additive; consider replacing hand-rolled <code>Dataset</code> subclasses</td>
+</tr>
+<tr>
+<td><strong>Crash recovery</strong></td>
+<td><code>Running → Pending_Upload</code> is now a legal state transition</td>
+<td>Additive; drop the <code>update_status(Failed)</code> workaround if you had one</td>
+</tr>
+<tr>
+<td><strong><code>find_*(sort=...)</code></strong></td>
+<td><code>find_executions</code>, <code>find_datasets</code>, <code>find_workflows</code> accept an optional <code>sort</code> parameter</td>
+<td>Additive; existing callers unaffected (default preserves backend order)</td>
+</tr>
+<tr>
+<td><strong><code>DerivaMLCatalog</code> / <code>DatasetLike</code> protocols</strong></td>
+<td>Extended with optional <code>sort=</code>, <code>materialize_limit=</code>, <code>execution_rids=</code> kwargs</td>
+<td>If you subclass these protocols, accept the new kwargs (or <code>**kwargs</code>) so static type-checks still pass</td>
+</tr>
+<tr>
+<td><strong><code>DerivaMLMaterializeLimitExceeded</code></strong></td>
+<td>New exception class exported from <code>deriva_ml</code></td>
+<td>Additive; catch it once you start passing <code>materialize_limit=</code> to <code>feature_values()</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="breaking-changes">Breaking changes</h2>
+<h3 id="datasetbagrestructure_assets-signature-typeerror-on-call">DatasetBag.restructure_assets signature (<code>TypeError</code> on call)</h3>
+<p>This is the largest break in the release. <code>restructure_assets</code> now shares the <code>targets</code> / <code>target_transform</code> / <code>missing</code> vocabulary with the new framework adapters (<code>as_torch_dataset</code>, <code>as_tf_dataset</code>). The old <code>group_by</code> / <code>value_selector</code> kwargs and the <code>"Feature.column"</code> dotted-string syntax are <strong>removed</strong>. Passing them raises <code>TypeError</code> (standard Python "unexpected keyword argument" behavior).</p>
+<p><strong>Simple rename — single feature:</strong></p>
+<pre><code class="language-python"># Before
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    group_by=[&quot;Diagnosis&quot;],
+)
+
+# After
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Diagnosis&quot;],
+)
+</code></pre>
+<p><strong>Dotted column syntax → <code>target_transform</code>:</strong></p>
+<pre><code class="language-python"># Before
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    group_by=[&quot;Classification.Label&quot;],  # picks the Label column of the Classification feature
+)
+
+# After
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Classification&quot;],
+    target_transform=lambda rec: rec.Label,  # the transform extracts the column you want
+)
+</code></pre>
+<p><code>target_transform</code> must return a string (used as the directory name). Non-string returns raise <code>DerivaMLValidationError</code> at construction.</p>
+<p><strong><code>value_selector</code> → per-feature selector dict:</strong></p>
+<pre><code class="language-python"># Before
+from deriva_ml.feature import FeatureRecord
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    group_by=[&quot;Glaucoma&quot;],
+    value_selector=FeatureRecord.select_newest,
+)
+
+# After
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets={&quot;Glaucoma&quot;: FeatureRecord.select_newest},
+)
+</code></pre>
+<p>The dict form is strictly more expressive — you can attach a different selector per feature, which <code>value_selector</code> (single callable for all features) could not do.</p>
+<p><strong>New <code>missing</code> parameter:</strong></p>
+<pre><code class="language-python"># Default preserves pre-D2 behavior: unlabeled assets go to unknown/
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Diagnosis&quot;],
+    missing=&quot;unknown&quot;,  # default; same tree as before
+)
+
+# Strict mode: raise if any asset is unlabeled
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Diagnosis&quot;],
+    missing=&quot;error&quot;,
+)
+
+# Drop mode: omit unlabeled assets from the output tree
+bag.restructure_assets(
+    output_dir=&quot;./ml_data&quot;,
+    targets=[&quot;Diagnosis&quot;],
+    missing=&quot;skip&quot;,
+)
+</code></pre>
+<p><strong>Unchanged parameters:</strong> <code>output_dir</code>, <code>asset_table</code>, <code>use_symlinks</code>, <code>type_selector</code>, <code>type_to_dir_map</code>, <code>enforce_vocabulary</code>, <code>file_transformer</code> work exactly as before. FK-reachability for finding assets through parent datasets is unchanged. Type-derived top-level directory naming (<code>Training</code> → <code>training</code> etc.) is unchanged.</p>
+<h3 id="renamed-private-methods-attributeerror-on-call">Renamed private methods (<code>AttributeError</code> on call)</h3>
+<p>Twelve methods that were public-named but actually internal helpers are now <code>_</code>-prefixed. If your code called them by the old name, switch to the underscored version or to the public alternative where one exists.</p>
+<table>
+<thead>
+<tr>
+<th>Old name</th>
+<th>New name</th>
+<th>Recommended replacement (if different)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml.domain_path()</code></td>
+<td><code>ml._domain_path()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ml.table_path()</code></td>
+<td><code>ml._table_path()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ml.is_system_schema()</code></td>
+<td><code>ml._is_system_schema()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ml.get_domain_schemas()</code></td>
+<td><code>ml._get_domain_schemas()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ml.apply_logger_overrides()</code></td>
+<td><code>ml._apply_logger_overrides()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ml.compute_diff()</code></td>
+<td><code>ml._compute_diff()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ml.retrieve_rid()</code></td>
+<td><code>ml._retrieve_rid()</code></td>
+<td><strong><code>ml.resolve_rid()</code></strong> is the user-facing API</td>
+</tr>
+<tr>
+<td><code>ml.cache_features()</code></td>
+<td><code>ml._cache_features()</code></td>
+<td>— (legacy workspace-cache shortcut)</td>
+</tr>
+<tr>
+<td><code>ml.add_workflow()</code></td>
+<td><code>ml._add_workflow()</code></td>
+<td><strong><code>ml.create_workflow()</code></strong> is the user-facing factory</td>
+</tr>
+<tr>
+<td><code>ml.start_upload()</code></td>
+<td><code>ml._start_upload()</code></td>
+<td>— (internal upload plumbing)</td>
+</tr>
+<tr>
+<td><code>asset_record_class()</code> (module-level factory)</td>
+<td><code>_asset_record_class()</code></td>
+<td><strong><code>ml.asset_record_class(table)</code></strong> mixin method stays public</td>
+</tr>
+</tbody>
+</table>
+<p>The underscored versions still work and behave identically — they are simply no longer part of the library's documented public surface. If your code calls one of them, the recommended fix is the public alternative where the table above names one; otherwise, just add the underscore.</p>
+<h3 id="deleted-methods-attributeerror-on-call">Deleted methods (<code>AttributeError</code> on call)</h3>
+<p>Five methods with no callers in any sibling repo were removed entirely.</p>
+<table>
+<thead>
+<tr>
+<th>Deleted</th>
+<th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml.prefetch_dataset(rid)</code></td>
+<td><code>ml.cache_dataset(rid)</code> — <code>prefetch_dataset</code> was a one-line deprecated shim</td>
+</tr>
+<tr>
+<td><code>ml.list_foreign_keys(...)</code></td>
+<td>None needed — the method had no users</td>
+</tr>
+<tr>
+<td><code>ml.add_page(...)</code></td>
+<td>None — stale web-app helper</td>
+</tr>
+<tr>
+<td><code>ml.user_list()</code></td>
+<td>None — stale web-app helper</td>
+</tr>
+<tr>
+<td><code>ml.globus_login()</code></td>
+<td>None — handled transparently by deriva-py</td>
+</tr>
+</tbody>
+</table>
+<h3 id="assetridconfig-class-name-importerror-on-copy-paste">AssetRIDConfig class name (<code>ImportError</code> on copy-paste)</h3>
+<p>The previously-published configuration documentation referred to a class named <code>AssetRIDConfig</code>. That class never existed under that name — the real public classes are <code>AssetSpec</code> (runtime Pydantic model) and <code>AssetSpecConfig</code> (hydra-zen interface). If you copied example code from the old configuration docs, you hit <code>ImportError</code>.</p>
+<pre><code class="language-python"># Before (from old docs — never actually worked)
+from deriva_ml.execution import AssetRIDConfig
+asset = AssetRIDConfig(rid=&quot;YYYY&quot;, description=&quot;Pretrained weights&quot;)
+
+# After (the real classes)
+from deriva_ml.execution import AssetSpec, AssetSpecConfig
+
+# For direct construction in non-hydra code:
+asset = AssetSpec(rid=&quot;YYYY&quot;, cache=True)
+
+# For hydra-zen store definitions:
+cfg = AssetSpecConfig(rid=&quot;YYYY&quot;, cache=True)
+</code></pre>
+<p>Note that the real classes do not accept a <code>description</code> parameter (that kwarg was fabricated in the old docs).</p>
+<h2 id="new-recommended-patterns-additive-no-migration-required">New recommended patterns (additive; no migration required)</h2>
+<p>You are not required to adopt these, but they replace common hand-rolled patterns with cleaner API surface.</p>
+<h3 id="training-metrics">Training metrics</h3>
+<p>Before, users wrote metrics to an <code>Execution_Metadata</code> asset via <code>asset_file_path</code> with a generic type:</p>
+<pre><code class="language-python"># Before — works but the asset type is misleading
+path = exe.asset_file_path(
+    MLAsset.execution_metadata,
+    &quot;metrics.jsonl&quot;,
+    asset_types=ExecMetadataType.execution_config.value,  # not really a config
+)
+with path.open(&quot;a&quot;) as f:
+    f.write(json.dumps({&quot;epoch&quot;: 0, &quot;val_loss&quot;: 0.23}) + &quot;\n&quot;)
+</code></pre>
+<p>Now there is a dedicated method and asset type:</p>
+<pre><code class="language-python"># After
+with exe.metrics_file().open(&quot;a&quot;) as f:
+    f.write(json.dumps({&quot;epoch&quot;: 0, &quot;val_loss&quot;: 0.23}) + &quot;\n&quot;)
+</code></pre>
+<p>The file uploads as an <code>Execution_Metadata</code> asset with <code>asset_types=Metrics_File</code>, honestly describing its purpose. See <a href="../executions/#how-to-record-training-metrics">Chapter 4 — Running an experiment</a>.</p>
+<h3 id="pytorch-tensorflow-keras-training">PyTorch / TensorFlow / Keras training</h3>
+<p>Before, users hand-rolled <code>torch.utils.data.Dataset</code> subclasses (~35 lines of join code) or reached for <code>restructure_assets</code> + <code>ImageFolder</code> for image classification only. Now both frameworks have native adapters:</p>
+<pre><code class="language-python"># After — PyTorch
+ds = bag.as_torch_dataset(
+    element_type=&quot;Image&quot;,
+    sample_loader=PIL.Image.open,
+    targets=[&quot;Glaucoma&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+)
+loader = DataLoader(ds, batch_size=32, shuffle=True)
+
+# After — TensorFlow
+ds = bag.as_tf_dataset(
+    element_type=&quot;Image&quot;,
+    sample_loader=lambda p, row: tf.io.decode_image(tf.io.read_file(str(p))),
+    targets=[&quot;Glaucoma&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+).batch(32).prefetch(tf.data.AUTOTUNE)
+
+# Keras works with either — choose the adapter matching your backend.
+</code></pre>
+<p>See <a href="../offline/#how-to-feed-a-bag-to-a-training-framework">Chapter 5 — Working offline</a> for the full walkthrough covering PyTorch, TensorFlow, Keras (all three backends), and the <code>restructure_assets</code> alternative for third-party trainers.</p>
+<p><code>restructure_assets</code> still exists and is still the right tool when your downstream trainer expects the <code>ImageFolder</code> class-folder directory layout (e.g., RetFound fine-tuning scripts). The new adapters and <code>restructure_assets</code> share the same <code>targets</code> / <code>target_transform</code> / <code>missing</code> vocabulary (that is the whole point of the D2 rename) — but they are alternatives, not a pipeline.</p>
+<h3 id="sorted-find_-results">Sorted <code>find_*</code> results</h3>
+<p><code>find_executions</code>, <code>find_datasets</code>, and <code>find_workflows</code> now accept an optional <code>sort=</code> keyword. The same three-state spec works on all three:</p>
+<pre><code class="language-python"># Backend-determined order — existing default, no behavior change.
+all_execs = ml.find_executions()
+
+# Newest-first by record creation time (RCT desc) — recommended for
+# &quot;show me what's new&quot; queries.
+recent = ml.find_executions(sort=True)
+recent_ds = ml.find_datasets(sort=True)
+recent_wfs = ml.find_workflows(sort=True)
+
+# Custom sort — receives the path-builder path and returns one or more
+# sort keys. Useful when you want to sort by a domain column.
+by_name = ml.find_workflows(sort=lambda p: p.Name)
+</code></pre>
+<p><code>sort=</code> defaults to <code>None</code>, so existing call sites are unaffected. Pass <code>True</code> to opt into the method's documented default (RCT desc). Pass a callable to compose your own ordering using path-builder column expressions.</p>
+<p>The shared semantics live in <a href="../api/index.md"><code>deriva_ml.core.sort.resolve_sort</code></a> (a one-line helper) and the matching <code>SortSpec</code> type alias, both available from <code>deriva_ml.core.sort</code> if you are writing your own <code>find_*</code>-shaped helpers in downstream code.</p>
+<h3 id="subclasser-note-derivamlcatalog-datasetlike-protocols">Subclasser note: <code>DerivaMLCatalog</code> / <code>DatasetLike</code> protocols</h3>
+<p>If you implement <code>DatasetLike</code>, <code>DerivaMLCatalogReader</code>, or <code>DerivaMLCatalog</code> yourself (custom storage backend, mock, test double), the protocol declarations now include three optional kwargs:</p>
+<ul>
+<li><code>sort=</code> (on <code>find_executions</code>, <code>find_datasets</code>, <code>find_workflows</code>, and reserved on <code>list_dataset_*</code> for forward-compat)</li>
+<li><code>materialize_limit=</code> (on <code>feature_values</code>)</li>
+<li><code>execution_rids=</code> (on <code>feature_values</code>)</li>
+</ul>
+<p>All three default to <code>None</code>, so live behavior is unchanged. But strict static type-checking (<code>mypy --strict</code> on a <code>Protocol</code> <code>runtime_checkable=True</code>) will flag your concrete class as no longer conforming if its method signatures don't expose the kwargs. The minimum-effort fix is to add <code>**kwargs</code> to your impls, or accept the new kwargs and ignore them.</p>
+<pre><code class="language-python"># Before — was protocol-conformant.
+class MyCustomCatalog(DerivaMLCatalogReader):
+    def find_executions(self) -&gt; list[Execution]: ...
+
+# After — accept the new kwarg (ignore if you don't use it).
+class MyCustomCatalog(DerivaMLCatalogReader):
+    def find_executions(self, sort=None) -&gt; list[Execution]: ...
+</code></pre>
+<h3 id="derivamlmaterializelimitexceeded"><code>DerivaMLMaterializeLimitExceeded</code></h3>
+<p>A new exception class is exported from the top-level package:</p>
+<pre><code class="language-python">from deriva_ml import DerivaMLMaterializeLimitExceeded
+</code></pre>
+<p>It is raised when a query result set would exceed the caller-supplied <code>materialize_limit=</code>. The first user-facing call site will be <code>feature_values(materialize_limit=...)</code>; the exception class is available now so downstream code can prepare its handler.</p>
+<pre><code class="language-python">try:
+    rows = ml.feature_values(
+        feature_name=&quot;Glaucoma&quot;,
+        materialize_limit=10_000,
+    )
+except DerivaMLMaterializeLimitExceeded as e:
+    # Narrow the query (e.g. pass execution_rids=...) or raise the limit.
+    ...
+</code></pre>
+<h3 id="crash-recovery">Crash recovery</h3>
+<p>Before, after a hard process crash (OOM, SIGKILL) in the middle of an execution, you had to manually mark the execution <code>Failed</code> so <code>upload_execution_outputs</code> could proceed:</p>
+<pre><code class="language-python"># Before — workaround that polluted the audit trail
+exe = ml.resume_execution(rid)
+exe.update_status(ExecutionStatus.Failed, &quot;Resumed after crash&quot;)  # spurious Failed marker
+exe.upload_execution_outputs()  # Failed → Pending_Upload → Uploaded
+</code></pre>
+<p>Now <code>Running → Pending_Upload</code> is a legal state transition; the crash-recovery path is explicit and does not lie about the execution's outcome:</p>
+<pre><code class="language-python"># After — clean path
+exe = ml.resume_execution(rid)
+exe.update_status(ExecutionStatus.Pending_Upload)  # honest: &quot;advance the state machine, please upload&quot;
+exe.upload_execution_outputs()  # Pending_Upload → Uploaded
+</code></pre>
+<p>See <a href="../executions/#how-to-handle-a-crash-resume">Chapter 4 — Running an experiment</a> for the full crash-recovery flow.</p>
+<h2 id="environment-and-tooling">Environment and tooling</h2>
+<h3 id="python-version">Python version</h3>
+<p>deriva-ml requires Python ≥3.12. This is unchanged from the previous release; stated here for completeness.</p>
+<h3 id="optional-dependencies">Optional dependencies</h3>
+<p>Two new optional dependency extras are available for the framework adapters:</p>
+<pre><code class="language-bash"># For PyTorch users:
+pip install 'deriva-ml[torch]'
+
+# For TensorFlow / Keras-on-TF users:
+pip install 'deriva-ml[tf]'
+
+# Both (uncommon but valid):
+pip install 'deriva-ml[torch,tf]'
+</code></pre>
+<p>The base install remains lean — neither framework is a hard dependency. Library imports continue to work without either installed; only the corresponding <code>as_*_dataset</code> method raises <code>ImportError</code> with an install hint when called.</p>
+<p><strong>Platform note for TensorFlow:</strong> on macOS (Apple Silicon), the conventional wheel is <code>tensorflow-macos</code> rather than vanilla <code>tensorflow</code>. On CUDA-enabled Linux, it is <code>tensorflow[and-cuda]</code>. Our extra pins <code>tensorflow&gt;=2.15</code> as the package name; if you want a different variant, install it separately and skip the <code>[tf]</code> extra — the import guard inside <code>as_tf_dataset</code> checks only that <code>tensorflow</code> is importable.</p>
+<h3 id="setuptools_use_distutils-env-var">SETUPTOOLS_USE_DISTUTILS env var</h3>
+<p>A small internal fix: <code>Workflow.get_dynamic_version()</code> used to set <code>os.environ["SETUPTOOLS_USE_DISTUTILS"] = "stdlib"</code> as a defensive measure for an older setuptools bug. That mutation leaked into every subsequent <code>subprocess.Popen</code>, which on Python 3.13 crashed third-party packages (e.g., <code>fair_identifiers_client</code>) that still import <code>distutils.version</code>. The env mutation is gone. No user action required; noted here because observers may have seen the env var appear process-wide before and wondered why.</p>
+<h3 id="schemaorm__del__-shutdown-noise"><code>SchemaORM.__del__</code> shutdown noise</h3>
+<p>Short-lived scripts that constructed a <code>DerivaML</code> instance and exited used to print a multi-line <code>Exception ignored in: &lt;function SchemaORM.__del__&gt;</code> traceback ending in <code>AttributeError: 'NoneType' object has no attribute '_dispose_registries'</code>. This was the well-known interpreter-shutdown ordering issue — SQLAlchemy module globals torn down before the finalizer ran. The runtime swallowed it, so nothing actually broke, but the traceback made successful runs look failed. The finalizer now catches and ignores the late-shutdown error explicitly. No user action required; the explicit <code>dispose()</code> and context-manager exit paths still raise normally.</p>
+<h3 id="internal-performance-fixes-no-api-change">Internal performance fixes (no API change)</h3>
+<p>Several catalog-load and feature-flush hot paths were rewritten to batch SQLite transactions and HTTP round-trips that previously fired per-row. On a 10K-asset CIFAR-10 load this collapses the wall-clock from ~50 minutes to ~11 minutes. The fixes are internal: no API surface changed for callers. Specific paths affected: lease-token writeback, feature-record staging and flush, upload-engine status callbacks, asset-RID resolution at execution start, <code>delete_dataset_members</code>, <code>find_workflows</code>, and <code>_load_hydra_config</code>.</p>
+<p>If you previously worked around the slow asset-load time with shell-side parallelism or chunking, you can drop those workarounds.</p>
+<h2 id="finding-affected-code-in-your-project">Finding affected code in your project</h2>
+<p>Run these greps against your project directory to enumerate call sites that need updates:</p>
+<pre><code class="language-bash"># restructure_assets old kwargs
+grep -rn &quot;group_by=\|value_selector=&quot; your_project/ --include=&quot;*.py&quot;
+grep -rnE 'restructure_assets.*&quot;[A-Za-z_]+\.[A-Za-z_]+&quot;' your_project/ --include=&quot;*.py&quot;
+
+# Renamed private methods — find calls by the old public name
+grep -rnE &quot;\b(domain_path|table_path|is_system_schema|get_domain_schemas|apply_logger_overrides|compute_diff|retrieve_rid|cache_features|add_workflow|start_upload)\(&quot; your_project/ --include=&quot;*.py&quot; \
+  | grep -v -E &quot;\._\(?(domain_path|table_path|is_system_schema|get_domain_schemas|apply_logger_overrides|compute_diff|retrieve_rid|cache_features|add_workflow|start_upload)&quot;
+
+# Deleted methods
+grep -rnE &quot;\.(prefetch_dataset|list_foreign_keys|add_page|user_list|globus_login)\(&quot; your_project/ --include=&quot;*.py&quot;
+
+# AssetRIDConfig (doc-only break)
+grep -rn &quot;AssetRIDConfig&quot; your_project/ --include=&quot;*.py&quot;
+
+# DerivaMLCatalog / DatasetLike subclassers (only relevant if you
+# implement these protocols — the kwargs default to None so live
+# behavior is unchanged, but mypy --strict will flag the protocol gap)
+grep -rnE &quot;class .*\(.*DerivaMLCatalog(Reader)?\)|class .*\(.*DatasetLike\)&quot; your_project/ --include=&quot;*.py&quot;
+</code></pre>
+<p>For known downstream projects in the deriva-ml ecosystem, the sibling-repo grep at the time this guide was written found the following call sites:</p>
+<pre><code>~/GitHub/deriva-ml-template-test/src/models/cifar10_cnn.py:288:        dataset.restructure_assets(
+~/GitHub/deriva-ml-template-test/src/models/cifar10_cnn.py:291:            group_by=[&quot;Image_Classification&quot;],  # Group by feature to create class subdirs
+</code></pre>
+<p>Template maintainers should update the <code>group_by=</code> to <code>targets=</code> in lockstep with upgrading.</p>
+<h2 id="version-compatibility">Version compatibility</h2>
+<table>
+<thead>
+<tr>
+<th>deriva-ml version</th>
+<th>Python</th>
+<th>Torch</th>
+<th>TensorFlow</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Previous published release</td>
+<td>≥3.12</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>Pre-S2 baseline</td>
+</tr>
+<tr>
+<td>This release (post-S2)</td>
+<td>≥3.12</td>
+<td>≥2.0 optional (<code>[torch]</code> extra)</td>
+<td>≥2.15 optional (<code>[tf]</code> extra)</td>
+<td>This migration guide applies. Includes the batched-SQLite/HTTP perf fixes (~5× speedup on 10K-asset loads) and the additive <code>find_*(sort=...)</code>, <code>materialize_limit=</code>, <code>execution_rids=</code> kwargs.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="support">Support</h2>
+<p>If you hit a break not documented in this chapter, please open an issue. In particular, if you have code that worked on the previous release and fails after upgrading with an error that is not listed here, that is likely a bug on our side — the clean-break renames are all enumerated above, and everything else in the release is intended to be additive.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../hydra-zen/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Integrating with hydra-zen">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Integrating with hydra-zen
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../configuration/overview/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

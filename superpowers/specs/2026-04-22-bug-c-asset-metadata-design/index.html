@@ -1,0 +1,2301 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-22-bug-c-asset-metadata-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Bug C: Asset Metadata None-Stringification — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bug-c-asset-metadata-none-stringification-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bug C: Asset Metadata None-Stringification — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals &amp; non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-design-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Design summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Design summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-why-pre-upload-not-per-mutation-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Why pre-upload (not per-mutation) validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-why-the-sentinel-pre-processor-not-skip-the-dir-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Why the sentinel + pre-processor (not "skip the dir level")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-why-__null__-specifically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Why "__NULL__" specifically
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-_validate_pending_asset_metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 _validate_pending_asset_metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-derivamodelasset_metadata_columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 DerivaModel.asset_metadata_columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-null_sentinel-constant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 NULL_SENTINEL constant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-nullsentinelprocessor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 NullSentinelProcessor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-upload-spec-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Upload spec wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-three-staging-site-edits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Three staging-site edits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-happy-path-all-metadata-supplied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Happy path (all metadata supplied)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-not-null-missing-the-validator-catches-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 NOT-NULL missing — the validator catches it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-nullable-missing-sentinel-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Nullable missing — sentinel path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-interaction-with-other-subsystems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Interaction with other subsystems
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-error-handling-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Error handling summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-testing-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Testing plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Testing plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-unit-tests-no-catalog-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Unit tests — no catalog needed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-integration-tests-live-catalog-gated-on-deriva_host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Integration tests — live-catalog, gated on DERIVA_HOST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-test-catalog-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Test catalog requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Rollout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bug-c-asset-metadata-none-stringification-design">Bug C: Asset Metadata None-Stringification — Design</h1>
+<p><strong>Status:</strong> Draft · <strong>Date:</strong> 2026-04-22 · <strong>Bug:</strong> Pre-S3 regression, affects all asset tables with non-string metadata columns</p>
+<h2 id="1-problem">1. Problem</h2>
+<p>Three call-sites in the asset-upload pipeline substitute the literal string <code>"None"</code> for missing metadata values when building the staging directory tree:</p>
+<ul>
+<li><code>src/deriva_ml/execution/execution.py:1074</code> (<code>_build_upload_staging</code>)</li>
+<li><code>src/deriva_ml/execution/upload_engine.py:644</code> (<code>_invoke_deriva_py_uploader</code>)</li>
+<li><code>src/deriva_ml/dataset/upload.py:691</code> (<code>asset_file_path</code> path-builder)</li>
+</ul>
+<p>Each looks like:</p>
+<pre><code class="language-python">target_dir = target_dir / str(metadata.get(col, &quot;None&quot;))
+</code></pre>
+<p>deriva-py's <code>GenericUploader</code> walks that tree, captures the directory segment with its <code>(?P&lt;col&gt;[-:._ \w]+)</code> regex (which matches <code>"None"</code> happily), and substitutes it via <code>column_map</code> into the catalog insert. For non-string columns — timestamp, date, int4, etc. — the server rejects the insert:</p>
+<pre><code>invalid input syntax for type timestamp: &quot;None&quot;
+</code></pre>
+<p>When metadata is <code>nullok=True</code>, the user expects SQL <code>NULL</code> in the catalog. When <code>nullok=False</code>, they expect a clear error pointing at the missing value. Today they get neither — just an opaque 400 from the catalog mid-upload.</p>
+<h2 id="2-goals-non-goals">2. Goals &amp; non-goals</h2>
+<p><strong>In scope:</strong>
+- Pre-upload validation that fails fast with an actionable error when NOT-NULL metadata columns are missing.
+- Correct SQL <code>NULL</code> emission when nullable metadata columns are missing.
+- A single pre-upload checkpoint that covers all three staging sites (<code>upload_outputs</code>, <code>upload_pending</code>, <code>run_upload_engine</code>).
+- A pre-processor pattern that plugs into deriva-py's documented extension point.</p>
+<p><strong>Out of scope:</strong>
+- Adding per-column defaults that the validator would fill in automatically. (YAGNI; users can do this in their own code.)
+- Renaming or restructuring existing metadata APIs (<code>asset_file_path</code>, <code>AssetFilePath.metadata</code>).
+- Any upstream changes to deriva-py itself.
+- Bug E.2 (deriva-py upserts by MD5+Filename, separate subsystem).</p>
+<h2 id="3-design-summary">3. Design summary</h2>
+<p>Three units, one pre-upload checkpoint, one deriva-py extension point:</p>
+<ol>
+<li>
+<p><strong>Validator</strong> — <code>_validate_pending_asset_metadata(model, manifest)</code> in <code>src/deriva_ml/asset/manifest.py</code>. Runs once at the top of every upload entry point. Raises <code>DerivaMLValidationError</code> listing all missing NOT-NULL columns across all pending assets.</p>
+</li>
+<li>
+<p><strong>Sentinel</strong> — <code>NULL_SENTINEL = "__NULL__"</code> constant in <code>src/deriva_ml/dataset/upload.py</code>. The three staging sites use this instead of <code>"None"</code> for nullable missing metadata.</p>
+</li>
+<li>
+<p><strong>Pre-processor</strong> — <code>NullSentinelProcessor(BaseProcessor)</code> in <code>src/deriva_ml/asset/null_sentinel_processor.py</code>. Registered in <code>asset_table_upload_spec</code>'s <code>pre_processors</code> list. Mutates <code>self.metadata</code>, replacing <code>"__NULL__"</code> with <code>None</code> before deriva-py's <code>interpolateDict</code> runs. deriva-py's existing None-pruning (at <code>deriva_upload.py:356-358</code>) drops those keys, and the catalog insert receives SQL <code>NULL</code>.</p>
+</li>
+</ol>
+<h3 id="31-why-pre-upload-not-per-mutation-validation">3.1 Why pre-upload (not per-mutation) validation</h3>
+<p>Metadata can enter the manifest at two points: <code>asset_file_path(metadata=...)</code> at registration, and <code>AssetFilePath.metadata = ...</code> post-registration via the setter. Validating at either of those individually would miss the case where the user registers incomplete, adds some metadata, then uploads still-incomplete. A single pass at the top of the upload entry point inspects the <strong>final</strong> manifest state and catches any inconsistency regardless of how it arose.</p>
+<h3 id="32-why-the-sentinel-pre-processor-not-skip-the-dir-level">3.2 Why the sentinel + pre-processor (not "skip the dir level")</h3>
+<p>deriva-py's <code>asset_path_regex</code> is built from <code>sorted(metadata_columns)</code> at spec-generation time and is a static regex — there's no per-file conditional path. Making some directory levels optional would require forking <code>asset_table_upload_spec</code> per-file or post-processing the scan results. The sentinel is a minimal in-band marker that lets us reuse the existing regex + column_map plumbing with one small in-place transformation.</p>
+<h3 id="33-why-__null__-specifically">3.3 Why <code>"__NULL__"</code> specifically</h3>
+<ul>
+<li>Matches deriva-py's <code>(?P&lt;col&gt;[-:._ \w]+)</code> regex (<code>\w</code> includes underscores).</li>
+<li>Unambiguous — no natural metadata value looks like <code>__NULL__</code>.</li>
+<li>Short enough to inspect in a staging-directory listing.</li>
+<li>Collision risk documented as a known constraint.</li>
+</ul>
+<h2 id="4-components">4. Components</h2>
+<h3 id="41-_validate_pending_asset_metadata">4.1 <code>_validate_pending_asset_metadata</code></h3>
+<p><strong>Location:</strong> module-level private function in <code>src/deriva_ml/asset/manifest.py</code>.</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-python">def _validate_pending_asset_metadata(
+    model: &quot;DerivaModel&quot;,
+    manifest: &quot;AssetManifest&quot;,
+) -&gt; None:
+    &quot;&quot;&quot;Raise DerivaMLValidationError if any pending asset entry is
+    missing a NOT-NULL metadata column value.
+
+    Iterates manifest entries where status == pending and the asset
+    table has metadata columns. For each NOT-NULL column absent from
+    the entry's metadata dict, records (manifest_key, schema, table,
+    column). If any errors collected, raises a single
+    DerivaMLValidationError whose message lists every failure in
+    sorted order.
+
+    Nullable columns may be absent without error; downstream staging
+    substitutes ``NULL_SENTINEL`` which the upload pre-processor
+    translates to SQL NULL.
+    &quot;&quot;&quot;
+</code></pre>
+<p><strong>Error message shape:</strong></p>
+<pre><code>Missing required metadata for 3 pending asset(s):
+  - Image/acq001.png: missing columns Acquisition_Date, Acquisition_Time
+  - Image/acq002.png: missing columns Acquisition_Time
+  - Plate/p1.json: missing column Well_Position
+Supply these values before calling upload_outputs(), either via
+the ``metadata=`` arg to asset_file_path(...) or by assigning to
+the returned AssetFilePath's ``metadata`` property.
+</code></pre>
+<p><strong>Call sites (3):</strong>
+- <code>Execution.upload_outputs()</code> — first step, before <code>_build_upload_staging</code>.
+- <code>DerivaML.upload_pending()</code> — first step, before engine dispatch.
+- <code>run_upload_engine()</code> — first step, before <code>_enumerate_work</code>.</p>
+<h3 id="42-derivamodelasset_metadata_columns">4.2 <code>DerivaModel.asset_metadata_columns</code></h3>
+<p><strong>Location:</strong> new method on <code>DerivaModel</code> in <code>src/deriva_ml/model/catalog.py</code> (or wherever the existing <code>asset_metadata(table) -&gt; set[str]</code> lives).</p>
+<p><strong>Signature:</strong></p>
+<pre><code class="language-python">def asset_metadata_columns(
+    self, table: &quot;str | Table&quot;
+) -&gt; list[&quot;Column&quot;]:
+    &quot;&quot;&quot;Return Column objects (not just names) for the asset-metadata
+    columns of ``table``. Ordered deterministically (sorted by name)
+    for stable iteration in callers.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Used by the validator to inspect <code>nullok</code>. The existing <code>asset_metadata(table) -&gt; set[str]</code> method remains unchanged for backward compatibility.</p>
+<h3 id="43-null_sentinel-constant">4.3 <code>NULL_SENTINEL</code> constant</h3>
+<p><strong>Location:</strong> module-level constant at the top of <code>src/deriva_ml/dataset/upload.py</code>.</p>
+<pre><code class="language-python">NULL_SENTINEL = &quot;__NULL__&quot;
+&quot;&quot;&quot;Directory-segment marker for nullable asset-metadata columns with
+no value. Translated to Python None by NullSentinelProcessor before
+deriva-py builds the catalog insert. See Bug C design doc.&quot;&quot;&quot;
+</code></pre>
+<p>Imported by the three staging sites.</p>
+<h3 id="44-nullsentinelprocessor">4.4 <code>NullSentinelProcessor</code></h3>
+<p><strong>Module:</strong> <code>src/deriva_ml/asset/null_sentinel_processor.py</code>.</p>
+<p><strong>Class:</strong></p>
+<pre><code class="language-python">from deriva.transfer.upload.processors import BaseProcessor
+
+
+class NullSentinelProcessor(BaseProcessor):
+    &quot;&quot;&quot;Pre-upload metadata pre-processor for deriva-py's GenericUploader.
+
+    Translates the sentinel string ``&quot;__NULL__&quot;`` (see
+    :data:`deriva_ml.dataset.upload.NULL_SENTINEL`) in the uploader's
+    metadata dict to Python ``None``. deriva-py's
+    :func:`interpolateDict` then drops None-valued keys, causing the
+    resulting catalog insert to send SQL ``NULL`` for those columns.
+
+    Not part of the end-user API — configured automatically by
+    :func:`deriva_ml.dataset.upload.asset_table_upload_spec`.
+    &quot;&quot;&quot;
+
+    def process(self):
+        for k, v in list(self.metadata.items()):
+            if v == &quot;__NULL__&quot;:
+                self.metadata[k] = None
+</code></pre>
+<h3 id="45-upload-spec-wiring">4.5 Upload spec wiring</h3>
+<p>In <code>asset_table_upload_spec()</code> at <code>src/deriva_ml/dataset/upload.py</code>, when <code>metadata_columns</code> is non-empty, the returned spec dict gains:</p>
+<pre><code class="language-python">spec[&quot;pre_processors&quot;] = [
+    {
+        &quot;processor&quot;: &quot;NullSentinelProcessor&quot;,
+        &quot;processor_type&quot;: (
+            &quot;deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor&quot;
+        ),
+    }
+]
+</code></pre>
+<p>deriva-py's <code>find_processor(..., bypass_whitelist=True)</code> imports the class by its fully-qualified path and instantiates it per file upload.</p>
+<h3 id="46-three-staging-site-edits">4.6 Three staging-site edits</h3>
+<p>Each site replaces one string literal:</p>
+<pre><code class="language-diff">- target_dir = target_dir / str(metadata.get(col, &quot;None&quot;))
++ target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
+</code></pre>
+<p>and adds <code>from deriva_ml.dataset.upload import NULL_SENTINEL</code> at the top.</p>
+<h2 id="5-data-flow">5. Data flow</h2>
+<h3 id="51-happy-path-all-metadata-supplied">5.1 Happy path (all metadata supplied)</h3>
+<pre><code>exe.upload_outputs()
+  → _validate_pending_asset_metadata — no errors
+  → staging: directory per metadata col, all values real
+  → deriva-py scanner → regex → column_map → catalog insert with real values
+</code></pre>
+<h3 id="52-not-null-missing-the-validator-catches-it">5.2 NOT-NULL missing — the validator catches it</h3>
+<pre><code>exe.upload_outputs()
+  → _validate_pending_asset_metadata — collects errors
+  → raise DerivaMLValidationError
+  → user sees aggregated message, fixes, retries
+</code></pre>
+<p>No staging or upload work performed.</p>
+<h3 id="53-nullable-missing-sentinel-path">5.3 Nullable missing — sentinel path</h3>
+<pre><code>exe.upload_outputs()
+  → _validate_pending_asset_metadata — no errors (nullable OK)
+  → staging: &quot;__NULL__&quot; written as directory segment for missing values
+  → deriva-py scanner → regex captures &quot;__NULL__&quot; into self.metadata
+  → _execute_processors(PRE_PROCESSORS_KEY)
+      → NullSentinelProcessor.process() — &quot;__NULL__&quot; → None
+  → interpolateDict — drops None-valued keys
+  → catalog insert with SQL NULL for those columns
+</code></pre>
+<h3 id="54-interaction-with-other-subsystems">5.4 Interaction with other subsystems</h3>
+<ul>
+<li><strong>Offline mode:</strong> <code>upload_outputs</code> is already online-only. The validator runs purely against local manifest + cached model — works offline, though the subsequent upload would fail with <code>DerivaMLReadOnlyError</code>. No regression.</li>
+<li><strong>Schema pin:</strong> Orthogonal. Pinned cache still lets the validator inspect <code>nullok</code> (it reads from the in-memory model, not the live catalog).</li>
+<li><strong>Workspace reset:</strong> Orthogonal. Validator reads whatever manifest exists.</li>
+</ul>
+<h2 id="6-error-handling-summary">6. Error handling summary</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Exception / behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NOT-NULL column missing on any pending asset</td>
+<td><code>DerivaMLValidationError</code> with aggregated message</td>
+</tr>
+<tr>
+<td>Nullable column missing on any pending asset</td>
+<td>(none — sentinel path)</td>
+</tr>
+<tr>
+<td>All metadata supplied</td>
+<td>(none — clean upload)</td>
+</tr>
+<tr>
+<td>Asset table has zero metadata columns</td>
+<td>Validator fast-paths (no errors); staging skips sentinel logic</td>
+</tr>
+<tr>
+<td>User sets <code>entry.metadata["X"] = None</code> explicitly (Pydantic <code>model_dump</code> exclude_none idiom)</td>
+<td>Treated identically to absence — same validator + sentinel path</td>
+</tr>
+<tr>
+<td><code>"__NULL__"</code> is a legitimate metadata value</td>
+<td><strong>Corrupted to SQL NULL by the pre-processor.</strong> Known constraint; documented in the processor's docstring.</td>
+</tr>
+<tr>
+<td>Pre-processor import fails (class renamed/moved)</td>
+<td><code>DerivaUploadConfigurationError</code> from deriva-py at upload time — surfaces as upload failure, not silent corruption</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-testing-plan">7. Testing plan</h2>
+<h3 id="71-unit-tests-no-catalog-needed">7.1 Unit tests — no catalog needed</h3>
+<p><strong><code>tests/asset/test_metadata_validator.py</code></strong> (new, ~8 tests):
+1. <code>test_empty_manifest_returns_none</code>
+2. <code>test_asset_with_no_metadata_columns_passes</code>
+3. <code>test_all_required_metadata_present_passes</code>
+4. <code>test_missing_single_not_null_column_raises</code>
+5. <code>test_missing_multiple_columns_aggregated</code>
+6. <code>test_missing_across_multiple_assets_aggregated</code>
+7. <code>test_nullable_missing_is_not_an_error</code>
+8. <code>test_error_message_is_deterministic</code></p>
+<p><strong><code>tests/asset/test_null_sentinel_processor.py</code></strong> (new, ~4 tests):
+9. <code>test_single_sentinel_converted_to_none</code>
+10. <code>test_multiple_sentinels_in_metadata_all_converted</code>
+11. <code>test_non_sentinel_values_unchanged</code>
+12. <code>test_empty_metadata_is_no_op</code></p>
+<h3 id="72-integration-tests-live-catalog-gated-on-deriva_host">7.2 Integration tests — live-catalog, gated on <code>DERIVA_HOST</code></h3>
+<p>Resurrect and extend <code>tests/execution/test_upload_engine_live_smoke.py</code> (deleted after the S3 branch merge; original at commit <code>df620c3</code>).</p>
+<ol>
+<li><code>test_upload_engine_live_end_to_end</code> — unchanged from original; zero-metadata <code>Execution_Asset</code> path.</li>
+<li><code>test_upload_asset_with_missing_required_metadata_raises_validation_error</code> — Bug C reproducer now passing as <code>DerivaMLValidationError</code>, not xfail.</li>
+<li><code>test_upload_asset_with_missing_nullable_metadata_succeeds_with_null</code> — the sentinel path, end-to-end, asserts catalog row has SQL NULL.</li>
+</ol>
+<h3 id="73-regression">7.3 Regression</h3>
+<ul>
+<li>Existing <code>tests/execution/</code> upload tests pass unchanged — validation + sentinel are no-ops when metadata is complete.</li>
+<li>Schema-pin, S4, and S3 regression suites pass unchanged (orthogonal).</li>
+<li>Old xfail reproducer becomes redundant — deleted or repurposed as test #14.</li>
+</ul>
+<h3 id="74-test-catalog-requirements">7.4 Test catalog requirements</h3>
+<p>The validator test (#14) needs an asset table with at least one <code>nullok=False</code> metadata column. The test fixtures already include <code>Image</code> with <code>Acquisition_Time</code> and <code>Acquisition_Date</code> — nullability needs confirmation at implementation time. If both are nullable, the plan adds a fixture tweak (add a NOT-NULL column to one asset table for the test).</p>
+<h2 id="8-risks">8. Risks</h2>
+<ol>
+<li>
+<p><strong><code>"__NULL__"</code> collision with a legitimate string value.</strong> Mitigation: double-underscore framing + docstring note.</p>
+</li>
+<li>
+<p><strong>deriva-py <code>self.metadata</code> semantics change.</strong> We rely on <code>process()</code> receiving a live mutable reference. Current behavior verified at <code>deriva_upload.py:1141</code>. Integration test #15 is the canary — a silent drift would fail it.</p>
+</li>
+<li>
+<p><strong><code>find_processor(bypass_whitelist=True)</code> behavior drift.</strong> Low risk; this is the documented path for asset-mapping pre_processors.</p>
+</li>
+<li>
+<p><strong>Validator false positives.</strong> Reading <code>nullok</code> from the parsed ermrest schema (via <code>DerivaModel</code>) avoids any translation-layer bugs.</p>
+</li>
+<li>
+<p><strong>Users who relied on broken <code>None</code>-stringification.</strong> Those uploads were already failing in production. New behavior replaces a 400 with a <code>DerivaMLValidationError</code> — better UX, same net outcome (the upload still cannot succeed).</p>
+</li>
+</ol>
+<h2 id="9-rollout">9. Rollout</h2>
+<p>Single PR against <code>main</code>. No feature flag. Breaking change is limited to callers whose uploads were already broken.</p>
+<p>CHANGELOG entry under a new <code>## Unreleased — Bug C: asset metadata None-stringification</code> section documenting:
+- The validator and its failure mode.
+- The sentinel protocol.
+- The <code>NullSentinelProcessor</code> as an opaque implementation detail.
+- That callers whose uploads succeeded before continue to succeed.</p>
+<h2 id="10-open-questions">10. Open questions</h2>
+<p>None at spec time. Implementation-time checks:
+- Confirm <code>Image.Acquisition_Time</code>/<code>Acquisition_Date</code> nullability in the test fixture.
+- Confirm <code>model.name_to_table(t).columns[c].nullok</code> is the right accessor (vs. <code>nullok()</code> method or similar).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

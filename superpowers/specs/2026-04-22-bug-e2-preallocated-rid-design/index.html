@@ -1,0 +1,2350 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-22-bug-e2-preallocated-rid-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Bug E.2: Asset Uploads Honor Pre-Leased RIDs — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bug-e2-asset-uploads-honor-pre-leased-rids-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bug E.2: Asset Uploads Honor Pre-Leased RIDs — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals &amp; non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-design-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Design summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Design summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-deriva-py-upstream-branch-20-dev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 deriva-py (upstream, branch 2.0-dev)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-deriva-ml-downstream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 deriva-ml (downstream)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-deriva-py-use_pre_allocated_rid-flag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 deriva-py — use_pre_allocated_rid flag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-deriva-ml-_validate_pending_asset_leases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 deriva-ml — _validate_pending_asset_leases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-deriva-ml-validator-call-sites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 deriva-ml — validator call sites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-deriva-ml-upload-spec-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 deriva-ml — upload spec changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-deriva-ml-staging-path-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 deriva-ml — staging path changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-deriva-ml-dependency-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 deriva-ml — dependency pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-happy-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Happy path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-missing-lease-validator-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Missing-lease validator failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-retry-after-partial-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Retry after partial failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-flag-off-path-backward-compat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Flag-off path (backward compat)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-interaction-with-bug-c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Interaction with Bug C
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-error-handling-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Error handling summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-testing-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Testing plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Testing plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-deriva-py-unit-tests-no-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 deriva-py unit tests (no catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-deriva-ml-unit-tests-no-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 deriva-ml unit tests (no catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-deriva-ml-upload-spec-tests-live-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 deriva-ml upload-spec tests (live catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-deriva-ml-integration-tests-deriva_host-gated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 deriva-ml integration tests (DERIVA_HOST-gated)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Rollout
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bug-e2-asset-uploads-honor-pre-leased-rids-design">Bug E.2: Asset Uploads Honor Pre-Leased RIDs — Design</h1>
+<p><strong>Status:</strong> Draft · <strong>Date:</strong> 2026-04-22 · <strong>Bug:</strong> Pre-S3 architectural gap — deriva-py's asset uploader ignores pre-allocated RIDs</p>
+<h2 id="1-problem">1. Problem</h2>
+<p>DerivaML's lease system (§2.6, <code>rid_lease.py</code> + <code>lease_orchestrator.py</code>) pre-allocates RIDs from <code>public:ERMrest_RID_Lease</code> so client code can reference those RIDs in FK columns <strong>before</strong> the target row exists in the catalog. The plain-row drain path honors pre-leased RIDs correctly: <code>metadata["RID"] = r["rid"]</code> + <code>tpath.insert(body)</code> (see <code>upload_engine.py</code> around line 573).</p>
+<p>The <strong>asset-row path</strong> does not. It delegates to deriva-py's <code>GenericUploader</code>, which uses <code>record_query_template: "/entity/{target_table}/MD5={md5}&amp;Filename={file_name}"</code> to either look up an existing row (by MD5+Filename) or <code>_catalogRecordCreate</code> a new one with a <strong>server-generated RID</strong>. The pre-leased RID in <code>files[i]["rid"]</code> is never threaded into the insert payload.</p>
+<p>Consequences:
+- Any client code that captured the pre-leased RID (e.g., to build an FK-referencing row elsewhere) ends up with a dangling reference — the row in the asset table has a different RID.
+- SQLite's <code>pending_rows.rid</code> column becomes stale (diverged from catalog).
+- The whole point of the lease system — "client has a valid RID immediately, no round-trip per row" — is silently broken for asset tables.</p>
+<h2 id="2-goals-non-goals">2. Goals &amp; non-goals</h2>
+<p><strong>In scope:</strong>
+- Asset uploads must use the pre-leased RID for the catalog insert.
+- Upstream fix in deriva-py (branch <code>2.0-dev</code>): add opt-in config flag <code>use_pre_allocated_rid</code> to asset mappings.
+- Pre-flight validator in deriva-ml that confirms every pre-leased RID is still live in <code>ERMrest_RID_Lease</code> before the upload runs — raises an aggregated <code>DerivaMLValidationError</code> if any are missing.
+- Idempotent retry: if a partial failure leaves a catalog row at the pre-leased RID, a subsequent upload detects and skips the duplicate insert rather than raising an RID-collision error.</p>
+<p><strong>Explicitly out of scope:</strong>
+- Any change to the plain-row drain path (already works).
+- Removing the MD5+Filename query for callers who don't opt into <code>use_pre_allocated_rid</code> (backward compatibility requirement).
+- Implementing a separate lease-release-on-success workflow — a successfully consumed lease stays in <code>ERMrest_RID_Lease</code> indefinitely (existing behavior).
+- Changes to the state-store's lease-acquisition protocol.
+- Cross-repo tooling automation. The deriva-py and deriva-ml PRs are coordinated manually.</p>
+<h2 id="3-design-summary">3. Design summary</h2>
+<p>Four units across two repos:</p>
+<h3 id="31-deriva-py-upstream-branch-20-dev">3.1 deriva-py (upstream, branch <code>2.0-dev</code>)</h3>
+<ul>
+<li><strong>New config flag</strong> <code>use_pre_allocated_rid: true</code> on any asset mapping in the upload spec. Default <code>false</code> (legacy MD5+Filename behavior).</li>
+<li><strong>Fast-fail validation</strong> in <code>_initFileMetadata</code>: if flag is set and <code>match_groupdict</code> lacks <code>RID</code>, raise <code>DerivaUploadConfigurationError</code> before any hatrac I/O.</li>
+<li><strong>New method</strong> <code>_createFileRecordWithRid</code> replaces <code>_getFileRecord</code> when the flag is set. Does a pre-check GET by RID for idempotency; if no row exists, creates one with the caller-supplied RID in the payload.</li>
+<li>Everything else (hatrac upload, regex, column_map, pre/post processors) unchanged.</li>
+</ul>
+<h3 id="32-deriva-ml-downstream">3.2 deriva-ml (downstream)</h3>
+<ul>
+<li><strong>New validator</strong> <code>_validate_pending_asset_leases(catalog, entries)</code> in <code>rid_lease.py</code> — batch-queries <code>ERMrest_RID_Lease</code> and raises <code>DerivaMLValidationError</code> aggregating any missing RIDs.</li>
+<li><strong>Upload entry points</strong> (<code>Execution._upload_execution_dirs</code> and <code>run_upload_engine</code>) call the new validator alongside the existing <code>_validate_pending_asset_metadata</code>.</li>
+<li><strong>Upload spec</strong> (<code>asset_table_upload_spec</code>) emits <code>use_pre_allocated_rid=True</code>, adds <code>(?P&lt;RID&gt;[-A-Z0-9]+)</code> to <code>file_pattern</code>, and adds <code>"RID": "{RID}"</code> to <code>column_map</code>.</li>
+<li><strong>Staging path builders</strong> (<code>_invoke_deriva_py_uploader._path_for</code> and <code>Execution._build_upload_staging</code>) append the pre-leased RID as the final directory segment after the metadata columns: <code>.../Table/&lt;col1&gt;/&lt;col2&gt;/&lt;RID&gt;/&lt;file&gt;</code>.</li>
+<li><strong>Dependency</strong> bumps <code>deriva-py</code> in <code>pyproject.toml</code> to the release that ships the new flag.</li>
+</ul>
+<h2 id="4-components">4. Components</h2>
+<h3 id="41-deriva-py-use_pre_allocated_rid-flag">4.1 deriva-py — <code>use_pre_allocated_rid</code> flag</h3>
+<p><strong>File:</strong> <code>deriva/transfer/upload/deriva_upload.py</code></p>
+<p><strong>Change A</strong> — after <code>_initFileMetadata</code>'s <code>self._updateFileMetadata(match_groupdict)</code>:</p>
+<pre><code class="language-python">if stob(asset_mapping.get(&quot;use_pre_allocated_rid&quot;, False)):
+    if not self.metadata.get(&quot;RID&quot;):
+        raise DerivaUploadConfigurationError(
+            &quot;Asset mapping has use_pre_allocated_rid=true but no RID &quot;
+            &quot;was captured by the file_pattern regex. Ensure the pattern &quot;
+            &quot;includes a (?P&lt;RID&gt;[A-Z0-9-]+) named group.&quot;
+        )
+</code></pre>
+<p><strong>Change B</strong> — in <code>_uploadAsset</code> Step 7 (<code>if not record:</code>):</p>
+<pre><code class="language-python">if not record:
+    if stob(asset_mapping.get(&quot;use_pre_allocated_rid&quot;, False)):
+        record, result = self._createFileRecordWithRid(asset_mapping)
+    else:
+        record, result = self._getFileRecord(asset_mapping)
+</code></pre>
+<p><strong>Change C</strong> — new private method on <code>GenericUploader</code>:</p>
+<pre><code class="language-python">def _createFileRecordWithRid(self, asset_mapping):
+    &quot;&quot;&quot;Create a new record using a caller-supplied RID.
+
+    Used when asset_mapping has ``use_pre_allocated_rid: true``.
+    Skips the MD5+Filename lookup in ``_getFileRecord``; the caller
+    (via the scan-path regex) must have supplied an RID that was
+    pre-allocated from ``ERMrest_RID_Lease``.
+
+    Idempotency: if a row with the supplied RID already exists
+    (e.g., a prior upload landed the catalog row but the client
+    crashed before recording success), returns that row rather
+    than raising an RID-collision error. Callers can safely retry
+    after partial failures.
+
+    Returns:
+        Tuple of (record, result) mirroring ``_getFileRecord``'s
+        return shape.
+    &quot;&quot;&quot;
+    column_map = asset_mapping.get(&quot;column_map&quot;, {})
+    allow_none_col_list = asset_mapping.get(&quot;allow_empty_columns_on_update&quot;, [])
+    target_table = self.metadata['target_table']
+    rid = self.metadata[&quot;RID&quot;]
+
+    existing = self.catalog.get(f&quot;/entity/{target_table}/RID={rid}&quot;).json()
+    if existing:
+        record = existing[0]
+        self._updateFileMetadata(record, no_overwrite=True)
+        return self.pruneDict(record, column_map, allow_none_col_list), record
+
+    row = self.interpolateDict(self.metadata, column_map, allow_none_col_list)
+    result = self._catalogRecordCreate(target_table, row)
+    record = result[0] if result else row
+    if record:
+        self._updateFileMetadata(record)
+    return self.interpolateDict(
+        self.metadata, column_map, allow_none_column_list=allow_none_col_list
+    ), record
+</code></pre>
+<h3 id="42-deriva-ml-_validate_pending_asset_leases">4.2 deriva-ml — <code>_validate_pending_asset_leases</code></h3>
+<p><strong>Location:</strong> module-level private function at the end of <code>src/deriva_ml/execution/rid_lease.py</code>.</p>
+<pre><code class="language-python">def _validate_pending_asset_leases(
+    catalog: &quot;ErmrestCatalog&quot;,
+    entries: &quot;Iterable[tuple[str, str]]&quot;,
+) -&gt; None:
+    &quot;&quot;&quot;Confirm each (key, rid) pair's RID is still live in ERMrest_RID_Lease.
+
+    Queries the lease table in batches of ``PENDING_ROWS_LEASE_CHUNK``.
+    Aggregates missing RIDs and raises a single
+    :class:`DerivaMLValidationError` listing every failure in sorted
+    order. Returns ``None`` silently when every RID is present.
+
+    Args:
+        catalog: Live ErmrestCatalog for querying the lease table.
+        entries: Iterable of (key, rid) tuples. Key is a
+            human-readable identifier used in the error message.
+
+    Raises:
+        DerivaMLValidationError: If one or more RIDs are not found
+            in ``ERMrest_RID_Lease``.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Uses the existing <code>PENDING_ROWS_LEASE_CHUNK</code> constant for batch size.</p>
+<p><strong>Error-message shape:</strong></p>
+<pre><code>Missing or invalid pre-allocated RIDs for 2 pending asset(s):
+  - Image/acq001.png: RID 1-ABC not found in ERMrest_RID_Lease
+  - Image/acq002.png: RID 1-DEF not found in ERMrest_RID_Lease
+A pre-leased RID has become invalid (e.g., cleared from the lease
+table or never successfully POSTed). Restart the execution to
+re-lease, or investigate lease-table state.
+</code></pre>
+<h3 id="43-deriva-ml-validator-call-sites">4.3 deriva-ml — validator call sites</h3>
+<p><strong>Call site 1 — <code>Execution._upload_execution_dirs</code>:</strong>
+After the existing <code>_validate_pending_asset_metadata(self._model, self._get_manifest())</code> call, add:</p>
+<pre><code class="language-python">from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+manifest = self._get_manifest()
+lease_entries = [
+    (key, entry.rid)
+    for key, entry in manifest.pending_assets().items()
+    if entry.rid
+]
+if lease_entries:
+    _validate_pending_asset_leases(self._ml_object.catalog, lease_entries)
+</code></pre>
+<p><strong>Call site 2 — <code>run_upload_engine</code>:</strong>
+After the existing metadata-validator block, reuse the row-iteration to build lease entries:</p>
+<pre><code class="language-python">from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+lease_entries = [
+    (key_str, row[&quot;rid&quot;])
+    for key_str, row in &lt;rows already iterated&gt;
+    if row.get(&quot;rid&quot;) and row.get(&quot;asset_file_path&quot;)
+]
+if lease_entries:
+    _validate_pending_asset_leases(ml.catalog, lease_entries)
+</code></pre>
+<h3 id="44-deriva-ml-upload-spec-changes">4.4 deriva-ml — upload spec changes</h3>
+<p>In <code>asset_table_upload_spec()</code> (<code>src/deriva_ml/dataset/upload.py</code>):</p>
+<p><strong>Regex</strong> — add RID capture group after metadata path, before filename:</p>
+<pre><code class="language-python">metadata_path = &quot;/&quot;.join([rf&quot;(?P&lt;{c}&gt;[-:._ \w]+)&quot; for c in metadata_columns])
+rid_path = r&quot;(?P&lt;RID&gt;[-A-Z0-9]+)&quot;
+parts = [metadata_path, rid_path] if metadata_path else [rid_path]
+asset_path = (
+    f&quot;{exec_dir_regex}/asset/{schema}/{asset_table.name}/&quot;
+    f&quot;{'/'.join(parts)}/{asset_file_regex}&quot;
+)
+</code></pre>
+<p><strong>Column map</strong> — add <code>"RID": "{RID}"</code>.</p>
+<p><strong>Spec dict</strong> — add <code>"use_pre_allocated_rid": True</code>.</p>
+<h3 id="45-deriva-ml-staging-path-changes">4.5 deriva-ml — staging path changes</h3>
+<p><strong>In <code>_invoke_deriva_py_uploader._path_for</code></strong> (<code>upload_engine.py</code>):</p>
+<pre><code class="language-python">def _path_for(f: dict) -&gt; Path:
+    src = Path(f[&quot;path&quot;]).resolve()
+    metadata = f.get(&quot;metadata&quot;) or {}
+    target_dir = asset_root / schema_name / target_table
+    for col in metadata_cols:
+        target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
+    target_dir = target_dir / f[&quot;rid&quot;]
+    return target_dir / src.name
+</code></pre>
+<p><strong>In <code>Execution._build_upload_staging</code></strong> (<code>execution.py</code>):</p>
+<pre><code class="language-python">metadata_parts = [
+    str(entry.metadata.get(k, NULL_SENTINEL)) for k in all_metadata_cols
+] if all_metadata_cols else []
+target_dir = staging_root / entry.schema / asset_table_name
+for part in metadata_parts:
+    target_dir = target_dir / part
+target_dir = target_dir / entry.rid
+target_dir.mkdir(parents=True, exist_ok=True)
+</code></pre>
+<p><strong>In <code>dataset/upload.py:asset_file_path</code></strong> (bag-export helper, line 657):</p>
+<pre><code class="language-python">for m in asset_metadata:
+    path = path / str(metadata.get(m, NULL_SENTINEL))
+path = path / rid  # requires new rid argument; see §8
+path.mkdir(parents=True, exist_ok=True)
+return path / file_name
+</code></pre>
+<p>This helper is primarily used by <code>core/mixins/execution.py:229</code> for <code>Execution_Metadata</code> (zero metadata columns). It will need a new <code>rid: str</code> parameter. Callers that don't have a pre-leased RID (bag-export for already-catalog-resident rows) must pass the catalog row's existing RID. See §8.</p>
+<h3 id="46-deriva-ml-dependency-pin">4.6 deriva-ml — dependency pin</h3>
+<p>In <code>pyproject.toml</code>, bump <code>deriva-py</code> requirement to the version that includes the <code>use_pre_allocated_rid</code> flag. Target version TBD when the upstream release tag is chosen.</p>
+<h2 id="5-data-flow">5. Data flow</h2>
+<h3 id="51-happy-path">5.1 Happy path</h3>
+<pre><code>exe.upload_outputs()
+  → _validate_pending_asset_metadata (Bug C validator, unchanged)
+  → _validate_pending_asset_leases (NEW)
+    [batch query /entity/public:ERMrest_RID_Lease/RID=r1;RID=r2;...]
+    [all found → no error]
+  → staging: .../Table/&lt;col1&gt;/&lt;col2&gt;/&lt;RID&gt;/&lt;file&gt;
+  → GenericUploader.scanDirectory
+  → _initFileMetadata captures RID from regex match_groupdict
+  → [flag set + RID present → pass validation]
+  → hatrac upload (Step 6, unchanged)
+  → _createFileRecordWithRid
+    → GET /entity/{table}/RID={rid}
+    → [no existing row → _catalogRecordCreate with RID in payload]
+  → Catalog row has pre-leased RID ✓
+</code></pre>
+<h3 id="52-missing-lease-validator-failure">5.2 Missing-lease validator failure</h3>
+<pre><code>exe.upload_outputs()
+  → _validate_pending_asset_metadata — ok
+  → _validate_pending_asset_leases
+    [one or more RIDs not in ERMrest_RID_Lease]
+    → raise DerivaMLValidationError (aggregated)
+</code></pre>
+<p>No hatrac upload, no catalog mutation.</p>
+<h3 id="53-retry-after-partial-failure">5.3 Retry after partial failure</h3>
+<pre><code>[Attempt 1: hatrac upload succeeds, catalog insert interrupted]
+  → pending_rows.status = failed
+[User retries: exe.upload_outputs(retry_failed=True)]
+  → _validate_pending_asset_leases passes (lease still live)
+  → staging rebuilt with same RID
+  → GenericUploader.scanDirectory → _initFileMetadata ok
+  → _createFileRecordWithRid
+    → GET /entity/{table}/RID={rid}
+    → [row EXISTS from attempt 1 → return existing row, skip create]
+  → Upload reported successful; pending row marked uploaded
+</code></pre>
+<h3 id="54-flag-off-path-backward-compat">5.4 Flag-off path (backward compat)</h3>
+<pre><code>[Asset tables without use_pre_allocated_rid=true — any caller not opted in]
+  → Existing _getFileRecord flow runs (MD5+Filename lookup, server RID on create)
+  → No behavior change vs. pre-Bug-E.2
+</code></pre>
+<h3 id="55-interaction-with-bug-c">5.5 Interaction with Bug C</h3>
+<p>Orthogonal. Bug C's validator runs first, then Bug E.2's. Staging path has metadata-column segments (from Bug C) followed by RID segment (from Bug E.2). <code>NULL_SENTINEL</code> + <code>NullSentinelProcessor</code> continue to work unchanged.</p>
+<h2 id="6-error-handling-summary">6. Error handling summary</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Exception / behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-leased RID not in <code>ERMrest_RID_Lease</code> (stale SQLite)</td>
+<td><code>DerivaMLValidationError</code> (aggregated)</td>
+</tr>
+<tr>
+<td><code>use_pre_allocated_rid=true</code> but regex didn't capture RID</td>
+<td><code>DerivaUploadConfigurationError</code> (deriva-py, fast-fail in <code>_initFileMetadata</code>)</td>
+</tr>
+<tr>
+<td>Catalog row at pre-leased RID already exists (retry after partial success)</td>
+<td>Treated as idempotent success; existing row returned</td>
+</tr>
+<tr>
+<td>Catalog insert fails with RID-collision for some OTHER reason</td>
+<td>Row marked <code>failed</code> in SQLite; retry behavior same as today</td>
+</tr>
+<tr>
+<td>Hatrac upload fails</td>
+<td>Same as today — retry re-attempts the upload</td>
+</tr>
+<tr>
+<td>Flag not set on asset mapping</td>
+<td>Legacy MD5+Filename flow, no validator runs</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-testing-plan">7. Testing plan</h2>
+<h3 id="71-deriva-py-unit-tests-no-catalog">7.1 deriva-py unit tests (no catalog)</h3>
+<ol>
+<li><code>test_init_file_metadata_raises_when_flag_set_and_no_rid_captured</code></li>
+<li><code>test_init_file_metadata_passes_when_flag_set_and_rid_captured</code></li>
+<li><code>test_create_file_record_with_rid_happy_path</code> — no existing row → <code>_catalogRecordCreate</code> called with RID</li>
+<li><code>test_create_file_record_with_rid_idempotent_on_existing</code> — GET returns row → skip create</li>
+<li><code>test_flag_off_uses_existing_md5_filename_path</code></li>
+</ol>
+<h3 id="72-deriva-ml-unit-tests-no-catalog">7.2 deriva-ml unit tests (no catalog)</h3>
+<ol>
+<li><code>test_empty_entries_returns_none</code></li>
+<li><code>test_all_leases_valid_passes</code></li>
+<li><code>test_single_missing_lease_raises</code></li>
+<li><code>test_multiple_missing_leases_aggregated</code></li>
+<li><code>test_batched_queries_use_chunk_size</code></li>
+</ol>
+<h3 id="73-deriva-ml-upload-spec-tests-live-catalog">7.3 deriva-ml upload-spec tests (live catalog)</h3>
+<ol>
+<li><code>test_asset_table_upload_spec_has_use_pre_allocated_rid_flag</code></li>
+<li><code>test_asset_table_upload_spec_file_pattern_captures_rid</code></li>
+<li><code>test_asset_table_upload_spec_column_map_includes_rid</code></li>
+</ol>
+<h3 id="74-deriva-ml-integration-tests-deriva_host-gated">7.4 deriva-ml integration tests (DERIVA_HOST-gated)</h3>
+<ol>
+<li><code>test_upload_asset_uses_pre_leased_rid</code> — happy path end-to-end, assert catalog row's RID equals the pre-leased RID.</li>
+<li><code>test_upload_asset_raises_validation_when_lease_missing</code> — RID not in lease table → <code>DerivaMLValidationError</code>.</li>
+<li><code>test_upload_asset_retry_after_hatrac_success_is_idempotent</code> — partial failure + retry → same catalog row.</li>
+</ol>
+<h3 id="75-regression">7.5 Regression</h3>
+<ul>
+<li>Bug C tests pass unchanged.</li>
+<li>Plain-row drain path tests pass unchanged.</li>
+<li><code>Execution_Asset</code> (zero-metadata) smoke test passes — now exercises the new RID-segment path.</li>
+</ul>
+<h2 id="8-open-questions">8. Open questions</h2>
+<ul>
+<li><strong><code>asset_file_path</code> signature.</strong> The bag-export helper at <code>dataset/upload.py:657</code> currently takes <code>(prefix, exec_rid, file_name, asset_table, metadata)</code>. The new staging layout requires a RID segment. Callers split into two cases:</li>
+<li><strong>Upload-time</strong> (manifest-driven): caller has a pre-leased RID, passes it.</li>
+<li><strong>Bag-export-time</strong> (reading existing catalog rows): caller has the catalog's existing RID.
+  Both cases can supply a RID. The signature gains a new <code>rid: str</code> parameter. Any existing callers without a RID at hand need to be updated; grep confirms only <code>core/mixins/execution.py:229</code> uses this helper, and that call is for an <code>Execution_Metadata</code> row being re-uploaded with known RID.</li>
+<li><strong>Retry MD5 mismatch edge case.</strong> If a retry supplies a DIFFERENT file at the same pre-leased RID (e.g., the user re-staged), the idempotency pre-check returns the old row and skips insert. Not a ship blocker — pre-leased RIDs are tied to specific file identities in practice — but worth a follow-up hardening to compare MD5 and raise a clear error on mismatch.</li>
+</ul>
+<h2 id="9-rollout">9. Rollout</h2>
+<p><strong>Phase 1: deriva-py PR</strong> against <code>2.0-dev</code>. Minimal: flag + fast-fail + <code>_createFileRecordWithRid</code>. Unit tests. Review + merge.
+<strong>Phase 2: deriva-py prerelease</strong> tagged (e.g., <code>2.0.0.dev&lt;N&gt;</code>).
+<strong>Phase 3: deriva-ml PR</strong> against <code>main</code>. Pin bump + validator + spec changes + staging changes + tests + CHANGELOG. Review + merge.</p>
+<p>CHANGELOG entry under <code>## Unreleased — Bug E.2: asset uploads honor pre-leased RIDs</code> documenting:
+- The new deriva-py <code>use_pre_allocated_rid</code> flag.
+- deriva-ml's opt-in via <code>asset_table_upload_spec</code> (automatic — no caller changes needed).
+- The new lease validator and its failure mode.
+- That callers who already supplied correct metadata continue to succeed.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

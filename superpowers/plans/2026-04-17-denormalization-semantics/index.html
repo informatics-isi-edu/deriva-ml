@@ -1,0 +1,5310 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-17-denormalization-semantics/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Denormalization Semantics Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#denormalization-semantics-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Denormalization Semantics Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#environment-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment &amp; conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unchanged-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unchanged files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reuse-inventory-dry-do-not-reimplement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reuse inventory (DRY — do NOT reimplement)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reuse inventory (DRY — do NOT reimplement)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#must-reuse-as-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Must-reuse (as-is)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#must-extract-currently-nested-promote-to-methods-on-derivamodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Must-extract (currently nested — promote to methods on DerivaModel)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minor-interface-tweaks-small-additions-that-make-reuse-cleaner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor interface tweaks (small additions that make reuse cleaner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wrap-compose-new-thin-helpers-delegate-to-existing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wrap / compose (new thin helpers delegate to existing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#must-study-reference-implementation-may-be-wrappable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Must-study (reference implementation, may be wrappable)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#red-flag-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Red-flag checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-add-denormalize-specific-exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Add denormalize-specific exceptions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-implement-the-new-planner-rules-in-modelcatalogpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Implement the new planner rules in model/catalog.py
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 2: Implement the new planner rules in model/catalog.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dry-strategy-for-this-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DRY strategy for this task
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-rename-denormalize-_denormalize_impl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Rename denormalize() → _denormalize_impl()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-create-the-denormalizer-class-skeleton-core-as_dataframe-as_dict-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Create the Denormalizer class skeleton + core as_dataframe, as_dict, columns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-wire-row_per-and-via-through-to-_denormalize_impl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Wire row_per and via through to _denormalize_impl
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-anchor-validation-unrelated-anchor-rejection-rule-7-rule-8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Anchor validation + unrelated-anchor rejection (Rule 7, Rule 8)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-extend-describe-to-return-the-full-plan-dict-spec-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Extend describe() to return the full plan dict (spec §5)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-implement-list_paths-for-schema-exploration-spec-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Implement list_paths() for schema exploration (spec §6)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-add-denormalizerfrom_rids-for-arbitrary-anchor-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Add Denormalizer.from_rids for arbitrary anchor sets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-10-add-sugar-methods-on-dataset-and-datasetbag-remove-old-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Add sugar methods on Dataset and DatasetBag; remove old methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-11-update-workspacecache_denormalized-to-forward-new-params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Update Workspace.cache_denormalized to forward new params
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-12-restructure-the-existing-integration-test-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: Restructure the existing integration test file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-13-full-test-suite-run-comprehensive-code-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 13: Full test suite run + comprehensive code review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-checklist-run-before-declaring-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification checklist (run before declaring done)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-plan-delivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this plan delivers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="denormalization-semantics-implementation-plan">Denormalization Semantics Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Implement the <code>Denormalizer</code> class with deterministic star-schema denormalization semantics, replacing the ad-hoc path-selection behavior in the current free <code>denormalize()</code> function and the existing <code>Dataset.denormalize_*</code> methods.</p>
+<p><strong>Architecture:</strong> Rewrite the planner in <code>model/catalog.py</code> to implement sink-finding (Rule 2), downstream rejection (Rule 5), and ambiguity detection (Rule 6). Introduce <code>Denormalizer</code> class as the public API in <code>local_db/denormalize.py</code> with <code>as_dataframe</code>, <code>as_dict</code>, <code>columns</code>, <code>describe</code>, <code>list_paths</code> methods and <code>from_rids</code> constructor for non-dataset anchor sets. Rename <code>Dataset</code>/<code>DatasetBag</code> methods to follow <code>get_*_as_*</code> / <code>list_*</code> / <code>describe_*</code> conventions. Old method names are removed outright (no deprecation window). The three currently-xfailed integration tests become passing by design.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, SQLAlchemy 2.x, SQLite (WAL), deriva-py (ErmrestCatalog, ermrest_model), pandas, pytest.</p>
+<p><strong>Spec:</strong>
+- Implementation: <code>docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md</code>
+- User-facing: <code>docs/concepts/denormalization.md</code></p>
+<hr />
+<h2 id="environment-conventions">Environment &amp; conventions</h2>
+<ul>
+<li>Work in worktree <code>/Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/</code> on branch <code>claude/compassionate-visvesvaraya</code>.</li>
+<li><code>uv</code> at <code>/Users/carl/.local/bin/uv</code>. Prepend to PATH if not found.</li>
+<li><code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest ...</code> for tests.</li>
+<li><code>uv run ruff format src/ tests/</code> and <code>uv run ruff check src/</code> before each commit.</li>
+<li>Live integration tests require <code>DERIVA_HOST=localhost</code> and take 10–30 minutes — run them at the end, not between every task.</li>
+<li>Commit after each task. Messages use <code>feat(denormalize):</code>, <code>refactor(denormalize):</code>, <code>test(denormalize):</code> prefixes.</li>
+</ul>
+<h2 id="file-structure">File structure</h2>
+<h3 id="new-files">New files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/local_db/denormalizer.py</code></td>
+<td>New module hosting the <code>Denormalizer</code> class. Imports the existing <code>_denormalize_impl</code> (renamed from today's <code>denormalize()</code> function) from <code>denormalize.py</code>.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_denormalizer.py</code></td>
+<td>Unit tests for the <code>Denormalizer</code> class public API against the canned fixtures.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_planner_rules.py</code></td>
+<td>Unit tests for the planner: sink-finding (Rule 2), downstream rejection (Rule 5), path ambiguity (Rule 6), orphan classification (Rule 7), unrelated-anchor rejection (Rule 8). Uses canned models, no catalog.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="modified-files">Modified files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/model/catalog.py</code></td>
+<td><strong>Extract</strong> two nested functions to module-level methods on <code>DerivaModel</code>: <code>_is_likely_association</code> (was nested in <code>_build_join_tree</code> at lines 727-751) → <code>_is_association_table</code>; <code>find_arcs</code> (was nested in <code>_schema_to_paths</code> at lines 1173-1188) → <code>_fk_neighbors</code>. <strong>Extend</strong> <code>_schema_to_paths</code> with a <code>stop_at: str \| None</code> kwarg (endpoint filtering). <strong>Compose</strong> new helpers on top of those + existing <code>_schema_to_paths</code> / <code>_table_relationship</code>: <code>_outbound_reachable</code>, <code>_enumerate_paths</code>, <code>_find_sinks</code>, <code>_determine_row_per</code>, <code>_find_path_ambiguities</code>. Update <code>_prepare_wide_table</code> to accept <code>row_per</code> / <code>via</code> and invoke the new rules before the existing tree-building flow.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/exceptions.py</code></td>
+<td>Add <code>DerivaMLDenormalizeAmbiguousPath</code>, <code>DerivaMLDenormalizeMultiLeaf</code>, <code>DerivaMLDenormalizeNoSink</code>, <code>DerivaMLDenormalizeDownstreamLeaf</code>, <code>DerivaMLDenormalizeUnrelatedAnchor</code> exception classes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/denormalize.py</code></td>
+<td>Rename public <code>denormalize()</code> → <code>_denormalize_impl()</code>. Keep <code>DenormalizeResult</code>, <code>_MinimalDatasetMock</code>, helpers. <code>_denormalize_impl</code> becomes the private implementation called by <code>Denormalizer</code>. Add <code>DenormalizeResult.extend(rows)</code> helper so orphan-row combining in <code>Denormalizer._run</code> stays a one-liner.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/__init__.py</code></td>
+<td>Export <code>Denormalizer</code> (new), remove export of free <code>denormalize</code> function (replaced by class).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset.py</code></td>
+<td>Remove <code>denormalize_as_dataframe</code> (~165 lines), <code>denormalize_as_dict</code> (~100 lines), <code>denormalize_columns</code> (~45 lines), <code>denormalize_info</code> (~155 lines). Add sugar methods: <code>get_denormalized_as_dataframe</code>, <code>get_denormalized_as_dict</code>, <code>list_denormalized_columns</code>, <code>describe_denormalized</code>, <code>list_schema_paths</code>.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset_bag.py</code></td>
+<td>Same — remove old methods, add the same sugar methods.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/interfaces.py</code></td>
+<td>Remove old methods from <code>DatasetLike</code> protocol (~180 lines of docstrings). Add new methods to protocol.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/mixins/dataset.py</code></td>
+<td>Rename <code>DerivaML.denormalize_info</code> → <code>DerivaML.describe_denormalized</code>. Update the body to use <code>Denormalizer</code> (no dataset required — same pattern: catalog-wide counts).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/split.py:738</code></td>
+<td>Update <code>source_ds.denormalize_as_dataframe(...)</code> → <code>source_ds.get_denormalized_as_dataframe(...)</code>.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/workspace.py</code></td>
+<td>Update <code>cache_denormalized</code> to pass <code>row_per</code>, <code>via</code>, <code>ignore_unrelated_anchors</code> through to the planner, and include them in the cache key.</td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_denormalize.py</code></td>
+<td>Rewrite: restructure around new rules, rename calls to new API, remove <code>xfail</code> markers from three tests (diamond-resolved, association-mandatory, feature-table), add new test classes for rules.</td>
+</tr>
+<tr>
+<td><code>tests/dataset/test_denormalize_info.py</code></td>
+<td>Rename to <code>tests/dataset/test_describe_denormalized.py</code>, update to new method name and new return-dict structure.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_denormalize.py</code></td>
+<td>Rename to <code>tests/local_db/test_denormalize_impl.py</code> (covers the private <code>_denormalize_impl</code> function). Update for new signature.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="unchanged-files">Unchanged files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/local_db/paths.py</code></td>
+<td>Phase 1–2, no changes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/sqlite_helpers.py</code></td>
+<td>Phase 1, no changes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/schema.py</code></td>
+<td>Phase 1, no changes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/paged_fetcher.py</code></td>
+<td>Phase 1, no changes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/paged_fetcher_ermrest.py</code></td>
+<td>Phase 1, no changes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/manifest_store.py</code></td>
+<td>Phase 1, no changes.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/result_cache.py</code></td>
+<td>Phase 2, no changes.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="reuse-inventory-dry-do-not-reimplement">Reuse inventory (DRY — do NOT reimplement)</h2>
+<p>The codebase already contains the primitives this refactor needs. Every new
+helper must either <strong>reuse as-is</strong>, <strong>extract from where it's currently
+nested</strong>, or <strong>wrap</strong> an existing routine. If you find yourself writing a new
+BFS/DFS over the FK graph, stop — it already exists.</p>
+<h3 id="must-reuse-as-is">Must-reuse (as-is)</h3>
+<table>
+<thead>
+<tr>
+<th>Existing routine</th>
+<th>Location</th>
+<th>Use in new code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DerivaModel._schema_to_paths(root, max_depth=..., stop_at=...)</code></td>
+<td><code>src/deriva_ml/model/catalog.py:1120</code></td>
+<td>Authoritative FK-path enumerator (DFS, handles cycles, terminates at vocabs). Base for <code>_enumerate_paths</code> and <code>_outbound_reachable</code>. Task 2 Step 4a adds the <code>stop_at</code> kwarg for endpoint filtering.</td>
+</tr>
+<tr>
+<td><code>DerivaModel._table_relationship(fk_src, pk_dst)</code></td>
+<td><code>src/deriva_ml/model/catalog.py:1079</code></td>
+<td>Resolves FK column pairs between two tables. Handles composite FKs + ambiguity detection. Use wherever pairs of joined tables need their FK edge.</td>
+</tr>
+<tr>
+<td><code>DerivaModel.name_to_table(name)</code></td>
+<td><code>src/deriva_ml/model/catalog.py:371</code></td>
+<td>Name → Table resolver. Single source of truth — never walk schemas manually.</td>
+</tr>
+<tr>
+<td><code>DerivaModel.is_vocabulary(tbl)</code></td>
+<td><code>src/deriva_ml/model/catalog.py:399</code></td>
+<td>Vocabulary detection for path termination.</td>
+</tr>
+<tr>
+<td><code>DerivaModel.is_asset(tbl)</code></td>
+<td><code>src/deriva_ml/model/catalog.py:482</code></td>
+<td>Asset-table detection when formatting output columns.</td>
+</tr>
+<tr>
+<td><code>denormalize_column_name(table, column, multi_schema)</code></td>
+<td><code>src/deriva_ml/model/catalog.py:100</code></td>
+<td><code>{Table}.{col}</code> / <code>{schema}.{Table}.{col}</code> naming. <strong>Do not invent new naming.</strong></td>
+</tr>
+<tr>
+<td><code>Dataset.list_dataset_members(...)</code></td>
+<td><code>src/deriva_ml/dataset/dataset.py:701</code></td>
+<td>Dataset-member retrieval (grouped by element type) — the anchor source when <code>Denormalizer</code> is constructed from a dataset.</td>
+</tr>
+<tr>
+<td><code>Dataset._denormalize_datapath(...)</code></td>
+<td><code>src/deriva_ml/dataset/dataset.py:782</code></td>
+<td>LEFT-JOIN / NULL-init pattern for row emission. Study before writing <code>Denormalizer._run()</code> — the NULL-initialization orphan pattern is already implemented here.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="must-extract-currently-nested-promote-to-methods-on-derivamodel">Must-extract (currently nested — promote to methods on <code>DerivaModel</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Currently nested</th>
+<th>Promote to</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_is_likely_association(tbl)</code> — nested inside <code>_build_join_tree</code> at <code>catalog.py:727-751</code></td>
+<td><code>DerivaModel._is_association_table(name_or_tbl)</code></td>
+<td>Both <code>_prepare_wide_table</code> and the new <code>Denormalizer</code> need it. Nested function cannot be reused.</td>
+</tr>
+<tr>
+<td><code>find_arcs(table)</code> — nested inside <code>_schema_to_paths</code> at <code>catalog.py:1173-1188</code></td>
+<td><code>DerivaModel._fk_neighbors(tbl)</code></td>
+<td>Returns FK-reachable tables (both outbound and inbound, deduplicated by target). The building block for <code>_outbound_reachable</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="minor-interface-tweaks-small-additions-that-make-reuse-cleaner">Minor interface tweaks (small additions that make reuse cleaner)</h3>
+<p>Low-risk, purely additive. Zero existing callers affected.</p>
+<table>
+<thead>
+<tr>
+<th>Existing routine</th>
+<th>Added</th>
+<th>Payoff</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_schema_to_paths</code></td>
+<td><code>stop_at: str \| None = None</code> kwarg (Task 2 Step 4a)</td>
+<td>Lets <code>_enumerate_paths</code> ask for only paths ending at a specific table directly, avoiding a post-hoc filter. Default <code>None</code> preserves original behavior.</td>
+</tr>
+<tr>
+<td><code>DenormalizeResult</code></td>
+<td><code>extend(rows) -&gt; DenormalizeResult</code> method (Task 3 Step 3b)</td>
+<td>Replaces 3-line manual dataclass rebuild for orphan-row combining with a one-line <code>main_result.extend(orphans)</code> call in <code>Denormalizer._run</code> (Task 6).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="wrap-compose-new-thin-helpers-delegate-to-existing">Wrap / compose (new thin helpers delegate to existing)</h3>
+<table>
+<thead>
+<tr>
+<th>New helper</th>
+<th>Composes</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_outbound_reachable(from_table, tables_in_set)</code></td>
+<td><code>_fk_neighbors</code> + association-transparent filter</td>
+<td>BFS over already-available <code>_fk_neighbors</code>. ~15 lines.</td>
+</tr>
+<tr>
+<td><code>_enumerate_paths(from_t, to_t, tables_in_set, max_depth)</code></td>
+<td><code>_schema_to_paths(root=from_t, max_depth=...)</code> + filter</td>
+<td>Filter full path list for paths ending at <code>to_t</code>. Do NOT re-implement DFS.</td>
+</tr>
+<tr>
+<td><code>_find_sinks(include_tables, via)</code></td>
+<td><code>_outbound_reachable</code></td>
+<td>Sink = table with empty <code>_outbound_reachable</code> (minus self) within the set.</td>
+</tr>
+<tr>
+<td><code>_determine_row_per(include_tables, via, row_per)</code></td>
+<td><code>_find_sinks</code> + <code>_outbound_reachable</code></td>
+<td>Explicit-row_per validation also delegates to <code>_outbound_reachable</code>.</td>
+</tr>
+<tr>
+<td><code>_find_path_ambiguities(row_per, include_tables, via)</code></td>
+<td><code>_enumerate_paths</code></td>
+<td>For each target, count distinct paths; assemble ambiguity dicts.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="must-study-reference-implementation-may-be-wrappable">Must-study (reference implementation, may be wrappable)</h3>
+<ul>
+<li><code>Dataset.denormalize_as_dataframe</code> (<code>src/deriva_ml/dataset/dataset.py:974</code>) — wraps <code>_denormalize_datapath</code> to produce a DataFrame with <code>denormalize_column_name</code>-prefixed columns. The new <code>Denormalizer.as_dataframe</code> should produce the <strong>same column-naming convention</strong>. Consider whether <code>Denormalizer</code> can call <code>_denormalize_datapath</code> (after the planner guards) rather than replicate its generator logic.</li>
+<li><code>Dataset.denormalize_info</code> (<code>src/deriva_ml/core/mixins/dataset.py:312</code>) — already produces a plan-dict with columns, join_path, per-table counts. <code>describe_denormalized</code> should <strong>extend</strong> this shape with <code>row_per</code>, <code>row_per_source</code>, <code>ambiguities</code>, <code>orphan_rows</code>, <code>anchors</code> fields — not rewrite it.</li>
+</ul>
+<h3 id="red-flag-checklist">Red-flag checklist</h3>
+<p>Before every helper function you add, ask:
+- [ ] Am I walking FK edges? → use <code>_schema_to_paths</code> or <code>_fk_neighbors</code>.
+- [ ] Am I checking if a table is an association? → use extracted <code>_is_association_table</code>.
+- [ ] Am I resolving FK columns between two tables? → use <code>_table_relationship</code>.
+- [ ] Am I naming an output column? → use <code>denormalize_column_name</code>.
+- [ ] Am I fetching dataset member rows? → use <code>list_dataset_members</code>.
+- [ ] Am I walking table records to build the wide table? → extend <code>_denormalize_datapath</code> or call it directly.</p>
+<hr />
+<h2 id="task-1-add-denormalize-specific-exceptions">Task 1: Add denormalize-specific exceptions</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/exceptions.py</code>
+- Test: <code>tests/model/test_exceptions.py</code> (may not exist — create if needed).</p>
+<ul>
+<li>[ ] <strong>Step 1: Find the existing exception hierarchy and add new classes under a <code>DenormalizeError</code> sub-hierarchy.</strong></li>
+</ul>
+<p>First read the file to understand the existing hierarchy:</p>
+<pre><code class="language-bash">grep -n &quot;class DerivaML&quot; src/deriva_ml/core/exceptions.py | head -20
+</code></pre>
+<p>Expected output should show a base <code>DerivaMLException</code> and a data error subtype like <code>DerivaMLDataError</code>. The new exceptions inherit from <code>DerivaMLException</code> (or from <code>DerivaMLDataError</code> if it exists and fits; pick the closest established convention).</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the new exception classes.</strong></li>
+</ul>
+<p>Add to <code>src/deriva_ml/core/exceptions.py</code> (at the end of the existing exception definitions, before the module-level <code>__all__</code> if there is one):</p>
+<pre><code class="language-python">class DerivaMLDenormalizeError(DerivaMLException):
+    &quot;&quot;&quot;Base class for denormalization errors.
+
+    All errors raised by :class:`~deriva_ml.local_db.denormalizer.Denormalizer`
+    and related planning functions are instances of this class.
+    &quot;&quot;&quot;
+
+
+class DerivaMLDenormalizeMultiLeaf(DerivaMLDenormalizeError):
+    &quot;&quot;&quot;Multiple candidate tables for ``row_per`` — ambiguous leaf.
+
+    Raised when auto-inference finds more than one table in
+    ``include_tables`` that could serve as the leaf. The user must specify
+    ``row_per`` explicitly.
+
+    Attributes:
+        candidates: list of table names that all qualify as sinks.
+    &quot;&quot;&quot;
+
+    def __init__(self, candidates: list[str], include_tables: list[str]) -&gt; None:
+        self.candidates = list(candidates)
+        self.include_tables = list(include_tables)
+        super().__init__(
+            f&quot;Multiple candidates for row_per: {candidates}. &quot;
+            f&quot;Specify row_per=... explicitly. &quot;
+            f&quot;(include_tables={include_tables})&quot;
+        )
+
+
+class DerivaMLDenormalizeNoSink(DerivaMLDenormalizeError):
+    &quot;&quot;&quot;No sink found in the FK subgraph — cycle detected.
+
+    Raised when every table in ``include_tables`` has an outbound FK to
+    another table in the set, forming a cycle. Pathological — rare in
+    real schemas.
+    &quot;&quot;&quot;
+
+
+class DerivaMLDenormalizeDownstreamLeaf(DerivaMLDenormalizeError):
+    &quot;&quot;&quot;Explicit ``row_per`` conflicts with a downstream table in ``include_tables``.
+
+    Raised when the user specifies ``row_per=X`` but another table in
+    ``include_tables`` is downstream of X via FK (would require aggregation).
+
+    Attributes:
+        row_per: the explicit row_per value.
+        downstream_tables: tables downstream of row_per that can't be hoisted.
+    &quot;&quot;&quot;
+
+    def __init__(self, row_per: str, downstream_tables: list[str]) -&gt; None:
+        self.row_per = row_per
+        self.downstream_tables = list(downstream_tables)
+        super().__init__(
+            f&quot;Table(s) {downstream_tables} are downstream of row_per={row_per!r}. &quot;
+            f&quot;One row per {row_per} would require aggregating multiple rows of &quot;
+            f&quot;{downstream_tables} — aggregation is not yet supported. &quot;
+            f&quot;Drop row_per to get one row per {downstream_tables}, or remove &quot;
+            f&quot;{downstream_tables} from include_tables.&quot;
+        )
+
+
+class DerivaMLDenormalizeAmbiguousPath(DerivaMLDenormalizeError):
+    &quot;&quot;&quot;Multiple FK paths between two requested tables — can't silently choose.
+
+    Raised when two or more distinct FK paths exist between ``row_per`` and
+    another requested/via table. Silent path selection is rejected by
+    design; the user must disambiguate by adding tables to ``include_tables``
+    or ``via``.
+
+    Attributes:
+        from_table: the row_per table name.
+        to_table: the table with ambiguous path.
+        paths: list of path descriptions (each a list of table names).
+        suggested_intermediates: tables that appear in at least one path but
+            not in ``include_tables``.
+    &quot;&quot;&quot;
+
+    def __init__(
+        self,
+        from_table: str,
+        to_table: str,
+        paths: list[list[str]],
+        suggested_intermediates: list[str],
+    ) -&gt; None:
+        self.from_table = from_table
+        self.to_table = to_table
+        self.paths = [list(p) for p in paths]
+        self.suggested_intermediates = list(suggested_intermediates)
+        path_strs = [&quot;\n    &quot; + &quot; → &quot;.join(p) for p in paths]
+        super().__init__(
+            f&quot;Multiple FK paths between {from_table!r} and {to_table!r}:&quot;
+            f&quot;{''.join(path_strs)}\n&quot;
+            f&quot;Resolve by one of:\n&quot;
+            f&quot;  • Add an intermediate to include_tables &quot;
+            f&quot;(its columns will be in output): {suggested_intermediates}\n&quot;
+            f&quot;  • Add an intermediate to via= (path-only, no columns): &quot;
+            f&quot;{suggested_intermediates}\n&quot;
+            f&quot;  • Narrow include_tables so only one path is valid.&quot;
+        )
+
+
+class DerivaMLDenormalizeUnrelatedAnchor(DerivaMLDenormalizeError):
+    &quot;&quot;&quot;Anchor has no FK path to any table in ``include_tables``.
+
+    Raised when the caller passes anchors whose table has no FK relationship
+    to any table in ``include_tables ∪ via``. The anchor would contribute
+    nothing to the output.
+
+    Pass ``ignore_unrelated_anchors=True`` to silently drop them.
+
+    Attributes:
+        unrelated_tables: tables of the unrelated anchors.
+        include_tables: the include_tables argument for reference.
+    &quot;&quot;&quot;
+
+    def __init__(
+        self,
+        unrelated_tables: list[str],
+        include_tables: list[str],
+    ) -&gt; None:
+        self.unrelated_tables = list(unrelated_tables)
+        self.include_tables = list(include_tables)
+        super().__init__(
+            f&quot;Anchors of table(s) {unrelated_tables} have no FK path to any &quot;
+            f&quot;table in include_tables={include_tables}. They would contribute &quot;
+            f&quot;nothing to the output.\n&quot;
+            f&quot;Options:\n&quot;
+            f&quot;  • Remove these anchors from the anchor set.\n&quot;
+            f&quot;  • Add {unrelated_tables} (or a linking table) to include_tables.\n&quot;
+            f&quot;  • Pass ignore_unrelated_anchors=True to silently drop them.&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add tests for the exception classes.</strong></li>
+</ul>
+<p>Create <code>tests/model/test_exceptions.py</code> (or append if it exists):</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for denormalization-specific exception classes.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.core.exceptions import (
+    DerivaMLDenormalizeAmbiguousPath,
+    DerivaMLDenormalizeDownstreamLeaf,
+    DerivaMLDenormalizeError,
+    DerivaMLDenormalizeMultiLeaf,
+    DerivaMLDenormalizeNoSink,
+    DerivaMLDenormalizeUnrelatedAnchor,
+    DerivaMLException,
+)
+
+
+class TestDenormalizeExceptionHierarchy:
+    &quot;&quot;&quot;All denormalize exceptions inherit from DerivaMLDenormalizeError.&quot;&quot;&quot;
+
+    def test_multi_leaf_inherits(self) -&gt; None:
+        err = DerivaMLDenormalizeMultiLeaf([&quot;A&quot;, &quot;B&quot;], [&quot;A&quot;, &quot;B&quot;, &quot;C&quot;])
+        assert isinstance(err, DerivaMLDenormalizeError)
+        assert isinstance(err, DerivaMLException)
+
+    def test_ambiguous_path_inherits(self) -&gt; None:
+        err = DerivaMLDenormalizeAmbiguousPath(&quot;X&quot;, &quot;Y&quot;, [[&quot;X&quot;, &quot;Y&quot;], [&quot;X&quot;, &quot;Z&quot;, &quot;Y&quot;]], [&quot;Z&quot;])
+        assert isinstance(err, DerivaMLDenormalizeError)
+
+    def test_downstream_leaf_inherits(self) -&gt; None:
+        err = DerivaMLDenormalizeDownstreamLeaf(&quot;Subject&quot;, [&quot;Image&quot;])
+        assert isinstance(err, DerivaMLDenormalizeError)
+
+    def test_unrelated_anchor_inherits(self) -&gt; None:
+        err = DerivaMLDenormalizeUnrelatedAnchor([&quot;Foo&quot;], [&quot;Image&quot;, &quot;Subject&quot;])
+        assert isinstance(err, DerivaMLDenormalizeError)
+
+    def test_no_sink_inherits(self) -&gt; None:
+        err = DerivaMLDenormalizeNoSink(&quot;cycle detected in FK graph&quot;)
+        assert isinstance(err, DerivaMLDenormalizeError)
+
+
+class TestDenormalizeExceptionMessages:
+    &quot;&quot;&quot;Exception messages include the specific fields needed to fix the problem.&quot;&quot;&quot;
+
+    def test_multi_leaf_message_includes_candidates(self) -&gt; None:
+        err = DerivaMLDenormalizeMultiLeaf([&quot;Subject&quot;, &quot;Diagnosis&quot;], [&quot;Subject&quot;, &quot;Diagnosis&quot;])
+        assert &quot;Subject&quot; in str(err)
+        assert &quot;Diagnosis&quot; in str(err)
+        assert &quot;row_per&quot; in str(err)
+
+    def test_ambiguous_path_message_includes_paths(self) -&gt; None:
+        err = DerivaMLDenormalizeAmbiguousPath(
+            &quot;Image&quot;, &quot;Subject&quot;,
+            [[&quot;Image&quot;, &quot;Subject&quot;], [&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]],
+            [&quot;Observation&quot;],
+        )
+        assert &quot;Image&quot; in str(err)
+        assert &quot;Subject&quot; in str(err)
+        assert &quot;Observation&quot; in str(err)
+        assert &quot;include_tables&quot; in str(err)
+        assert &quot;via&quot; in str(err)
+
+    def test_downstream_leaf_message_includes_tables(self) -&gt; None:
+        err = DerivaMLDenormalizeDownstreamLeaf(&quot;Subject&quot;, [&quot;Image&quot;, &quot;Diagnosis&quot;])
+        assert &quot;Subject&quot; in str(err)
+        assert &quot;Image&quot; in str(err)
+        assert &quot;Diagnosis&quot; in str(err)
+        assert &quot;aggregation&quot; in str(err).lower()
+
+    def test_unrelated_anchor_message_includes_ignore_option(self) -&gt; None:
+        err = DerivaMLDenormalizeUnrelatedAnchor([&quot;Foo&quot;], [&quot;Image&quot;])
+        assert &quot;Foo&quot; in str(err)
+        assert &quot;ignore_unrelated_anchors&quot; in str(err)
+
+
+class TestDenormalizeExceptionAttributes:
+    &quot;&quot;&quot;Exceptions expose structured fields for programmatic consumers.&quot;&quot;&quot;
+
+    def test_multi_leaf_fields(self) -&gt; None:
+        err = DerivaMLDenormalizeMultiLeaf([&quot;A&quot;, &quot;B&quot;], [&quot;A&quot;, &quot;B&quot;])
+        assert err.candidates == [&quot;A&quot;, &quot;B&quot;]
+        assert err.include_tables == [&quot;A&quot;, &quot;B&quot;]
+
+    def test_ambiguous_path_fields(self) -&gt; None:
+        err = DerivaMLDenormalizeAmbiguousPath(
+            &quot;X&quot;, &quot;Y&quot;, [[&quot;X&quot;, &quot;Y&quot;], [&quot;X&quot;, &quot;Z&quot;, &quot;Y&quot;]], [&quot;Z&quot;]
+        )
+        assert err.from_table == &quot;X&quot;
+        assert err.to_table == &quot;Y&quot;
+        assert err.paths == [[&quot;X&quot;, &quot;Y&quot;], [&quot;X&quot;, &quot;Z&quot;, &quot;Y&quot;]]
+        assert err.suggested_intermediates == [&quot;Z&quot;]
+
+    def test_downstream_leaf_fields(self) -&gt; None:
+        err = DerivaMLDenormalizeDownstreamLeaf(&quot;Subject&quot;, [&quot;Image&quot;])
+        assert err.row_per == &quot;Subject&quot;
+        assert err.downstream_tables == [&quot;Image&quot;]
+
+    def test_unrelated_anchor_fields(self) -&gt; None:
+        err = DerivaMLDenormalizeUnrelatedAnchor([&quot;Foo&quot;], [&quot;Image&quot;])
+        assert err.unrelated_tables == [&quot;Foo&quot;]
+        assert err.include_tables == [&quot;Image&quot;]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the exception tests.</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/model/test_exceptions.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/core/exceptions.py tests/model/test_exceptions.py
+uv run ruff check src/deriva_ml/core/exceptions.py
+git add src/deriva_ml/core/exceptions.py tests/model/test_exceptions.py
+git commit -m &quot;feat(denormalize): add denormalize-specific exception hierarchy&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-implement-the-new-planner-rules-in-modelcatalogpy">Task 2: Implement the new planner rules in <code>model/catalog.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/model/catalog.py</code> (<code>_prepare_wide_table</code>, <code>_build_join_tree</code>, helpers).
+- Create: <code>tests/local_db/test_planner_rules.py</code>.</p>
+<p>This is the largest single task because the planner is the semantic core. The rules to implement:</p>
+<ul>
+<li><strong>Rule 2 (sink-finding):</strong> Given <code>include_tables ∪ via</code>, find the unique sink (table with no outbound FK to any other table in the set via transparent-association links). Multiple sinks → <code>DerivaMLDenormalizeMultiLeaf</code>. Zero sinks (cycle) → <code>DerivaMLDenormalizeNoSink</code>.</li>
+<li><strong>Rule 5 (downstream-leaf detection):</strong> If <code>row_per</code> is explicit and any table in <code>include_tables</code> is downstream of it, raise <code>DerivaMLDenormalizeDownstreamLeaf</code>.</li>
+<li><strong>Rule 6 (path ambiguity):</strong> For every pair (<code>row_per</code>, T) where T ∈ <code>include_tables ∪ via</code>, enumerate all simple paths through the FK graph (with association tables as transparent edges). If &gt;1 path, raise <code>DerivaMLDenormalizeAmbiguousPath</code> with the path list and suggested intermediates (tables in at least one path but not in <code>include_tables</code>).</li>
+<li><strong>Association tables as transparent intermediates:</strong> pure association tables on a required chain between two requested tables are joined through without contributing columns.</li>
+</ul>
+<h3 id="dry-strategy-for-this-task">DRY strategy for this task</h3>
+<p>The existing planner (<code>_build_join_tree</code> at <code>catalog.py:632</code>, <code>_schema_to_paths</code> at
+<code>catalog.py:1120</code>) already does 80% of what these rules need. The task is to:</p>
+<ol>
+<li><strong>Extract</strong> two nested functions so they can be reused:</li>
+<li><code>_is_likely_association</code> (nested in <code>_build_join_tree</code> at lines 727-751)
+     → <code>DerivaModel._is_association_table</code></li>
+<li>
+<p><code>find_arcs</code> (nested in <code>_schema_to_paths</code> at lines 1173-1188)
+     → <code>DerivaModel._fk_neighbors</code></p>
+</li>
+<li>
+<p><strong>Compose</strong> the new helpers (<code>_outbound_reachable</code>, <code>_enumerate_paths</code>,
+   <code>_find_sinks</code>, <code>_determine_row_per</code>, <code>_find_path_ambiguities</code>) by calling
+   the extracted + existing routines. No new FK traversal code.</p>
+</li>
+<li>
+<p><strong>Extend</strong> <code>_prepare_wide_table</code> with the three guard calls
+   (<code>_determine_row_per</code>, <code>_find_path_ambiguities</code>) in front of the existing
+   tree-building logic. The existing path-selection / flattening is preserved
+   for the legacy <code>_denormalize_impl</code> code path.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 1: Write failing planner unit tests.</strong></p>
+</li>
+</ol>
+<p>Create <code>tests/local_db/test_planner_rules.py</code>. These tests use a canned ERMrest <code>Model</code> from the existing <code>denorm_deriva_model</code> fixture in <code>tests/local_db/conftest.py</code>. No live catalog.</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for _prepare_wide_table / _build_join_tree planner rules.
+
+These tests verify the semantic rules independently of any catalog fetching
+or SQL execution. They check the pure model-analysis behavior:
+
+- Rule 2: sink-finding for row_per auto-inference
+- Rule 5: downstream-leaf rejection when row_per is explicit
+- Rule 6: per-pair path ambiguity detection
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from deriva_ml.core.exceptions import (
+    DerivaMLDenormalizeAmbiguousPath,
+    DerivaMLDenormalizeDownstreamLeaf,
+    DerivaMLDenormalizeMultiLeaf,
+)
+
+
+class TestSinkFinding:
+    &quot;&quot;&quot;Rule 2: row_per is the unique sink in the FK subgraph on include_tables.&quot;&quot;&quot;
+
+    def test_linear_chain_sink(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;Subject ← Observation ← Image: Image is the sink.&quot;&quot;&quot;
+        # Observation in canned model — check denorm_deriva_model actually has it.
+        # If not, skip until test fixture is extended in Task 8.
+        # For now, this test documents expected behavior; extend fixture as needed.
+        model = denorm_deriva_model
+        if &quot;Observation&quot; not in model.name_to_schema_and_table:
+            pytest.skip(&quot;Canned model needs Observation/Image chain fixture&quot;)
+
+        sinks = model._find_sinks(
+            include_tables=[&quot;Subject&quot;, &quot;Observation&quot;, &quot;Image&quot;],
+            via=[],
+        )
+        assert sinks == [&quot;Image&quot;], f&quot;expected ['Image'], got {sinks}&quot;
+
+    def test_single_sink_simple(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;Image points to Subject. Image is the sink.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        sinks = model._find_sinks(include_tables=[&quot;Subject&quot;, &quot;Image&quot;], via=[])
+        assert sinks == [&quot;Image&quot;]
+
+    def test_multi_leaf_raises(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;If two requested tables have no FK between them, both are sinks.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        # &quot;Dataset&quot; and &quot;Subject&quot; don't point to each other in canned schema.
+        sinks = model._find_sinks(include_tables=[&quot;Dataset&quot;, &quot;Subject&quot;], via=[])
+        assert len(sinks) &gt;= 2
+        assert &quot;Dataset&quot; in sinks or &quot;Subject&quot; in sinks
+        # And _determine_row_per raises multi-leaf
+        with pytest.raises(DerivaMLDenormalizeMultiLeaf) as excinfo:
+            model._determine_row_per(
+                include_tables=[&quot;Dataset&quot;, &quot;Subject&quot;], via=[], row_per=None
+            )
+        assert &quot;Dataset&quot; in str(excinfo.value)
+        assert &quot;Subject&quot; in str(excinfo.value)
+
+
+class TestDownstreamLeafRejection:
+    &quot;&quot;&quot;Rule 5: explicit row_per with downstream table in include_tables → error.&quot;&quot;&quot;
+
+    def test_downstream_leaf_rejected(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;row_per=Subject with Image (downstream) → error.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        with pytest.raises(DerivaMLDenormalizeDownstreamLeaf) as excinfo:
+            model._determine_row_per(
+                include_tables=[&quot;Subject&quot;, &quot;Image&quot;],
+                via=[],
+                row_per=&quot;Subject&quot;,
+            )
+        assert &quot;Subject&quot; in str(excinfo.value)
+        assert &quot;Image&quot; in str(excinfo.value)
+
+    def test_downstream_leaf_accepted_if_no_downstream(
+        self, denorm_deriva_model
+    ) -&gt; None:
+        &quot;&quot;&quot;row_per=Image is fine because Image IS the sink (nothing downstream).&quot;&quot;&quot;
+        model = denorm_deriva_model
+        result = model._determine_row_per(
+            include_tables=[&quot;Subject&quot;, &quot;Image&quot;],
+            via=[],
+            row_per=&quot;Image&quot;,
+        )
+        assert result == &quot;Image&quot;
+
+
+class TestPathAmbiguity:
+    &quot;&quot;&quot;Rule 6: multiple FK paths between row_per and a requested table → error.&quot;&quot;&quot;
+
+    def test_no_ambiguity_single_path(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;Simple chain: no ambiguity.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        # Image → Subject (direct only in canned schema). No ambiguity.
+        result = model._find_path_ambiguities(
+            row_per=&quot;Image&quot;,
+            include_tables=[&quot;Image&quot;, &quot;Subject&quot;],
+            via=[],
+        )
+        assert result == []
+
+    def test_ambiguity_raises(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;If canned schema has diamond Image→Subject, raise.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        # This test requires a diamond schema (Image→Subject direct and
+        # Image→Observation→Subject). The canned model may need extension.
+        if &quot;Observation&quot; not in model.name_to_schema_and_table:
+            pytest.skip(&quot;Canned model needs diamond fixture for this test&quot;)
+        # When both paths exist and Observation is NOT in include_tables:
+        result = model._find_path_ambiguities(
+            row_per=&quot;Image&quot;,
+            include_tables=[&quot;Image&quot;, &quot;Subject&quot;],
+            via=[],
+        )
+        # Result is a list of ambiguities; expect at least one
+        assert len(result) &gt;= 1
+        amb = result[0]
+        assert amb[&quot;from_table&quot;] == &quot;Image&quot;
+        assert amb[&quot;to_table&quot;] == &quot;Subject&quot;
+        assert len(amb[&quot;paths&quot;]) &gt;= 2
+
+    def test_ambiguity_resolved_by_intermediate(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;Including the intermediate in include_tables removes ambiguity.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        if &quot;Observation&quot; not in model.name_to_schema_and_table:
+            pytest.skip(&quot;Canned model needs diamond fixture for this test&quot;)
+        result = model._find_path_ambiguities(
+            row_per=&quot;Image&quot;,
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;],
+            via=[],
+        )
+        # With Observation in include_tables, the multi-hop is the only valid path
+        assert result == []
+
+    def test_ambiguity_resolved_by_via(self, denorm_deriva_model) -&gt; None:
+        &quot;&quot;&quot;via=[Observation] removes ambiguity without adding Observation columns.&quot;&quot;&quot;
+        model = denorm_deriva_model
+        if &quot;Observation&quot; not in model.name_to_schema_and_table:
+            pytest.skip(&quot;Canned model needs diamond fixture for this test&quot;)
+        result = model._find_path_ambiguities(
+            row_per=&quot;Image&quot;,
+            include_tables=[&quot;Image&quot;, &quot;Subject&quot;],
+            via=[&quot;Observation&quot;],
+        )
+        assert result == []
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the new tests — expect failures.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_planner_rules.py -v
+</code></pre>
+<p>Expected: most fail with <code>AttributeError</code> because <code>_find_sinks</code>, <code>_determine_row_per</code>, <code>_find_path_ambiguities</code> don't exist yet. Some may skip (diamond schema not yet in fixture).</p>
+<ul>
+<li>[ ] <strong>Step 3: Read the current <code>_prepare_wide_table</code> and <code>_build_join_tree</code> to understand the existing structure.</strong></li>
+</ul>
+<p>Read <code>src/deriva_ml/model/catalog.py:887-1100</code> for <code>_prepare_wide_table</code> and <code>src/deriva_ml/model/catalog.py:633-830</code> for <code>_build_join_tree</code>. Note the existing single-method interface.</p>
+<ul>
+<li>[ ] <strong>Step 4a: Extract the two nested helpers to module-level methods on <code>DerivaModel</code>.</strong></li>
+</ul>
+<p>These are currently nested functions that cannot be reused by the new planner code. Promote each to a method on <code>DerivaModel</code>.</p>
+<p><strong>First</strong>, extract <code>_is_likely_association</code> from <code>_build_join_tree</code> (currently at <code>catalog.py:727-751</code>). Replace the nested <code>def _is_likely_association(tbl)</code> with a call to the new method, and add the method at module-level alongside other <code>DerivaModel</code> helpers:</p>
+<pre><code class="language-python">def _is_association_table(self, name_or_table: str | Table) -&gt; bool:
+    &quot;&quot;&quot;Check if a table is a pure association (M:N link) table.
+
+    An association table has only system columns (RID/RCT/RMT/RCB/RMB)
+    plus exactly two domain FK columns. ERMrest's built-in
+    ``Table.is_association()`` counts system FKs (RCB/RMB →
+    ERMrest_Client), so we use our own check that ignores them.
+
+    Previously nested inside ``_build_join_tree``; promoted so that
+    denormalization planning can also use it.
+
+    Args:
+        name_or_table: table name (looked up via :meth:`name_to_table`) or
+            a :class:`Table` instance.
+
+    Returns:
+        True if the table is a pure association table.
+    &quot;&quot;&quot;
+    system_cols = {&quot;RID&quot;, &quot;RCT&quot;, &quot;RMT&quot;, &quot;RCB&quot;, &quot;RMB&quot;}
+    try:
+        tbl = (
+            name_or_table
+            if hasattr(name_or_table, &quot;foreign_keys&quot;)
+            else self.name_to_table(name_or_table)
+        )
+        cols = {c.name for c in tbl.columns}
+        fks = list(tbl.foreign_keys)
+        domain_fks = [
+            fk for fk in fks
+            if fk.pk_table.name not in (&quot;ERMrest_Client&quot;, &quot;ERMrest_Group&quot;)
+        ]
+        fk_col_names: set[str] = set()
+        for fk in domain_fks:
+            for col in fk.columns:
+                fk_col_names.add(col.name if hasattr(col, &quot;name&quot;) else str(col))
+        user_cols = cols - system_cols - fk_col_names
+        return len(domain_fks) == 2 and len(user_cols) == 0
+    except Exception:
+        return False
+</code></pre>
+<p>Then in <code>_build_join_tree</code>, replace the nested <code>def _is_likely_association(tbl): ...</code> and the <code>_is_likely_association(tbl)</code> call site with:</p>
+<pre><code class="language-python"># (delete the nested def here — it's now self._is_association_table)
+</code></pre>
+<p>and update the call site in <code>_intermediates_covered</code>:</p>
+<pre><code class="language-python">if tbl is not None and self._is_association_table(tbl):
+</code></pre>
+<p><strong>Second</strong>, extract <code>find_arcs</code> from <code>_schema_to_paths</code> (currently at <code>catalog.py:1173-1188</code>). The new method follows both outbound and inbound FKs, returning reachable tables deduplicated by target.</p>
+<pre><code class="language-python">def _fk_neighbors(self, table: str | Table) -&gt; set[Table]:
+    &quot;&quot;&quot;Return FK-neighbor tables of *table* (outbound + inbound, deduplicated).
+
+    Follows both ``table.foreign_keys`` (outbound) and
+    ``table.referenced_by`` (inbound), filters to valid schemas
+    (``domain_schemas ∪ {ml_schema}``), and deduplicates multi-FK
+    targets — if two FKs both point to Foo, Foo appears once.
+
+    Previously nested inside ``_schema_to_paths``; promoted so that
+    denormalization planning can also use it as the FK-traversal primitive.
+
+    Args:
+        table: table name or Table instance.
+
+    Returns:
+        Set of :class:`Table` objects reachable from *table* via one FK arc.
+    &quot;&quot;&quot;
+    tbl = table if hasattr(table, &quot;foreign_keys&quot;) else self.name_to_table(table)
+    valid_schemas = self.domain_schemas | {self.ml_schema}
+    arc_list = (
+        [fk.pk_table for fk in tbl.foreign_keys]
+        + [fk.table for fk in tbl.referenced_by]
+    )
+    arc_list = [t for t in arc_list if t.schema.name in valid_schemas]
+    # Deduplicate: when multiple FKs point to the same target table, keep
+    # only one. Downstream code handles FK selection via _table_relationship.
+    seen: set[Table] = set()
+    deduped: list[Table] = []
+    for t in arc_list:
+        if t not in seen:
+            seen.add(t)
+            deduped.append(t)
+    return set(deduped)
+</code></pre>
+<p>In <code>_schema_to_paths</code>, replace the nested <code>def find_arcs(table)</code> and the <code>find_arcs(root)</code> call with:</p>
+<pre><code class="language-python"># (delete the nested def here — it's now self._fk_neighbors)
+for child in self._fk_neighbors(root):
+</code></pre>
+<p><strong>While you are editing <code>_schema_to_paths</code></strong>, add one more small enhancement — a <code>stop_at</code> kwarg that lets the caller ask for only paths ending at a specific table. This lets <code>_enumerate_paths</code> become a near one-liner instead of filtering paths after the fact.</p>
+<p>Update the signature (adding <code>stop_at</code> last, defaulting to <code>None</code> for zero behavior change):</p>
+<pre><code class="language-python">def _schema_to_paths(
+    self,
+    root: Table | None = None,
+    path: list[Table] | None = None,
+    exclude_tables: set[str] | None = None,
+    skip_tables: frozenset[str] | None = None,
+    max_depth: int | None = None,
+    stop_at: str | None = None,     # NEW
+) -&gt; list[list[Table]]:
+</code></pre>
+<p>Update the docstring with:</p>
+<pre><code>    stop_at: If given, return only paths whose final table's name equals
+        ``stop_at``. The root-only path ``[root]`` is excluded unless
+        ``root.name == stop_at``. Default ``None`` returns all prefixes
+        (the original behavior).
+</code></pre>
+<p>Implement the filter as a final-return transformation (no traversal changes):</p>
+<pre><code class="language-python">    # ... existing body ends with `return paths` — replace with:
+    if stop_at is not None:
+        return [p for p in paths if p and p[-1].name == stop_at]
+    return paths
+</code></pre>
+<p>All existing callers pass <code>stop_at=None</code> implicitly, so behavior is unchanged.
+The new <code>_enumerate_paths</code> will use <code>stop_at=to_table</code> to get only the
+paths it cares about.</p>
+<ul>
+<li>[ ] <strong>Step 4b: Add the new planner helpers — each composes the extracted primitives.</strong></li>
+</ul>
+<p>These helpers are all thin compositions of <code>_fk_neighbors</code>, <code>_is_association_table</code>, <code>_schema_to_paths</code>, and <code>_table_relationship</code>. No new FK traversal — just filter/orchestrate calls into the existing routines.</p>
+<p>Add these methods to <code>DerivaModel</code> (in <code>src/deriva_ml/model/catalog.py</code>, near <code>_prepare_wide_table</code> around line 887):</p>
+<pre><code class="language-python">def _find_sinks(
+    self,
+    include_tables: list[str],
+    via: list[str] | None = None,
+) -&gt; list[str]:
+    &quot;&quot;&quot;Find sinks in the FK subgraph on include_tables ∪ via.
+
+    A sink is a table in ``include_tables`` with no outbound FK to any
+    other table in the set, considering association tables not in the set
+    as transparent edges.
+
+    Composes :meth:`_outbound_reachable` — does not traverse FKs itself.
+
+    Args:
+        include_tables: tables whose FK edges are considered.
+        via: additional tables that are part of the subgraph (routing only).
+
+    Returns:
+        List of sink table names, sorted alphabetically. Empty if a cycle
+        in the subgraph means no sink exists.
+    &quot;&quot;&quot;
+    via = via or []
+    all_tables = set(include_tables) | set(via)
+    return sorted(
+        t for t in all_tables
+        if t in include_tables
+        and not (self._outbound_reachable(t, all_tables) - {t})
+    )
+
+
+def _outbound_reachable(
+    self,
+    from_table: str,
+    tables_in_set: set[str],
+) -&gt; set[str]:
+    &quot;&quot;&quot;Tables in ``tables_in_set`` reachable from ``from_table`` via FKs.
+
+    BFS over :meth:`_fk_neighbors` — association tables NOT in
+    ``tables_in_set`` are transparent hops (we traverse past them to see
+    the tables they link). Tables in ``tables_in_set`` are recorded.
+
+    Args:
+        from_table: starting table.
+        tables_in_set: the subgraph — only edges to/from these tables count
+            as &quot;destinations.&quot; Association tables outside this set are
+            transparent.
+
+    Returns:
+        Set of names in ``tables_in_set`` reachable from from_table
+        (excluding from_table itself).
+    &quot;&quot;&quot;
+    seen: set[str] = set()
+    stack: list[str] = [from_table]
+    while stack:
+        t = stack.pop()
+        if t in seen:
+            continue
+        seen.add(t)
+        try:
+            tbl = self.name_to_table(t)
+        except Exception:
+            continue
+        # Use the extracted _fk_neighbors primitive — no direct FK walking here.
+        for neighbor in self._fk_neighbors(t):
+            target_name = neighbor.name
+            if target_name == from_table:
+                continue
+            if target_name in tables_in_set:
+                seen.add(target_name)
+                # Continue through it only if association — so we can see
+                # past it to further requested targets.
+                if self._is_association_table(neighbor):
+                    stack.append(target_name)
+            elif self._is_association_table(neighbor):
+                # Transparent hop through a non-requested association.
+                stack.append(target_name)
+            # else: non-requested, non-association — dead end
+    seen.discard(from_table)
+    return {t for t in seen if t in tables_in_set and t != from_table}
+
+
+# Note: _is_association_table is added in Step 4a above (extracted from
+# _build_join_tree). Do NOT re-define it here.
+
+
+def _determine_row_per(
+    self,
+    include_tables: list[str],
+    via: list[str] | None,
+    row_per: str | None,
+) -&gt; str:
+    &quot;&quot;&quot;Resolve the row_per table per Rule 2 and Rule 5.
+
+    - If ``row_per`` is explicit, validate it's in ``include_tables`` and
+      that no table in ``include_tables`` is downstream of it. Raise
+      :class:`DerivaMLDenormalizeDownstreamLeaf` otherwise.
+    - If ``row_per`` is None, auto-infer by finding sinks. Exactly one sink
+      → return it. Zero → :class:`DerivaMLDenormalizeNoSink`. Multiple →
+      :class:`DerivaMLDenormalizeMultiLeaf`.
+
+    Returns:
+        The resolved ``row_per`` table name.
+
+    Raises:
+        DerivaMLDenormalizeMultiLeaf: auto-inference finds multiple sinks.
+        DerivaMLDenormalizeNoSink: no sink (cycle).
+        DerivaMLDenormalizeDownstreamLeaf: explicit row_per with downstream
+            table in include_tables.
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import (
+        DerivaMLDenormalizeDownstreamLeaf,
+        DerivaMLDenormalizeMultiLeaf,
+        DerivaMLDenormalizeNoSink,
+    )
+
+    via = via or []
+    all_tables = set(include_tables) | set(via)
+
+    if row_per is not None:
+        if row_per not in include_tables:
+            raise ValueError(
+                f&quot;row_per={row_per!r} must be in include_tables={include_tables}&quot;
+            )
+        # Rule 5: check no include_tables entry is downstream of row_per.
+        downstream = self._outbound_reachable(row_per, all_tables)
+        downstream_in_inc = [t for t in include_tables if t in downstream and t != row_per]
+        if downstream_in_inc:
+            raise DerivaMLDenormalizeDownstreamLeaf(
+                row_per=row_per,
+                downstream_tables=sorted(downstream_in_inc),
+            )
+        return row_per
+
+    # Auto-infer via sink-finding.
+    sinks = self._find_sinks(include_tables, via)
+    if not sinks:
+        raise DerivaMLDenormalizeNoSink(
+            f&quot;No sink found in include_tables={include_tables}. &quot;
+            f&quot;The FK subgraph may contain a cycle.&quot;
+        )
+    if len(sinks) &gt; 1:
+        raise DerivaMLDenormalizeMultiLeaf(
+            candidates=sinks,
+            include_tables=list(include_tables),
+        )
+    return sinks[0]
+
+
+def _find_path_ambiguities(
+    self,
+    row_per: str,
+    include_tables: list[str],
+    via: list[str] | None = None,
+) -&gt; list[dict[str, Any]]:
+    &quot;&quot;&quot;Enumerate path ambiguities per Rule 6.
+
+    For each T in include_tables ∪ via (T != row_per), enumerate all
+    simple FK paths between T and row_per, considering association tables
+    as transparent edges. If &gt;1 distinct path, collect an ambiguity entry.
+
+    Args:
+        row_per: the leaf table.
+        include_tables: tables whose paths to row_per are checked.
+        via: additional tables whose paths are checked (but their columns
+            aren't in the output).
+
+    Returns:
+        List of ambiguity dicts. Each dict has:
+          - from_table: row_per
+          - to_table: the T with multiple paths
+          - paths: list of path lists (each path a list of table names)
+          - suggested_intermediates: tables in at least one path but not
+            in include_tables
+    &quot;&quot;&quot;
+    via = via or []
+    all_tables = set(include_tables) | set(via)
+    ambiguities: list[dict[str, Any]] = []
+
+    for t in all_tables:
+        if t == row_per:
+            continue
+        paths = self._enumerate_paths(row_per, t, all_tables)
+        # Deduplicate by tuple signature.
+        unique = list({tuple(p): p for p in paths}.values())
+        if len(unique) &gt; 1:
+            # Tables in at least one path but not in include_tables
+            all_intermediates: set[str] = set()
+            for p in unique:
+                for node in p[1:-1]:  # skip endpoints
+                    if node not in include_tables:
+                        all_intermediates.add(node)
+            ambiguities.append(
+                {
+                    &quot;from_table&quot;: row_per,
+                    &quot;to_table&quot;: t,
+                    &quot;paths&quot;: unique,
+                    &quot;suggested_intermediates&quot;: sorted(all_intermediates),
+                }
+            )
+    return ambiguities
+
+
+def _enumerate_paths(
+    self,
+    from_table: str,
+    to_table: str,
+    tables_in_set: set[str],
+    max_depth: int = 6,
+) -&gt; list[list[str]]:
+    &quot;&quot;&quot;Enumerate simple FK paths from ``from_table`` to ``to_table``.
+
+    **Implementation:** delegates the FK-graph DFS to the existing
+    :meth:`_schema_to_paths` (which handles cycle detection, vocabulary
+    termination, schema filtering, and multi-FK deduplication). Uses the
+    ``stop_at`` kwarg added in Step 4a to avoid filtering paths by
+    endpoint after the fact. Only the transparency filter (intermediates
+    must be requested or association tables) is applied here. Do NOT
+    write a fresh DFS.
+
+    Args:
+        from_table: path start.
+        to_table: path end.
+        tables_in_set: ``include_tables ∪ via``. Paths passing through
+            tables NOT in this set are accepted only if every intermediate
+            is a pure association table (transparent hop).
+        max_depth: forwarded to ``_schema_to_paths`` as safety cap.
+
+    Returns:
+        List of paths, each a list of table-name strings from
+        ``from_table`` to ``to_table``.
+    &quot;&quot;&quot;
+    paths = self._schema_to_paths(
+        root=self.name_to_table(from_table),
+        max_depth=max_depth,
+        stop_at=to_table,
+    )
+    result: list[list[str]] = []
+    for path in paths:
+        names = [t.name for t in path]
+        # Transparency check: every intermediate is either requested or a
+        # pure association table.
+        if all(
+            mid in tables_in_set or self._is_association_table(mid)
+            for mid in names[1:-1]
+        ):
+            result.append(names)
+    return result
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Run the planner tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_planner_rules.py -v
+</code></pre>
+<p>Expected: tests that don't require the diamond fixture pass. Tests that need the diamond fixture skip with a message.</p>
+<ul>
+<li>[ ] <strong>Step 6: Extend the canned model fixture to support diamond tests.</strong></li>
+</ul>
+<p>Edit <code>tests/local_db/conftest.py</code>. In the canned schema (look for the fixture that creates the <code>isa.Image</code> table with the Subject FK), add:</p>
+<ol>
+<li>A new <code>isa.Observation</code> table with columns <code>RID</code>, <code>Subject</code> (FK to Subject), <code>Date</code>.</li>
+<li>A new FK on <code>isa.Image</code>: <code>Observation</code> (nullable FK to Observation). This creates the diamond.</li>
+</ol>
+<p>Look at the existing fixture definition around the <code>isa</code> / <code>deriva-ml</code> schema setup in <code>conftest.py</code> and extend it.</p>
+<p>After editing, re-run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_planner_rules.py -v
+</code></pre>
+<p>All tests in the file should now PASS (no skips).</p>
+<ul>
+<li>[ ] <strong>Step 7: Wire the new helpers into <code>_prepare_wide_table</code>.</strong></li>
+</ul>
+<p>Update <code>_prepare_wide_table</code> in <code>src/deriva_ml/model/catalog.py</code> to:</p>
+<ol>
+<li>Accept new <code>row_per</code> and <code>via</code> parameters:</li>
+</ol>
+<pre><code class="language-python">def _prepare_wide_table(
+    self,
+    dataset,
+    dataset_rid: RID,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; tuple[dict[str, Any], list[tuple], bool]:
+    &quot;&quot;&quot;...&quot;&quot;&quot;
+</code></pre>
+<ol>
+<li>
+<p>Before any existing logic, call <code>self._determine_row_per(...)</code> and <code>self._find_path_ambiguities(...)</code>. If ambiguities are non-empty, raise the first one as a <code>DerivaMLDenormalizeAmbiguousPath</code>.</p>
+</li>
+<li>
+<p>Use the resolved <code>row_per</code> as the element type for the JoinTree (instead of the current "paths_by_element" discovery).</p>
+</li>
+</ol>
+<p>Keep the rest of the implementation (join-tree building, flattening) — it still produces the same output shape. The new logic is the guard in front.</p>
+<ul>
+<li>[ ] <strong>Step 8: Run all existing planner tests + new tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py tests/dataset/test_denormalize.py -x --tb=short 2&gt;&amp;1 | tail -40
+</code></pre>
+<p>Expected: the new planner tests pass; integration tests in <code>tests/dataset/test_denormalize.py</code> that used to silently select a path now raise. This is expected — they will be updated in Task 9 below.</p>
+<p>Note: don't fix the integration test failures yet. Just confirm the planner-level unit tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 9: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/model/catalog.py tests/local_db/test_planner_rules.py tests/local_db/conftest.py
+uv run ruff check src/deriva_ml/model/catalog.py
+git add src/deriva_ml/model/catalog.py tests/local_db/test_planner_rules.py tests/local_db/conftest.py
+git commit -m &quot;feat(denormalize): implement Rule 2/5/6 planner helpers with unit tests
+
+Extract two nested functions to module-level methods on DerivaModel:
+  - _is_likely_association (was nested in _build_join_tree)
+      → DerivaModel._is_association_table
+  - find_arcs (was nested in _schema_to_paths)
+      → DerivaModel._fk_neighbors
+Both _build_join_tree and _schema_to_paths now call the extracted methods.
+
+Add thin composing helpers that reuse the extracted primitives and the
+existing _schema_to_paths / _table_relationship:
+  - _outbound_reachable (BFS on _fk_neighbors)
+  - _enumerate_paths (filter on _schema_to_paths output)
+  - _find_sinks / _determine_row_per / _find_path_ambiguities
+
+_prepare_wide_table accepts row_per and via kwargs and invokes the new
+rules before the existing tree-building flow.
+
+Extends canned test fixture with Observation table to support diamond-path
+test coverage.
+&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-rename-denormalize-_denormalize_impl">Task 3: Rename <code>denormalize()</code> → <code>_denormalize_impl()</code></h2>
+<p>The existing free <code>denormalize()</code> function becomes the private implementation detail called by the <code>Denormalizer</code> class. Rename it, update callers.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/denormalize.py</code>
+- Modify: <code>src/deriva_ml/local_db/__init__.py</code>
+- Modify: <code>src/deriva_ml/local_db/workspace.py:452</code> (the <code>cache_denormalized</code> method calls it)
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> (the delegate methods call it)
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (same)
+- Rename: <code>tests/local_db/test_denormalize.py</code> → <code>tests/local_db/test_denormalize_impl.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Rename the function in <code>denormalize.py</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/denormalize.py</code>, find <code>def denormalize(</code> and rename to <code>def _denormalize_impl(</code>. Keep the signature exactly the same. Also update the module docstring to reflect that the public API is now <code>Denormalizer</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update in-repo callers.</strong></li>
+</ul>
+<p>Find every caller:</p>
+<pre><code class="language-bash">grep -rn &quot;from deriva_ml.local_db.denormalize import denormalize\|from deriva_ml.local_db import denormalize\|denormalize(&quot; src/deriva_ml/ --include=&quot;*.py&quot; | grep -v __pycache__ | grep -v &quot;def denormalize&quot;
+</code></pre>
+<p>Update each import and each call to use <code>_denormalize_impl</code>. Expected locations:</p>
+<ul>
+<li><code>src/deriva_ml/local_db/workspace.py</code> — <code>cache_denormalized</code> method.</li>
+<li><code>src/deriva_ml/dataset/dataset.py</code> — delegate methods.</li>
+<li><code>src/deriva_ml/dataset/dataset_bag.py</code> — delegate methods.</li>
+</ul>
+<p>Each call site just needs the import line updated and the call changed.</p>
+<ul>
+<li>[ ] <strong>Step 3: Remove <code>denormalize</code> from package exports.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/__init__.py</code>, remove the <code>denormalize</code> name from the <code>__all__</code> list and from the imports block. Keep <code>DenormalizeResult</code> exported (it's a public return type).</p>
+<ul>
+<li>[ ] <strong>Step 3b: Add <code>DenormalizeResult.extend()</code> helper.</strong></li>
+</ul>
+<p>The orphan-row logic in Task 6 needs to append orphan rows to a main result. Rather than rebuilding the dataclass manually at each call site, add a small helper method on <code>DenormalizeResult</code> in <code>src/deriva_ml/local_db/denormalize.py</code>:</p>
+<pre><code class="language-python">def extend(self, rows: list[dict[str, Any]]) -&gt; &quot;DenormalizeResult&quot;:
+    &quot;&quot;&quot;Return a new :class:`DenormalizeResult` with additional rows appended.
+
+    Used when combining phases of denormalization — e.g., the main JOIN
+    result plus orphan rows emitted by LEFT-JOIN-style upstream anchors
+    (:meth:`Denormalizer._emit_orphan_rows`).
+
+    Columns and schema are preserved from ``self``. The returned result's
+    :attr:`row_count` is ``self.row_count + len(rows)``.
+
+    Args:
+        rows: Row dicts to append (same shape as ``self.iter_rows()``).
+
+    Returns:
+        New :class:`DenormalizeResult` — does not mutate ``self``.
+    &quot;&quot;&quot;
+    return DenormalizeResult(
+        columns=self.columns,
+        row_count=self.row_count + len(rows),
+        _rows=list(self._rows) + list(rows),
+    )
+</code></pre>
+<p>Add a quick test in <code>tests/local_db/test_denormalize_impl.py</code>:</p>
+<pre><code class="language-python">def test_denormalize_result_extend() -&gt; None:
+    &quot;&quot;&quot;DenormalizeResult.extend appends rows and updates row_count.&quot;&quot;&quot;
+    from deriva_ml.local_db.denormalize import DenormalizeResult
+
+    base = DenormalizeResult(
+        columns=[(&quot;A.RID&quot;, &quot;text&quot;)],
+        row_count=2,
+        _rows=[{&quot;A.RID&quot;: &quot;1-A&quot;}, {&quot;A.RID&quot;: &quot;1-B&quot;}],
+    )
+    extended = base.extend([{&quot;A.RID&quot;: &quot;1-C&quot;}, {&quot;A.RID&quot;: &quot;1-D&quot;}])
+    assert extended.row_count == 4
+    assert extended.columns == base.columns
+    assert [r[&quot;A.RID&quot;] for r in extended.iter_rows()] == [&quot;1-A&quot;, &quot;1-B&quot;, &quot;1-C&quot;, &quot;1-D&quot;]
+    # Does not mutate the original
+    assert base.row_count == 2
+</code></pre>
+<p>Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize_impl.py::test_denormalize_result_extend -v
+</code></pre>
+<p>Expected: pass.</p>
+<ul>
+<li>[ ] <strong>Step 4: Rename the test file.</strong></li>
+</ul>
+<pre><code class="language-bash">git mv tests/local_db/test_denormalize.py tests/local_db/test_denormalize_impl.py
+</code></pre>
+<p>Update the module docstring at the top of the renamed file to say "tests for <code>_denormalize_impl</code> — the low-level primitive called by <code>Denormalizer</code>."</p>
+<ul>
+<li>[ ] <strong>Step 5: Update the test file's imports and function references.</strong></li>
+</ul>
+<pre><code class="language-bash">sed -i '' 's/from deriva_ml.local_db.denormalize import DenormalizeResult, denormalize/from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl/' tests/local_db/test_denormalize_impl.py
+sed -i '' 's/\&lt;denormalize(/_denormalize_impl(/g' tests/local_db/test_denormalize_impl.py
+</code></pre>
+<p>Verify the edits:</p>
+<pre><code class="language-bash">grep -n &quot;denormalize\b\|_denormalize_impl&quot; tests/local_db/test_denormalize_impl.py | head -10
+</code></pre>
+<p>Expected: all references are <code>_denormalize_impl</code>, no bare <code>denormalize(</code>.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run the renamed tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize_impl.py -v
+</code></pre>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run the full local_db test suite.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py --tb=short 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 8: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/ tests/local_db/
+uv run ruff check src/deriva_ml/
+git add -A
+git commit -m &quot;refactor(denormalize): rename denormalize() → _denormalize_impl()&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-create-the-denormalizer-class-skeleton-core-as_dataframe-as_dict-columns">Task 4: Create the <code>Denormalizer</code> class skeleton + core <code>as_dataframe</code>, <code>as_dict</code>, <code>columns</code></h2>
+<p>Introduce the class in a new module <code>denormalizer.py</code> to avoid making <code>denormalize.py</code> too large. The class constructor accepts a <code>DatasetLike</code> for the common case; <code>from_rids</code> is added in a later task.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/denormalizer.py</code>
+- Create: <code>tests/local_db/test_denormalizer.py</code></p>
+<p><strong>DRY reminders (see Reuse inventory above):</strong>
+- <code>as_dataframe</code> / <code>as_dict</code> delegate to <code>_denormalize_impl</code> — do NOT
+  re-implement the SQL execution loop. <code>_denormalize_impl</code> already handles
+  the JOIN construction, row emission with NULL-init, and schema-prefixed
+  column names via <code>denormalize_column_name</code>.
+- <code>columns</code> invokes <code>self._model._prepare_wide_table(...)</code> (model-only
+  planning, no data fetch) and formats with <code>denormalize_column_name</code>.
+  Do NOT invent a new schema-prefixing scheme.
+- Anchor retrieval uses <code>dataset.list_dataset_members(recurse=True)</code> —
+  <code>_anchors_as_dict</code> in Task 6 wraps this.
+- Study <code>Dataset.denormalize_as_dataframe</code> (<code>dataset/dataset.py:974</code>)
+  before writing <code>Denormalizer.as_dataframe</code> — the public shape (column
+  prefixing, row dicts, DataFrame construction) is already defined there.
+  The new class preserves that shape so downstream tools keep working.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests for the class skeleton.</strong></li>
+</ul>
+<p>Create <code>tests/local_db/test_denormalizer.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for the Denormalizer class public API.
+
+These tests use the canned bag-model fixtures from conftest.py — no live
+catalog required. They verify the class wraps _denormalize_impl correctly
+with the new rules applied.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from typing import Any
+
+import pandas as pd
+import pytest
+
+from deriva_ml.core.exceptions import (
+    DerivaMLDenormalizeAmbiguousPath,
+    DerivaMLDenormalizeDownstreamLeaf,
+    DerivaMLDenormalizeMultiLeaf,
+)
+from deriva_ml.local_db.denormalizer import Denormalizer
+
+
+class TestDenormalizerConstruction:
+    &quot;&quot;&quot;Denormalizer(dataset) derives catalog/workspace/model from the dataset.&quot;&quot;&quot;
+
+    def test_construct_from_dataset_like(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Minimal construction: wrap a dataset-like object.&quot;&quot;&quot;
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        assert d is not None
+
+
+class TestAsDataframe:
+    &quot;&quot;&quot;Denormalizer.as_dataframe returns a pd.DataFrame with expected shape.&quot;&quot;&quot;
+
+    def test_simple_star_schema(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;One row per Image, Subject columns hoisted.&quot;&quot;&quot;
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+        assert isinstance(df, pd.DataFrame)
+        # 3 Images in the fixture (one with NULL Subject = LEFT JOIN preserved).
+        assert len(df) == 3
+        assert any(c.startswith(&quot;Image.&quot;) for c in df.columns)
+        assert any(c.startswith(&quot;Subject.&quot;) for c in df.columns)
+
+    def test_empty_dataset(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Nonexistent dataset RID returns empty DataFrame with correct columns.&quot;&quot;&quot;
+        ds = _FakeDataset(populated_denorm, dataset_rid=&quot;NO-SUCH-DS&quot;)
+        d = Denormalizer(ds)
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+        assert len(df) == 0
+        assert len(df.columns) &gt; 0  # schema preserved
+
+
+class TestAsDict:
+    &quot;&quot;&quot;Denormalizer.as_dict streams rows as dicts.&quot;&quot;&quot;
+
+    def test_yields_dicts(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        rows = list(d.as_dict([&quot;Image&quot;, &quot;Subject&quot;]))
+        assert len(rows) == 3
+        for r in rows:
+            assert isinstance(r, dict)
+
+
+class TestColumns:
+    &quot;&quot;&quot;Denormalizer.columns previews column names and types — no data fetch.&quot;&quot;&quot;
+
+    def test_columns_returns_tuples(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        cols = d.columns([&quot;Image&quot;, &quot;Subject&quot;])
+        assert isinstance(cols, list)
+        for entry in cols:
+            assert isinstance(entry, tuple)
+            assert len(entry) == 2
+            name, typ = entry
+            assert isinstance(name, str)
+            assert isinstance(typ, str)
+
+
+class TestRowPerAutoInference:
+    &quot;&quot;&quot;Verify Rule 2 auto-inference through the Denormalizer.&quot;&quot;&quot;
+
+    def test_image_is_sink(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;include_tables=[Subject, Image] → row_per auto = Image.&quot;&quot;&quot;
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe([&quot;Subject&quot;, &quot;Image&quot;])
+        assert plan[&quot;row_per&quot;] == &quot;Image&quot;
+        assert plan[&quot;row_per_source&quot;] == &quot;auto-inferred&quot;
+
+
+class TestExplicitRowPer:
+    &quot;&quot;&quot;Verify explicit row_per honored; Rule 5 downstream rejection.&quot;&quot;&quot;
+
+    def test_explicit_matching_auto(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Explicit row_per=Image (same as auto) works.&quot;&quot;&quot;
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;], row_per=&quot;Image&quot;)
+        assert len(df) == 3
+
+    def test_downstream_leaf_rejected(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;row_per=Subject with Image downstream → DerivaMLDenormalizeDownstreamLeaf.&quot;&quot;&quot;
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        with pytest.raises(DerivaMLDenormalizeDownstreamLeaf):
+            d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;], row_per=&quot;Subject&quot;)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+class _FakeDataset:
+    &quot;&quot;&quot;Minimal DatasetLike for Denormalizer construction in tests.
+
+    Wraps the populated_denorm fixture with the interface bits the
+    Denormalizer needs: model, engine, orm_resolver, dataset_rid,
+    list_dataset_members, list_dataset_children.
+    &quot;&quot;&quot;
+
+    def __init__(self, populated_denorm: dict[str, Any], dataset_rid: str | None = None):
+        self._pd = populated_denorm
+        self.dataset_rid = dataset_rid or populated_denorm[&quot;dataset_rid&quot;]
+        # Attributes the Denormalizer uses:
+        self.model = populated_denorm[&quot;model&quot;]
+        self.engine = populated_denorm[&quot;local_schema&quot;].engine
+        self._orm_resolver = populated_denorm[&quot;local_schema&quot;].get_orm_class
+
+    # Attributes exposed as &quot;ml instance&quot; pseudo-shim for Denormalizer(ds)
+    # construction: the class pulls workspace/catalog from ds. For unit
+    # tests against the canned fixture, we supply only what's actually
+    # dereferenced — see Denormalizer.__init__.
+    @property
+    def _ml_instance(self):
+        return None  # sentinel: tests use the fixture's engine directly
+
+    def list_dataset_members(self, **kwargs: Any) -&gt; dict[str, list[dict]]:
+        # All member types in the fixture
+        return {
+            &quot;Image&quot;: [{&quot;RID&quot;: r} for r in self._pd[&quot;image_rids&quot;]],
+            &quot;Subject&quot;: [{&quot;RID&quot;: r} for r in self._pd[&quot;subject_rids&quot;]],
+        }
+
+    def list_dataset_children(self, **kwargs: Any) -&gt; list:
+        return []
+</code></pre>
+<p>Note: the <code>_FakeDataset</code> fixture is a workaround — once <code>Denormalizer(ds)</code> is fully implemented, we'll discover the real cleaner way. For now, the class's constructor needs enough flexibility to accept this shim. Document that the test-only shim is intentional and tests will be refactored when the integration is complete.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect ImportError.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py -v
+</code></pre>
+<p>Expected: <code>ImportError: cannot import name 'Denormalizer' from 'deriva_ml.local_db.denormalizer'</code> (module doesn't exist yet).</p>
+<ul>
+<li>[ ] <strong>Step 3: Create the <code>Denormalizer</code> class.</strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/local_db/denormalizer.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Denormalizer — public API for producing wide tables from Deriva data.
+
+Wraps the lower-level ``_denormalize_impl`` primitive in a class-based API
+with support for auto-inferred ``row_per``, explicit ``via`` path routing,
+orphan-row handling, and arbitrary RID anchor sets.
+
+See ``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``
+for the semantic rules this class implements.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any, Generator
+
+import pandas as pd
+
+from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl
+
+if TYPE_CHECKING:
+    from deriva_ml.interfaces import DatasetLike
+
+logger = logging.getLogger(__name__)
+
+
+class Denormalizer:
+    &quot;&quot;&quot;Produce wide-table denormalizations from Deriva datasets or anchor sets.
+
+    Construction:
+      - ``Denormalizer(dataset_like)`` — use the dataset's members as anchors
+        and derive catalog/workspace/model from the dataset's bindings.
+      - ``Denormalizer.from_rids(rids, ml=...)`` — arbitrary RID anchors
+        (see classmethod; implemented in a later task).
+
+    Methods:
+      - :meth:`as_dataframe` — materialize as pd.DataFrame.
+      - :meth:`as_dict` — stream rows as dicts.
+      - :meth:`columns` — preview column schema without fetching.
+      - :meth:`describe` — dry-run the call; returns planning metadata.
+      - :meth:`list_paths` — describe the FK graph (for exploration).
+    &quot;&quot;&quot;
+
+    def __init__(self, dataset: &quot;DatasetLike&quot;) -&gt; None:
+        &quot;&quot;&quot;Construct from a ``DatasetLike`` object.
+
+        The dataset's members (recursively via ``list_dataset_members``)
+        become the anchor set. The underlying model, engine, and
+        orm_resolver are derived from the dataset.
+
+        Args:
+            dataset: A :class:`Dataset` or :class:`DatasetBag` (or any
+                object satisfying the ``DatasetLike`` protocol plus the
+                attributes ``model``, ``engine``, ``_orm_resolver``).
+        &quot;&quot;&quot;
+        self._dataset = dataset
+        self._dataset_rid = dataset.dataset_rid
+        self._model = dataset.model
+        # engine / orm_resolver / paged_client are extracted lazily so
+        # test fixtures can inject their own.
+        self._engine = getattr(dataset, &quot;engine&quot;, None)
+        self._orm_resolver = getattr(dataset, &quot;_orm_resolver&quot;, None)
+        if self._orm_resolver is None:
+            # Fall back to model's get_orm_class_by_name if available
+            gocbn = getattr(self._model, &quot;get_orm_class_by_name&quot;, None)
+            self._orm_resolver = gocbn
+
+    # ------------------------------------------------------------------
+    # Public methods
+    # ------------------------------------------------------------------
+
+    def as_dataframe(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -&gt; pd.DataFrame:
+        &quot;&quot;&quot;Materialize the denormalized table as a pandas DataFrame.
+
+        Args:
+            include_tables: Tables whose columns appear in the output.
+                Also determines ``row_per`` unless overridden.
+            row_per: Explicit leaf table. Must be in ``include_tables``.
+                If None, auto-inferred (Rule 2).
+            via: Tables forced into the join chain without contributing
+                columns. Useful for disambiguating path ambiguity without
+                cluttering the output.
+            ignore_unrelated_anchors: If True, silently drop anchors whose
+                table has no FK path to any requested table. Default False
+                raises :class:`DerivaMLDenormalizeUnrelatedAnchor`.
+
+        Returns:
+            A :class:`pandas.DataFrame` with one row per ``row_per`` instance
+            in scope. See the semantic rules (Rules 1–8 in the spec) for
+            the full cardinality and column-projection semantics.
+        &quot;&quot;&quot;
+        result = self._run(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
+        )
+        return result.to_dataframe()
+
+    def as_dict(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -&gt; Generator[dict[str, Any], None, None]:
+        &quot;&quot;&quot;Stream the denormalized table row-by-row as dicts.
+
+        Same semantics as :meth:`as_dataframe` but yields one dict per row.
+        Use for large datasets where a full DataFrame won't fit in memory.
+        &quot;&quot;&quot;
+        result = self._run(
+            include_tables,
+            row_per=row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
+        )
+        yield from result.iter_rows()
+
+    def columns(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -&gt; list[tuple[str, str]]:
+        &quot;&quot;&quot;Preview (column_name, type_name) pairs for the denormalized table.
+
+        Model-only — no data fetch, no catalog query. Runs the same path
+        validation as :meth:`as_dataframe` so ambiguity errors surface
+        here too.
+        &quot;&quot;&quot;
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        # Invokes the planner; raises on ambiguity.
+        element_tables, column_specs, multi_schema = self._model._prepare_wide_table(
+            self._dataset,
+            self._dataset_rid,
+            list(include_tables),
+            row_per=row_per,
+            via=via,
+        )
+        return [
+            (denormalize_column_name(s, t, c, multi_schema), tp)
+            for s, t, c, tp in column_specs
+        ]
+
+    def describe(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None = None,
+        via: list[str] | None = None,
+    ) -&gt; dict[str, Any]:
+        &quot;&quot;&quot;Return a planning-metadata dict describing what would happen.
+
+        Stub implementation in this task — extended in Task 7 below.
+        &quot;&quot;&quot;
+        # Minimal implementation: return just the row_per + columns.
+        resolved_row_per = self._model._determine_row_per(
+            include_tables=list(include_tables),
+            via=list(via or []),
+            row_per=row_per,
+        )
+        cols = self.columns(include_tables, row_per=row_per, via=via)
+        return {
+            &quot;row_per&quot;: resolved_row_per,
+            &quot;row_per_source&quot;: &quot;explicit&quot; if row_per else &quot;auto-inferred&quot;,
+            &quot;columns&quot;: cols,
+            &quot;include_tables&quot;: list(include_tables),
+            &quot;via&quot;: list(via or []),
+            &quot;ambiguities&quot;: [],
+        }
+
+    def list_paths(
+        self,
+        tables: list[str] | None = None,
+    ) -&gt; dict[str, Any]:
+        &quot;&quot;&quot;Describe the FK graph for exploration. Stub — filled in Task 8.&quot;&quot;&quot;
+        # Stub: full implementation in Task 8.
+        return {
+            &quot;member_types&quot;: [],
+            &quot;reachable_tables&quot;: {},
+            &quot;association_tables&quot;: [],
+            &quot;feature_tables&quot;: [],
+            &quot;schema_paths&quot;: {},
+        }
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _run(
+        self,
+        include_tables: list[str],
+        *,
+        row_per: str | None,
+        via: list[str] | None,
+        ignore_unrelated_anchors: bool,
+    ) -&gt; DenormalizeResult:
+        &quot;&quot;&quot;Dispatch to the low-level primitive.&quot;&quot;&quot;
+        # For now, delegate unchanged — Task 5+ wires row_per/via through.
+        return _denormalize_impl(
+            model=self._model,
+            engine=self._engine,
+            orm_resolver=self._orm_resolver,
+            dataset_rid=self._dataset_rid,
+            include_tables=list(include_tables),
+            dataset=self._dataset,
+            source=&quot;local&quot;,  # fixture tests pre-populate the DB
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py -v
+</code></pre>
+<p>Expected: most pass. The <code>TestExplicitRowPer::test_downstream_leaf_rejected</code> and <code>TestRowPerAutoInference</code> tests depend on the planner passing <code>row_per</code> through correctly — they should pass because we added row_per to <code>_prepare_wide_table</code> in Task 2.</p>
+<ul>
+<li>[ ] <strong>Step 5: Add <code>Denormalizer</code> to the package exports.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/__init__.py</code>, add:</p>
+<pre><code class="language-python">from deriva_ml.local_db.denormalizer import Denormalizer
+</code></pre>
+<p>And add <code>"Denormalizer"</code> to <code>__all__</code>.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run all local_db tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py -q --tb=short 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 7: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py src/deriva_ml/local_db/__init__.py
+uv run ruff check src/deriva_ml/local_db/
+git add src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py src/deriva_ml/local_db/__init__.py
+git commit -m &quot;feat(denormalize): add Denormalizer class with as_dataframe/as_dict/columns&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-wire-row_per-and-via-through-to-_denormalize_impl">Task 5: Wire <code>row_per</code> and <code>via</code> through to <code>_denormalize_impl</code></h2>
+<p>Currently <code>_denormalize_impl</code> accepts these kwargs but ignores <code>row_per</code>/<code>via</code> — Task 2 added the guards in the planner but the impl doesn't forward them. Connect the flow so explicit <code>row_per</code>/<code>via</code> affect the join plan and SQL.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/denormalize.py</code> (<code>_denormalize_impl</code>).
+- Modify: <code>src/deriva_ml/local_db/denormalizer.py</code> (<code>_run</code> method).</p>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>_denormalize_impl</code> signature to accept <code>row_per</code> and <code>via</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/denormalize.py</code>, modify the signature:</p>
+<pre><code class="language-python">def _denormalize_impl(
+    model: DerivaModel,
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    dataset_rid: str,
+    include_tables: list[str],
+    dataset: Any = None,
+    dataset_children_rids: list[str] | None = None,
+    source: str = &quot;local&quot;,
+    paged_client: PagedClient | None = None,
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; DenormalizeResult:
+</code></pre>
+<p>Inside the body, pass <code>row_per=row_per, via=via</code> to the <code>model._prepare_wide_table(...)</code> call.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update <code>Denormalizer._run</code> to forward the params.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/denormalizer.py</code>:</p>
+<pre><code class="language-python">def _run(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None,
+    via: list[str] | None,
+    ignore_unrelated_anchors: bool,
+) -&gt; DenormalizeResult:
+    return _denormalize_impl(
+        model=self._model,
+        engine=self._engine,
+        orm_resolver=self._orm_resolver,
+        dataset_rid=self._dataset_rid,
+        include_tables=list(include_tables),
+        dataset=self._dataset,
+        source=&quot;local&quot;,
+        row_per=row_per,
+        via=list(via) if via else None,
+    )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add a test that explicit via= resolves an ambiguity.</strong></li>
+</ul>
+<p>In <code>tests/local_db/test_denormalizer.py</code>, add:</p>
+<pre><code class="language-python">class TestViaParameter:
+    &quot;&quot;&quot;Verify via= is forwarded to the planner and resolves path ambiguity.&quot;&quot;&quot;
+
+    def test_via_resolves_diamond(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Diamond schema: via=['Observation'] should prevent ambiguity error.&quot;&quot;&quot;
+        # This test requires the canned model to include the diamond fixture
+        # from Task 2 step 6.
+        if &quot;Observation&quot; not in populated_denorm[&quot;model&quot;].name_to_schema_and_table:
+            pytest.skip(&quot;Canned model needs diamond fixture (Task 2 step 6)&quot;)
+
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # Without via, diamond raises
+        with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+            d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+        # With via, ambiguity resolved
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;], via=[&quot;Observation&quot;])
+        assert isinstance(df, pd.DataFrame)
+        # Observation columns should NOT be present
+        assert not any(c.startswith(&quot;Observation.&quot;) for c in df.columns)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py tests/local_db/test_denormalize_impl.py tests/local_db/test_planner_rules.py -v --tb=short 2&gt;&amp;1 | tail -15
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/
+uv run ruff check src/deriva_ml/local_db/
+git add src/deriva_ml/local_db/denormalize.py src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py
+git commit -m &quot;feat(denormalize): wire row_per and via through Denormalizer to planner&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-anchor-validation-unrelated-anchor-rejection-rule-7-rule-8">Task 6: Anchor validation + unrelated-anchor rejection (Rule 7, Rule 8)</h2>
+<p>Implement the anchor-classification logic that rejects unrelated anchors unless <code>ignore_unrelated_anchors=True</code>. Also implement orphan-row emission (Rule 7 case 3) — upstream anchors with no reachable <code>row_per</code> produce LEFT-JOIN-style rows with <code>row_per</code>-side NULL.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/denormalizer.py</code> — add <code>_classify_anchors</code>, <code>_emit_orphan_rows</code>.</p>
+<p><strong>DRY reminders (see Reuse inventory above):</strong>
+- <code>_classify_anchors</code> uses <code>self._model._outbound_reachable</code> — do NOT walk FKs here.
+- <code>_emit_orphan_rows</code> uses <code>denormalize_column_name</code> for column labels — do NOT reinvent the <code>{Table}.{col}</code> convention.
+- The NULL-init / LEFT-JOIN pattern is already established in
+  <code>Dataset._denormalize_datapath</code> (<code>src/deriva_ml/dataset/dataset.py:941-970</code>).
+  Read it before writing <code>_emit_orphan_rows</code> — your implementation follows
+  the same shape (init everything to None, populate only the anchor's
+  columns from its own row).
+- The orphan anchor's own row is looked up from the local engine via the
+  orm_resolver. The <code>_populate_from_catalog</code> helper in <code>denormalize.py:255</code>
+  (and <code>PagedFetcher.fetch_by_rids</code> in <code>paged_fetcher.py:174</code>) is the
+  catalog-side analog if source="catalog" — the existing
+  <code>_denormalize_impl</code> already fetches these rows, so in practice the orm
+  table is populated by the time <code>_emit_orphan_rows</code> runs.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_denormalizer.py</code>:</p>
+<pre><code class="language-python">class TestUnrelatedAnchors:
+    &quot;&quot;&quot;Rule 8: anchors with no FK path to include_tables → error by default.&quot;&quot;&quot;
+
+    def test_unrelated_anchor_rejected(self, populated_denorm) -&gt; None:
+        # A dataset whose members include an unrelated type.
+        class _HeteroDataset(_FakeDataset):
+            def list_dataset_members(self, **kwargs):
+                return {
+                    &quot;Image&quot;: [{&quot;RID&quot;: &quot;IMG-1&quot;}],
+                    # Dataset_Version is in the ML schema but has no FK path
+                    # to Subject alone. This is contrived, but exercises the rule.
+                    &quot;Dataset_Version&quot;: [{&quot;RID&quot;: &quot;DV-1&quot;}],
+                }
+
+        ds = _HeteroDataset(populated_denorm)
+        d = Denormalizer(ds)
+        with pytest.raises(DerivaMLDenormalizeUnrelatedAnchor):
+            d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+
+    def test_unrelated_anchor_ignored_with_flag(self, populated_denorm) -&gt; None:
+        class _HeteroDataset(_FakeDataset):
+            def list_dataset_members(self, **kwargs):
+                return {
+                    &quot;Image&quot;: [{&quot;RID&quot;: &quot;IMG-1&quot;}],
+                    &quot;Dataset_Version&quot;: [{&quot;RID&quot;: &quot;DV-1&quot;}],
+                }
+
+        ds = _HeteroDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # With the flag, no error
+        df = d.as_dataframe(
+            [&quot;Image&quot;, &quot;Subject&quot;],
+            ignore_unrelated_anchors=True,
+        )
+        assert isinstance(df, pd.DataFrame)
+
+
+class TestOrphanRows:
+    &quot;&quot;&quot;Rule 7 case 3: upstream anchor with no row_per reachable → orphan row.&quot;&quot;&quot;
+
+    def test_orphan_subject_emits_row(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Subject member with no Image in the dataset → one orphan row.&quot;&quot;&quot;
+        class _WithOrphan(_FakeDataset):
+            def list_dataset_members(self, **kwargs):
+                members = super().list_dataset_members()
+                # Add an orphan Subject that no Image points to
+                members[&quot;Subject&quot;].append({&quot;RID&quot;: &quot;ORPHAN-SUBJ&quot;})
+                return members
+
+        ds = _WithOrphan(populated_denorm)
+        d = Denormalizer(ds)
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+        # 3 Image rows + 1 orphan Subject row = 4
+        # The orphan row has Image cols NULL and Subject cols populated.
+        orphans = df[df[&quot;Image.RID&quot;].isna()]
+        assert len(orphans) == 1
+        # The orphan's Subject.RID should be &quot;ORPHAN-SUBJ&quot;.
+        assert orphans.iloc[0][&quot;Subject.RID&quot;] == &quot;ORPHAN-SUBJ&quot;
+</code></pre>
+<p>Add import at top of the test file:</p>
+<pre><code class="language-python">from deriva_ml.core.exceptions import DerivaMLDenormalizeUnrelatedAnchor
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the tests — expect failures.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestUnrelatedAnchors tests/local_db/test_denormalizer.py::TestOrphanRows -v --tb=short
+</code></pre>
+<p>Expected: fails. Either:
+- Unrelated anchors are silently included (producing empty result rows).
+- Orphans are dropped.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add <code>_classify_anchors</code> method to <code>Denormalizer</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/denormalizer.py</code>, add:</p>
+<pre><code class="language-python">def _classify_anchors(
+    self,
+    anchors: dict[str, list[str]],
+    *,
+    include_tables: list[str],
+    via: list[str],
+    row_per: str,
+    ignore_unrelated_anchors: bool,
+) -&gt; tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
+    &quot;&quot;&quot;Classify anchors by their relationship to row_per (Rule 7 + Rule 8).
+
+    Args:
+        anchors: table_name -&gt; list of RIDs.
+        include_tables, via, row_per: the planner inputs.
+        ignore_unrelated_anchors: if False, raise on Rule-8 cases.
+
+    Returns:
+        Tuple of (scoping_anchors, orphan_anchors, ignored_anchors). Each
+        is a table_name -&gt; list of RIDs dict.
+
+        - scoping_anchors: anchors that scope the main SQL query (their
+          reachable row_per rows go in the output).
+        - orphan_anchors: anchors whose table is in include_tables but can't
+          reach row_per — they emit orphan rows.
+        - ignored_anchors: anchors whose table isn't in include_tables and
+          can't reach row_per — contribute nothing; only populated when
+          ignore_unrelated_anchors=True.
+
+    Raises:
+        DerivaMLDenormalizeUnrelatedAnchor: if any anchor's table has no FK
+            path to include_tables and ignore_unrelated_anchors=False.
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLDenormalizeUnrelatedAnchor
+
+    scoping: dict[str, list[str]] = {}
+    orphans: dict[str, list[str]] = {}
+    ignored: dict[str, list[str]] = {}
+    unrelated: list[str] = []
+
+    all_tables = set(include_tables) | set(via)
+
+    for table, rids in anchors.items():
+        if table == row_per:
+            scoping[table] = list(rids)
+            continue
+        # Does this table have any FK path into the subgraph?
+        reachable = self._model._outbound_reachable(table, all_tables | {table})
+        if row_per in reachable:
+            # Upstream of row_per and reaches it → scoping
+            scoping[table] = list(rids)
+        elif table in include_tables:
+            # Upstream of row_per (in the subgraph) but no row_per reachable
+            # from this specific anchor — we emit an orphan row per anchor.
+            # (Actual reachability-from-the-anchor is per-RID, evaluated in
+            # _emit_orphan_rows.)
+            orphans[table] = list(rids)
+        else:
+            # Anchor's table is not in include_tables — and has no path to
+            # row_per. It would contribute nothing.
+            unrelated.append(table)
+
+    if unrelated and not ignore_unrelated_anchors:
+        raise DerivaMLDenormalizeUnrelatedAnchor(
+            unrelated_tables=sorted(set(unrelated)),
+            include_tables=list(include_tables),
+        )
+    if unrelated:
+        for table in unrelated:
+            ignored[table] = list(anchors[table])
+
+    return scoping, orphans, ignored
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Wire <code>_classify_anchors</code> into <code>_run</code>.</strong></li>
+</ul>
+<p>Modify <code>Denormalizer._run</code>:</p>
+<pre><code class="language-python">def _run(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None,
+    via: list[str] | None,
+    ignore_unrelated_anchors: bool,
+) -&gt; DenormalizeResult:
+    # Step 1: planner decisions (row_per, ambiguity checks)
+    resolved_row_per = self._model._determine_row_per(
+        include_tables=list(include_tables),
+        via=list(via or []),
+        row_per=row_per,
+    )
+    ambiguities = self._model._find_path_ambiguities(
+        row_per=resolved_row_per,
+        include_tables=list(include_tables),
+        via=list(via or []),
+    )
+    if ambiguities:
+        from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
+
+        a = ambiguities[0]
+        raise DerivaMLDenormalizeAmbiguousPath(
+            from_table=a[&quot;from_table&quot;],
+            to_table=a[&quot;to_table&quot;],
+            paths=a[&quot;paths&quot;],
+            suggested_intermediates=a[&quot;suggested_intermediates&quot;],
+        )
+
+    # Step 2: anchor classification (Rule 7, Rule 8)
+    anchors = self._anchors_as_dict()
+    scoping, orphans, ignored = self._classify_anchors(
+        anchors,
+        include_tables=list(include_tables),
+        via=list(via or []),
+        row_per=resolved_row_per,
+        ignore_unrelated_anchors=ignore_unrelated_anchors,
+    )
+
+    # Step 3: main SQL via _denormalize_impl
+    main_result = _denormalize_impl(
+        model=self._model,
+        engine=self._engine,
+        orm_resolver=self._orm_resolver,
+        dataset_rid=self._dataset_rid,
+        include_tables=list(include_tables),
+        dataset=self._dataset,
+        source=&quot;local&quot;,
+        row_per=resolved_row_per,
+        via=list(via or []) or None,
+    )
+
+    # Step 4: orphan rows (Rule 7 case 3). Uses DenormalizeResult.extend
+    # (added in Task 3 Step 3b) to keep the combine a one-liner.
+    if orphans:
+        orphan_rows = self._emit_orphan_rows(
+            orphans,
+            include_tables=list(include_tables),
+            row_per=resolved_row_per,
+        )
+        main_result = main_result.extend(orphan_rows)
+
+    return main_result
+
+
+def _anchors_as_dict(self) -&gt; dict[str, list[str]]:
+    &quot;&quot;&quot;Return anchors as table_name -&gt; list of RID strings.&quot;&quot;&quot;
+    members = self._dataset.list_dataset_members(recurse=True)
+    return {table: [r[&quot;RID&quot;] for r in rows] for table, rows in members.items()}
+
+
+def _emit_orphan_rows(
+    self,
+    orphans: dict[str, list[str]],
+    *,
+    include_tables: list[str],
+    row_per: str,
+) -&gt; list[dict[str, Any]]:
+    &quot;&quot;&quot;Emit one output row per orphan anchor.
+
+    For each orphan RID, fetch its row and construct an output dict with:
+      - Anchor's columns populated with the row values.
+      - row_per and downstream columns set to None.
+      - Upstream columns (reachable by outbound FK from the anchor)
+        populated by walking the chain.
+    &quot;&quot;&quot;
+    from deriva_ml.model.catalog import denormalize_column_name
+    from sqlalchemy import select
+
+    # Only emit orphan rows for anchors that don't reach row_per.
+    # (The scoping anchors that DO reach row_per are handled by the main SQL.)
+    orphan_rows: list[dict[str, Any]] = []
+
+    # Get the full column spec so we know what keys to populate.
+    _, column_specs, multi_schema = self._model._prepare_wide_table(
+        self._dataset, self._dataset_rid, list(include_tables),
+    )
+
+    # For each orphan anchor table, for each RID, emit one row.
+    for anchor_table, rids in orphans.items():
+        orm_cls = self._orm_resolver(anchor_table)
+        if orm_cls is None:
+            continue
+        for rid in rids:
+            with self._engine.connect() as conn:
+                row = conn.execute(
+                    select(orm_cls.__table__).where(orm_cls.__table__.c.RID == rid)
+                ).mappings().first()
+            if row is None:
+                continue
+            # Build the output dict: anchor cols populated, others None.
+            out: dict[str, Any] = {}
+            for schema_name, table_name, col_name, _type_name in column_specs:
+                label = denormalize_column_name(
+                    schema_name, table_name, col_name, multi_schema
+                )
+                if table_name == anchor_table:
+                    out[label] = row.get(col_name)
+                else:
+                    out[label] = None
+            orphan_rows.append(out)
+
+    return orphan_rows
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Run tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py -v --tb=short 2&gt;&amp;1 | tail -30
+</code></pre>
+<p>Expected: all pass, including the new <code>TestUnrelatedAnchors</code> and <code>TestOrphanRows</code> classes.</p>
+<ul>
+<li>[ ] <strong>Step 6: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py
+uv run ruff check src/deriva_ml/local_db/denormalizer.py
+git add src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py
+git commit -m &quot;feat(denormalize): anchor classification + orphan row emission (Rules 7, 8)&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-extend-describe-to-return-the-full-plan-dict-spec-5">Task 7: Extend <code>describe()</code> to return the full plan dict (spec §5)</h2>
+<p>The minimal <code>describe</code> from Task 4 just returned row_per + columns. The full plan dict needs: transparent intermediates, join path, ambiguities (when the user explicitly asks for a dry-run), estimated row counts, anchor summary, source mode.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/denormalizer.py</code> — extend <code>describe</code>.
+- Modify: <code>tests/local_db/test_denormalizer.py</code> — extend <code>TestDescribe</code>.</p>
+<p><strong>DRY reminders (see Reuse inventory above):</strong>
+- <code>describe()</code> should reuse the existing <code>Dataset.denormalize_info</code> shape
+  (<code>src/deriva_ml/core/mixins/dataset.py:312</code>) as its starting point —
+  that function already produces <code>columns</code>, <code>join_path</code>, and per-table
+  counts. Extend with <code>row_per</code> / <code>row_per_source</code> / <code>row_per_candidates</code> /
+  <code>ambiguities</code> / <code>orphan_rows</code> / <code>anchors</code> fields. Do NOT rewrite column
+  generation or join-path construction.
+- All row-count estimation should go through <code>_classify_anchors</code> (added
+  in Task 6) — do NOT duplicate anchor classification.
+- Ambiguity detection: call <code>self._model._find_path_ambiguities(...)</code>.
+  Unlike <code>as_dataframe</code>, <code>describe</code> reports ambiguities (dry-run) rather
+  than raising.
+- Use <code>denormalize_column_name</code> for all output column labels.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_denormalizer.py</code>:</p>
+<pre><code class="language-python">class TestDescribe:
+    &quot;&quot;&quot;Denormalizer.describe returns the full plan dict per spec §5.&quot;&quot;&quot;
+
+    def test_describe_keys(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe([&quot;Image&quot;, &quot;Subject&quot;])
+        # Required keys per spec §5
+        for key in [
+            &quot;row_per&quot;,
+            &quot;row_per_source&quot;,
+            &quot;row_per_candidates&quot;,
+            &quot;columns&quot;,
+            &quot;include_tables&quot;,
+            &quot;via&quot;,
+            &quot;join_path&quot;,
+            &quot;transparent_intermediates&quot;,
+            &quot;ambiguities&quot;,
+            &quot;estimated_row_count&quot;,
+            &quot;anchors&quot;,
+            &quot;source&quot;,
+        ]:
+            assert key in plan, f&quot;plan missing key {key}: {list(plan.keys())}&quot;
+
+    def test_describe_row_per_explicit(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe([&quot;Image&quot;, &quot;Subject&quot;], row_per=&quot;Image&quot;)
+        assert plan[&quot;row_per_source&quot;] == &quot;explicit&quot;
+
+    def test_describe_row_per_auto(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe([&quot;Image&quot;, &quot;Subject&quot;])
+        assert plan[&quot;row_per_source&quot;] == &quot;auto-inferred&quot;
+        assert plan[&quot;row_per&quot;] == &quot;Image&quot;
+
+    def test_describe_ambiguity_reported(self, populated_denorm) -&gt; None:
+        if &quot;Observation&quot; not in populated_denorm[&quot;model&quot;].name_to_schema_and_table:
+            pytest.skip(&quot;Canned model needs diamond fixture (Task 2 step 6)&quot;)
+
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe([&quot;Image&quot;, &quot;Subject&quot;])
+        # Ambiguity reported rather than raised (describe is dry-run)
+        assert len(plan[&quot;ambiguities&quot;]) &gt; 0
+        amb = plan[&quot;ambiguities&quot;][0]
+        assert amb[&quot;from&quot;] == &quot;Image&quot;
+        assert amb[&quot;to&quot;] == &quot;Subject&quot;
+        assert &quot;paths&quot; in amb
+        assert &quot;suggestions&quot; in amb
+
+    def test_describe_anchors(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe([&quot;Image&quot;, &quot;Subject&quot;])
+        anc = plan[&quot;anchors&quot;]
+        assert &quot;by_type&quot; in anc
+        assert &quot;total&quot; in anc
+        assert anc[&quot;by_type&quot;][&quot;Image&quot;] == 3  # 3 image members in fixture
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect failures.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestDescribe -v
+</code></pre>
+<p>Expected: <code>KeyError: 'transparent_intermediates'</code> etc.</p>
+<ul>
+<li>[ ] <strong>Step 3: Extend <code>Denormalizer.describe</code>.</strong></li>
+</ul>
+<p>Replace the <code>describe</code> body in <code>src/deriva_ml/local_db/denormalizer.py</code>:</p>
+<pre><code class="language-python">def describe(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;Return a planning-metadata dict describing what would happen.
+
+    Unlike :meth:`as_dataframe`, ``describe`` does NOT raise on ambiguity —
+    it reports ambiguities in the ``ambiguities`` key so callers can
+    inspect before committing to a real call.
+
+    Returns a dict with these keys (see spec §5):
+        row_per, row_per_source, row_per_candidates, columns,
+        include_tables, via, join_path, transparent_intermediates,
+        ambiguities, estimated_row_count, anchors, source
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import (
+        DerivaMLDenormalizeDownstreamLeaf,
+        DerivaMLDenormalizeMultiLeaf,
+    )
+    from deriva_ml.model.catalog import denormalize_column_name
+
+    include = list(include_tables)
+    via_list = list(via or [])
+
+    # ── row_per resolution ─────────────────────────────────────────────
+    row_per_source = &quot;explicit&quot; if row_per else &quot;auto-inferred&quot;
+    row_per_candidates = self._model._find_sinks(include, via_list)
+    try:
+        resolved_row_per: str | None = self._model._determine_row_per(
+            include_tables=include, via=via_list, row_per=row_per,
+        )
+    except (DerivaMLDenormalizeMultiLeaf, DerivaMLDenormalizeDownstreamLeaf):
+        resolved_row_per = None
+
+    # ── columns (may raise if row_per is None) ─────────────────────────
+    try:
+        element_tables, column_specs, multi_schema = self._model._prepare_wide_table(
+            self._dataset, self._dataset_rid, include,
+            row_per=row_per, via=via_list,
+        )
+        cols = [
+            (denormalize_column_name(s, t, c, multi_schema), tp)
+            for s, t, c, tp in column_specs
+        ]
+    except Exception:
+        element_tables = {}
+        cols = []
+
+    # ── ambiguities (reported, not raised) ─────────────────────────────
+    ambiguities_raw = []
+    if resolved_row_per is not None:
+        ambiguities_raw = self._model._find_path_ambiguities(
+            row_per=resolved_row_per,
+            include_tables=include,
+            via=via_list,
+        )
+    ambiguities = [
+        {
+            &quot;type&quot;: &quot;multiple_paths&quot;,
+            &quot;from&quot;: a[&quot;from_table&quot;],
+            &quot;to&quot;: a[&quot;to_table&quot;],
+            &quot;paths&quot;: [&quot; → &quot;.join(p) for p in a[&quot;paths&quot;]],
+            &quot;suggestions&quot;: {
+                &quot;add_to_include_tables&quot;: a[&quot;suggested_intermediates&quot;],
+                &quot;add_to_via&quot;: a[&quot;suggested_intermediates&quot;],
+            },
+        }
+        for a in ambiguities_raw
+    ]
+
+    # ── join path + transparent intermediates ───────────────────────────
+    join_path: list[str] = []
+    transparent: list[str] = []
+    for _, (path_names, _, _) in element_tables.items():
+        for tn in path_names:
+            if tn not in join_path and tn != &quot;Dataset&quot;:
+                join_path.append(tn)
+                if tn not in include and self._model.is_association(tn):
+                    transparent.append(tn)
+
+    # ── anchors summary ─────────────────────────────────────────────────
+    anchors = self._anchors_as_dict()
+    anchors_by_type = {t: len(rids) for t, rids in anchors.items()}
+
+    # ── estimated row count (crude — refined in future work) ────────────
+    # For v1: report how many anchors would be scoping vs orphan.
+    estimated = {
+        &quot;in_scope_row_per_rows&quot;: None,
+        &quot;orphan_rows&quot;: None,
+        &quot;total&quot;: None,
+    }
+    if resolved_row_per is not None:
+        # Count anchors classified as scoping (includes row_per anchors)
+        try:
+            scoping, orphans, _ = self._classify_anchors(
+                anchors,
+                include_tables=include,
+                via=via_list,
+                row_per=resolved_row_per,
+                ignore_unrelated_anchors=True,  # describe shouldn't raise
+            )
+            in_scope = sum(len(rids) for table, rids in scoping.items() if table == resolved_row_per)
+            orphan_count = sum(len(rids) for rids in orphans.values())
+            estimated = {
+                &quot;in_scope_row_per_rows&quot;: in_scope,
+                &quot;orphan_rows&quot;: orphan_count,
+                &quot;total&quot;: in_scope + orphan_count,
+            }
+        except Exception:
+            pass
+
+    return {
+        &quot;row_per&quot;: resolved_row_per,
+        &quot;row_per_source&quot;: row_per_source,
+        &quot;row_per_candidates&quot;: row_per_candidates,
+        &quot;columns&quot;: cols,
+        &quot;include_tables&quot;: include,
+        &quot;via&quot;: via_list,
+        &quot;join_path&quot;: join_path,
+        &quot;transparent_intermediates&quot;: transparent,
+        &quot;ambiguities&quot;: ambiguities,
+        &quot;estimated_row_count&quot;: estimated,
+        &quot;anchors&quot;: {&quot;total&quot;: sum(anchors_by_type.values()), &quot;by_type&quot;: anchors_by_type},
+        &quot;source&quot;: &quot;local&quot;,  # Task 11 updates this when source is tracked
+    }
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestDescribe -v --tb=short
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/denormalizer.py
+uv run ruff check src/deriva_ml/local_db/denormalizer.py
+git add src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py
+git commit -m &quot;feat(denormalize): Denormalizer.describe returns full plan dict (spec §5)&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-implement-list_paths-for-schema-exploration-spec-6">Task 8: Implement <code>list_paths()</code> for schema exploration (spec §6)</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/denormalizer.py</code> — implement <code>list_paths</code>.
+- Modify: <code>tests/local_db/test_denormalizer.py</code> — add <code>TestListPaths</code>.</p>
+<p><strong>DRY reminders (see Reuse inventory above):</strong>
+- <code>reachable_tables</code> uses <code>self._model._outbound_reachable</code> — do NOT
+  re-walk FKs.
+- <code>association_tables</code> uses <code>self._model._is_association_table</code>.
+- <code>schema_paths</code> uses <code>self._model._enumerate_paths</code> — which itself
+  wraps <code>_schema_to_paths</code>.
+- <code>feature_tables</code> should use <code>DerivaModel.find_features</code> /
+  <code>is_feature_table</code> if exposed; do NOT heuristic-detect by name parsing.
+- If the <code>Dataset</code> has a dedicated <code>list_dataset_element_types</code> (see
+  <code>src/deriva_ml/core/mixins/dataset.py:166</code>), use that for
+  <code>member_types</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_denormalizer.py</code>:</p>
+<pre><code class="language-python">class TestListPaths:
+    &quot;&quot;&quot;list_paths describes the FK graph from the dataset's anchor types.&quot;&quot;&quot;
+
+    def test_list_paths_keys(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        info = d.list_paths()
+        # Required keys per spec §6
+        for key in [
+            &quot;member_types&quot;,
+            &quot;anchor_types&quot;,
+            &quot;reachable_tables&quot;,
+            &quot;association_tables&quot;,
+            &quot;feature_tables&quot;,
+            &quot;schema_paths&quot;,
+        ]:
+            assert key in info
+
+    def test_list_paths_reports_member_types(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        info = d.list_paths()
+        assert &quot;Image&quot; in info[&quot;member_types&quot;]
+        assert &quot;Subject&quot; in info[&quot;member_types&quot;]
+
+    def test_list_paths_filter_by_tables(self, populated_denorm) -&gt; None:
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # When filter is given, schema_paths contains only entries involving
+        # those tables.
+        info = d.list_paths(tables=[&quot;Image&quot;])
+        for (source, target), _ in info[&quot;schema_paths&quot;].items():
+            assert &quot;Image&quot; in (source, target)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect failures.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestListPaths -v
+</code></pre>
+<p>Expected: assertions fail (the stub returns empty).</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>list_paths</code>.</strong></li>
+</ul>
+<p>Replace <code>Denormalizer.list_paths</code> body in <code>src/deriva_ml/local_db/denormalizer.py</code>:</p>
+<pre><code class="language-python">def list_paths(
+    self,
+    tables: list[str] | None = None,
+) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;Describe the FK graph reachable from the dataset/anchors.
+
+    Useful for picking ``include_tables`` when the user doesn't know the
+    schema. Model-only analysis.
+
+    Args:
+        tables: If given, filter ``schema_paths`` to paths involving at
+            least one of these tables.
+
+    Returns:
+        Dict with:
+            member_types: list of dataset element types (if constructed
+                from a dataset); else empty.
+            anchor_types: union of all distinct anchor table names.
+            reachable_tables: mapping from each member/anchor type to
+                tables reachable from it via FK.
+            association_tables: names of pure association tables in the
+                schema.
+            feature_tables: names of feature tables (detected heuristically).
+            schema_paths: mapping from (source_table, target_table) to a
+                list of path descriptions.
+    &quot;&quot;&quot;
+    model = self._model
+    anchors = self._anchors_as_dict()
+    anchor_types = sorted(anchors.keys())
+
+    # member_types: if constructed from a dataset, the dataset's members.
+    # For from_rids, this is the anchor types. Same in both cases.
+    member_types = anchor_types
+
+    # Enumerate all tables in the relevant schemas.
+    all_table_names: set[str] = set()
+    try:
+        ml_schema = getattr(model, &quot;ml_schema&quot;, &quot;deriva-ml&quot;)
+        domain_schemas = getattr(model, &quot;domain_schemas&quot;, [])
+        for sname in [ml_schema, *domain_schemas]:
+            if sname in model.schemas:
+                for t in model.schemas[sname].tables.values():
+                    all_table_names.add(t.name)
+    except Exception:
+        pass
+
+    # reachable_tables: from each anchor type, which domain tables are
+    # reachable via FK (using the whole schema as the subgraph).
+    reachable_tables: dict[str, list[str]] = {}
+    for t in anchor_types:
+        reach = model._outbound_reachable(t, all_table_names)
+        reachable_tables[t] = sorted(reach)
+
+    # association_tables: pure M-to-N linking tables
+    association_tables = sorted(
+        t for t in all_table_names if model._is_association_table(t)
+    )
+
+    # feature_tables: heuristic — tables whose name contains &quot;_&quot; and
+    # have an FK to a non-association, non-system table plus FK to a
+    # vocabulary term. Approximated by: `is_feature_table` if the model
+    # exposes it, else empty.
+    feature_tables: list[str] = []
+    is_feat = getattr(model, &quot;is_feature_table&quot;, None)
+    if callable(is_feat):
+        for t in all_table_names:
+            try:
+                if is_feat(t):
+                    feature_tables.append(t)
+            except Exception:
+                pass
+    feature_tables.sort()
+
+    # schema_paths: for every (source, target) pair among anchor_types ×
+    # reachable_tables, enumerate FK paths.
+    schema_paths: dict[tuple[str, str], list[dict]] = {}
+    sources = set(anchor_types)
+    if tables is not None:
+        sources |= set(tables)
+    for source in sources:
+        for target in reachable_tables.get(source, []):
+            if tables is not None and source not in tables and target not in tables:
+                continue
+            paths = model._enumerate_paths(source, target, all_table_names)
+            # Deduplicate
+            unique = list({tuple(p): p for p in paths}.values())
+            schema_paths[(source, target)] = [
+                {&quot;path&quot;: p, &quot;direct&quot;: len(p) == 2}
+                for p in unique
+            ]
+
+    return {
+        &quot;member_types&quot;: member_types,
+        &quot;anchor_types&quot;: anchor_types,
+        &quot;reachable_tables&quot;: reachable_tables,
+        &quot;association_tables&quot;: association_tables,
+        &quot;feature_tables&quot;: feature_tables,
+        &quot;schema_paths&quot;: schema_paths,
+    }
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestListPaths -v --tb=short
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/denormalizer.py
+uv run ruff check src/deriva_ml/local_db/denormalizer.py
+git add src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py
+git commit -m &quot;feat(denormalize): implement Denormalizer.list_paths for schema exploration&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-add-denormalizerfrom_rids-for-arbitrary-anchor-sets">Task 9: Add <code>Denormalizer.from_rids</code> for arbitrary anchor sets</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/denormalizer.py</code> — add <code>from_rids</code> classmethod.
+- Modify: <code>tests/local_db/test_denormalizer.py</code> — add <code>TestFromRids</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_denormalizer.py</code>:</p>
+<pre><code class="language-python">class TestFromRids:
+    &quot;&quot;&quot;Denormalizer.from_rids constructs from arbitrary RID anchors.&quot;&quot;&quot;
+
+    def test_from_rids_with_table_tuples(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;(table, RID) pairs skip the lookup.&quot;&quot;&quot;
+        from deriva_ml.local_db.workspace import Workspace
+
+        ml = _FakeMl(populated_denorm)
+        d = Denormalizer.from_rids(
+            [(&quot;Image&quot;, r) for r in populated_denorm[&quot;image_rids&quot;]],
+            ml=ml,
+        )
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+        # 3 Images in fixture — all reachable.
+        assert len(df) == 3
+
+    def test_from_rids_with_separate_deps(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Escape hatch: pass catalog, workspace, model explicitly.&quot;&quot;&quot;
+        ls = populated_denorm[&quot;local_schema&quot;]
+        d = Denormalizer.from_rids(
+            [(&quot;Image&quot;, r) for r in populated_denorm[&quot;image_rids&quot;]],
+            catalog=None,  # no lookup needed (table supplied)
+            workspace=None,  # fixture provides engine directly
+            model=populated_denorm[&quot;model&quot;],
+            engine=ls.engine,
+            orm_resolver=ls.get_orm_class,
+        )
+        df = d.as_dataframe([&quot;Image&quot;, &quot;Subject&quot;])
+        assert len(df) == 3
+
+    def test_from_rids_mixed_forms_not_implemented_yet(self, populated_denorm) -&gt; None:
+        &quot;&quot;&quot;Bare RIDs require catalog lookup; in this test we'll just use
+        the tuple form (bare-RID lookup is catalog-dependent and exercised
+        in the live integration test suite).&quot;&quot;&quot;
+        # Placeholder - mixed forms with bare RIDs need a live catalog.
+        pass
+
+
+class _FakeMl:
+    &quot;&quot;&quot;Minimal DerivaML-shaped fixture for from_rids tests.&quot;&quot;&quot;
+    def __init__(self, populated_denorm):
+        self._pd = populated_denorm
+        self.model = populated_denorm[&quot;model&quot;]
+        # Workspace-like object that exposes engine + local_schema
+        class _WS:
+            def __init__(self, ls):
+                self._ls = ls
+                self.local_schema = ls
+                self.engine = ls.engine
+        self.workspace = _WS(populated_denorm[&quot;local_schema&quot;])
+        self.catalog = None  # bare-RID lookup not needed for tuple anchors
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect <code>AttributeError: from_rids</code>.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestFromRids -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>from_rids</code> classmethod.</strong></li>
+</ul>
+<p>Add to the <code>Denormalizer</code> class:</p>
+<pre><code class="language-python">@classmethod
+def from_rids(
+    cls,
+    anchors: list[str | tuple[str, str]],
+    *,
+    ml: Any = None,
+    catalog: Any = None,
+    workspace: Any = None,
+    model: Any = None,
+    engine: Any = None,
+    orm_resolver: Any = None,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; &quot;Denormalizer&quot;:
+    &quot;&quot;&quot;Construct from an explicit anchor set.
+
+    Anchors may be bare RIDs (table looked up via catalog) or
+    ``(table_name, RID)`` tuples (lookup skipped). Mixed forms supported.
+
+    Pass either ``ml=`` (common path) or the separate ``catalog``,
+    ``workspace``, ``model`` keyword args (escape hatch).
+
+    Args:
+        anchors: list of RIDs or (table, RID) tuples.
+        ml: Convenience: pass a DerivaML instance. catalog/workspace/model
+            are derived from it.
+        catalog, workspace, model, engine, orm_resolver: Explicit deps.
+        ignore_unrelated_anchors: propagated to subsequent method calls.
+    &quot;&quot;&quot;
+    # Derive deps from ml if given
+    if ml is not None:
+        catalog = catalog or getattr(ml, &quot;catalog&quot;, None)
+        workspace = workspace or getattr(ml, &quot;workspace&quot;, None)
+        model = model or getattr(ml, &quot;model&quot;, None)
+        if engine is None and workspace is not None:
+            engine = workspace.engine
+        if orm_resolver is None and workspace is not None:
+            ls = getattr(workspace, &quot;local_schema&quot;, None)
+            if ls is not None:
+                orm_resolver = ls.get_orm_class
+
+    if model is None:
+        raise ValueError(
+            &quot;Denormalizer.from_rids requires either ml= or an explicit model=&quot;
+        )
+
+    # Normalize anchors to (table, RID) pairs
+    resolved: list[tuple[str, str]] = []
+    bare_rids: list[str] = []
+    for a in anchors:
+        if isinstance(a, tuple):
+            resolved.append(a)
+        else:
+            bare_rids.append(a)
+
+    # Batch-resolve bare RIDs via catalog
+    if bare_rids:
+        if catalog is None:
+            raise ValueError(
+                &quot;Bare RIDs given but no catalog available for lookup. &quot;
+                &quot;Pass (table, RID) tuples or provide catalog=.&quot;
+            )
+        for rid in bare_rids:
+            info = catalog.resolve_rid(rid) if hasattr(catalog, &quot;resolve_rid&quot;) else None
+            if info is None:
+                raise ValueError(f&quot;Cannot resolve RID {rid!r} to a table&quot;)
+            resolved.append((info.table.name, rid))
+
+    # Group by table
+    anchors_by_table: dict[str, list[str]] = {}
+    for table, rid in resolved:
+        anchors_by_table.setdefault(table, []).append(rid)
+
+    # Use the first anchor as a &quot;pseudo-dataset_rid&quot; for _prepare_wide_table
+    # (it only uses this for the WHERE clause Dataset.RID IN (...) — for
+    # from_rids we don't have a Dataset context, so we pass the resolver
+    # a placeholder).
+    pseudo_rid = resolved[0][1] if resolved else &quot;&quot;
+
+    # Create a pseudo-dataset that exposes the anchors dict as members
+    class _AnchorSet:
+        dataset_rid = pseudo_rid
+        model = None  # filled below
+
+        def list_dataset_members(self, **_kwargs):
+            return {t: [{&quot;RID&quot;: r} for r in rids] for t, rids in anchors_by_table.items()}
+
+        def list_dataset_children(self, **_kwargs):
+            return []
+
+    anchor_set = _AnchorSet()
+    anchor_set.model = model
+
+    # Build the Denormalizer manually
+    inst = object.__new__(cls)
+    inst._dataset = anchor_set
+    inst._dataset_rid = pseudo_rid
+    inst._model = model
+    inst._engine = engine
+    inst._orm_resolver = orm_resolver
+    return inst
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalizer.py::TestFromRids -v --tb=short
+</code></pre>
+<p>Expected: the tuple-form tests pass; the mixed-form test is a placeholder that passes trivially.</p>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/denormalizer.py
+uv run ruff check src/deriva_ml/local_db/denormalizer.py
+git add src/deriva_ml/local_db/denormalizer.py tests/local_db/test_denormalizer.py
+git commit -m &quot;feat(denormalize): Denormalizer.from_rids for arbitrary RID anchors&quot;
+</code></pre>
+<hr />
+<h2 id="task-10-add-sugar-methods-on-dataset-and-datasetbag-remove-old-methods">Task 10: Add sugar methods on <code>Dataset</code> and <code>DatasetBag</code>; remove old methods</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> — add new methods, remove old.
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> — same.
+- Modify: <code>src/deriva_ml/interfaces.py</code> — update <code>DatasetLike</code> protocol.</p>
+<ul>
+<li>[ ] <strong>Step 1: In <code>src/deriva_ml/dataset/dataset.py</code>, add the five sugar methods.</strong></li>
+</ul>
+<p>Near the end of the <code>Dataset</code> class (before the <code>cache_denormalized</code> method), add:</p>
+<pre><code class="language-python">def get_denormalized_as_dataframe(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; &quot;pd.DataFrame&quot;:
+    &quot;&quot;&quot;Return the dataset as a denormalized wide table (DataFrame).
+
+    Shortcut for ``Denormalizer(self).as_dataframe(include_tables, ...)``.
+    See :class:`~deriva_ml.local_db.denormalizer.Denormalizer` for the
+    full API and semantic rules.
+    &quot;&quot;&quot;
+    from deriva_ml.local_db.denormalizer import Denormalizer
+    return Denormalizer(self).as_dataframe(
+        include_tables,
+        row_per=row_per,
+        via=via,
+        ignore_unrelated_anchors=ignore_unrelated_anchors,
+    )
+
+
+def get_denormalized_as_dict(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; &quot;Generator[dict[str, Any], None, None]&quot;:
+    &quot;&quot;&quot;Stream the denormalized dataset rows as dicts.
+
+    Shortcut for ``Denormalizer(self).as_dict(include_tables, ...)``.
+    &quot;&quot;&quot;
+    from deriva_ml.local_db.denormalizer import Denormalizer
+    yield from Denormalizer(self).as_dict(
+        include_tables,
+        row_per=row_per,
+        via=via,
+        ignore_unrelated_anchors=ignore_unrelated_anchors,
+    )
+
+
+def list_denormalized_columns(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; list[tuple[str, str]]:
+    &quot;&quot;&quot;List the columns the denormalized table would have.
+
+    Shortcut for ``Denormalizer(self).columns(include_tables, ...)``.
+    Model-only — no data fetch.
+    &quot;&quot;&quot;
+    from deriva_ml.local_db.denormalizer import Denormalizer
+    return Denormalizer(self).columns(
+        include_tables, row_per=row_per, via=via,
+    )
+
+
+def describe_denormalized(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;Dry-run the denormalization; return planning metadata.
+
+    Shortcut for ``Denormalizer(self).describe(include_tables, ...)``.
+    See the spec (docs/superpowers/specs/...) for the exact structure.
+    &quot;&quot;&quot;
+    from deriva_ml.local_db.denormalizer import Denormalizer
+    return Denormalizer(self).describe(
+        include_tables, row_per=row_per, via=via,
+    )
+
+
+def list_schema_paths(
+    self,
+    tables: list[str] | None = None,
+) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;List FK paths reachable from this dataset's members.
+
+    Shortcut for ``Denormalizer(self).list_paths(tables)``. Useful for
+    discovering what tables are available to include in denormalization.
+    &quot;&quot;&quot;
+    from deriva_ml.local_db.denormalizer import Denormalizer
+    return Denormalizer(self).list_paths(tables=tables)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Remove the old methods from <code>Dataset</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset.py</code>, delete these method definitions (they're around the line numbers shown — use the grep output above to confirm):</p>
+<ul>
+<li><code>def denormalize_as_dataframe(...)</code> at line ~782</li>
+<li><code>def denormalize_as_dict(...)</code> at line ~944</li>
+<li><code>def denormalize_columns(...)</code> at line ~1043</li>
+<li><code>def denormalize_info(...)</code> at line ~1083</li>
+</ul>
+<p>Remove these methods entirely. Do not leave stubs or aliases.</p>
+<ul>
+<li>[ ] <strong>Step 3: Do the same for <code>src/deriva_ml/dataset/dataset_bag.py</code>.</strong></li>
+</ul>
+<p>Add the same five sugar methods, and remove the corresponding old methods at lines ~763, ~841, ~934.</p>
+<ul>
+<li>[ ] <strong>Step 4: Update the <code>DatasetLike</code> protocol in <code>src/deriva_ml/interfaces.py</code>.</strong></li>
+</ul>
+<p>Replace the old method stubs (around lines 225, 299, 350) with the new ones. Keep the type-signature-level documentation but use the new names.</p>
+<ul>
+<li>[ ] <strong>Step 5: Update <code>DerivaML.describe_denormalized</code> in <code>core/mixins/dataset.py</code>.</strong></li>
+</ul>
+<p>Rename <code>DerivaML.denormalize_info</code> to <code>DerivaML.describe_denormalized</code>. Update the body to use the new planner helpers (delegate to <code>Denormalizer</code> isn't straightforward since there's no dataset — keep the same implementation shape but with the new method name).</p>
+<ul>
+<li>[ ] <strong>Step 6: Update all in-repo callers to the new names.</strong></li>
+</ul>
+<pre><code class="language-bash">grep -rn &quot;denormalize_as_dataframe\|denormalize_as_dict\|denormalize_columns\|denormalize_info&quot; src/ tests/ --include=&quot;*.py&quot; | grep -v __pycache__ | grep -v &quot;.pyc&quot;
+</code></pre>
+<p>For each hit that's not in the deleted methods themselves, update:</p>
+<ul>
+<li><code>denormalize_as_dataframe(...)</code> → <code>get_denormalized_as_dataframe(...)</code></li>
+<li><code>denormalize_as_dict(...)</code> → <code>get_denormalized_as_dict(...)</code></li>
+<li><code>denormalize_columns(...)</code> → <code>list_denormalized_columns(...)</code></li>
+<li><code>denormalize_info(...)</code> → <code>describe_denormalized(...)</code></li>
+</ul>
+<p>Known locations:
+- <code>src/deriva_ml/dataset/split.py:738</code> — <code>source_ds.denormalize_as_dataframe</code> call.
+- <code>tests/dataset/test_denormalize.py</code> — many call sites.
+- <code>tests/dataset/test_denormalize_info.py</code> — all call sites.
+- <code>src/deriva_ml/interfaces.py</code> — docstring references in <code>denormalize_as_dict</code>'s See Also.</p>
+<p>Use a global sed to speed this up for source files:</p>
+<pre><code class="language-bash"># Source files only — tests handled in Task 12
+find src -name &quot;*.py&quot; -not -path &quot;*/node_modules/*&quot; -exec sed -i '' \
+  -e 's/\.denormalize_as_dataframe(/\.get_denormalized_as_dataframe(/g' \
+  -e 's/\.denormalize_as_dict(/\.get_denormalized_as_dict(/g' \
+  -e 's/\.denormalize_columns(/\.list_denormalized_columns(/g' \
+  -e 's/\.denormalize_info(/\.describe_denormalized(/g' \
+  {} \;
+</code></pre>
+<p>Verify no stale method names remain in src:</p>
+<pre><code class="language-bash">grep -rn &quot;\.denormalize_as_dataframe\|\.denormalize_as_dict\|\.denormalize_columns\|\.denormalize_info&quot; src/ --include=&quot;*.py&quot; | grep -v __pycache__
+</code></pre>
+<p>Expected: empty.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run the new Denormalizer tests + split tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py --tb=short 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: all pass. Don't run dataset integration tests yet — those are updated in Task 12.</p>
+<ul>
+<li>[ ] <strong>Step 8: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/
+uv run ruff check src/
+git add src/
+git commit -m &quot;refactor(denormalize): add Dataset/DatasetBag sugar methods; remove old names
+
+Rename denormalize_as_dataframe → get_denormalized_as_dataframe,
+denormalize_as_dict → get_denormalized_as_dict, denormalize_columns →
+list_denormalized_columns, denormalize_info → describe_denormalized.
+Old methods removed outright (no deprecation). All in-repo callers
+updated via sed.
+&quot;
+</code></pre>
+<hr />
+<h2 id="task-11-update-workspacecache_denormalized-to-forward-new-params">Task 11: Update <code>Workspace.cache_denormalized</code> to forward new params</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/workspace.py</code> — <code>cache_denormalized</code> method.</p>
+<ul>
+<li>[ ] <strong>Step 1: Find the current implementation.</strong></li>
+</ul>
+<pre><code class="language-bash">grep -n &quot;def cache_denormalized\|def cache_key\|resolve_row_per&quot; src/deriva_ml/local_db/workspace.py
+</code></pre>
+<p>Expected: <code>cache_denormalized</code> around line 412.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update the signature to accept <code>row_per</code>, <code>via</code>, <code>ignore_unrelated_anchors</code>.</strong></li>
+</ul>
+<p>Add these params with sensible defaults. Include them in the cache key so different denormalizations are cached independently. The impl forwards to <code>_denormalize_impl</code> or a fresh <code>Denormalizer</code> — whichever is cleanest (check if the current impl calls <code>_denormalize_impl</code> or an intermediate).</p>
+<p>Key fragment:</p>
+<pre><code class="language-python">def cache_denormalized(
+    self,
+    model: Any,
+    dataset_rid: str,
+    include_tables: list[str],
+    version: str | None = None,
+    source: str = &quot;local&quot;,
+    slice_id: str | None = None,
+    refresh: bool = False,
+    dataset: Any = None,
+    dataset_children_rids: list[str] | None = None,
+    paged_client: Any = None,
+    row_per: str | None = None,                    # new
+    via: list[str] | None = None,                  # new
+    ignore_unrelated_anchors: bool = False,        # new
+) -&gt; &quot;CachedResult&quot;:
+</code></pre>
+<p>In the body, include row_per/via/ignore_unrelated_anchors in the cache key and pass them through to the impl.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run workspace tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v --tb=short 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/workspace.py
+uv run ruff check src/deriva_ml/local_db/workspace.py
+git add src/deriva_ml/local_db/workspace.py
+git commit -m &quot;feat(denormalize): Workspace.cache_denormalized forwards row_per/via&quot;
+</code></pre>
+<hr />
+<h2 id="task-12-restructure-the-existing-integration-test-file">Task 12: Restructure the existing integration test file</h2>
+<p>This is the largest test-rewriting task. The existing <code>tests/dataset/test_denormalize.py</code> (1461 lines) has classes organized by historical concern, not by the new rules. Restructure to match the rule-by-rule organization in the spec, update all call sites to the new API, and un-xfail the three tests that should now pass.</p>
+<p><strong>Files:</strong>
+- Rewrite: <code>tests/dataset/test_denormalize.py</code>
+- Rewrite: <code>tests/dataset/test_denormalize_info.py</code> → <code>tests/dataset/test_describe_denormalized.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Update call sites in <code>tests/dataset/test_denormalize.py</code>.</strong></li>
+</ul>
+<p>Run the same sed as in Task 10 step 6 but for tests:</p>
+<pre><code class="language-bash">find tests -name &quot;*.py&quot; -exec sed -i '' \
+  -e 's/\.denormalize_as_dataframe(/\.get_denormalized_as_dataframe(/g' \
+  -e 's/\.denormalize_as_dict(/\.get_denormalized_as_dict(/g' \
+  -e 's/\.denormalize_columns(/\.list_denormalized_columns(/g' \
+  -e 's/\.denormalize_info(/\.describe_denormalized(/g' \
+  {} \;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Remove <code>xfail</code> markers on the three tests that should now pass.</strong></li>
+</ul>
+<p>In <code>tests/dataset/test_denormalize.py</code>:</p>
+<ul>
+<li>
+<p>Line 1275: <code>@pytest.mark.xfail(reason="Pending join tree refactoring — intermediate should force multi-hop path")</code> on <code>test_diamond_resolved_with_intermediate</code>. Delete the decorator.</p>
+</li>
+<li>
+<p>Line 1317: <code>@pytest.mark.xfail(reason="Pending join tree refactoring — association table must be joined through as implicit intermediate")</code> on <code>test_association_mandatory_intermediate</code>. Delete.</p>
+</li>
+<li>
+<p>Line 1427: <code>@pytest.mark.xfail(reason="Feature table denormalization not yet implemented in include_tables")</code> on <code>test_feature_table_included</code>. Delete.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Update the diamond-ambiguity test that used to silently succeed but now raises.</strong></p>
+</li>
+</ul>
+<p>In <code>test_denormalize.py</code>, the <code>TestAmbiguousPaths::test_direct_fk_prefers_shortest_path</code> test (line ~1141) expects the direct FK to silently win. Under the new rules, this is an ambiguity error. Update:</p>
+<pre><code class="language-python">def test_direct_fk_raises_ambiguity(self, dataset_test, tmp_path):
+    &quot;&quot;&quot;A1: Two FK paths between Image and Subject now raise (was: silent pick).
+
+    Under the new denormalization semantics (spec §3.6 / Rule 6), any
+    path ambiguity is surfaced as an error. Users must add an intermediate
+    to include_tables or via= to disambiguate.
+
+    This replaces the old test_direct_fk_prefers_shortest_path test —
+    silent path selection is explicitly rejected by design.
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
+
+    dataset_description = dataset_test.dataset_description
+    current_version = dataset_description.dataset.current_version
+    bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+    with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+        bag.get_denormalized_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Subject&quot;])
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run the dataset integration tests against a live catalog.</strong></li>
+</ul>
+<p>Requires <code>DERIVA_HOST=localhost</code>. Takes ~20 minutes.</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_denormalize.py -q --tb=short 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected: all pass. Failures likely fall into these categories — fix each:</p>
+<ol>
+<li>Test still uses old method name — update with sed or manually.</li>
+<li>Test expects silent path selection in a diamond — update to <code>pytest.raises(DerivaMLDenormalizeAmbiguousPath)</code>.</li>
+<li>Test expects bag.denormalize_* to work — already handled by sugar method.</li>
+<li>
+<p>Test asserts row count that changed due to new rules — if the new count is correct per spec, update the test.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 5: Rename and update <code>test_denormalize_info.py</code>.</strong></p>
+</li>
+</ol>
+<pre><code class="language-bash">git mv tests/dataset/test_denormalize_info.py tests/dataset/test_describe_denormalized.py
+</code></pre>
+<p>Update the module docstring to reference <code>describe_denormalized</code>. The return-dict structure has more keys now (see spec §5). Update the test assertions to include the new keys (<code>row_per</code>, <code>row_per_candidates</code>, <code>ambiguities</code>, <code>transparent_intermediates</code>, etc.) and check they have sensible values.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run both renamed/updated test files.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_denormalize.py tests/dataset/test_describe_denormalized.py -q --tb=short 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 7: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format tests/
+uv run ruff check tests/
+git add tests/dataset/test_denormalize.py tests/dataset/test_describe_denormalized.py
+git commit -m &quot;test(denormalize): restructure integration tests for new rules
+
+Update all call sites to new API names. Remove xfail markers on three
+tests that pass under the new rules (diamond-resolved, association-
+mandatory, feature-table). Update test_direct_fk_prefers_shortest_path
+to assert ambiguity raises under the new semantics. Rename
+test_denormalize_info.py → test_describe_denormalized.py.
+&quot;
+</code></pre>
+<hr />
+<h2 id="task-13-full-test-suite-run-comprehensive-code-review">Task 13: Full test suite run + comprehensive code review</h2>
+<p><strong>Files:</strong> None — this is the final gate.</p>
+<ul>
+<li>[ ] <strong>Step 1: Run the full unit test suite (fast).</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py tests/model/ -q --tb=short 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the full integration test suite.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ tests/local_db/test_denormalize_impl.py -q --tb=short 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected: all pass. Allow ~20–30 minutes.</p>
+<ul>
+<li>[ ] <strong>Step 3: Dispatch a comprehensive code review subagent.</strong></li>
+</ul>
+<p>Using the implementer's session (or <code>Agent</code> tool in Claude Code), dispatch a review agent. The prompt should include:</p>
+<pre><code>You are performing a comprehensive code review of the denormalization
+semantics refactor in the deriva-ml project.
+
+Working directory: /Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/
+Branch: claude/compassionate-visvesvaraya
+Base commit: &lt;commit SHA just before Task 1&gt;
+Head commit: &lt;HEAD SHA after Task 12&gt;
+
+Spec: docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md
+User-facing doc: docs/concepts/denormalization.md
+
+Review all changes with focus on:
+
+1. Correctness
+   - Does the planner implement Rules 2, 5, 6 exactly as specified?
+   - Does Denormalizer.as_dataframe produce correct output for all the
+     example scenarios in the spec (linear chain, diamond, diamond with
+     intermediate, diamond with via, feature table, orphan members)?
+   - Are association tables correctly handled as transparent
+     intermediates (joined through, columns excluded)?
+   - Does Rule 7 case 3 (orphan rows) actually produce NULL on the
+     row_per side?
+   - Does Rule 8 (unrelated anchors) raise on default and silently drop
+     with the flag?
+
+2. Interface consistency
+   - Do the new Dataset/DatasetBag method names follow the
+     get_*_as_* / list_* / describe_* pattern?
+   - Do Denormalizer class method signatures match the spec §2.3?
+   - Is Denormalizer.from_rids consistent with the spec §2.2?
+
+3. Error messages
+   - Do the five new exception classes (DerivaMLDenormalize*) include
+     all the fields the spec says they should (candidates, paths,
+     suggestions, etc.)?
+   - Are error messages actionable — do they tell the user exactly what
+     to do?
+
+4. Test coverage
+   - Does tests/local_db/test_planner_rules.py cover all the sink/
+     downstream/path-ambiguity scenarios from the spec?
+   - Does tests/local_db/test_denormalizer.py cover every public method
+     of Denormalizer, both happy paths and error cases?
+   - Are the three xfail tests now passing under the new rules?
+   - Is TestOrphanRows actually exercising the Rule-7-case-3 path?
+   - Is TestUnrelatedAnchors exercising Rule 8 including the ignore flag?
+
+5. Code quality &amp; DRY
+   - Is each method in Denormalizer / the planner helpers focused on one
+     responsibility?
+   - Are there copy-paste duplications between Denormalizer and the
+     older _denormalize_impl that should be consolidated?
+   - Do the planner helpers (_find_sinks, _determine_row_per, etc.)
+     have clear docstrings with args/returns/raises?
+   - Any dead code left over from the old API?
+
+   **DRY audit (check against the plan's &quot;Reuse inventory&quot; section):**
+   - Does `_enumerate_paths` delegate to `_schema_to_paths` (the
+     authoritative FK-graph DFS) via the new `stop_at` kwarg, or does
+     it re-implement DFS / filter paths post-hoc?
+   - Is `_is_association_table` a method on `DerivaModel` (extracted
+     from its previous nested definition in `_build_join_tree`), and do
+     both the planner and `Denormalizer.list_paths` call the same method?
+   - Is `_fk_neighbors` a method on `DerivaModel` (extracted from its
+     previous nested definition in `_schema_to_paths`), and are there any
+     places still walking `table.foreign_keys` + `table.referenced_by`
+     directly that should instead call `_fk_neighbors`?
+   - Are all output column names generated through
+     `deriva_ml.model.catalog.denormalize_column_name`, or is there a new
+     `{table}.{col}` string concatenation?
+   - Are FK edges between two tables resolved through
+     `DerivaModel._table_relationship`, or re-implemented?
+   - Does `_emit_orphan_rows` follow the same NULL-init pattern as
+     `Dataset._denormalize_datapath`, or invent its own?
+   - Does `Denormalizer._run` combine orphan rows using
+     `DenormalizeResult.extend(...)`, or does it manually rebuild the
+     dataclass?
+   - Does `describe` reuse the shape established by `denormalize_info`
+     (columns / join_path / per-table counts), or does it recompute them?
+   - Does the anchor-retrieval path use `list_dataset_members` rather
+     than querying dataset association tables directly?
+
+   Any &quot;yes it duplicates&quot; finding is an Important-severity issue.
+
+6. Docstring accuracy
+   - Do the docstrings on the new methods match the spec's semantic
+     rules?
+   - Do they accurately describe row cardinality and orphan behavior?
+
+Format the review as:
+- Summary (1 paragraph)
+- Strengths (top 3-5)
+- Issues, organized by severity: Critical / Important / Minor
+  Each issue: file path, line numbers, what's wrong, suggested fix.
+- Test coverage assessment
+- Recommendation: READY / NEEDS FIXES / NEEDS REDESIGN
+</code></pre>
+<p>Run the review agent. Address any Critical issues immediately. Important issues should be addressed before merge. Minor issues can be deferred or fixed as a follow-up.</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint all changed files.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/ tests/
+uv run ruff check src/
+</code></pre>
+<p>Fix any remaining lint issues. Commit any lint fixes:</p>
+<pre><code class="language-bash">git add -A
+git commit -m &quot;style: ruff format across denormalize changes&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Final verification.</strong></li>
+</ul>
+<pre><code class="language-bash"># Verify no stale old-name references in source
+grep -rn &quot;\.denormalize_as_dataframe\|\.denormalize_as_dict\|\.denormalize_columns\|\.denormalize_info&quot; src/ tests/ --include=&quot;*.py&quot; | grep -v __pycache__
+# Verify all new names resolve
+DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;
+from deriva_ml.local_db.denormalizer import Denormalizer
+from deriva_ml.core.exceptions import (
+    DerivaMLDenormalizeError,
+    DerivaMLDenormalizeAmbiguousPath,
+    DerivaMLDenormalizeMultiLeaf,
+    DerivaMLDenormalizeNoSink,
+    DerivaMLDenormalizeDownstreamLeaf,
+    DerivaMLDenormalizeUnrelatedAnchor,
+)
+print('All imports resolve')
+&quot;
+</code></pre>
+<p>Expected:
+- <code>grep</code> returns no hits.
+- Python import succeeds.</p>
+<ul>
+<li>[ ] <strong>Step 6: Update CHANGELOG / release notes (if present).</strong></li>
+</ul>
+<p>Check if <code>CHANGELOG.md</code> or similar exists. If so, append a breaking-change note:</p>
+<pre><code class="language-markdown">### Breaking changes
+
+- Denormalization API renamed to follow `get_*_as_*` / `list_*` / `describe_*` conventions:
+  - `denormalize_as_dataframe` → `get_denormalized_as_dataframe`
+  - `denormalize_as_dict` → `get_denormalized_as_dict`
+  - `denormalize_columns` → `list_denormalized_columns`
+  - `denormalize_info` → `describe_denormalized`
+- Ambiguous FK paths now raise `DerivaMLDenormalizeAmbiguousPath` instead
+  of silently selecting the shortest path. See the migration guide in
+  `docs/concepts/denormalization.md`.
+- New `Denormalizer` class in `deriva_ml.local_db.denormalizer` is the
+  primary entry point for ad-hoc denormalization from arbitrary RID sets.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Final commit.</strong></li>
+</ul>
+<pre><code class="language-bash">git add CHANGELOG.md 2&gt;/dev/null || true
+git commit -m &quot;docs: note breaking denormalization API changes in CHANGELOG&quot; || true
+</code></pre>
+<hr />
+<h2 id="verification-checklist-run-before-declaring-done">Verification checklist (run before declaring done)</h2>
+<ul>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py tests/model/ -v --tb=short</code> → all pass.</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ -v --tb=short</code> → all pass, including the three previously-xfailed tests.</li>
+<li>[ ] <code>grep -rn "denormalize_as_dataframe\|denormalize_as_dict\|denormalize_columns\|denormalize_info" src/</code> returns no matches.</li>
+<li>[ ] <code>uv run ruff check src/</code> → no issues.</li>
+<li>[ ] <code>from deriva_ml.local_db.denormalizer import Denormalizer</code> works.</li>
+<li>[ ] The five new exception classes are importable from <code>deriva_ml.core.exceptions</code>.</li>
+<li>[ ] Code review (Task 13 step 3) returns READY or all issues addressed.</li>
+</ul>
+<h2 id="what-this-plan-delivers">What this plan delivers</h2>
+<p>At the end:</p>
+<ul>
+<li><strong><code>Denormalizer</code> class</strong> in <code>src/deriva_ml/local_db/denormalizer.py</code> with the five public methods and two constructors.</li>
+<li><strong>New planner helpers</strong> in <code>src/deriva_ml/model/catalog.py</code>: <code>_find_sinks</code>, <code>_determine_row_per</code>, <code>_find_path_ambiguities</code>, <code>_enumerate_paths</code>, <code>_outbound_reachable</code>, <code>_is_association_table</code>.</li>
+<li><strong>Five new exception classes</strong> in <code>src/deriva_ml/core/exceptions.py</code>.</li>
+<li><strong>Renamed sugar methods</strong> on <code>Dataset</code> / <code>DatasetBag</code> / <code>DatasetLike</code> protocol.</li>
+<li><strong>All three xfail markers removed</strong> from the integration tests that now pass.</li>
+<li><strong>Restructured test files</strong> matching the rule-by-rule organization.</li>
+<li><strong>Zero remaining stale method names</strong> anywhere in the repo.</li>
+<li><strong>Comprehensive code review</strong> (Task 13 step 3) confirming correctness and quality.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

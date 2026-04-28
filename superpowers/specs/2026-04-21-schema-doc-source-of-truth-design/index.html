@@ -1,0 +1,2281 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml Schema Documentation — Source-of-Truth Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-schema-documentation-source-of-truth-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml Schema Documentation — Source-of-Truth Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-motivation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Motivation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decisions-from-brainstorming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Decisions (from brainstorming)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. File layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. File layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-docsreferenceschemamd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 docs/reference/schema.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-toolsvalidate_schema_docpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 tools/validate_schema_doc.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-pyprojecttoml-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 pyproject.toml entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-githubworkflowsvalidate-schemayml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 .github/workflows/validate-schema.yml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-docsreferencereadmemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 docs/reference/README.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-validator-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Validator implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Validator implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-load_from_doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 load_from_doc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-load_from_code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 load_from_code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-diff_schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 diff_schemas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-mismatch-output-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Mismatch output format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-testing-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Testing strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Testing strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-unit-tests-teststoolstest_validate_schema_docpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Unit tests (tests/tools/test_validate_schema_doc.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-integration-tests-teststoolstest_validate_schema_doc_integrationpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Integration tests (tests/tools/test_validate_schema_doc_integration.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-doc-structure-tests-teststoolstest_schema_doc_structurepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Doc structure tests (tests/tools/test_schema_doc_structure.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Error handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Bootstrap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-filed-follow-ups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Filed follow-ups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-delivery-order-for-the-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Delivery order (for the plan)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-schema-documentation-source-of-truth-design">deriva-ml Schema Documentation — Source-of-Truth Design</h1>
+<p><strong>Date:</strong> 2026-04-21
+<strong>Author:</strong> Claude (with Carl)
+<strong>Status:</strong> Approved, ready for implementation-plan
+<strong>Phase:</strong> Phase 2, Subsystem 0 (of 5)
+<strong>Related spec:</strong> <code>2026-04-21-status-enum-reconciliation-design.md</code> (Subsystem 1; blocked on this)</p>
+<h2 id="1-motivation">1. Motivation</h2>
+<p>The <code>deriva-ml</code> schema (tables, columns, FKs, vocabulary terms) is defined programmatically in <code>src/deriva_ml/schema/create_schema.py</code>. That file is Python, executable at catalog-creation time via <code>create_ml_schema</code> / <code>initialize_ml_schema</code>. It is the authoritative source for what a freshly-created catalog contains.</p>
+<p>But there is no corresponding reviewable document describing the schema. The existing <code>docs/architecture.md</code> has a 5-row summary table and references <code>docs/assets/ERD.png</code> — an image that is 15+ months stale (last updated Jan 2025, well before Phase 1's SQLite-backed execution state and numerous other additions).</p>
+<p>Subsystem 1 (status-enum reconciliation) adds <code>Execution_Status</code> as a new vocabulary table. Reviewing that change, and every future schema change, is harder than it should be without a current-state reference.</p>
+<p>This spec establishes <code>docs/reference/schema.md</code> as the <strong>authoritative document</strong> for the <code>deriva-ml</code> schema structure and vocabulary seeding. A CI validator enforces that the document and <code>create_schema.py</code> agree.</p>
+<h2 id="2-decisions-from-brainstorming">2. Decisions (from brainstorming)</h2>
+<ul>
+<li><strong>Path 1 (doc + code coexist, validator enforces agreement).</strong> Both <code>docs/reference/schema.md</code> and <code>src/deriva_ml/schema/create_schema.py</code> are maintained by developers. The doc describes the intended schema; the code defines it at runtime. Neither is generated from the other. A validator asserts they match on structure and seeded terms.</li>
+<li><strong>Scope</strong>: <code>deriva-ml</code> schema only. Domain schemas (Subject, Image, test-schema, etc.) are user-defined and out of scope.</li>
+<li><strong>Doc format</strong>: single Markdown file <code>docs/reference/schema.md</code>, one section per table, with a fenced YAML block per section carrying the machine-readable structure.</li>
+<li><strong>Validator scope</strong>: enforces tables, columns (name + type), FKs, vocabulary seeded terms. Descriptions (both table-level and column-level) are narrative in the doc but NOT cross-validated against code comments. Annotations, display configs, indexes — skipped.</li>
+<li><strong>When validation runs</strong>: CI only. Local developers run <code>uv run deriva-ml-validate-schema</code> for faster feedback.</li>
+<li><strong>Direction 1 ships (code ↔ doc)</strong>; Direction 2 (doc ↔ live catalog) is a filed follow-up.</li>
+</ul>
+<h2 id="3-architecture">3. Architecture</h2>
+<p>The validator has three loaders producing one in-memory <code>SchemaModel</code> and one comparator:</p>
+<pre><code>  docs/reference/schema.md                                 schema.md ←→ create_schema.py
+      ├── Markdown sections per table                       [Direction 1, SHIPS NOW]
+      └── Fenced YAML blocks per section
+          │
+          ▼ load_from_doc(path) ─┐
+                                 │
+                                 │  ─────►  diff_schemas(expected, actual)
+                                 │              │
+  src/deriva_ml/schema/create_schema.py          ▼
+      ├── TableDef / VocabularyTableDef          list[Mismatch]
+      ├── ColumnDef / ForeignKeyDef              │
+      └── _ensure_terms(...)                     ▼
+          │                                   Exit 0 or 1
+          ▼ load_from_code(module) ─┘
+
+  (follow-up: load_from_catalog(catalog) for Direction 2)
+</code></pre>
+<p>All loaders produce the same <code>SchemaModel</code> shape. The comparator knows nothing about where the data came from.</p>
+<h2 id="4-file-layout">4. File layout</h2>
+<h3 id="41-docsreferenceschemamd">4.1 <code>docs/reference/schema.md</code></h3>
+<p>Single Markdown file. Structure:</p>
+<ul>
+<li><strong>Top-of-file prose</strong> (~50-100 lines): overview, how to edit the doc + code together, schema-level invariants.</li>
+<li><strong>Per-table sections</strong>, ordered:</li>
+<li>Core entity tables (Dataset, Execution, Workflow, Feature_Name, ...).</li>
+<li>Vocabulary tables (Asset_Type, Dataset_Type, Workflow_Type, Execution_Status, ...).</li>
+<li>Association tables (Dataset_Execution, Nested_Execution, ...).</li>
+</ul>
+<p>Each section:</p>
+<pre><code class="language-markdown">## Execution
+
+Per-execution lifecycle row. Created once per workflow run; updated as state transitions per Phase-1 spec §2.2.
+
+```yaml
+table: Execution
+kind: table
+description: Per-execution lifecycle row.
+columns:
+  - name: Workflow
+    type: text
+  - name: Description
+    type: markdown
+  - name: Duration
+    type: text
+  - name: Status
+    type: fk
+  - name: Status_Detail
+    type: text
+foreign_keys:
+  - columns: [Workflow]
+    referenced_schema: deriva-ml
+    referenced_table: Workflow
+    referenced_columns: [RID]
+  - columns: [Status]
+    referenced_schema: deriva-ml
+    referenced_table: Execution_Status
+    referenced_columns: [Name]
+```
+</code></pre>
+<p>Vocabulary tables also include a <code>terms:</code> list:</p>
+<pre><code class="language-yaml">table: Execution_Status
+kind: vocabulary
+description: Controlled vocabulary for Execution.Status lifecycle values.
+terms:
+  - name: Created
+  - name: Running
+  - name: Stopped
+  - name: Failed
+  - name: Pending_Upload
+  - name: Uploaded
+  - name: Aborted
+</code></pre>
+<p>Association tables have an <code>associates:</code> list:</p>
+<pre><code class="language-yaml">table: Nested_Execution
+kind: association
+description: Hierarchical execution nesting (parent → child).
+associates:
+  - table: Execution
+    role: parent
+  - table: Execution
+    role: child
+metadata:
+  - name: Sequence
+    type: int4
+    nullok: true
+</code></pre>
+<h3 id="42-toolsvalidate_schema_docpy">4.2 <code>tools/validate_schema_doc.py</code></h3>
+<p>Python module with:</p>
+<ul>
+<li><code>SchemaModel</code> dataclass (tables list).</li>
+<li><code>TableModel</code>, <code>ColumnModel</code>, <code>ForeignKeyModel</code>, <code>VocabularyTermModel</code>, <code>AssociationEndpointModel</code> sub-dataclasses.</li>
+<li><code>load_from_doc(path: Path) -&gt; SchemaModel</code> — Markdown parser + YAML deserializer.</li>
+<li><code>load_from_code(module_path: Path) -&gt; SchemaModel</code> — AST parser over <code>create_schema.py</code>.</li>
+<li><code>diff_schemas(expected: SchemaModel, actual: SchemaModel) -&gt; list[Mismatch]</code> — comparator.</li>
+<li><code>Mismatch</code> dataclass with <code>kind</code>, <code>location</code>, <code>detail</code> fields.</li>
+<li><code>main(argv)</code> — CLI entry point.</li>
+</ul>
+<h3 id="43-pyprojecttoml-entry-point">4.3 <code>pyproject.toml</code> entry point</h3>
+<pre><code class="language-toml">[project.scripts]
+deriva-ml-validate-schema = &quot;deriva_ml_tools.validate_schema_doc:main&quot;
+</code></pre>
+<p>(Or similar path — consistent with existing <code>deriva-ml-*</code> scripts.)</p>
+<h3 id="44-githubworkflowsvalidate-schemayml">4.4 <code>.github/workflows/validate-schema.yml</code></h3>
+<p>GitHub Actions workflow (or step in existing test workflow):</p>
+<pre><code class="language-yaml">name: Validate deriva-ml schema doc
+on: [pull_request]
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Run validator
+        run: uv run deriva-ml-validate-schema
+</code></pre>
+<h3 id="45-docsreferencereadmemd">4.5 <code>docs/reference/README.md</code></h3>
+<p>Short contributor doc explaining the doc-first workflow:</p>
+<pre><code class="language-markdown"># Reference docs
+
+`schema.md` is the authoritative description of the deriva-ml schema.
+To modify the schema:
+
+1. Edit `docs/reference/schema.md` to describe the intended state.
+2. Edit `src/deriva_ml/schema/create_schema.py` to match.
+3. Run `uv run deriva-ml-validate-schema` locally to verify agreement.
+4. Commit both files together. CI re-runs the validator.
+</code></pre>
+<h2 id="5-validator-implementation">5. Validator implementation</h2>
+<h3 id="51-load_from_doc">5.1 <code>load_from_doc</code></h3>
+<p>Parse the Markdown. Find fenced code blocks with language <code>yaml</code>. Deserialize each block into a dict via <code>yaml.safe_load</code>. Build <code>SchemaModel</code> entries based on <code>table:</code> and <code>kind:</code> keys.</p>
+<p>Malformed YAML, missing required keys, unknown <code>kind:</code> → raise <code>SchemaDocError</code> with the Markdown line number. The CLI reports these as parse failures rather than mismatches.</p>
+<h3 id="52-load_from_code">5.2 <code>load_from_code</code></h3>
+<p>AST-parse <code>create_schema.py</code> without executing it. Walk the tree looking for these call patterns:</p>
+<ul>
+<li><code>schema.create_table(TableDef(name=..., columns=[...], foreign_keys=[...]))</code> → table.</li>
+<li><code>schema.create_table(VocabularyTableDef(name=..., curie_template=...))</code> → vocab table.</li>
+<li><code>schema.create_table(Table.define_association(associates=[...], metadata=[...]))</code> → association table.</li>
+<li><code>_ensure_terms(vocab_name, [{"Name": ..., ...}, ...])</code> → seeded terms for a vocab.</li>
+</ul>
+<p>Enum references (<code>MLTable.execution</code>, <code>MLVocab.workflow_type</code>) are resolved by AST-parsing <code>src/deriva_ml/core/definitions.py</code> and building a <code>{enum_member: value}</code> lookup.</p>
+<p>Dynamic Python (f-strings in <code>curie_template</code>, conditional FKs, comprehensions building column lists) are intentionally out of scope. If a <code>ColumnDef(...)</code> or <code>ForeignKeyDef(...)</code> is inside a comprehension or conditional, the validator extracts it when the outer structure is still statically walkable; if not, it reports a <code>SchemaCodeError</code> with the code line number.</p>
+<h3 id="53-diff_schemas">5.3 <code>diff_schemas</code></h3>
+<p>Given expected (doc-side) and actual (code-side) <code>SchemaModel</code> instances:</p>
+<ul>
+<li>For every table name in either: if present in both, recursively compare; if only in one, emit <code>MissingTable</code> mismatch.</li>
+<li>For each table's columns: compare by name; mismatches on type emit <code>ColumnMismatch</code>.</li>
+<li>For each table's FKs: compare by <code>(columns, referenced_table, referenced_columns)</code> tuple. Missing or extra FK → <code>ForeignKeyMismatch</code>.</li>
+<li>For vocab tables: compare the set of <code>term.name</code> values. Symmetric difference → <code>VocabularyTermsMismatch</code>.</li>
+<li>For association tables: compare <code>associates</code> endpoints (by target table name) and <code>metadata</code> columns.</li>
+<li>Column/table descriptions skipped per §2.</li>
+<li>Annotations, indexes, display configs skipped per §2.</li>
+</ul>
+<h3 id="54-cli">5.4 CLI</h3>
+<pre><code>$ deriva-ml-validate-schema [--doc PATH] [--code PATH] [--definitions PATH]
+</code></pre>
+<p>Default paths: <code>docs/reference/schema.md</code>, <code>src/deriva_ml/schema/create_schema.py</code>, <code>src/deriva_ml/core/definitions.py</code> (resolved from the working directory).</p>
+<p>Output on mismatch: structured text (see §5.5 for format). Exit code 1.
+Output on match: single line <code>deriva-ml-validate-schema: schema.md and create_schema.py agree.</code> Exit code 0.
+Output on parse error: error location + message. Exit code 2.</p>
+<h3 id="55-mismatch-output-format">5.5 Mismatch output format</h3>
+<pre><code>deriva-ml-validate-schema: schema.md and create_schema.py disagree.
+
+MISSING FROM CODE:
+  - table 'Execution_Status' declared in docs/reference/schema.md:142
+    but not found in src/deriva_ml/schema/create_schema.py.
+
+MISSING FROM DOC:
+  (none)
+
+COLUMN MISMATCH:
+  - Execution.Status
+    doc (schema.md:78):   type=fk
+    code (create_schema.py:149): type=text
+
+FOREIGN KEY MISMATCH:
+  (none)
+
+VOCABULARY TERMS MISMATCH:
+  - Asset_Type (schema.md:203; create_schema.py:395):
+    code-only: {Model_File, Notebook_Output}
+    doc-only:  {Execution_Config}
+
+Exit code: 1
+</code></pre>
+<h2 id="6-testing-strategy">6. Testing strategy</h2>
+<h3 id="61-unit-tests-teststoolstest_validate_schema_docpy">6.1 Unit tests (<code>tests/tools/test_validate_schema_doc.py</code>)</h3>
+<ol>
+<li><code>test_load_from_doc_parses_yaml_blocks</code> — handcrafted fixture Markdown with two tables; verify <code>SchemaModel</code> fields populated.</li>
+<li><code>test_load_from_code_parses_simple_tabledef</code> — fixture Python module with a <code>TableDef</code>; verify AST extraction matches.</li>
+<li><code>test_load_from_code_parses_vocabulary_table</code> — fixture with <code>VocabularyTableDef</code>; verify.</li>
+<li><code>test_load_from_code_parses_ensure_terms</code> — fixture with <code>_ensure_terms</code> calls; verify seeded-terms extraction.</li>
+<li><code>test_load_from_code_resolves_mlvocab_enum_refs</code> — fixture that uses <code>MLVocab.workflow_type</code>; verify resolver maps to "Workflow_Type".</li>
+<li><code>test_diff_identical_schemas_is_empty</code> — two identical models → zero mismatches.</li>
+<li><code>test_diff_missing_table</code> — table in doc, missing in code → <code>MissingTable</code> mismatch.</li>
+<li><code>test_diff_column_type_mismatch</code> — same column, different types → <code>ColumnMismatch</code>.</li>
+<li><code>test_diff_fk_target_mismatch</code> — FK target differs → <code>ForeignKeyMismatch</code>.</li>
+<li><code>test_diff_vocab_terms_differ</code> — extra term in code → <code>VocabularyTermsMismatch</code> with correct symmetric-difference.</li>
+<li><code>test_diff_ignores_descriptions</code> — schemas identical except doc has descriptions → zero mismatches (per §2).</li>
+<li><code>test_diff_ignores_annotations</code> — schemas identical except code has annotations → zero mismatches.</li>
+</ol>
+<h3 id="62-integration-tests-teststoolstest_validate_schema_doc_integrationpy">6.2 Integration tests (<code>tests/tools/test_validate_schema_doc_integration.py</code>)</h3>
+<ol>
+<li><code>test_validator_runs_clean_on_current_repo</code> — load actual <code>docs/reference/schema.md</code> + actual <code>src/deriva_ml/schema/create_schema.py</code>; assert zero mismatches. This test IS the CI gate in test form — if the two drift, this fails.</li>
+<li><code>test_cli_exit_codes</code> — subprocess invocation of <code>deriva-ml-validate-schema</code> on the real repo; assert exit 0.</li>
+</ol>
+<h3 id="63-doc-structure-tests-teststoolstest_schema_doc_structurepy">6.3 Doc structure tests (<code>tests/tools/test_schema_doc_structure.py</code>)</h3>
+<ol>
+<li><code>test_schema_doc_yaml_blocks_all_valid</code> — every fenced YAML block parses without error.</li>
+<li><code>test_schema_doc_has_entry_per_mltable_member</code> — every member of <code>MLTable</code> enum has a corresponding <code>table:</code> entry in the doc. Catches "added a table to <code>MLTable</code> but forgot the doc."</li>
+<li><code>test_schema_doc_has_entry_per_mlvocab_member</code> — parallel for <code>MLVocab</code>.</li>
+<li><code>test_schema_doc_table_order</code> — core → vocabulary → association. Warns (not fails) on ordering violations; enforces the readability convention.</li>
+</ol>
+<h3 id="64-ci">6.4 CI</h3>
+<p>GitHub Actions workflow runs <code>uv run deriva-ml-validate-schema</code> on every PR. Failure surfaces in the PR check. No extra setup — the validator is pure-Python + PyYAML (transitive) + stdlib <code>ast</code>.</p>
+<h2 id="7-error-handling">7. Error handling</h2>
+<ul>
+<li><strong>Parse errors in the doc</strong> (malformed YAML, unknown <code>kind:</code>, missing required key): validator reports <code>SchemaDocError</code> with Markdown line number. Exit 2.</li>
+<li><strong>Parse errors in the code</strong> (call pattern inside a comprehension, enum member can't resolve): <code>SchemaCodeError</code> with code line number. Exit 2.</li>
+<li><strong>Mismatch</strong>: structured output per §5.5. Exit 1.</li>
+<li><strong>Agreement</strong>: single-line OK. Exit 0.</li>
+</ul>
+<p>Parse errors are a developer-facing signal: "the tool couldn't understand this section; refactor it or extend the validator."</p>
+<h2 id="8-bootstrap">8. Bootstrap</h2>
+<p>The initial <code>docs/reference/schema.md</code> is hand-written to match the current <code>create_schema.py</code> exactly. Implementation plan task 1:</p>
+<ol>
+<li>Run the validator's <code>load_from_code</code> on the current <code>create_schema.py</code> to produce a <code>SchemaModel</code>.</li>
+<li>Render that <code>SchemaModel</code> back to the doc format as a starting point.</li>
+<li>Hand-edit the result: add prose, add the top-of-file overview, add descriptions, re-order sections per §4.1.</li>
+<li>Commit the doc. Validator passes with zero mismatches.</li>
+</ol>
+<p>A one-shot "render SchemaModel to Markdown" helper (<code>SchemaModel.to_doc_markdown() -&gt; str</code>) can ship as part of the tool — useful for bootstrap, handy for future "emergency regenerate" flows (reset the doc from code, re-add prose).</p>
+<h2 id="9-filed-follow-ups">9. Filed follow-ups</h2>
+<p>These are deferred by design:</p>
+<ol>
+<li><strong>Direction 2 — live catalog validation.</strong> Add <code>load_from_catalog(catalog: ErmrestCatalog) -&gt; SchemaModel</code> loader and CLI flags <code>--against=catalog --hostname=X --catalog=N</code>. Enables operational "does my deployed catalog match the doc?" diagnostics. Separate subsystem; not Subsystem 0.</li>
+<li><strong>Descriptions validation.</strong> Extend validator to enforce <code>comment=</code> ↔ <code>description:</code> matching (opt-in per-column). Requires bootstrap pass adding <code>comment=</code> to existing <code>ColumnDef</code> sites. Deferred per Q8-c decision.</li>
+<li><strong>Annotation validation.</strong> <code>curie_template</code>, display annotations, FK annotations. Heavy; likely never worth it.</li>
+<li><strong>ERD image regeneration.</strong> Replace stale <code>docs/assets/ERD.png</code>. Separate effort; could be driven from <code>docs/reference/schema.md</code> via Graphviz or similar.</li>
+</ol>
+<h2 id="10-non-goals">10. Non-goals</h2>
+<ul>
+<li>Domain schema documentation (Subject, Image, test-schema, etc.) — user-defined, not part of <code>create_schema.py</code>.</li>
+<li>Generating <code>create_schema.py</code> from the doc — explicitly rejected (Path 2); loses Python expressiveness.</li>
+<li>Replacing <code>docs/architecture.md</code> — different purpose (overview + concepts vs. structural reference). The two coexist.</li>
+<li>Schema migration tooling for existing catalogs — Subsystem 1's concern.</li>
+<li>Real-time schema drift monitoring — out of scope; Direction 2 is on-demand.</li>
+</ul>
+<h2 id="11-delivery-order-for-the-plan">11. Delivery order (for the plan)</h2>
+<p>Rough sequence; the implementation plan will refine into bite-sized steps:</p>
+<ol>
+<li>Create <code>tools/validate_schema_doc.py</code> skeleton: <code>SchemaModel</code> dataclass hierarchy, loader/diff/CLI stubs.</li>
+<li>Implement <code>load_from_doc</code> with unit tests.</li>
+<li>Implement <code>load_from_code</code> (AST-based) with unit tests, including <code>MLTable</code> / <code>MLVocab</code> resolver.</li>
+<li>Implement <code>diff_schemas</code> with unit tests.</li>
+<li>Implement CLI (<code>main</code>) and the mismatch output format.</li>
+<li>Implement <code>SchemaModel.to_doc_markdown()</code> helper (bootstrap tool).</li>
+<li>Use (6) to generate an initial <code>docs/reference/schema.md</code>. Hand-edit prose + ordering.</li>
+<li>Register <code>deriva-ml-validate-schema</code> entry point in <code>pyproject.toml</code>.</li>
+<li>Add <code>docs/reference/README.md</code> with the doc-first workflow instructions.</li>
+<li>Add GitHub Actions workflow step.</li>
+<li>Run integration test (<code>test_validator_runs_clean_on_current_repo</code>) — green gate.</li>
+<li>CHANGELOG entry noting the new doc-first workflow for schema changes.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

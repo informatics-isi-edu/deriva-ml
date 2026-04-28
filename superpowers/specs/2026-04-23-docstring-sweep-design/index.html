@@ -1,0 +1,2487 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-23-docstring-sweep-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Docstring Sweep Design — Sub-project 2 of the Documentation Pass - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#docstring-sweep-design-sub-project-2-of-the-documentation-pass" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Docstring Sweep Design — Sub-project 2 of the Documentation Pass
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-docstring-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Docstring Contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-module-level-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Module-Level Docstrings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-inline-comment-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Inline Comment Gaps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-private-naming-convention-the-rename-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Private-Naming Convention — The Rename List
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Private-Naming Convention — The Rename List">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#7a-preparatory-verification-start_upload-visibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7a. Preparatory Verification — start_upload() Visibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-dead-code-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Dead Code — Resolved
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-testing-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Testing Approach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-per-module-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Per-Module Breakdown
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Per-Module Breakdown">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#priority-1-worst-areas-reviewer-2-weak-areas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 1 — Worst areas (Reviewer #2 "weak areas")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-2-named-method-gaps-reviewer-2-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 2 — Named method gaps (Reviewer #2 table)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-3-private-renames-reviewer-4-no-docstring-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 3 — Private renames (Reviewer #4, no docstring gaps)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-4-module-level-docstring-sweep-all-other-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 4 — Module-level docstring sweep (all other modules)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary counts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Approach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-design-decisions-resolved-2026-04-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Design Decisions — Resolved 2026-04-23
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="docstring-sweep-design-sub-project-2-of-the-documentation-pass">Docstring Sweep Design — Sub-project 2 of the Documentation Pass</h1>
+<p><strong>Date:</strong> 2026-04-23
+<strong>Status:</strong> Approved — all open questions resolved 2026-04-23
+<strong>Branch:</strong> <code>feature/docstring-sweep</code>
+<strong>Related:</strong> Sub-project 1 (user-guide rewrite, separate worktree)
+<strong>Source material:</strong> <code>docs/superpowers/specs/2026-04-23-post-s2-findings.md</code> §1 (Reviewer #2) and §3–4 (Reviewer #4)</p>
+<hr />
+<h2 id="1-problem-statement">1. Problem Statement</h2>
+<p>The post-S2 audit (Reviewer #2) found docstring coverage at roughly <strong>60–70%</strong> against the project's stated bar. The weak areas are older modules that predate the spec-driven standard: <code>DatasetMixin</code>, <code>AnnotationMixin</code>, <code>Feature</code>, and <code>DatasetBag</code> each have methods with missing <code>Raises:</code>, <code>Example:</code>, or both. Several modules lack module-level docstrings entirely. Five non-trivial machinery sites have no "why" comment, making them opaque to contributors and to AI assistants reading the source.</p>
+<p>Concurrently, Reviewer #4 identified 12 public-named symbols that should be private (<code>_prefixed</code>) plus 7 dead symbols that should be deleted. Private renames touch the same files and methods as docstring edits; doing them together in one sweep is cheaper than two separate passes and keeps the diff reviewable per module.</p>
+<p>The result of this sub-project is a library where every public API has a complete docstring, every module has a meaningful module-level docstring, and the public namespace contains only intentional user-facing names.</p>
+<hr />
+<h2 id="2-goals">2. Goals</h2>
+<ol>
+<li>Every public method in <code>src/deriva_ml/</code> satisfies the <strong>docstring contract</strong> defined in §4.</li>
+<li>Every <code>.py</code> file in <code>src/deriva_ml/</code> has a <strong>module-level docstring</strong> (§5).</li>
+<li>Five flagged <strong>inline comment gaps</strong> receive "why" comments (§6).</li>
+<li>All 12 <strong>leaked names</strong> from Reviewer #4's confirmed list are <code>_prefixed</code> (§7).</li>
+<li>All 7 <strong>dead symbols</strong> from Reviewer #4 are deleted in-scope alongside docstring edits, with the exception of <code>working_data</code> (kept through the next major-version bump — see §8).</li>
+<li>Changes are delivered <strong>module by module</strong>, one commit per module, so each commit is independently reviewable and can be bisected.</li>
+</ol>
+<hr />
+<h2 id="3-non-goals">3. Non-Goals</h2>
+<ul>
+<li><strong>No behavior changes.</strong> Docstrings, renames, and dead-code deletion only.</li>
+<li><strong>No changes to <code>src/deriva_ml/feature.py</code> S2-touched surface.</strong> The selector classmethod suite (<code>Feature.for_table</code>, <code>Feature.for_dataset</code>, etc.) is already at spec bar from S2 work. This sweep adds only the missing <code>Feature.__init__</code> docstring and one inline comment.</li>
+<li><strong>No changes to <code>docs/</code>.</strong> All prose improvements for human readers belong in sub-project 1 (user-guide rewrite). This sweep is reference material — docstrings consumed by IDE hover, <code>help()</code>, and MCP tool indexing.</li>
+<li><strong>No new tests beyond doctest verification.</strong> Test file changes are limited to updating any test that references a renamed private symbol.</li>
+<li><strong>No DRY refactoring.</strong> Reviewer #3's DRY findings are a separate hygiene task. The only structural changes here are renames and deletions.</li>
+</ul>
+<hr />
+<h2 id="4-docstring-contract">4. Docstring Contract</h2>
+<p>Every public method, property, and class in <code>src/deriva_ml/</code> must conform to this shape:</p>
+<pre><code class="language-python">def method_name(self, param: Type) -&gt; ReturnType:
+    &quot;&quot;&quot;One-line imperative summary (≤ 72 chars, no trailing period).
+
+    Extended description explaining intent, non-obvious behavior, and
+    important invariants. Omit this block only for trivially-named
+    no-argument methods where the one-liner is exhaustive.
+
+    Args:
+        param: Type and semantic meaning. Document every parameter
+            including ``self`` is implied. For optional parameters note
+            the default behavior when omitted.
+
+    Returns:
+        Type and semantic meaning. Describe the shape for complex
+        return types (e.g., dict keys, list element type).
+
+    Raises:
+        DerivaMLNotFoundError: When ``param`` does not resolve to a
+            known catalog entity.
+        DerivaMLValidationError: When the supplied value fails schema
+            validation.
+
+    Example:
+        &gt;&gt;&gt; ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;)
+        &gt;&gt;&gt; result = ml.method_name(param)
+    &quot;&quot;&quot;
+</code></pre>
+<p><strong>Mandatory sections:</strong> one-line summary, <code>Args:</code> (even if empty — omit only for zero-parameter methods), <code>Returns:</code> (omit only for <code>-&gt; None</code> methods with no meaningful return), <code>Raises:</code> (omit only if the method genuinely raises nothing), <code>Example:</code> (at least one).</p>
+<p><strong>Exemptions from <code>Example:</code>:</strong></p>
+<ul>
+<li>Abstract methods and protocol stubs (they document the contract, not an invocation).</li>
+<li>Pure <code>@property</code> getters where the getter is self-documenting and the class already has an example that exercises it.</li>
+</ul>
+<p><strong>Module docstring shape:</strong></p>
+<pre><code class="language-python">&quot;&quot;&quot;Short noun phrase describing what this module provides.
+
+Extended description covering the key classes/functions exported, the
+design rationale, and any important usage constraints (e.g., &quot;not
+intended for direct import — access via DerivaML methods&quot;).
+&quot;&quot;&quot;
+</code></pre>
+<hr />
+<h2 id="5-module-level-docstrings">5. Module-Level Docstrings</h2>
+<p>Modules confirmed to need new or expanded module docstrings:</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Current state</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catalog/localize.py</code></td>
+<td>One-liner only</td>
+<td>Expand: explain three-stage clone flow, asset copy semantics</td>
+</tr>
+<tr>
+<td><code>feature.py</code></td>
+<td>Names Feature + FeatureRecord only</td>
+<td>Add: document selector classmethod suite</td>
+</tr>
+</tbody>
+</table>
+<p>All other modules must be checked during the sweep. Any module with no docstring at all gets one.</p>
+<hr />
+<h2 id="6-inline-comment-gaps">6. Inline Comment Gaps</h2>
+<p>Five machinery sites identified by Reviewer #2 that need "why" comments:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Location</th>
+<th>Comment to add</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>core/mixins/dataset.py:217–236</code></td>
+<td>Why workspace ORM is rebuilt after <code>add_dataset_element_type</code> (ORM eagerly built at init; new DDL not visible without rebuild)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>dataset/dataset.py:1580–1610</code></td>
+<td>Why the two-step INSERT + GET <code>snaptime</code> pattern (ERMrest does not return snaptime on INSERT)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>execution/execution.py:322–361</code></td>
+<td>Why <code>not self._dry_run and reload is None</code> gates SQLite registry insertion</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>dataset/dataset_bag.py:276–315</code></td>
+<td>Why <code>union(*)</code> is load-bearing (SQLAlchemy UNION is DISTINCT by default; de-duplicates rows reachable via multiple FK paths)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>feature.py:448–463</code></td>
+<td>Why <code>assoc_fkeys</code> is subtracted before role classification</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-private-naming-convention-the-rename-list">7. Private-Naming Convention — The Rename List</h2>
+<p>All 12 items from Reviewer #4's confirmed-leak list. These are <strong>breaking changes to the technically-public namespace</strong>, but no external consumers import these names (they are internal helpers). Note that test files that call these through <code>DerivaML</code> mixins will need corresponding updates.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Current name</th>
+<th>New name</th>
+<th>Module</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>domain_path()</code></td>
+<td><code>_domain_path()</code></td>
+<td><code>core/mixins/path_builder.py</code></td>
+<td>Low-level ERMrest handle; only used inside deriva-ml</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>table_path()</code></td>
+<td><code>_table_path()</code></td>
+<td><code>core/mixins/path_builder.py</code></td>
+<td>Filesystem path helper for CSV bag export</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>prefetch_dataset()</code></td>
+<td><code>_prefetch_dataset()</code></td>
+<td><code>core/mixins/dataset.py</code></td>
+<td>Deprecated shim; zero callers — also flagged for deletion (§8)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>list_foreign_keys()</code></td>
+<td><code>_list_foreign_keys()</code></td>
+<td><code>core/mixins/annotation.py</code></td>
+<td>Zero callers in src/, tests/, docs/ — also flagged for deletion (§8)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>is_system_schema()</code></td>
+<td><code>_is_system_schema()</code></td>
+<td><code>core/constants.py</code></td>
+<td>Schema introspection predicate; users will not call this</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>get_domain_schemas()</code></td>
+<td><code>_get_domain_schemas()</code></td>
+<td><code>core/constants.py</code></td>
+<td>Same as above</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>apply_logger_overrides()</code></td>
+<td><code>_apply_logger_overrides()</code></td>
+<td><code>core/logging_config.py</code></td>
+<td>Called once inside <code>DerivaML.__init__</code>; not user-facing</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>compute_diff()</code></td>
+<td><code>_compute_diff()</code></td>
+<td><code>core/schema_diff.py</code></td>
+<td>Only used inside <code>base.py</code> pin/diff logic</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>retrieve_rid()</code></td>
+<td><code>_retrieve_rid()</code></td>
+<td><code>core/mixins/rid_resolution.py</code></td>
+<td>Low-level; user-facing is <code>resolve_rid()</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>asset_record_class()</code></td>
+<td><code>_asset_record_class()</code></td>
+<td><code>asset/asset_record.py</code></td>
+<td>Internal factory; users access via mixin method</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>cache_features()</code></td>
+<td><code>_cache_features()</code></td>
+<td><code>core/base.py</code></td>
+<td>No callers in tests; legacy workspace-cache shortcut</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>add_workflow()</code></td>
+<td><code>_add_workflow()</code></td>
+<td><code>core/mixins/workflow.py</code></td>
+<td><code>create_workflow()</code> is the user-facing factory</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Resolved triage items:</strong></p>
+<ul>
+<li><strong><code>CatalogGraph</code></strong> (<code>dataset/catalog_graph.py</code>) — <strong>leave public.</strong> It is user-facing dataset code and users may import it for advanced bag-graph analysis. No rename, no move.</li>
+<li><strong><code>VocabularyTermHandle</code></strong> (<code>ermrest.py:245</code>) — <strong>keep in <code>__all__</code> as a public type.</strong> It is returned by <code>add_term</code> and <code>lookup_term</code>; users see it as a return type and may import it for type annotations.</li>
+<li><strong><code>start_upload()</code></strong> (<code>core/mixins/execution.py:745</code>) — <strong>requires preparatory verification before renaming</strong> (see §7a below).</li>
+</ul>
+<h3 id="7a-preparatory-verification-start_upload-visibility">7a. Preparatory Verification — <code>start_upload()</code> Visibility</h3>
+<p>Before renaming <code>start_upload()</code> to <code>_start_upload()</code>, grep the downstream template repository for callers:</p>
+<pre><code class="language-bash">grep -r &quot;start_upload&quot; /Users/carl/GitHub/deriva-ml-model-template
+</code></pre>
+<p>Decision rule:
+- <strong>If the template or any installed caller uses <code>start_upload</code></strong> — keep it public, add a full docstring, and do not rename.
+- <strong>If no external caller is found</strong> — rename to <code>_start_upload</code> in the same commit as the rest of <code>core/mixins/execution.py</code>.</p>
+<p>Document the outcome in the commit message for the <code>core/mixins/execution.py</code> task.</p>
+<hr />
+<h2 id="8-dead-code-resolved">8. Dead Code — Resolved</h2>
+<p><strong>Decision: delete dead code in the same commits as docstring edits (Option A).</strong> Dead-code deletion is mechanical, touches the same modules as the docstring sweep, and makes the diff smaller overall — no new docstring is needed for a deleted method. Each deletion is one commit within its module task. This is NOT a separate hygiene PR.</p>
+<p><strong>Dead symbol list:</strong></p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Location</th>
+<th>Evidence</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>core/mixins/dataset.py:485</code> — <code>prefetch_dataset()</code></td>
+<td>One-line <code>return self.cache_dataset(...)</code>; docstring says "Deprecated"; zero callers</td>
+<td><strong>Delete</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>core/mixins/annotation.py:405</code> — <code>list_foreign_keys()</code></td>
+<td>Zero callers</td>
+<td><strong>Delete</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>core/base.py:1364</code> — <code>add_page()</code></td>
+<td>Zero callers outside own docstring</td>
+<td><strong>Delete</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>core/base.py:1097</code> — <code>user_list()</code></td>
+<td>Zero callers</td>
+<td><strong>Delete</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>core/base.py:955</code> — <code>globus_login()</code></td>
+<td>Zero callers</td>
+<td><strong>Delete</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>core/base.py:856</code> — <code>working_data</code> property</td>
+<td>Deprecation stub; only a test asserts the warning fires</td>
+<td><strong>Keep</strong> — see note below</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>tools/validate_schema_doc.py:127,500,568</code> — <code>load_from_doc()</code> / <code>load_from_code()</code> / <code>diff_schemas()</code></td>
+<td>Only called from same file's <code>main()</code> and from <code>tests/tools/</code></td>
+<td><strong>Rename <code>_prefixed</code></strong> — see note below</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>working_data</code> (item 6) — kept until major-version bump.</strong> The deprecation stub is doing its job as a deprecation signal. Removing it now would break any caller still importing the property. The stub must be given a proper docstring (following the contract in §4) that includes the <code>DeprecationWarning</code> behavior and directs users to the replacement. Removal is deferred to the next major-version bump.</p>
+<p><strong><code>validate_schema_doc.py</code> helpers (item 7) — rename <code>_prefixed</code>, not delete.</strong> <code>load_from_doc()</code>, <code>load_from_code()</code>, and <code>diff_schemas()</code> are CLI-tool internals — called only from the same file's <code>main()</code> and from <code>tests/tools/</code>. They are not intended as importable helpers for external tooling. <strong>Action:</strong> rename to <code>_load_from_doc</code>, <code>_load_from_code</code>, <code>_diff_schemas</code>. Tests in <code>tests/tools/</code> that import them continue to work under the underscored names.</p>
+<hr />
+<h2 id="9-testing-approach">9. Testing Approach</h2>
+<p><strong>Decision: <code>--doctest-modules</code> with <code># doctest: +SKIP</code> for catalog-dependent examples.</strong> No dedicated <code>tests/docstring_examples/</code> files; no manual-verification-only approach.</p>
+<p>Add <code>--doctest-modules</code> to the pytest configuration (or pass it in the relevant test command). Examples that require a live Deriva catalog are annotated <code># doctest: +SKIP</code> so they are collected but not executed without infrastructure. Pure-Python examples (type coercion, Pydantic model construction, selector factories operating on <code>FeatureRecord</code> instances with stub containers) run for real and fail the test suite if they break.</p>
+<p><strong>Annotation pattern for catalog-dependent examples:</strong></p>
+<pre><code class="language-python">Example:
+    &gt;&gt;&gt; ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;)  # doctest: +SKIP
+    &gt;&gt;&gt; result = ml.list_datasets()  # doctest: +SKIP
+</code></pre>
+<p><strong>Examples that run without a catalog</strong> (no <code>+SKIP</code> needed):</p>
+<ul>
+<li><code>ExecutionConfiguration</code> and <code>DatasetSpecConfig</code> construction</li>
+<li>Enum values and <code>DerivaMLConfig</code> field validation</li>
+<li><code>FeatureRecord</code> creation with a stub or in-memory container</li>
+<li>Selector factory classmethods that operate on a pre-built record</li>
+</ul>
+<p><strong>CLAUDE.md note (to be added in the same PR):</strong> New public methods must include an <code>Example:</code> block with a passing doctest (or <code>+SKIP</code> with a comment explaining what infrastructure is needed) before merge.</p>
+<hr />
+<h2 id="10-per-module-breakdown">10. Per-Module Breakdown</h2>
+<p>The sweep is organized as one task per module (or tightly-coupled module pair). Each task produces one commit: docstring upgrades + module-level docstring (if missing) + private renames for that module's leaked names + dead-code deletions for that module.</p>
+<p>Modules with zero findings from either reviewer are swept for completeness (module docstring check, spot-check of any methods that might have been missed) but are low-effort.</p>
+<h3 id="priority-1-worst-areas-reviewer-2-weak-areas">Priority 1 — Worst areas (Reviewer #2 "weak areas")</h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Docstring gaps</th>
+<th>Inline comments</th>
+<th>Renames</th>
+<th>Dead code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>core/mixins/dataset.py</code></td>
+<td>Items 6, 7, 8 (delete/list-types/add-type)</td>
+<td>Item 1 (ORM rebuild)</td>
+<td><code>prefetch_dataset</code> → <code>_prefetch_dataset</code></td>
+<td>Delete <code>prefetch_dataset</code></td>
+</tr>
+<tr>
+<td><code>core/mixins/annotation.py</code></td>
+<td>Item 10 (all <code>AnnotationMixin.*</code>)</td>
+<td>—</td>
+<td><code>list_foreign_keys</code> → <code>_list_foreign_keys</code></td>
+<td>Delete <code>list_foreign_keys</code></td>
+</tr>
+<tr>
+<td><code>feature.py</code></td>
+<td>Items 11, 12 (<code>Feature.__init__</code>, <code>feature_record_class</code>)</td>
+<td>Item 5 (assoc_fkeys)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>dataset/dataset_bag.py</code></td>
+<td>Item 13 (<code>list_dataset_members</code>)</td>
+<td>Item 4 (union semantics)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="priority-2-named-method-gaps-reviewer-2-table">Priority 2 — Named method gaps (Reviewer #2 table)</h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Docstring gaps</th>
+<th>Inline comments</th>
+<th>Renames</th>
+<th>Dead code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>execution/execution.py</code></td>
+<td>Items 1, 14 (<code>create_dataset</code>, <code>upload_execution_outputs</code>)</td>
+<td>Item 3 (dry_run guard)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>dataset/dataset.py</code></td>
+<td>Items 2, 3, 4, 5 (parents/children/add-members/download)</td>
+<td>Item 2 (snaptime pattern)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>core/mixins/asset.py</code></td>
+<td>Item 9 (<code>create_asset</code>)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="priority-3-private-renames-reviewer-4-no-docstring-gaps">Priority 3 — Private renames (Reviewer #4, no docstring gaps)</h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Docstring gaps</th>
+<th>Renames</th>
+<th>Dead code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>core/mixins/path_builder.py</code></td>
+<td>Spot check</td>
+<td><code>domain_path</code> → <code>_domain_path</code>, <code>table_path</code> → <code>_table_path</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>core/constants.py</code></td>
+<td>Spot check</td>
+<td><code>is_system_schema</code> → <code>_is_system_schema</code>, <code>get_domain_schemas</code> → <code>_get_domain_schemas</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>core/logging_config.py</code></td>
+<td>Module docstring (expand)</td>
+<td><code>apply_logger_overrides</code> → <code>_apply_logger_overrides</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>core/schema_diff.py</code></td>
+<td>Spot check</td>
+<td><code>compute_diff</code> → <code>_compute_diff</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>core/mixins/rid_resolution.py</code></td>
+<td>Spot check</td>
+<td><code>retrieve_rid</code> → <code>_retrieve_rid</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>asset/asset_record.py</code></td>
+<td>Spot check</td>
+<td><code>asset_record_class</code> → <code>_asset_record_class</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>core/base.py</code></td>
+<td>Spot check</td>
+<td><code>cache_features</code> → <code>_cache_features</code></td>
+<td>Delete items 3–5 (<code>add_page</code>, <code>user_list</code>, <code>globus_login</code>); keep <code>working_data</code> with proper docstring</td>
+</tr>
+<tr>
+<td><code>core/mixins/workflow.py</code></td>
+<td>Spot check</td>
+<td><code>add_workflow</code> → <code>_add_workflow</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="priority-4-module-level-docstring-sweep-all-other-modules">Priority 4 — Module-level docstring sweep (all other modules)</h3>
+<p>Remaining ~50 modules get a sweep pass: add/expand module docstring, verify all public methods have at minimum a one-line summary. No Reviewer #2 or #4 findings in these modules; expect low effort.</p>
+<p>Key modules in this tier (not exhaustive — implementer to walk full tree):</p>
+<ul>
+<li><code>catalog/localize.py</code> (module docstring expansion noted by Reviewer #2)</li>
+<li><code>core/mixins/execution.py</code> (also: verify <code>start_upload()</code> visibility per §7a before committing)</li>
+<li><code>dataset/catalog_graph.py</code> (<code>CatalogGraph</code> stays public — no rename needed; docstring sweep only)</li>
+<li><code>execution/execution_configuration.py</code></li>
+<li><code>execution/workflow.py</code></li>
+<li><code>model/catalog.py</code>, <code>model/annotations.py</code>, <code>model/schema_builder.py</code></li>
+<li><code>schema/create_schema.py</code>, <code>schema/check_schema.py</code></li>
+<li><code>local_db/workspace.py</code>, <code>local_db/denormalize.py</code></li>
+<li><code>interfaces.py</code></li>
+<li><code>core/exceptions.py</code></li>
+</ul>
+<h3 id="summary-counts">Summary counts</h3>
+<table>
+<thead>
+<tr>
+<th>Priority tier</th>
+<th>Modules</th>
+<th>Docstring items</th>
+<th>Inline comments</th>
+<th>Renames</th>
+<th>Dead-code items</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 — worst areas</td>
+<td>4</td>
+<td>7</td>
+<td>3</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>2 — named gaps</td>
+<td>3</td>
+<td>8</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>3 — rename-only</td>
+<td>8</td>
+<td>~16 (spot check)</td>
+<td>0</td>
+<td>10</td>
+<td>4</td>
+</tr>
+<tr>
+<td>4 — docstring sweep</td>
+<td>~50</td>
+<td>varies</td>
+<td>0</td>
+<td>1 (start_upload, pending §7a grep)</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Total (confirmed)</strong></td>
+<td><strong>~65</strong></td>
+<td><strong>~30</strong></td>
+<td><strong>5</strong></td>
+<td><strong>12</strong></td>
+<td><strong>7</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-approach">11. Approach</h2>
+<ul>
+<li><strong>One commit per module.</strong> Commit message format: <code>docs(docstrings): &lt;module-name&gt; — docstrings + renames</code>.</li>
+<li><strong>Test file updates.</strong> After all renames are committed, a single follow-on commit updates any test file that references the old public name.</li>
+<li><strong>No squash.</strong> Module-by-module history makes it easy to identify which commit introduced a regression if a doctest starts failing.</li>
+<li><strong>Review cadence.</strong> Priority 1 and 2 commits go for review before Priority 3 and 4 begin, to get early signal on whether the docstring contract shape is right.</li>
+</ul>
+<hr />
+<h2 id="12-design-decisions-resolved-2026-04-23">12. Design Decisions — Resolved 2026-04-23</h2>
+<p>All seven open questions from the draft are resolved. No further input needed before implementation begins.</p>
+<ol>
+<li>
+<p><strong>Dead code scope (§8):</strong> Delete dead code in the same commits as docstring edits (Option A). Not a separate hygiene PR.</p>
+</li>
+<li>
+<p><strong>Testing approach (§9):</strong> <code>--doctest-modules</code> with <code># doctest: +SKIP</code> for catalog-dependent examples. No dedicated <code>tests/docstring_examples/</code> files; no manual-verification-only.</p>
+</li>
+<li>
+<p><strong><code>start_upload()</code> visibility (§7a):</strong> Deferred to implementation — grep <code>deriva-ml-model-template</code> before renaming. Decision rule: keep public if any external caller is found; rename to <code>_start_upload</code> otherwise. Document outcome in commit message.</p>
+</li>
+<li>
+<p><strong><code>CatalogGraph</code> naming (§7):</strong> Leave public. No rename, no move.</p>
+</li>
+<li>
+<p><strong><code>VocabularyTermHandle</code> public API (§7):</strong> Keep in <code>__all__</code> as a public return type.</p>
+</li>
+<li>
+<p><strong><code>validate_schema_doc.py</code> internals (§8):</strong> Rename <code>_prefixed</code> (<code>_load_from_doc</code>, <code>_load_from_code</code>, <code>_diff_schemas</code>). Tests in <code>tests/tools/</code> update to use underscored names.</p>
+</li>
+<li>
+<p><strong><code>working_data</code> deprecation stub (§8):</strong> Keep until major-version bump. Add a proper docstring documenting the deprecation and replacement.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

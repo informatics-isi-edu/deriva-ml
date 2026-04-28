@@ -1,0 +1,2516 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-15-unified-local-db-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Unified Local SQLite Layer for deriva-ml - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#unified-local-sqlite-layer-for-deriva-ml" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Unified Local SQLite Layer for deriva-ml
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goals-and-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goals and scope
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Goals and scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-migration-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Migration posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-architecture-and-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Architecture and layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Architecture and layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-on-disk-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 On-disk layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-two-tier-database-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Two-tier database model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Module map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-component-relationships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Component relationships
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-concurrency-and-locking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Concurrency and locking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-schema-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Schema versioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-compatibility-with-existing-bags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 Compatibility with existing bags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-multi-schema-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 Multi-schema handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-paged-fetching-and-unified-denormalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Paged fetching and unified denormalization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Paged fetching and unified denormalization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-pagedfetcher-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 PagedFetcher API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-cardinality-heuristic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Cardinality heuristic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-url-length-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 URL length handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-unified-denormalization-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Unified denormalization algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-what-this-unifies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 What this unifies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-caching-denormalization-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Caching denormalization results
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-asset-manifest-migration-and-cached-tabular-read-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Asset manifest migration and cached tabular-read API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Asset manifest migration and cached tabular-read API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-assetmanifest-on-sqlite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 AssetManifest on SQLite
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-cached-tabular-read-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Cached tabular-read API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-mcp-migration-phase-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 MCP migration (Phase 3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-testing-risks-and-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Testing, risks, and rollout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Testing, risks, and rollout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-phased-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Phased rollout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="unified-local-sqlite-layer-for-deriva-ml">Unified Local SQLite Layer for deriva-ml</h1>
+<p><strong>Status:</strong> Draft, pending review.
+<strong>Date:</strong> 2026-04-15.
+<strong>Scope:</strong> Design spec. Implementation plan follows separately.</p>
+<h2 id="1-goals-and-scope">1. Goals and scope</h2>
+<h3 id="11-goals">1.1 Goals</h3>
+<p>Build a unified client-side SQLite layer for deriva-ml that subsumes today's
+per-bag <code>DatabaseModel</code>, the ad-hoc <code>WorkingDataCache</code>, and JSON-based asset
+state. It becomes the substrate for:</p>
+<ol>
+<li>A general client-side caching mechanism based on SQLite that complements
+   the existing use of DBCatalog in deriva-ml and builds on that foundation.</li>
+<li>Robust denormalization, via paged server requests assembled into local SQL
+   joins rather than single complex server-side joins.</li>
+<li>A unified denormalization implementation that serves both live-catalog and
+   bag-driven workflows.</li>
+<li>A foundation for future evolution where arbitrary catalog slices (not only
+   BDBags) are stored into a local database, with an eventual upload-back
+   path.</li>
+<li>Replacement of today's filesystem/JSON caches (notably <code>AssetManifest</code>)
+   with database-backed storage, located in the deriva-ml working directory so
+   it can be shared across catalog connections and script invocations.</li>
+<li>Promotion of client-side cached tabular-read capabilities (currently
+   maintained separately in deriva-mcp) into the deriva-ml public API, so any
+   consumer — MCP, notebooks, scripts — shares the same semantics.</li>
+</ol>
+<h3 id="12-non-goals">1.2 Non-goals</h3>
+<ul>
+<li>Offline editing or conflict resolution across disconnected sessions. We
+  target the "work on a local DB while connected" case only.</li>
+<li>Replacing BDBag as a portable interchange format. Bags remain the way to
+  hand data to another party; the local DB is the working copy.</li>
+<li>A general-purpose query engine over the catalog. We are not reimplementing
+  ERMrest client-side.</li>
+<li>Migrating cheap filesystem markers (<code>validated_check.txt</code>, <code>fetch.txt</code>,
+  etc.) into the database.</li>
+<li>Preserving existing cached bag directories across the upgrade. New layout
+  applies to new caches; old caches are abandoned and users can re-download.
+  The one narrow exception is in-progress <code>AssetManifest</code> state (§4.1).</li>
+</ul>
+<h3 id="13-migration-posture">1.3 Migration posture</h3>
+<p>Additive, not big-bang. The new modules live alongside existing code. Today's
+<code>DatabaseModel</code> becomes the slice-DB implementation with minimal change.
+<code>WorkingDataCache</code> is absorbed into the new workspace. <code>AssetManifest</code> is
+rewritten to persist into the working DB. The two denormalization
+implementations are deleted and replaced with one.</p>
+<h2 id="2-architecture-and-layout">2. Architecture and layout</h2>
+<h3 id="21-on-disk-layout">2.1 On-disk layout</h3>
+<pre><code>{working_dir}/
+  catalogs/
+    {host}__{cat}/
+      working.db              # per-catalog working DB (WAL mode)
+      slices/
+        {slice_id}/
+          slice.db            # immutable slice DB (WAL mode, opened read-only at query time)
+          assets/             # materialized asset files (same role as today's bag data/assets/)
+          manifest.json       # slice provenance descriptor (root_rid, spec, snapshot_ts, content hash)
+</code></pre>
+<p><code>slice_id</code> is a content hash of <code>(root_rid, reachability_spec, snapshot_ts)</code>.
+For downloaded bags, the existing bag hash is used as <code>slice_id</code> so bag
+identity is preserved.</p>
+<p>Today's <code>{working_dir}/databases/{bag_hash}/</code> and
+<code>{working_dir}/working-data/catalog.db</code> move to this layout. No automatic
+migration of existing bag directories is performed. <code>WorkingDataCache</code>'s
+contents are a cache — users may delete or let the new code start fresh.</p>
+<h3 id="22-two-tier-database-model">2.2 Two-tier database model</h3>
+<p><strong>Slice databases.</strong> Immutable, native-shape, complete-by-construction. One
+per materialized slice. Identity is <code>(root_rid, spec, snapshot_ts)</code>. A bag is
+a special case of a slice. Slice DBs are opened read-only at query time.</p>
+<p><strong>Working database.</strong> One per <code>(hostname, catalog_id)</code>. Mutable. Holds:</p>
+<ul>
+<li>partial table caches populated by the paged fetcher</li>
+<li>cached tabular results (denormalization outputs, <code>preview_table</code>
+  results, feature-value fetches, etc.)</li>
+<li>asset-metadata cache (rows fetched from asset tables)</li>
+<li>execution state (<code>AssetManifest</code> tables)</li>
+</ul>
+<p>The working DB can have multiple logical areas distinguished by SQL schema
+qualifier within the single file (e.g. <code>cached_results.*</code>,
+<code>execution_state.*</code>, plus the native-shape tables).</p>
+<h3 id="23-module-map">2.3 Module map</h3>
+<p><strong>New modules:</strong></p>
+<ul>
+<li>
+<p><code>deriva_ml.local_db.schema</code> — unified SQLAlchemy schema builder. Consumes
+  either a bag <code>schema.json</code> or a live ERMrest <code>Model</code> and produces the same
+  metadata shape on both sides, so cross-DB joins are type-safe. Supersedes
+  <code>model/schema_builder.py</code> (which handles only bags today).</p>
+</li>
+<li>
+<p><code>deriva_ml.local_db.paged_fetcher</code> — the fetch primitive. Owns keyset
+  paging, RID-set batching with byte-length guard and POST fallback, bounded
+  concurrency, and per-operation dedup.</p>
+</li>
+<li>
+<p><code>deriva_ml.local_db.workspace</code> — runtime orchestrator. Holds the working DB
+  handle, a registry of known slices, and the <code>attach_slice(...)</code> mechanism.
+  Exposes the cached-tabular-read API.</p>
+</li>
+<li>
+<p><code>deriva_ml.local_db.denormalize</code> — single denormalization implementation.</p>
+</li>
+</ul>
+<p><strong>Refactors:</strong></p>
+<ul>
+<li><code>model/database.py::DatabaseModel</code> — becomes the slice-DB class. Loses its
+  role as the denormalization engine (that moves to the new module). Gains a
+  read-only open mode.</li>
+<li><code>core/working_data.py::WorkingDataCache</code> — internal implementation detail
+  of <code>Workspace</code>; public API replaced by the cached-tabular-read surface.</li>
+<li><code>dataset/dataset.py::_denormalize_datapath</code> and
+  <code>dataset/dataset_bag.py::_denormalize</code> — deleted. <code>denormalize_*</code> methods
+  on <code>Dataset</code> and <code>DatasetBag</code> become thin delegates to the unified module.</li>
+<li><code>asset/manifest.py::AssetManifest</code> — rewritten to persist into working-DB
+  tables (same public API; storage swap only).</li>
+</ul>
+<h3 id="24-component-relationships">2.4 Component relationships</h3>
+<pre><code>               ┌─────────────────────────┐
+               │     Workspace           │  (per host+catalog)
+               │  - working.db handle    │
+               │  - slice registry       │
+               │  - attach_slice()       │
+               └──────────┬──────────────┘
+                          │ uses
+          ┌───────────────┼────────────────┐
+          ▼               ▼                ▼
+  ┌──────────────┐  ┌──────────┐    ┌──────────────┐
+  │ PagedFetcher │  │ Denorm-  │    │ AssetManifest│
+  │              │  │ alizer   │    │ (DB-backed)  │
+  └──────┬───────┘  └────┬─────┘    └──────┬───────┘
+         │                │                 │
+         │ writes rows    │ SQL joins       │ reads/writes
+         ▼                ▼                 ▼
+  ┌────────────────────────────────────────────────┐
+  │         SQLite connection                       │
+  │   main  = working.db                           │
+  │   slice = (optional) slice.db  [ATTACH]        │
+  └────────────────────────────────────────────────┘
+</code></pre>
+<p><code>PagedFetcher</code>, the denormalizer, and <code>AssetManifest</code> all hold a <code>Workspace</code>
+and never directly know whether they're in a live-catalog scenario (main
+schema only), a bag scenario (slice attached), or a hybrid case.</p>
+<h3 id="25-concurrency-and-locking">2.5 Concurrency and locking</h3>
+<p>SQLite WAL mode is required. Multiple Python processes may share a working DB
+(e.g., concurrent scripts in the same working directory). WAL gives readers
+non-blocking semantics against writers. Default <code>PRAGMA synchronous=NORMAL</code>.
+<code>PagedFetcher</code> commits every N pages (configurable, default 10) to bound the
+worst-case writer-block window.</p>
+<h3 id="26-schema-versioning">2.6 Schema versioning</h3>
+<p>The unified schema is versioned via a <code>schema_meta</code> table with an integer
+version. A small migration runner at workspace-open time upgrades older
+working DBs. Slice DBs are pinned to the version of their producer and are
+read-only at query time; schema-version mismatches are handled by the
+tolerant column resolution described in §5.2 (R2).</p>
+<h3 id="27-compatibility-with-existing-bags">2.7 Compatibility with existing bags</h3>
+<p>No migration of bag directories. Existing bag caches are effectively
+abandoned — the first access to a dataset after upgrade may re-download.
+BDBag materialization is idempotent and resumable via <code>fetch.txt</code>, so the
+cost of re-downloading is walking the fetch manifest and verifying what's on
+disk. Release notes will point users at a one-line shell command
+(<code>mv</code>/symlink) if they want to preserve a large cache by hand.</p>
+<h3 id="28-multi-schema-handling">2.8 Multi-schema handling</h3>
+<p>The unified schema builder treats SQLAlchemy schema-qualified names exactly
+as today (<code>deriva-ml.Dataset</code>, <code>isa.Image</code>, etc.). Within a single DB,
+schema-qualified names coexist naturally. Across attached DBs, SQLite's
+database namespace (<code>main</code>, <code>slice</code>) is orthogonal to the <code>schema.table</code>
+naming inside each file; the denormalizer emits fully qualified references
+(e.g. <code>slice."isa.Image"</code>) so callers never hand-write these. Working DB and
+slice DB are always built from the same ERMrest <code>Model</code> at build time,
+guaranteeing alignment. Multi-schema collisions between a slice and the
+current catalog (same schema name, different column shape) are out of scope
+for this phase and will be revisited when upload-back (goal #4) is designed.</p>
+<h2 id="3-paged-fetching-and-unified-denormalization">3. Paged fetching and unified denormalization</h2>
+<h3 id="31-pagedfetcher-api">3.1 <code>PagedFetcher</code> API</h3>
+<p>Three public methods. The class is constructed from an ERMrest catalog
+handle and a <code>Workspace</code>.</p>
+<pre><code class="language-python">PagedFetcher.fetch_predicate(
+    table,                  # ERMrest table ref
+    predicate=None,         # optional ERMrest filter expression
+    target_table,           # SQLAlchemy Table in working/slice DB
+    sort=(&quot;RID&quot;,),          # keyset sort — must end in a unique column
+    page_size=1000,
+    on_page=None,           # optional callback(rows); default inserts into target_table
+) -&gt; int
+</code></pre>
+<p>Streams everything matching <code>predicate</code> into local SQLite via keyset paging
+(<code>@sort(...)@after(...)?limit=N</code>). No full-result buffering on server or
+client.</p>
+<pre><code class="language-python">PagedFetcher.fetch_by_rids(
+    table,
+    rids: Iterable[str],
+    target_table,
+    rid_column=&quot;RID&quot;,       # or any indexed column (e.g. FK column)
+    batch_size=500,
+    max_url_bytes=6144,
+    concurrency=4,
+) -&gt; int
+</code></pre>
+<p>Fetches rows whose <code>rid_column</code> value is in the given set. Default batch size
+500, with a byte-length guard that reduces the batch when the serialized URL
+would exceed <code>max_url_bytes</code>. If even the reduced batch overflows, the request
+switches to POST-body filtering. Bounded concurrency across batches.
+Per-operation dedup skips RIDs already fetched.</p>
+<pre><code class="language-python">PagedFetcher.fetched_rids(table) -&gt; set[str]
+</code></pre>
+<p>Returns RIDs already materialized in the workspace for the given table.
+Callers use this to compute deltas before requesting more.</p>
+<h3 id="32-cardinality-heuristic">3.2 Cardinality heuristic</h3>
+<p>When a RID set approaches the table size, RID-set batching is the wrong
+primitive. The fetcher applies this rule:</p>
+<ul>
+<li>If <code>|rid_set| / table_row_count &gt; threshold</code> (default 0.5), fall back to
+  <code>fetch_predicate</code> (paged keyset scan) and filter locally.</li>
+<li>Otherwise use <code>fetch_by_rids</code>.</li>
+</ul>
+<p>Row counts come from <code>/aggregate/T/cnt(*)</code>, memoized per table per operation.</p>
+<h3 id="33-url-length-handling">3.3 URL length handling</h3>
+<p>Default <code>max_url_bytes=6144</code> leaves headroom under typical 8KB proxy limits.
+Handling escalates in order:</p>
+<ol>
+<li>Shrink batch size to fit GET.</li>
+<li>If even the minimum practical batch overflows, switch the request to POST
+   with the filter expression in the body (supported by ERMrest and
+   deriva-py).</li>
+<li>If POST also fails at runtime, shrink batch and retry with logging; as a
+   last resort, fall back to <code>fetch_predicate</code> with a local filter.</li>
+</ol>
+<p>Users never see this; the fetcher picks the transport.</p>
+<h3 id="34-unified-denormalization-algorithm">3.4 Unified denormalization algorithm</h3>
+<p>Lives in <code>deriva_ml.local_db.denormalize</code>. Takes a <code>Workspace</code>, an optional
+slice to attach, a list of <code>include_tables</code>, and an optional root (e.g. a
+dataset RID). Produces rows as an iterator, a pandas DataFrame, or a
+SQLAlchemy <code>Select</code>.</p>
+<p>Steps:</p>
+<ol>
+<li><strong>Resolve the required table set.</strong> BFS from the primary table through
+   <code>include_tables</code> using the ERMrest model's FK graph. Detect ambiguous
+   paths up front (same check both today's implementations perform, lifted
+   into the unified path). Model-only step, no I/O.</li>
+<li><strong>Determine required rows.</strong> For each table in the chain, compute the
+   required RID set by walking from root forward — root table uses the
+   dataset/slice filter predicate; child tables derive RID sets from
+   previously fetched rows' FKs or from association tables.</li>
+<li><strong>Fetch missing rows only.</strong> For each table, subtract
+   <code>workspace.fetched_rids(table)</code> from the required set and fetch the
+   remainder. If a slice is attached and already contains the rows, skip the
+   fetch entirely.</li>
+<li><strong>Build the SQL <code>Select</code>.</strong> One SQLAlchemy <code>Select</code> joining across the
+   chain. Columns prefixed by table name (existing <code>denormalize_column_name</code>
+   behavior). JOIN conditions come from the FK graph from step 1. If a slice
+   is attached, the <code>Select</code> references the slice version of a table
+   (<code>slice.{table}</code>) when that table's rows came entirely from the slice,
+   the working-DB version (<code>main.{table}</code>) when they came entirely from live
+   fetches, or a <code>UNION ALL</code> subquery over both when both contributed. The
+   "who contributed" decision is per-table, made from the step-3 bookkeeping
+   (which RIDs came from which source); callers never choose.</li>
+<li><strong>Execute and yield.</strong> Same execution path regardless of row source.</li>
+</ol>
+<h3 id="35-what-this-unifies">3.5 What this unifies</h3>
+<ul>
+<li>Today's <code>Dataset._denormalize_datapath</code> and <code>DatasetBag._denormalize</code>
+  disappear. Both callers reduce to <code>workspace.denormalize(include_tables,
+  root=...)</code>. The bag case just attaches the slice first; the catalog case
+  fetches on demand.</li>
+<li>Ambiguous-path detection is one implementation.</li>
+<li>Column naming, skip-column handling, multi-schema handling are one
+  implementation.</li>
+<li>The hybrid case ("bag plus a fresh feature the catalog has that the bag
+  doesn't") becomes free.</li>
+</ul>
+<h3 id="36-caching-denormalization-results">3.6 Caching denormalization results</h3>
+<p>Denormalization output can optionally be materialized into <code>working.db</code> under
+<code>cached_results.*</code>. The cache key is
+<code>hash(root, include_tables, slice_id or snapshot, schema_version)</code>. Managed
+by the same cached-tabular-read API described in §4.2, so denormalization
+caching and general cached reads share one implementation.</p>
+<h2 id="4-asset-manifest-migration-and-cached-tabular-read-api">4. Asset manifest migration and cached tabular-read API</h2>
+<h3 id="41-assetmanifest-on-sqlite">4.1 <code>AssetManifest</code> on SQLite</h3>
+<p>Two tables under an <code>execution_state</code> schema in the working DB:</p>
+<pre><code class="language-sql">execution_state.assets (
+    execution_rid    TEXT NOT NULL,
+    key              TEXT NOT NULL,   -- manifest key (relative path)
+    asset_table      TEXT NOT NULL,
+    schema           TEXT NOT NULL,
+    asset_types      JSON,            -- small list, stored as JSON text
+    metadata         JSON,            -- arbitrary column values
+    description      TEXT,
+    status           TEXT NOT NULL,   -- pending | uploaded | failed
+    rid              TEXT,
+    uploaded_at      TEXT,
+    error            TEXT,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    PRIMARY KEY (execution_rid, key)
+)
+
+execution_state.features (
+    execution_rid    TEXT NOT NULL,
+    feature_name     TEXT NOT NULL,
+    target_table     TEXT NOT NULL,
+    schema           TEXT NOT NULL,
+    values_path      TEXT NOT NULL,
+    asset_columns    JSON,
+    status           TEXT NOT NULL,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    PRIMARY KEY (execution_rid, feature_name)
+)
+</code></pre>
+<p>Indexes <code>(execution_rid, status)</code> on both.</p>
+<p><strong>Crash safety.</strong> WAL + <code>synchronous=NORMAL</code>, with each <code>add_asset</code>,
+<code>mark_uploaded</code>, and <code>mark_failed</code> committed in its own transaction. WAL
+recovery rolls forward committed transactions; the uncommitted-write loss
+window is equivalent to today's "write-but-not-fsync" edge case.</p>
+<p><strong>JSON import.</strong> On workspace open, scan the working dir for pre-existing
+<code>*.manifest.json</code> files. For each: parse, upsert into the tables, move the
+file to <code>{path}.migrated.json</code> (do not delete; users may want it for
+forensics). Idempotent via the primary keys.</p>
+<p><strong>JSON export.</strong> <code>AssetManifest.to_json()</code> dumps the old file format on
+demand, for debugging and postmortems.</p>
+<h3 id="42-cached-tabular-read-api">4.2 Cached tabular-read API</h3>
+<p>Public methods on <code>Workspace</code>, reachable from the <code>DerivaML</code> instance.</p>
+<pre><code class="language-python">workspace.cached_table_read(
+    table: str | Table,
+    predicate=None,                   # ERMrest or SQLAlchemy-style filter
+    columns=None,                     # subset; None = all non-system columns
+    refresh: bool = False,            # force re-fetch even if cached
+    ttl: timedelta | None = None,     # optional freshness bound
+) -&gt; CachedResult
+</code></pre>
+<p>Returns a <code>CachedResult</code> — opaque handle wrapping a cache key and the
+underlying SQLite table.</p>
+<pre><code class="language-python">result.to_dataframe()
+result.iter_rows()
+result.query(sort=..., filter=..., limit=..., offset=...) -&gt; CachedResult
+result.row_count
+result.cache_key
+result.fetched_at
+result.invalidate()
+</code></pre>
+<p><code>query(...)</code> runs SQL against the cached table without re-fetching. Sort,
+filter, and pagination are applied locally. Returns a new <code>CachedResult</code> so
+chained calls work. This is the operation MCP's <code>query_cached_result</code>
+delegates to.</p>
+<p><strong>Storage.</strong> One table per cached result under <code>cached_results.*</code>, plus a
+registry:</p>
+<pre><code class="language-sql">cached_results._registry (
+    cache_key       TEXT PRIMARY KEY,
+    source          TEXT NOT NULL,   -- &quot;table&quot;, &quot;denormalize&quot;, &quot;feature_values&quot;, ...
+    params          JSON NOT NULL,
+    row_count       INTEGER,
+    fetched_at      TEXT NOT NULL,
+    schema_version  INTEGER NOT NULL
+)
+</code></pre>
+<p><code>cache_key = hash(source, params, catalog_snapshot_ts_if_pinned)</code>.</p>
+<p><strong>Top-level workspace methods:</strong></p>
+<pre><code class="language-python">workspace.list_cached_results() -&gt; list[CachedResultMeta]
+workspace.get_cached_result(cache_key) -&gt; CachedResult
+workspace.invalidate_cache(cache_key=None, source=None)
+</code></pre>
+<p><strong>Extensibility.</strong> Denormalization results and feature-value fetches
+register with the same machinery by picking a <code>source</code> tag and a stable
+params hash. One cache, many producers.</p>
+<h3 id="43-mcp-migration-phase-3">4.3 MCP migration (Phase 3)</h3>
+<p>Direct mapping:</p>
+<ul>
+<li><code>preview_table</code> → <code>workspace.cached_table_read(table, ...).query(limit=...,
+  offset=...)</code></li>
+<li><code>list_cached_results</code> → <code>workspace.list_cached_results()</code></li>
+<li><code>query_cached_result</code> → <code>workspace.get_cached_result(cache_key).query(...)</code></li>
+<li><code>invalidate_cache</code> → <code>workspace.invalidate_cache(...)</code></li>
+</ul>
+<p>MCP keeps its tool surface; the storage and logic live in deriva-ml. Cached
+results are then visible to scripts and notebooks connected to the same
+working directory and catalog, not siloed in the MCP process.</p>
+<h2 id="5-testing-risks-and-rollout">5. Testing, risks, and rollout</h2>
+<h3 id="51-testing">5.1 Testing</h3>
+<p><strong>Unit (no catalog):</strong></p>
+<ul>
+<li><code>PagedFetcher</code> against a fake ERMrest client: byte-length guard splits
+  correctly; POST fallback triggers at the right threshold; dedup across
+  calls; cardinality heuristic switches at the expected point.</li>
+<li><code>local_db.schema</code> against both a bag <code>schema.json</code> fixture and a canned
+  ERMrest <code>Model</code> dump; assert identical SQLAlchemy metadata.</li>
+<li><code>AssetManifest</code> DB-backed implementation runs the existing API-level test
+  suite unchanged. Migration test seeds JSON manifests, opens workspace,
+  asserts tables populated and <code>.migrated.json</code> sidecar present.</li>
+</ul>
+<p><strong>Integration (live catalog):</strong></p>
+<ul>
+<li>One denormalization test matrix parameterized by source (<code>"bag"</code>,
+  <code>"catalog"</code>, <code>"hybrid"</code>). Same assertions for all three. Verifies
+  unification directly.</li>
+<li>Cached tabular-read lifecycle: fetch → re-query with sort/filter →
+  invalidate → re-fetch.</li>
+<li>Multi-schema test: workspace+slice attach produces correct joined results
+  when both sides have multi-schema tables.</li>
+</ul>
+<p><strong>Regression safety net:</strong> existing <code>_denormalize_datapath</code> and
+<code>_denormalize</code> tests continue to run during Phase 1. Deleted only when the
+unified path passes at parity in Phase 2.</p>
+<h3 id="52-risks">5.2 Risks</h3>
+<p><strong>R1: SQLite concurrent-write contention under parallel scripts.</strong>
+WAL mitigates most of it; a long transaction (e.g. a 100k-row paged fetch
+committed as one unit) would block other writers. <em>Handling:</em> <code>PagedFetcher</code>
+commits every N pages (default 10). Worst-case writer-block window is
+O(seconds).</p>
+<p><strong>R2: Schema drift between working DB and attached slice.</strong>
+Slice built from an older snapshot; working DB reflects evolved catalog
+schema. <em>Handling:</em> the denormalizer selects explicit column lists from the
+FK graph (not <code>SELECT *</code>); missing columns read as NULL; extra columns on
+one side are ignored. Documented and tested.</p>
+<p><strong>R3: URL length despite POST fallback.</strong>
+POST-body filters have their own limits and are not universally supported on
+every ERMrest endpoint. <em>Handling:</em> fetcher tests include an oversized-batch
+case against the live catalog exercising the POST path end-to-end. Runtime
+fallback shrinks the batch and retries with logging; last resort falls back
+to <code>fetch_predicate</code> with a local filter.</p>
+<p><strong>R4: Working DB grows over time.</strong>
+Accumulated cached results, fetched rows, old execution manifests.
+<em>Handling:</em> <code>workspace.vacuum(older_than=...)</code> drops cached results and
+fetched-row tables past a configurable age (default 30 days). Execution
+state is preserved until the execution is final. Users can nuke the DB
+entirely; it's a cache.</p>
+<p><strong>R5: Two catalogs open simultaneously.</strong>
+Each <code>DerivaML</code> instance keyed by <code>(host, cat)</code> gets its own working DB. No
+global state. Test covers opening two, using both, closing both.</p>
+<p><strong>R6: Small-dataset regression.</strong>
+For tiny datasets, today's single-query path is faster than paged fetches.
+<em>Handling:</em> skip paging when estimated row count is below a threshold
+(default 500) — issue one bounded request and done.</p>
+<h3 id="53-phased-rollout">5.3 Phased rollout</h3>
+<p><strong>Phase 1 — Foundation.</strong> No user-visible API changes.
+- <code>local_db.schema</code>
+- <code>local_db.workspace</code> (per-catalog DB, slice attach/detach,
+  <code>WorkingDataCache</code> absorbed)
+- <code>PagedFetcher</code>
+- <code>AssetManifest</code> DB-backed + JSON import
+- Existing denormalization code unchanged; new code sits beside it.
+- Users see no behavioral change except path move of the working cache.</p>
+<p><strong>Phase 2 — Unified denormalization.</strong>
+- <code>local_db.denormalize</code> using Phase 1 primitives.
+- <code>Dataset.denormalize_*</code> and <code>DatasetBag.denormalize_*</code> become thin
+  delegates.
+- Old <code>_denormalize_datapath</code> and <code>_denormalize</code> deleted.
+- Cached tabular-read API exposed publicly.
+- Parameterized denormalization tests (bag/catalog/hybrid) go green.</p>
+<p><strong>Phase 3 — MCP migration (in deriva-mcp repo).</strong>
+- MCP cache tools delegate to workspace APIs.
+- MCP-local cache DB deprecated with a migration note in the deriva-mcp
+  release.</p>
+<p><strong>Out of scope for this spec:</strong> goal #4 upload-back. Foundation is in place
+after Phase 1 (workspace + slice + attach). The actual diff-and-apply logic
+is its own design problem (conflict resolution, FK ordering, partial-failure
+handling) and will get its own spec once this work ships.</p>
+<h2 id="6-open-questions">6. Open questions</h2>
+<p>None blocking. Items to revisit in follow-on specs:</p>
+<ul>
+<li>Upload-back from local DB (goal #4, deferred).</li>
+<li>Schema-name collisions between slice and live catalog during upload-back
+  (§2.8).</li>
+<li>Whether <code>validated_check.txt</code> and <code>fetch.txt</code> should eventually move into
+  the DB for a fully in-database bag representation (deferred per §1.2).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

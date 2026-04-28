@@ -1,0 +1,2823 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-22-h3-executionrecord-rename/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>H3 — ExecutionRecord Disambiguation Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#h3-executionrecord-disambiguation-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              H3 — ExecutionRecord Disambiguation Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-order-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Order Rationale
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Order Rationale">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-create-executionsnapshot-as-a-pydantic-class-in-the-new-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Create ExecutionSnapshot as a Pydantic class in the new module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-swap-the-internal-importer-to-the-new-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Swap the internal importer to the new class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-rename-and-update-test-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Rename and update test files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-rewrite-method-and-class-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Rewrite method and class docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-delete-old-module-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Delete old module + CHANGELOG
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Self-Review Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#placeholder-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Placeholder scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type consistency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="h3-executionrecord-disambiguation-implementation-plan">H3 — ExecutionRecord Disambiguation Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Rename the V2 <code>ExecutionRecord</code> class to <code>ExecutionSnapshot</code>, move it into <code>execution_snapshot.py</code>, convert it from <code>@dataclass(frozen=True)</code> to Pydantic <code>BaseModel(frozen=True)</code>, and rewrite live-vs-snapshot docstrings on the four execution-query methods.</p>
+<p><strong>Architecture:</strong> Pure rename + idiom-consistency cleanup. No functional changes. Field list and semantics unchanged; only the container type changes on <code>ExecutionSnapshot</code> (dataclass → Pydantic) and the class/module names change. Internal alias <code>_ExecutionRecordV2</code> goes away.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, Pydantic v2 (<code>BaseModel</code>, <code>ConfigDict</code>), pytest.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-04-22-h3-executionrecord-rename-design.md</code></p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/execution/execution_record_v2.py</code></td>
+<td>Current V2 home</td>
+<td><strong>DELETE</strong> (after moving content)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution_snapshot.py</code></td>
+<td>New home for <code>ExecutionSnapshot</code></td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution_record.py</code></td>
+<td>Legacy live class</td>
+<td>Modify — class docstring adds live-vs-snapshot disambiguation paragraph</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/mixins/execution.py</code></td>
+<td>Imports V2, defines query methods</td>
+<td>Modify — replace alias import, update type annotations, rewrite 4 method docstrings</td>
+</tr>
+<tr>
+<td><code>tests/execution/test_execution_record_v2.py</code></td>
+<td>Tests for V2 class</td>
+<td><strong>RENAME</strong> → <code>test_execution_snapshot.py</code>; update imports + one test name</td>
+</tr>
+<tr>
+<td><code>tests/execution/test_execution_registry.py</code></td>
+<td>Tests list_executions etc.</td>
+<td>Modify — update import + one test name</td>
+</tr>
+<tr>
+<td><code>CHANGELOG.md</code></td>
+<td>Release notes</td>
+<td>Modify — "Renamed" entry under Unreleased</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-order-rationale">Task Order Rationale</h2>
+<p>Tasks 1→2→3→4→5:
+- <strong>Task 1</strong> creates <code>execution_snapshot.py</code> with the new Pydantic class. Old file stays for now — tests still pass via the old path.
+- <strong>Task 2</strong> swaps the internal importer in <code>core/mixins/execution.py</code> to use the new name; old file becomes unreferenced.
+- <strong>Task 3</strong> renames the test files and updates imports. Tests still pass on the same behavior.
+- <strong>Task 4</strong> rewrites the docstrings (both class docstrings and all 4 method docstrings). Pure documentation.
+- <strong>Task 5</strong> deletes <code>execution_record_v2.py</code> (now unreferenced) and CHANGELOG.</p>
+<p>If Task 2 goes wrong (broken import, type-annotation typo) it's caught before Task 5 — the old file is still there as a safety net until the end.</p>
+<hr />
+<h3 id="task-1-create-executionsnapshot-as-a-pydantic-class-in-the-new-module">Task 1: Create <code>ExecutionSnapshot</code> as a Pydantic class in the new module</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/execution/execution_snapshot.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1.1: Write the failing test</strong></li>
+</ul>
+<p>Since this task creates a new file that duplicates an existing class, the "test" is an import-and-construct check. Create a temporary test file <code>tests/execution/test_execution_snapshot_new.py</code> (will be deleted in Task 3 when the real rename happens):</p>
+<pre><code class="language-python">&quot;&quot;&quot;Temporary test for Task 1 of H3. Deleted in Task 3.&quot;&quot;&quot;
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+from pydantic import BaseModel
+
+
+def test_execution_snapshot_exists_and_is_pydantic():
+    from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+    assert issubclass(ExecutionSnapshot, BaseModel)
+
+
+def test_execution_snapshot_is_frozen():
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    snap = ExecutionSnapshot(
+        rid=&quot;X&quot;, workflow_rid=None, description=None,
+        status=ExecutionStatus.Created, mode=ConnectionMode.online,
+        working_dir_rel=&quot;execution/X&quot;,
+        start_time=None, stop_time=None, last_activity=now,
+        error=None, sync_pending=False, created_at=now,
+        pending_rows=0, failed_rows=0, pending_files=0, failed_files=0,
+    )
+    with pytest.raises(Exception):  # Pydantic raises ValidationError
+        snap.rid = &quot;Y&quot;
+
+
+def test_execution_snapshot_from_row():
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    row = {
+        &quot;rid&quot;: &quot;EXE-A&quot;, &quot;workflow_rid&quot;: &quot;WFL-1&quot;, &quot;description&quot;: &quot;test&quot;,
+        &quot;status&quot;: &quot;Stopped&quot;, &quot;mode&quot;: &quot;online&quot;,
+        &quot;working_dir_rel&quot;: &quot;execution/EXE-A&quot;,
+        &quot;start_time&quot;: now, &quot;stop_time&quot;: now, &quot;last_activity&quot;: now,
+        &quot;error&quot;: None, &quot;sync_pending&quot;: False, &quot;created_at&quot;: now,
+        &quot;config_json&quot;: &quot;{}&quot;,
+    }
+    snap = ExecutionSnapshot.from_row(
+        row,
+        pending_rows=3, failed_rows=0,
+        pending_files=1, failed_files=0,
+    )
+    assert snap.rid == &quot;EXE-A&quot;
+    assert snap.status is ExecutionStatus.Stopped
+    assert snap.mode is ConnectionMode.online
+    assert snap.pending_rows == 3
+
+
+def test_execution_snapshot_model_dump():
+    &quot;&quot;&quot;Pydantic conversion gives .model_dump().&quot;&quot;&quot;
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    snap = ExecutionSnapshot(
+        rid=&quot;X&quot;, workflow_rid=None, description=None,
+        status=ExecutionStatus.Created, mode=ConnectionMode.online,
+        working_dir_rel=&quot;execution/X&quot;,
+        start_time=None, stop_time=None, last_activity=now,
+        error=None, sync_pending=False, created_at=now,
+        pending_rows=0, failed_rows=0, pending_files=0, failed_files=0,
+    )
+    d = snap.model_dump()
+    assert d[&quot;rid&quot;] == &quot;X&quot;
+    assert d[&quot;status&quot;] == &quot;Created&quot;
+    assert d[&quot;mode&quot;] == &quot;online&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 1.2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_snapshot_new.py -v</code></p>
+<p>Expected: FAIL with <code>ModuleNotFoundError: No module named 'deriva_ml.execution.execution_snapshot'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1.3: Create <code>execution_snapshot.py</code></strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/execution/execution_snapshot.py</code> with this exact content:</p>
+<pre><code class="language-python">&quot;&quot;&quot;SQLite-backed ExecutionSnapshot — a registry row with derived counts.
+
+Per spec §2.9 (originally drafted as execution_record_v2). A frozen
+Pydantic snapshot of one ``execution_state__executions`` row plus
+convenience counts from ``execution_state__pending_rows``. Returned
+by ``DerivaML.list_executions`` and ``DerivaML.find_incomplete_executions``.
+
+This is a VALUE OBJECT, not a live catalog record:
+
+- Constructed from a SQLite registry row (``from_row``) or directly.
+- Immutable (``ConfigDict(frozen=True)``) — the snapshot captures a
+  moment in time; mutating it would be meaningless.
+- Reads do not contact the catalog; works in offline mode.
+- Behavior methods (``pending_summary``, ``upload_outputs``,
+  ``update_status``) take ``ml: DerivaML`` as a kwarg because the
+  snapshot itself doesn't carry a server connection.
+
+For a live, catalog-bound record whose property setters write
+through to the catalog, see
+:class:`~deriva_ml.execution.execution_record.ExecutionRecord`,
+returned by :meth:`~deriva_ml.DerivaML.lookup_execution` and
+:meth:`~deriva_ml.DerivaML.find_executions`.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from pydantic import BaseModel, ConfigDict
+
+from deriva_ml.core.connection_mode import ConnectionMode
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.execution.state_store import ExecutionStatus
+
+if TYPE_CHECKING:
+    from deriva_ml.core.base import DerivaML  # noqa: F401
+    from deriva_ml.execution.pending_summary import PendingSummary
+    from deriva_ml.execution.upload_engine import UploadReport
+
+
+class ExecutionSnapshot(BaseModel):
+    &quot;&quot;&quot;Frozen snapshot of an execution's registry row plus pending counts.
+
+    A Pydantic value object — no mutation, no server reads on property
+    access. If you need lifecycle fields that change over time (live
+    status, etc.), use the Execution object returned by
+    ``resume_execution`` or the
+    :class:`~deriva_ml.execution.execution_record.ExecutionRecord`
+    returned by ``lookup_execution``/``find_executions``.
+
+    Attributes:
+        rid: Server-assigned Execution RID.
+        workflow_rid: Workflow FK; None if not set.
+        description: Free-form description from the configuration.
+        status: Current lifecycle status as of this snapshot.
+        mode: ConnectionMode the execution was last active under.
+        working_dir_rel: Relative path to the execution root.
+        start_time: Lifecycle start timestamp; None if not yet started.
+        stop_time: Lifecycle stop timestamp; None if still running.
+        last_activity: Last pending-row mutation time.
+        error: Last error message if status == Failed.
+        sync_pending: True if SQLite is ahead of the catalog.
+        created_at: When the local registry first knew about this row.
+        pending_rows: Count of non-asset pending rows not yet uploaded.
+        failed_rows: Count of non-asset rows in status='failed'.
+        pending_files: Count of asset-file rows not yet uploaded.
+        failed_files: Count of asset-file rows in status='failed'.
+
+    Example:
+        &gt;&gt;&gt; snapshots = ml.find_incomplete_executions()
+        &gt;&gt;&gt; for snap in snapshots:
+        ...     print(snap.rid, snap.status, snap.pending_rows)
+    &quot;&quot;&quot;
+
+    model_config = ConfigDict(frozen=True)
+
+    rid: str
+    workflow_rid: str | None
+    description: str | None
+    status: ExecutionStatus
+    mode: ConnectionMode
+    working_dir_rel: str
+    start_time: datetime | None
+    stop_time: datetime | None
+    last_activity: datetime
+    error: str | None
+    sync_pending: bool
+    created_at: datetime
+    pending_rows: int
+    failed_rows: int
+    pending_files: int
+    failed_files: int
+
+    @classmethod
+    def from_row(
+        cls,
+        row: dict,
+        *,
+        pending_rows: int = 0,
+        failed_rows: int = 0,
+        pending_files: int = 0,
+        failed_files: int = 0,
+    ) -&gt; &quot;ExecutionSnapshot&quot;:
+        &quot;&quot;&quot;Construct from a SQLite executions row + pending counts.
+
+        Args:
+            row: Dict returned by ``ExecutionStateStore.get_execution``
+                or ``list_executions``. Must contain all the
+                ``execution_state__executions`` columns.
+            pending_rows: Count of non-asset pending rows. Defaults to
+                0 when the caller hasn't queried pending_rows.
+            failed_rows: Count of non-asset rows in ``status='failed'``.
+            pending_files: Count of asset-file rows not yet uploaded.
+            failed_files: Count of asset-file rows in ``status='failed'``.
+
+        Returns:
+            A frozen ``ExecutionSnapshot`` instance.
+
+        Example:
+            &gt;&gt;&gt; row = store.get_execution(&quot;EXE-A&quot;)
+            &gt;&gt;&gt; counts = store.count_pending_by_kind(execution_rid=&quot;EXE-A&quot;)
+            &gt;&gt;&gt; snap = ExecutionSnapshot.from_row(row, **counts)
+        &quot;&quot;&quot;
+        return cls(
+            rid=row[&quot;rid&quot;],
+            workflow_rid=row[&quot;workflow_rid&quot;],
+            description=row[&quot;description&quot;],
+            status=ExecutionStatus(row[&quot;status&quot;]),
+            mode=ConnectionMode(row[&quot;mode&quot;]),
+            working_dir_rel=row[&quot;working_dir_rel&quot;],
+            start_time=row[&quot;start_time&quot;],
+            stop_time=row[&quot;stop_time&quot;],
+            last_activity=row[&quot;last_activity&quot;],
+            error=row[&quot;error&quot;],
+            sync_pending=bool(row[&quot;sync_pending&quot;]),
+            created_at=row[&quot;created_at&quot;],
+            pending_rows=pending_rows,
+            failed_rows=failed_rows,
+            pending_files=pending_files,
+            failed_files=failed_files,
+        )
+
+    def pending_summary(self, *, ml: &quot;DerivaML&quot;) -&gt; &quot;PendingSummary&quot;:
+        &quot;&quot;&quot;Return a PendingSummary via the DerivaML instance's workspace.
+
+        Snapshot objects are frozen Pydantic models and don't carry a
+        reference to DerivaML; the caller passes one.
+
+        Args:
+            ml: The DerivaML instance whose workspace to query.
+
+        Returns:
+            PendingSummary for this execution.
+
+        Example:
+            &gt;&gt;&gt; for snap in ml.list_executions():
+            ...     s = snap.pending_summary(ml=ml)
+            ...     if s.has_pending:
+            ...         print(s.render())
+        &quot;&quot;&quot;
+        from deriva_ml.execution.pending_summary import (
+            PendingAssetCount,
+            PendingRowCount,
+            PendingSummary,
+        )
+
+        store = ml.workspace.execution_state_store()
+        data = store.pending_summary_rows(execution_rid=self.rid)
+        return PendingSummary(
+            execution_rid=self.rid,
+            rows=[PendingRowCount(**r) for r in data[&quot;rows&quot;]],
+            assets=[PendingAssetCount(**a) for a in data[&quot;assets&quot;]],
+            diagnostics=data[&quot;diagnostics&quot;],
+        )
+
+    def upload_outputs(
+        self,
+        *,
+        ml: &quot;DerivaML&quot;,
+        retry_failed: bool = False,
+    ) -&gt; &quot;UploadReport&quot;:
+        &quot;&quot;&quot;Sugar for ``ml.upload_pending(execution_rids=[self.rid], ...)``.
+
+        Snapshots are frozen Pydantic models — the caller provides the
+        DerivaML instance that owns the workspace.
+        &quot;&quot;&quot;
+        return ml.upload_pending(
+            execution_rids=[self.rid],
+            retry_failed=retry_failed,
+        )
+
+    def update_status(
+        self,
+        target: ExecutionStatus,
+        *,
+        ml: &quot;DerivaML&quot;,
+        error: str | None = None,
+    ) -&gt; None:
+        &quot;&quot;&quot;Transition this execution's status via the workspace state machine.
+
+        Parallel to ``Execution.update_status``. The snapshot is a
+        frozen Pydantic model and doesn't carry an ml reference —
+        caller passes one.
+
+        Args:
+            target: Target ExecutionStatus enum member.
+            ml: The DerivaML instance whose workspace owns the registry.
+            error: For Failed/Aborted, a human-readable message.
+
+        Raises:
+            InvalidTransitionError: If the transition is not allowed.
+            DerivaMLStateInconsistency: If catalog sync detects divergence.
+
+        Example:
+            &gt;&gt;&gt; snap.update_status(ExecutionStatus.Aborted, ml=ml, error=&quot;user cancel&quot;)
+        &quot;&quot;&quot;
+        from deriva_ml.execution.state_machine import transition
+
+        store = ml.workspace.execution_state_store()
+        row = store.get_execution(self.rid)
+        if row is None:
+            raise DerivaMLException(
+                f&quot;Execution {self.rid} not in workspace registry&quot;
+            )
+        current = ExecutionStatus(row[&quot;status&quot;])
+
+        extra_fields: dict = {}
+        if target in (ExecutionStatus.Failed, ExecutionStatus.Aborted):
+            if error is not None:
+                extra_fields[&quot;error&quot;] = error
+        elif error is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                &quot;error= ignored on non-terminal transition to %s: %s&quot;,
+                target.value, error,
+            )
+
+        transition(
+            store=store,
+            catalog=ml.catalog if ml._mode is ConnectionMode.online else None,
+            execution_rid=self.rid,
+            current=current,
+            target=target,
+            mode=ml._mode,
+            extra_fields=extra_fields,
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 1.4: Run the new test</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_snapshot_new.py -v</code></p>
+<p>Expected: all 4 tests PASS. If <code>test_execution_snapshot_is_frozen</code> fails with an unexpected assertion error, Pydantic v2's frozen-enforcement may raise differently — update the <code>except Exception</code> to the specific exception type seen.</p>
+<ul>
+<li>[ ] <strong>Step 1.5: Verify the old class still works (no regressions)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_record_v2.py -v</code></p>
+<p>Expected: 3 tests PASS (the old class is untouched).</p>
+<ul>
+<li>[ ] <strong>Step 1.6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+git add src/deriva_ml/execution/execution_snapshot.py tests/execution/test_execution_snapshot_new.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(execution): add ExecutionSnapshot (Pydantic replacement for V2 ExecutionRecord)
+
+Task 1 of H3. Introduces the renamed Pydantic version of the V2
+ExecutionRecord alongside the old dataclass version. The old file
+stays in place for now — Task 2 swaps the importer, Task 5 deletes
+the old file after all references migrate.
+
+Fields and methods are identical to the dataclass version, with
+three deliberate changes:
+
+- @dataclass(frozen=True) → Pydantic BaseModel with
+  ConfigDict(frozen=True). Aligns with the project convention that
+  user-facing return types are Pydantic (see CLAUDE.md).
+- Class name: ExecutionRecord → ExecutionSnapshot. Removes the
+  naming collision with the live-catalog ExecutionRecord.
+- Docstrings explicitly state &quot;frozen Pydantic model&quot; and
+  cross-reference the live ExecutionRecord for callers looking for
+  mutable records.
+
+Temporary test file tests/execution/test_execution_snapshot_new.py
+verifies the new class imports, is frozen, from_row works, and
+.model_dump() is available. Will be absorbed into
+test_execution_snapshot.py in Task 3.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-swap-the-internal-importer-to-the-new-class">Task 2: Swap the internal importer to the new class</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (lines 19-20 import, lines 324/356/384 references)</p>
+<ul>
+<li>[ ] <strong>Step 2.1: Update the import</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>, find (around line 19-20):</p>
+<pre><code class="language-python">from deriva_ml.execution.execution_record_v2 import (
+    ExecutionRecord as _ExecutionRecordV2,
+)
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2.2: Update references</strong></li>
+</ul>
+<p>Three references to <code>_ExecutionRecordV2</code> exist in the file. Replace each:</p>
+<p>At line ~324 (in <code>list_executions</code>):</p>
+<pre><code class="language-python">    ) -&gt; list[_ExecutionRecordV2]:
+</code></pre>
+<p>→</p>
+<pre><code class="language-python">    ) -&gt; list[ExecutionSnapshot]:
+</code></pre>
+<p>At line ~356 (inside <code>list_executions</code>'s return comprehension):</p>
+<pre><code class="language-python">            _ExecutionRecordV2.from_row(
+</code></pre>
+<p>→</p>
+<pre><code class="language-python">            ExecutionSnapshot.from_row(
+</code></pre>
+<p>At line ~384 (in <code>find_incomplete_executions</code>):</p>
+<pre><code class="language-python">    def find_incomplete_executions(self) -&gt; list[_ExecutionRecordV2]:
+</code></pre>
+<p>→</p>
+<pre><code class="language-python">    def find_incomplete_executions(self) -&gt; list[ExecutionSnapshot]:
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2.3: Verify no <code>_ExecutionRecordV2</code> references remain in the file</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; grep -n "_ExecutionRecordV2" src/deriva_ml/core/mixins/execution.py</code></p>
+<p>Expected: no output.</p>
+<ul>
+<li>[ ] <strong>Step 2.4: Run related tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_execution_record_v2.py tests/execution/test_execution_registry.py tests/execution/test_execution_snapshot_new.py -v</code></p>
+<p>Expected: all PASS. The old V2 class tests still work (we haven't deleted it yet); the new class tests still work (the importer now uses ExecutionSnapshot, which is a real class); the registry tests (which construct <code>ExecutionSnapshot</code> via the mixin) pass because the mixin now emits <code>ExecutionSnapshot</code> instances.</p>
+<p>Note: <code>test_list_executions_returns_dataclass</code> in <code>test_execution_registry.py</code> asserts <code>isinstance(rows[0], ExecutionRecord)</code> importing from <code>execution_record_v2</code> — that still works (the V2 class exists). Task 3 updates this test to use <code>ExecutionSnapshot</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2.5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+git add src/deriva_ml/core/mixins/execution.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+refactor(mixins): execution mixin emits ExecutionSnapshot instead of V2 ExecutionRecord
+
+Task 2 of H3. Swaps the internal import in core/mixins/execution.py
+from the V2 dataclass to the new Pydantic ExecutionSnapshot. No
+behavior change — the fields, methods, and return values are
+identical; only the concrete class changes.
+
+list_executions and find_incomplete_executions now return
+list[ExecutionSnapshot]. Callers using attribute access
+(snap.rid, snap.status, etc.) continue to work unchanged.
+
+The old execution_record_v2 module is still imported by test
+files — Task 3 migrates those, Task 5 deletes the module.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-rename-and-update-test-files">Task 3: Rename and update test files</h3>
+<p><strong>Files:</strong>
+- Rename: <code>tests/execution/test_execution_record_v2.py</code> → <code>tests/execution/test_execution_snapshot.py</code>
+- Delete: <code>tests/execution/test_execution_snapshot_new.py</code> (temporary from Task 1)
+- Modify: <code>tests/execution/test_execution_registry.py</code> (one import + one test name)</p>
+<ul>
+<li>[ ] <strong>Step 3.1: Rename the test file</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; git mv tests/execution/test_execution_record_v2.py tests/execution/test_execution_snapshot.py</code></p>
+<ul>
+<li>[ ] <strong>Step 3.2: Update imports and class refs in the renamed file</strong></li>
+</ul>
+<p>In <code>tests/execution/test_execution_snapshot.py</code>, update:</p>
+<ul>
+<li>Line 1 docstring: <code>"""Tests for the SQLite-backed ExecutionRecord dataclass."""</code> → <code>"""Tests for the SQLite-backed ExecutionSnapshot Pydantic model."""</code></li>
+<li>Every import <code>from deriva_ml.execution.execution_record_v2 import ExecutionRecord</code> (3 sites) → <code>from deriva_ml.execution.execution_snapshot import ExecutionSnapshot</code></li>
+<li>Every constructor <code>ExecutionRecord(</code> → <code>ExecutionSnapshot(</code></li>
+<li>Every classmethod <code>ExecutionRecord.from_row(</code> → <code>ExecutionSnapshot.from_row(</code></li>
+<li>Rename the three test functions for clarity:</li>
+<li><code>test_execution_record_has_registry_fields</code> → <code>test_execution_snapshot_has_registry_fields</code></li>
+<li><code>test_execution_record_is_frozen</code> → <code>test_execution_snapshot_is_frozen</code></li>
+<li><code>test_from_row_constructs_from_sqlite_dict</code> → <code>test_execution_snapshot_from_row_constructs_from_sqlite_dict</code></li>
+</ul>
+<p>Concrete sed command to do all substitutions (run from the worktree root):</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+python3 &lt;&lt;'PYEOF'
+from pathlib import Path
+p = Path(&quot;tests/execution/test_execution_snapshot.py&quot;)
+s = p.read_text()
+s = s.replace(
+    '&quot;&quot;&quot;Tests for the SQLite-backed ExecutionRecord dataclass.&quot;&quot;&quot;',
+    '&quot;&quot;&quot;Tests for the SQLite-backed ExecutionSnapshot Pydantic model.&quot;&quot;&quot;',
+)
+s = s.replace(
+    &quot;from deriva_ml.execution.execution_record_v2 import ExecutionRecord&quot;,
+    &quot;from deriva_ml.execution.execution_snapshot import ExecutionSnapshot&quot;,
+)
+s = s.replace(&quot;ExecutionRecord(&quot;, &quot;ExecutionSnapshot(&quot;)
+s = s.replace(&quot;ExecutionRecord.from_row(&quot;, &quot;ExecutionSnapshot.from_row(&quot;)
+s = s.replace(
+    &quot;def test_execution_record_has_registry_fields&quot;,
+    &quot;def test_execution_snapshot_has_registry_fields&quot;,
+)
+s = s.replace(
+    &quot;def test_execution_record_is_frozen&quot;,
+    &quot;def test_execution_snapshot_is_frozen&quot;,
+)
+s = s.replace(
+    &quot;def test_from_row_constructs_from_sqlite_dict&quot;,
+    &quot;def test_execution_snapshot_from_row_constructs_from_sqlite_dict&quot;,
+)
+p.write_text(s)
+print(&quot;done&quot;)
+PYEOF
+</code></pre>
+<p>Also, <code>test_execution_snapshot_is_frozen</code> currently does <code>with pytest.raises((AttributeError, TypeError)):</code> — Pydantic v2's frozen models raise <code>pydantic.ValidationError</code>. Update that exception tuple:</p>
+<pre><code class="language-bash">python3 &lt;&lt;'PYEOF'
+from pathlib import Path
+p = Path(&quot;tests/execution/test_execution_snapshot.py&quot;)
+s = p.read_text()
+s = s.replace(
+    &quot;    with pytest.raises((AttributeError, TypeError)):&quot;,
+    &quot;    # Pydantic v2 frozen models raise ValidationError on mutation\n&quot;
+    &quot;    from pydantic import ValidationError\n&quot;
+    &quot;    with pytest.raises(ValidationError):&quot;,
+)
+p.write_text(s)
+print(&quot;done&quot;)
+PYEOF
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3.3: Delete the temporary test file from Task 1</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; git rm tests/execution/test_execution_snapshot_new.py</code></p>
+<p>The coverage provided by the temporary file is now fully covered by the renamed <code>test_execution_snapshot.py</code> plus one addition — add the <code>.model_dump()</code> check to the renamed file by appending this function at the end:</p>
+<pre><code class="language-python">def test_execution_snapshot_model_dump():
+    &quot;&quot;&quot;Pydantic conversion gives .model_dump() — consistent with other library types.&quot;&quot;&quot;
+    from deriva_ml.core.connection_mode import ConnectionMode
+    from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+    from deriva_ml.execution.state_store import ExecutionStatus
+
+    now = datetime.now(timezone.utc)
+    snap = ExecutionSnapshot(
+        rid=&quot;X&quot;, workflow_rid=None, description=None,
+        status=ExecutionStatus.Created, mode=ConnectionMode.online,
+        working_dir_rel=&quot;execution/X&quot;,
+        start_time=None, stop_time=None, last_activity=now,
+        error=None, sync_pending=False, created_at=now,
+        pending_rows=0, failed_rows=0, pending_files=0, failed_files=0,
+    )
+    d = snap.model_dump()
+    assert d[&quot;rid&quot;] == &quot;X&quot;
+    assert d[&quot;status&quot;] == &quot;Created&quot;
+    assert d[&quot;mode&quot;] == &quot;online&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3.4: Update <code>test_execution_registry.py</code></strong></li>
+</ul>
+<p>In <code>tests/execution/test_execution_registry.py</code>:</p>
+<ul>
+<li>Line 31 function name: <code>def test_list_executions_returns_dataclass(test_ml):</code> → <code>def test_list_executions_returns_snapshot(test_ml):</code></li>
+<li>Line 32 import: <code>from deriva_ml.execution.execution_record_v2 import ExecutionRecord</code> → <code>from deriva_ml.execution.execution_snapshot import ExecutionSnapshot</code></li>
+<li>
+<p>Line 39 isinstance: <code>assert isinstance(rows[0], ExecutionRecord)</code> → <code>assert isinstance(rows[0], ExecutionSnapshot)</code></p>
+</li>
+<li>
+<p>[ ] <strong>Step 3.5: Verify no old references remain in tests</strong></p>
+</li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+grep -rn &quot;execution_record_v2&quot; tests/
+</code></pre>
+<p>Expected: no output.</p>
+<ul>
+<li>[ ] <strong>Step 3.6: Run the renamed and updated tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_execution_snapshot.py tests/execution/test_execution_registry.py -v</code></p>
+<p>Expected: all PASS (4 in <code>test_execution_snapshot.py</code>, several in <code>test_execution_registry.py</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3.7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+git add -A tests/execution/
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+test(execution): rename test_execution_record_v2.py → test_execution_snapshot.py
+
+Task 3 of H3. Follows the class + module rename: the dedicated
+tests for the V2 class now live in test_execution_snapshot.py and
+exercise ExecutionSnapshot. Four changes:
+
+- git mv the old file to the new name
+- update imports + constructor + classmethod references
+- rename the three test functions with 'snapshot' in their names
+- update the frozen test to catch Pydantic ValidationError (v2
+  frozen models raise that, not AttributeError/TypeError)
+- add a new test_execution_snapshot_model_dump verifying the
+  .model_dump() API is available
+
+Also updates test_execution_registry.py:
+- test_list_executions_returns_dataclass →
+  test_list_executions_returns_snapshot
+- import + isinstance check use ExecutionSnapshot
+
+Removes the temporary test file from Task 1.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-rewrite-method-and-class-docstrings">Task 4: Rewrite method and class docstrings</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (4 method docstrings)
+- Modify: <code>src/deriva_ml/execution/execution_record.py</code> (class docstring — add disambiguation paragraph)</p>
+<ul>
+<li>[ ] <strong>Step 4.1: Rewrite <code>lookup_execution</code> docstring</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>, find the <code>lookup_execution</code> method (around line 233). Replace its docstring (between the first <code>"""</code> and the closing <code>"""</code>) with:</p>
+<pre><code>Look up a single execution by RID in the live catalog.
+
+Queries the ERMrest catalog for the Execution row with the given
+RID and returns an ``ExecutionRecord`` — a live, catalog-bound
+value whose mutable properties (``status``, ``description``)
+write through to the catalog on assignment. Online mode only.
+
+For enumerating executions from the local SQLite registry without
+touching the catalog, see ``list_executions()``. For catalog-side
+filter queries returning live records, see ``find_executions()``.
+
+Args:
+    execution_rid: Resource Identifier (RID) of the execution.
+
+Returns:
+    A live ``ExecutionRecord`` bound to the catalog. Property
+    setters (``record.status = ...``) write through.
+
+Raises:
+    DerivaMLException: If execution_rid is not valid or doesn't
+        refer to an Execution record.
+
+Example:
+    &gt;&gt;&gt; record = ml.lookup_execution(&quot;1-abc123&quot;)
+    &gt;&gt;&gt; record.status = ExecutionStatus.Uploaded   # writes to catalog
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4.2: Rewrite <code>find_executions</code> docstring</strong></li>
+</ul>
+<p>In the same file, find <code>find_executions</code> (around line 566). Replace its docstring with:</p>
+<pre><code>Search the live catalog for executions matching the given filters.
+
+Queries the ERMrest catalog (online only) and yields live,
+catalog-bound ``ExecutionRecord`` objects for each match. Each
+returned record's mutable properties (``status``, ``description``)
+write through to the catalog on assignment.
+
+For enumerating locally-known executions from the SQLite registry
+without touching the catalog (works in offline mode), see
+``list_executions()`` and ``find_incomplete_executions()``.
+
+Args:
+    workflow: Optional Workflow or RID to filter by.
+    workflow_type: Optional workflow type name (e.g., &quot;python_script&quot;).
+    status: Optional ExecutionStatus to filter by.
+
+Returns:
+    Iterable of live ``ExecutionRecord`` objects.
+
+Example:
+    &gt;&gt;&gt; for record in ml.find_executions(status=ExecutionStatus.Uploaded):
+    ...     print(record.execution_rid, record.status)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4.3: Rewrite <code>list_executions</code> docstring</strong></li>
+</ul>
+<p>Find <code>list_executions</code> (around line 317). Replace its docstring with:</p>
+<pre><code>Enumerate locally-known executions from the SQLite registry.
+
+Reads from the workspace SQLite registry — **no server contact**.
+Works in both online and offline mode. Each returned
+``ExecutionSnapshot`` is a frozen Pydantic value object captured
+at query time; it cannot mutate the catalog. Pending-row counts
+are included in the same pass.
+
+For live catalog queries that return mutable
+:class:`~deriva_ml.execution.execution_record.ExecutionRecord`
+objects bound to the catalog, see ``find_executions()`` and
+``lookup_execution()``.
+
+Args:
+    status: Single ExecutionStatus or list to filter; None = all.
+    workflow_rid: Match only executions tagged with this Workflow
+        RID; None = all.
+    mode: ConnectionMode the execution was last active under;
+        None = all.
+    since: Return only executions with last_activity &gt;= this
+        timestamp (timezone-aware). None = no time filter.
+
+Returns:
+    List of ``ExecutionSnapshot`` Pydantic models — one per matching
+    row in the registry. Empty list if nothing matches.
+
+Example:
+    &gt;&gt;&gt; from deriva_ml.execution.state_store import ExecutionStatus
+    &gt;&gt;&gt; failed = ml.list_executions(status=ExecutionStatus.Failed)
+    &gt;&gt;&gt; for snap in failed:
+    ...     print(snap.rid, snap.error)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4.4: Rewrite <code>find_incomplete_executions</code> docstring</strong></li>
+</ul>
+<p>Find <code>find_incomplete_executions</code> (around line 384). Replace its docstring with:</p>
+<pre><code>Sugar over :meth:`list_executions` for everything not terminally done.
+
+Reads from the workspace SQLite registry — no server contact.
+Returns executions in status in (Created, Running, Stopped, Failed,
+Pending_Upload) — the set of things a user would want to either
+resume, retry, or clean up. Excludes Uploaded (terminal success)
+and Aborted (terminal cleanup).
+
+For live catalog queries returning mutable
+:class:`~deriva_ml.execution.execution_record.ExecutionRecord`
+objects, see ``find_executions(status=...)``.
+
+Returns:
+    List of ``ExecutionSnapshot`` Pydantic models for each incomplete
+    execution known to the local registry.
+
+Example:
+    &gt;&gt;&gt; for snap in ml.find_incomplete_executions():
+    ...     print(snap.rid, snap.status, snap.pending_rows)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4.5: Add disambiguation paragraph to <code>ExecutionRecord</code> (live) class docstring</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution_record.py</code>, find the class docstring on <code>class ExecutionRecord(BaseModel):</code>. Right after its one-line summary <code>"""Represents a catalog record for an execution.</code>, and before the next paragraph, insert this:</p>
+<pre><code>
+    A live, catalog-bound record. Property setters (``record.status = ...``,
+    ``record.description = ...``) write through to the catalog on
+    assignment; requires online mode for mutations. Returned by
+    :meth:`~deriva_ml.DerivaML.lookup_execution` and
+    :meth:`~deriva_ml.DerivaML.find_executions`.
+
+    For a frozen snapshot value object that reads from the local
+    SQLite registry and works offline, see
+    :class:`~deriva_ml.execution.execution_snapshot.ExecutionSnapshot`
+    returned by :meth:`~deriva_ml.DerivaML.list_executions` and
+    :meth:`~deriva_ml.DerivaML.find_incomplete_executions`.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4.6: Quick syntax check</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+uv run python -c &quot;
+from deriva_ml.core.mixins.execution import ExecutionMixin
+from deriva_ml.execution.execution_record import ExecutionRecord
+from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+# Docstrings must mention the other class in each direction:
+assert 'ExecutionSnapshot' in ExecutionMixin.list_executions.__doc__
+assert 'ExecutionSnapshot' in ExecutionMixin.find_incomplete_executions.__doc__
+assert 'ExecutionRecord' in ExecutionMixin.list_executions.__doc__
+assert 'list_executions' in ExecutionMixin.find_executions.__doc__
+assert 'list_executions' in ExecutionMixin.lookup_execution.__doc__
+assert 'ExecutionSnapshot' in ExecutionRecord.__doc__
+print('ok')
+&quot;
+</code></pre>
+<p>Expected: <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 4.7: Run tests (regression check)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q --timeout=120</code></p>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 4.8: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+git add src/deriva_ml/core/mixins/execution.py src/deriva_ml/execution/execution_record.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(execution): disambiguate live vs snapshot in docstrings
+
+Task 4 of H3. Rewrites the four execution-query method docstrings
+(lookup_execution, find_executions, list_executions,
+find_incomplete_executions) and adds a disambiguation paragraph to
+the ExecutionRecord (live) class docstring.
+
+Each docstring now states whether it reads from the live catalog
+(ERMrest, online-only, mutable) or the local SQLite registry
+(offline-safe, frozen) and cross-references the sibling methods so
+readers arriving from either direction find the full picture.
+
+The ExecutionSnapshot class docstring (added in Task 1) already
+cross-references ExecutionRecord in the other direction.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-delete-old-module-changelog">Task 5: Delete old module + CHANGELOG</h3>
+<p><strong>Files:</strong>
+- Delete: <code>src/deriva_ml/execution/execution_record_v2.py</code>
+- Modify: <code>CHANGELOG.md</code></p>
+<ul>
+<li>[ ] <strong>Step 5.1: Final check — no remaining references to <code>execution_record_v2</code></strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+grep -rn &quot;execution_record_v2\|_ExecutionRecordV2&quot; src/ tests/ docs/ 2&gt;/dev/null | grep -v &quot;docs/superpowers/specs/\|docs/superpowers/plans/\|CHANGELOG.md&quot;
+</code></pre>
+<p>Expected: no output. (The specs and plans for H3 are historical records that DO mention <code>execution_record_v2</code> — that's intentional and not an offender.)</p>
+<ul>
+<li>[ ] <strong>Step 5.2: Delete the old module</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; git rm src/deriva_ml/execution/execution_record_v2.py</code></p>
+<ul>
+<li>[ ] <strong>Step 5.3: Add CHANGELOG entry</strong></li>
+</ul>
+<p>In <code>CHANGELOG.md</code>, under a new "Unreleased — H3" section at the top of the file (above existing entries), insert:</p>
+<pre><code class="language-markdown">## Unreleased — H3: ExecutionRecord disambiguation
+
+### Renamed
+
+- **`deriva_ml.execution.execution_record_v2.ExecutionRecord`** → **`deriva_ml.execution.execution_snapshot.ExecutionSnapshot`**. The V2 class-name collided with the live catalog-backed `ExecutionRecord` and was aliased internally as `_ExecutionRecordV2` to compensate. The rename makes the two distinct concepts — live catalog record (mutable, ERMrest-backed) vs. frozen snapshot (value object, SQLite-backed) — clear at the import site. Also converted from `@dataclass(frozen=True)` to Pydantic `BaseModel(frozen=True)` so users get `.model_dump()` for free and the class matches the project convention for user-facing return types.
+- The following methods now return `ExecutionSnapshot` (was: aliased `_ExecutionRecordV2`):
+  - `DerivaML.list_executions(...)`
+  - `DerivaML.find_incomplete_executions()`
+- Test module **`tests/execution/test_execution_record_v2.py`** → **`tests/execution/test_execution_snapshot.py`**.
+
+### External-caller impact
+
+If you were importing the V2 class directly by its module path:
+
+```python
+# Before
+from deriva_ml.execution.execution_record_v2 import ExecutionRecord
+
+# After
+from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
+</code></pre>
+<p>Callers using only the public method API (<code>ml.list_executions(...)</code>, <code>ml.find_incomplete_executions()</code>) see no change beyond the class name in the return type — attribute access (<code>snap.rid</code>, <code>snap.status</code>, <code>snap.pending_rows</code>, etc.) and the behavior methods (<code>snap.upload_outputs(ml=...)</code>, <code>snap.update_status(..., ml=...)</code>, <code>snap.pending_summary(ml=...)</code>) are unchanged.</p>
+<h3 id="docstrings">Docstrings</h3>
+<p>The four execution-query methods (<code>lookup_execution</code>, <code>find_executions</code>, <code>list_executions</code>, <code>find_incomplete_executions</code>) and both <code>ExecutionRecord</code> (live) and <code>ExecutionSnapshot</code> (local) class docstrings now explicitly state whether they use the live catalog or the local SQLite registry, and cross-reference the sibling methods/classes.</p>
+<pre><code>
+- [ ] **Step 5.4: Regression test run**
+
+Run: `cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/ -q --timeout=300`
+
+Expected: all pass (similar counts to the pre-H3 baseline of 413 passed, 3 skipped in the fast-unit subset, plus the new `test_execution_snapshot.py` tests).
+
+- [ ] **Step 5.5: Ruff check on touched files**
+
+Run: `cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename &amp;&amp; uv run ruff check src/deriva_ml/execution/execution_snapshot.py src/deriva_ml/execution/execution_record.py src/deriva_ml/core/mixins/execution.py tests/execution/test_execution_snapshot.py tests/execution/test_execution_registry.py`
+
+Expected: no new violations. (Pre-existing violations on these files are out of scope.)
+
+- [ ] **Step 5.6: Commit**
+
+```bash
+cd /Users/carl/GitHub/deriva-ml/.claude/worktrees/h3-execution-record-rename
+git add -A
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+chore(execution): remove execution_record_v2.py + CHANGELOG
+
+Task 5 of H3. All callers now import from execution_snapshot; the
+old V2 module is unreferenced and deletable. CHANGELOG documents
+the rename for external users who imported V2 by module path.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="self-review-checklist">Self-Review Checklist</h2>
+<h3 id="spec-coverage">Spec coverage</h3>
+<ul>
+<li>§2 in-scope items (rename class/module/test-file, convert to Pydantic, update importers, docstring rewrites, CHANGELOG): all have tasks ✓</li>
+<li>§3.1 Pydantic-vs-dataclass rationale: Task 1 commit message cites it ✓</li>
+<li>§4 rename table: Task 1 creates snapshot.py, Task 2 updates mixin imports, Task 3 renames tests, Task 5 deletes v2.py ✓</li>
+<li>§5 docstring rewrites (4 method + 2 class): Task 1 does both class docstrings (ExecutionSnapshot inline, ExecutionRecord in Task 4), Task 4 does all 4 methods + adds disambiguation to ExecutionRecord ✓</li>
+<li>§6 testing plan ("all existing tests pass unchanged"): Task 2.4, 3.6, 4.7, 5.4 all run the relevant suites ✓</li>
+</ul>
+<h3 id="placeholder-scan">Placeholder scan</h3>
+<ul>
+<li>No TBD/TODO/"handle appropriately"</li>
+<li>Every step has exact file paths + exact code</li>
+<li><code>sed</code> / <code>python3</code> substitution scripts are complete and runnable</li>
+</ul>
+<h3 id="type-consistency">Type consistency</h3>
+<ul>
+<li><code>ExecutionSnapshot</code> used in: Task 1 class def, Task 2 type annotations, Task 3 test imports, Task 4 docstrings</li>
+<li><code>model_dump</code> used in Task 1 test, Task 3 new test, CHANGELOG</li>
+<li><code>frozen=True</code> via <code>ConfigDict(frozen=True)</code> everywhere (not the old <code>@dataclass(frozen=True)</code>)</li>
+<li>Pydantic <code>ValidationError</code> (not <code>FrozenInstanceError</code>) is the exception raised on mutation, and Task 3.2 updates the test accordingly</li>
+</ul>
+<hr />
+<h2 id="execution-handoff">Execution Handoff</h2>
+<p>Plan complete. Two execution options (per project convention):</p>
+<p><strong>1. Subagent-Driven (recommended)</strong> — dispatch a fresh subagent per task, review between tasks.</p>
+<p><strong>2. Inline execution</strong> — run tasks in the main session.</p>
+<p>Given H3's small size (5 tasks, mostly mechanical, ~300 LoC total), inline is probably fine. The decision is yours.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

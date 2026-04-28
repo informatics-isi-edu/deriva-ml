@@ -1,0 +1,2981 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/user-guide/features/">
+      
+      
+        <link rel="prev" href="../datasets/">
+      
+      
+        <link rel="next" href="../executions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Defining and using features - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#chapter-3-defining-and-using-features" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Defining and using features
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a feature?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is a feature?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common use cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-decide-between-a-feature-and-a-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to decide between a feature and a column
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-create-a-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to create a vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-create-a-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to create a feature
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to create a feature">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#term-based-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Term-based feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-with-metadata-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature with metadata columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asset-based-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asset-based feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-record-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to record feature values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to record feature values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#asset-based-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asset-based feature values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read feature values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to read feature values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#find_features-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        find_features — discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature_values-read-typed-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        feature_values — read typed records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup_feature-structure-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lookup_feature — structure inspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-use-selectors-to-reduce-multi-annotator-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to use selectors to reduce multi-annotator data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to use selectors to reduce multi-annotator data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#select_newest-most-recent-by-creation-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_newest — most recent by creation time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_first-earliest-creation-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_first — earliest creation time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_by_execution-specific-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_by_execution — specific execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_by_workflow-workflow-scoped-factory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_by_workflow — workflow-scoped factory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_majority_vote-consensus-labeling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_majority_vote — consensus labeling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-define-asset-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to define asset features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to define asset features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-asset-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing asset features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-asset-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading asset features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-features-from-a-downloaded-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read features from a downloaded bag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-reach-for-feature_values-vs-denormalizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for feature_values vs Denormalizer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migrating-from-pre-s2-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrating from pre-S2 APIs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a feature?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is a feature?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common use cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-decide-between-a-feature-and-a-column" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to decide between a feature and a column
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-create-a-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to create a vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-create-a-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to create a feature
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to create a feature">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#term-based-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Term-based feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-with-metadata-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature with metadata columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asset-based-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asset-based feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-record-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to record feature values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to record feature values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#asset-based-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asset-based feature values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read feature values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to read feature values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#find_features-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        find_features — discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature_values-read-typed-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        feature_values — read typed records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup_feature-structure-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lookup_feature — structure inspection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-use-selectors-to-reduce-multi-annotator-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to use selectors to reduce multi-annotator data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to use selectors to reduce multi-annotator data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#select_newest-most-recent-by-creation-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_newest — most recent by creation time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_first-earliest-creation-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_first — earliest creation time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_by_execution-specific-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_by_execution — specific execution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_by_workflow-workflow-scoped-factory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_by_workflow — workflow-scoped factory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select_majority_vote-consensus-labeling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_majority_vote — consensus labeling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-define-asset-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to define asset features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to define asset features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-asset-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing asset features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-asset-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading asset features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-features-from-a-downloaded-bag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read features from a downloaded bag
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-reach-for-feature_values-vs-denormalizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for feature_values vs Denormalizer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migrating-from-pre-s2-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrating from pre-S2 APIs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="chapter-3-defining-and-using-features">Chapter 3: Defining and using features</h1>
+<p>Features are structured, provenance-linked annotations on existing catalog records. By the end of this chapter you will know how to define features and vocabularies, record values inside an execution, read them back using the three-method S2 surface, reduce multi-annotator data with selectors, and work with asset-based features — both online and from a downloaded bag. You will also understand when to choose each reading method and how selectors differ in their error-handling contracts.</p>
+<h2 id="what-is-a-feature">What is a feature?</h2>
+<p>A <strong>feature</strong> associates metadata values with records in your domain tables. The key distinction from a plain table column is provenance: every feature value records the execution that produced it, which workflow ran that execution, and when.</p>
+<p>Four properties distinguish features from columns:</p>
+<ol>
+<li><strong>Provenance.</strong> Every value is linked to an execution, so you always know which model or annotator produced it.</li>
+<li><strong>Controlled vocabularies.</strong> Categorical values come from a vocabulary table rather than free text, enforcing consistency across runs.</li>
+<li><strong>Multiple values.</strong> The same record can carry several values for the same feature — one per annotator, one per model version, or one per time window.</li>
+<li><strong>Versioned.</strong> Feature values travel with the dataset version they were captured under, so an older dataset snapshot returns the labels that existed then.</li>
+</ol>
+<p>A feature is backed by an <strong>association table</strong> created automatically by <code>create_feature</code>. The table has columns for the target record's RID, the feature name, the execution RID, and one column per vocabulary term or asset reference you declared.</p>
+<h3 id="common-use-cases">Common use cases</h3>
+<table>
+<thead>
+<tr>
+<th>Use case</th>
+<th>Example</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ground truth labels</td>
+<td>Normal / Abnormal classification</td>
+<td>Term-based</td>
+</tr>
+<tr>
+<td>Model predictions</td>
+<td>Classifier inference results</td>
+<td>Term-based</td>
+</tr>
+<tr>
+<td>Quality scores</td>
+<td>Image quality rating 1–5</td>
+<td>Term-based</td>
+</tr>
+<tr>
+<td>Derived measurements</td>
+<td>Computed signal-to-noise ratio</td>
+<td>Value-based (metadata column)</td>
+</tr>
+<tr>
+<td>Related assets</td>
+<td>Segmentation masks, embeddings</td>
+<td>Asset-based</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-to-decide-between-a-feature-and-a-column">How to decide between a feature and a column</h2>
+<p>Add a column to your domain table when the value is a single, permanent, schema-level property that does not change across runs and does not need provenance (for example, a patient's date of birth, or the pixel dimensions of an image).</p>
+<p>Use a feature when any of these is true:</p>
+<ul>
+<li>The value is produced by a workflow (model, annotator, analysis script).</li>
+<li>Multiple sources or versions may produce different values for the same record.</li>
+<li>You want to query "which execution produced this value?" or compare values across runs.</li>
+<li>The value depends on a controlled vocabulary.</li>
+<li>The value is a derived asset (mask, embedding) that needs to be tracked as a file in the object store.</li>
+</ul>
+<p>A good rule of thumb: if you will ever write <code>SELECT * FROM ... WHERE execution = ?</code>, use a feature.</p>
+<h2 id="how-to-create-a-vocabulary">How to create a vocabulary</h2>
+<p>Term-based features require a vocabulary table — a catalog-managed list of terms. Create the vocabulary before the feature that uses it.</p>
+<pre><code class="language-python">ml.create_vocabulary(&quot;Diagnosis_Type&quot;, &quot;Clinical diagnosis categories&quot;)
+
+ml.add_term(&quot;Diagnosis_Type&quot;, &quot;Normal&quot;,   &quot;No pathology detected&quot;)
+ml.add_term(&quot;Diagnosis_Type&quot;, &quot;Mild&quot;,     &quot;Mild pathology&quot;)
+ml.add_term(&quot;Diagnosis_Type&quot;, &quot;Severe&quot;,   &quot;Severe pathology&quot;)
+</code></pre>
+<p><code>create_vocabulary</code> creates the table; <code>add_term</code> adds rows to it. Both operations are idempotent by default (<code>exists_ok=True</code> on <code>add_term</code>), so re-running setup code is safe.</p>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>add_term</code> signature: <code>add_term(table, term_name, description, synonyms=None, exists_ok=True)</code>.</li>
+<li><code>create_vocabulary</code> signature: <code>create_vocabulary(vocab_name, comment="", schema=None, update_navbar=True)</code>.</li>
+<li>The same vocabulary can be used by multiple features and across target tables.</li>
+<li>Feature names are themselves vocabulary terms (in the <code>Feature_Name</code> table). <code>create_feature</code> adds the name automatically.</li>
+</ul>
+<h2 id="how-to-create-a-feature">How to create a feature</h2>
+<p><code>create_feature</code> returns the <code>FeatureRecord</code> subclass you will use to construct values. Calling it is a schema-modifying operation — it creates the backing association table — so it belongs in setup code, not inside the execution loop.</p>
+<h3 id="term-based-feature">Term-based feature</h3>
+<pre><code class="language-python">DiagnosisRecord = ml.create_feature(
+    target_table=&quot;Image&quot;,
+    feature_name=&quot;Diagnosis&quot;,
+    terms=[&quot;Diagnosis_Type&quot;],
+    comment=&quot;Clinical diagnosis label for this image&quot;,
+)
+</code></pre>
+<h3 id="feature-with-metadata-columns">Feature with metadata columns</h3>
+<pre><code class="language-python">from deriva_ml import ColumnDefinition, BuiltinTypes
+
+DiagnosisRecord = ml.create_feature(
+    target_table=&quot;Image&quot;,
+    feature_name=&quot;Diagnosis&quot;,
+    terms=[&quot;Diagnosis_Type&quot;],
+    metadata=[ColumnDefinition(name=&quot;Confidence&quot;, type=BuiltinTypes.float4)],
+    optional=[&quot;Confidence&quot;],
+    comment=&quot;Diagnosis with optional confidence score&quot;,
+)
+</code></pre>
+<h3 id="asset-based-feature">Asset-based feature</h3>
+<pre><code class="language-python">ml.create_asset(&quot;Segmentation_Mask&quot;, comment=&quot;Binary segmentation mask images&quot;)
+
+SegmentationRecord = ml.create_feature(
+    target_table=&quot;Image&quot;,
+    feature_name=&quot;Segmentation&quot;,
+    assets=[&quot;Segmentation_Mask&quot;],
+    comment=&quot;Segmentation mask for this image&quot;,
+)
+</code></pre>
+<p>The returned <code>SegmentationRecord</code> class accepts either a <code>pathlib.Path</code> (file to upload) or a catalog RID for the asset column. During upload the library replaces file paths with the RIDs of the uploaded assets automatically.</p>
+<h3 id="mixed-feature">Mixed feature</h3>
+<p>Pass both <code>terms</code> and <code>assets</code> to create a feature whose values include a vocabulary term and an associated asset in a single record.</p>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>create_feature</code> signature: <code>create_feature(target_table, feature_name, terms=None, assets=None, metadata=None, optional=None, comment="", update_navbar=True)</code>.</li>
+<li>All columns in <code>metadata</code> are required by default. Add their names to <code>optional</code> to allow <code>None</code>.</li>
+<li>When creating many features in a batch, pass <code>update_navbar=False</code> to each call and run <code>ml.apply_catalog_annotations()</code> once at the end.</li>
+<li>You can retrieve the record class later without re-creating the feature: <code>ml.feature_record_class("Image", "Diagnosis")</code>.</li>
+</ul>
+<h2 id="how-to-record-feature-values">How to record feature values</h2>
+<p>Feature values must be created inside an execution context. This is a hard requirement — there is no bypass. The execution provides the provenance link that makes feature values meaningful.</p>
+<p>The write path is: get the record class → create instances → call <code>exe.add_features(records)</code> inside the <code>with</code> block.</p>
+<pre><code class="language-python">from deriva_ml.execution import ExecutionConfiguration
+from deriva_ml.dataset import DatasetSpec
+
+config = ExecutionConfiguration(
+    workflow=ml.create_workflow(&quot;Labeling&quot;, &quot;Annotation&quot;),
+    datasets=[DatasetSpec(rid=dataset_rid)],
+    description=&quot;Human annotation pass 1&quot;,
+)
+
+# Retrieve the record class (or use the return value from create_feature)
+DiagnosisRecord = ml.feature_record_class(&quot;Image&quot;, &quot;Diagnosis&quot;)
+
+with ml.create_execution(config) as exe:
+    bag = exe.download_dataset_bag(DatasetSpec(rid=dataset_rid))
+
+    records = []
+    for image in bag.list_dataset_members()[&quot;Image&quot;]:
+        records.append(DiagnosisRecord(
+            Image=image[&quot;RID&quot;],         # target record RID
+            Diagnosis_Type=&quot;Normal&quot;,    # vocabulary term name
+        ))
+
+    exe.add_features(records)           # staged, not yet in the catalog
+
+exe.upload_execution_outputs()          # flush staged features to the catalog
+</code></pre>
+<p><code>exe.add_features</code> stages records to a local SQLite table with status <code>Pending</code>. They are not visible in the catalog until <code>upload_execution_outputs()</code> runs. The flush happens after asset upload, so feature rows that reference assets are guaranteed to find those asset rows already present.</p>
+<h3 id="asset-based-feature-values">Asset-based feature values</h3>
+<p>For asset features, provide a <code>pathlib.Path</code> where you would normally provide a term name. The upload step resolves the path to a catalog RID.</p>
+<pre><code class="language-python">SegmentationRecord = ml.feature_record_class(&quot;Image&quot;, &quot;Segmentation&quot;)
+
+with ml.create_execution(config) as exe:
+    bag = exe.download_dataset_bag(DatasetSpec(rid=dataset_rid))
+
+    records = []
+    for image in bag.list_dataset_members()[&quot;Image&quot;]:
+        mask_path = exe.asset_file_path(
+            &quot;Segmentation_Mask&quot;,
+            f&quot;mask_{image['RID']}.png&quot;,
+        )
+        generate_mask(image, output_path=mask_path)   # your model writes here
+
+        records.append(SegmentationRecord(
+            Image=image[&quot;RID&quot;],
+            Segmentation_Mask=mask_path,   # Path object, replaced with RID on upload
+        ))
+
+    exe.add_features(records)
+
+exe.upload_execution_outputs()
+</code></pre>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>exe.add_features(features)</code> signature: takes <code>list[FeatureRecord]</code>, returns the count staged.</li>
+<li>All records in a single <code>add_features</code> call must share one feature definition. Pass records for different features in separate calls.</li>
+<li><code>Execution</code> is auto-filled if unset. You do not need to set it on each record.</li>
+<li>Staged records survive a crash: a resumed execution re-flushes <code>Pending</code> rows. See Chapter 4 on <code>resume_execution</code>.</li>
+</ul>
+<h2 id="how-to-read-feature-values">How to read feature values</h2>
+<p>The S2 surface provides three methods, consistent across <code>DerivaML</code>, <code>Dataset</code>, and <code>DatasetBag</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>find_features(table)</code></td>
+<td><code>list[Feature]</code></td>
+<td>Discover what features exist on a table</td>
+</tr>
+<tr>
+<td><code>feature_values(table, feature_name, selector=...)</code></td>
+<td><code>Iterable[FeatureRecord]</code></td>
+<td>Read typed values, optionally selector-reduced</td>
+</tr>
+<tr>
+<td><code>lookup_feature(table, feature_name)</code></td>
+<td><code>Feature</code></td>
+<td>Inspect a feature's structure, get its record class</td>
+</tr>
+</tbody>
+</table>
+<h3 id="find_features-discovery"><code>find_features</code> — discovery</h3>
+<pre><code class="language-python"># Features defined on a specific table
+for f in ml.find_features(&quot;Image&quot;):
+    print(f.feature_name)
+
+# All features in the catalog
+for f in ml.find_features():
+    print(f&quot;{f.target_table.name}.{f.feature_name}&quot;)
+</code></pre>
+<h3 id="feature_values-read-typed-records"><code>feature_values</code> — read typed records</h3>
+<pre><code class="language-python">from deriva_ml.feature import FeatureRecord
+
+# All values, unfiltered (multiple records per image are possible)
+for rec in ml.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;):
+    print(f&quot;Image {rec.Image}: {rec.Diagnosis_Type} (execution {rec.Execution})&quot;)
+</code></pre>
+<p>Each record is a typed Pydantic model. Attributes match the feature's columns: the target RID (<code>rec.Image</code>), term columns (<code>rec.Diagnosis_Type</code>), asset columns, any metadata columns, plus provenance (<code>rec.Execution</code>, <code>rec.RCT</code>).</p>
+<p>To convert to a pandas DataFrame:</p>
+<pre><code class="language-python">import pandas as pd
+
+df = pd.DataFrame(r.model_dump() for r in ml.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;))
+</code></pre>
+<p>!!! note
+    <code>feature_values</code> fetches all rows for the feature from the catalog before yielding the first record. It is iterator-shaped for composability, not for streaming very large tables. For tables with millions of rows, apply a selector to reduce the output before collecting.</p>
+<h3 id="lookup_feature-structure-inspection"><code>lookup_feature</code> — structure inspection</h3>
+<pre><code class="language-python">feature = ml.lookup_feature(&quot;Image&quot;, &quot;Diagnosis&quot;)
+print(f&quot;Term columns:  {[c.name for c in feature.term_columns]}&quot;)
+print(f&quot;Asset columns: {[c.name for c in feature.asset_columns]}&quot;)
+print(f&quot;Value columns: {[c.name for c in feature.value_columns]}&quot;)
+
+# Get the record class without calling create_feature
+DiagnosisRecord = feature.feature_record_class()
+</code></pre>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>find_features(table=None)</code> returns a <code>list[Feature]</code>. Omit <code>table</code> to discover features across all domain tables.</li>
+<li><code>feature_values</code> returns an iterator but materializes all rows in memory before yielding the first record — it is not a true streaming cursor. Apply a <code>selector</code> to reduce memory usage when the feature table is large.</li>
+<li><code>lookup_feature</code> does not fetch values; it returns the schema-level <code>Feature</code> object and its <code>feature_record_class()</code>. Use it when you need column metadata or want a typed record class without running <code>create_feature</code> again.</li>
+<li>All three methods work identically on <code>DerivaML</code> (live catalog), <code>Dataset</code> (catalog-pinned to a snapshot), and <code>DatasetBag</code> (offline local bag). The only difference is scope: <code>Dataset</code> and <code>DatasetBag</code> are limited to data included in that version's bag.</li>
+</ul>
+<h2 id="how-to-use-selectors-to-reduce-multi-annotator-data">How to use selectors to reduce multi-annotator data</h2>
+<p>When the same record has multiple feature values — from different annotators, model runs, or time windows — a <strong>selector</strong> collapses the group to a single value per target RID.</p>
+<p>A selector is any callable: <code>(list[FeatureRecord]) -&gt; FeatureRecord | None</code>. Pass it as <code>selector=</code> to <code>feature_values</code>. A selector that returns <code>None</code> causes that target RID to be omitted from the output.</p>
+<h3 id="select_newest-most-recent-by-creation-time"><code>select_newest</code> — most recent by creation time</h3>
+<p>The most common selector. Picks the record with the latest <code>RCT</code> (Row Creation Time).</p>
+<pre><code class="language-python">newest = list(ml.feature_values(
+    &quot;Image&quot;, &quot;Diagnosis&quot;,
+    selector=FeatureRecord.select_newest,
+))
+</code></pre>
+<h3 id="select_first-earliest-creation-time"><code>select_first</code> — earliest creation time</h3>
+<p>Preserves the original annotation and ignores later revisions.</p>
+<pre><code class="language-python">originals = list(ml.feature_values(
+    &quot;Image&quot;, &quot;Diagnosis&quot;,
+    selector=FeatureRecord.select_first,
+))
+</code></pre>
+<p>(<code>select_latest</code> has the same behavior as <code>select_newest</code>.)</p>
+<h3 id="select_by_execution-specific-execution"><code>select_by_execution</code> — specific execution</h3>
+<p>Filters to records produced by one known execution RID. Raises if no record in a group matches.</p>
+<pre><code class="language-python">from_run = list(ml.feature_values(
+    &quot;Image&quot;, &quot;Diagnosis&quot;,
+    selector=FeatureRecord.select_by_execution(&quot;3-WY2A&quot;),
+))
+</code></pre>
+<p>!!! note
+    <code>select_by_execution</code> raises <code>DerivaMLException</code> when no record in a group matches the given execution RID; <code>select_by_workflow</code> returns <code>None</code> and silently omits that target RID from the iterator. Use <code>select_by_workflow</code> when "no match" is a valid state (some targets may not have been processed by that workflow); use <code>select_by_execution</code> when a missing match is a bug.</p>
+<h3 id="select_by_workflow-workflow-scoped-factory"><code>select_by_workflow</code> — workflow-scoped factory</h3>
+<p><code>FeatureRecord.select_by_workflow</code> is a <strong>classmethod factory</strong> — it takes the workflow name and a <code>container</code>, resolves the execution list eagerly at construction time, and returns a selector closure. Pass the result as <code>selector=</code>.</p>
+<pre><code class="language-python"># Keep only values from any execution of &quot;Manual_Annotation&quot; workflow
+selector = FeatureRecord.select_by_workflow(&quot;Manual_Annotation&quot;, container=ml)
+from_humans = list(ml.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;, selector=selector))
+
+# Scoped to a specific dataset (only executions that processed that dataset)
+selector = FeatureRecord.select_by_workflow(&quot;Model_Inference&quot;, container=dataset)
+model_preds = list(dataset.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;, selector=selector))
+</code></pre>
+<p><code>container</code> is <strong>required</strong> and keyword-only. It must be a <code>DerivaML</code>, <code>Dataset</code>, or <code>DatasetBag</code> instance — any object that implements <code>list_workflow_executions(workflow) -&gt; list[str]</code>. The container determines the scope: <code>DerivaML</code> considers all catalog executions; <code>Dataset</code> and <code>DatasetBag</code> consider only executions within that dataset's scope.</p>
+<p>Unknown-workflow errors surface at factory construction time, not during iteration.</p>
+<h3 id="select_majority_vote-consensus-labeling"><code>select_majority_vote</code> — consensus labeling</h3>
+<p>For multi-annotator scenarios, pick the most common value. The factory auto-detects the term column for single-term features.</p>
+<pre><code class="language-python">selector = DiagnosisRecord.select_majority_vote()   # auto-detects Diagnosis_Type
+consensus = list(ml.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;, selector=selector))
+
+# For multi-term features, specify the column explicitly
+selector = SomeRecord.select_majority_vote(column=&quot;MyTerm&quot;)
+</code></pre>
+<h2 id="how-to-define-asset-features">How to define asset features</h2>
+<p>Asset features link computed files — segmentation masks, embeddings, depth maps — to target records. They differ from term features in two ways:</p>
+<ol>
+<li>The feature column holds an asset RID, not a vocabulary term.</li>
+<li>During the execution write path, you provide a <code>Path</code> object instead of a string. The library uploads the file to Hatrac and replaces the path with the catalog-side asset RID before inserting the feature row.</li>
+</ol>
+<h3 id="setup">Setup</h3>
+<pre><code class="language-python"># Create the asset table (once, at schema setup time)
+ml.create_asset(&quot;Embedding&quot;, comment=&quot;512-dim image embedding vectors&quot;)
+
+# Create the feature
+EmbeddingRecord = ml.create_feature(
+    target_table=&quot;Image&quot;,
+    feature_name=&quot;ResNet50_Embedding&quot;,
+    assets=[&quot;Embedding&quot;],
+    comment=&quot;ResNet-50 embedding for contrastive learning&quot;,
+)
+</code></pre>
+<h3 id="writing-asset-features">Writing asset features</h3>
+<pre><code class="language-python">with ml.create_execution(config) as exe:
+    records = []
+    for image in images:
+        emb_path = exe.asset_file_path(&quot;Embedding&quot;, f&quot;emb_{image['RID']}.npy&quot;)
+        np.save(emb_path, compute_embedding(image))
+
+        records.append(EmbeddingRecord(
+            Image=image[&quot;RID&quot;],
+            Embedding=emb_path,      # Path → resolved to RID on upload
+        ))
+    exe.add_features(records)
+
+exe.upload_execution_outputs()       # assets uploaded first, then feature rows
+</code></pre>
+<h3 id="reading-asset-features">Reading asset features</h3>
+<p>After upload, the <code>Embedding</code> column holds the asset's catalog RID. Use it to retrieve the file:</p>
+<pre><code class="language-python">for rec in ml.feature_values(&quot;Image&quot;, &quot;ResNet50_Embedding&quot;):
+    print(f&quot;Image {rec.Image} → asset RID {rec.Embedding}&quot;)
+</code></pre>
+<p><strong>Notes</strong></p>
+<ul>
+<li>The upload ordering contract — assets before features — is enforced by the library. You do not need to manage it.</li>
+<li>Mixed features (terms + assets) work the same way: put a <code>Path</code> in the asset column and a term name in the term column; both are resolved at upload time.</li>
+</ul>
+<h2 id="how-to-read-features-from-a-downloaded-bag">How to read features from a downloaded bag</h2>
+<p><code>DatasetBag</code> implements the same three-method surface as <code>DerivaML</code>. You can call <code>find_features</code>, <code>feature_values</code>, and <code>lookup_feature</code> on a bag without a catalog connection.</p>
+<pre><code class="language-python">bag = dataset.download_dataset_bag(version=&quot;2.0.0&quot;, materialize=True)
+
+# Identical API to the live catalog
+for rec in bag.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;,
+                               selector=FeatureRecord.select_newest):
+    print(f&quot;{rec.Image}: {rec.Diagnosis_Type}&quot;)
+</code></pre>
+<p><code>select_by_workflow</code> also works offline — pass <code>container=bag</code>:</p>
+<pre><code class="language-python">selector = FeatureRecord.select_by_workflow(&quot;Manual_Annotation&quot;, container=bag)
+human_labels = list(bag.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;, selector=selector))
+</code></pre>
+<p>The bag reads from a per-feature denormalization cache in its local SQLite database. The first call for a feature populates the cache; subsequent calls are cheap. The cache is immutable — bags are read-only.</p>
+<p><code>lookup_feature</code> on a bag returns a <code>Feature</code> whose <code>feature_record_class()</code> works fully offline. This means you can construct <code>FeatureRecord</code> instances from a bag's data, then hand them to <code>exe.add_features</code> when you are back online:</p>
+<pre><code class="language-python"># Offline: build records from bag data
+feature = bag.lookup_feature(&quot;Image&quot;, &quot;QualityScore&quot;)
+RecordClass = feature.feature_record_class()
+pending = [RecordClass(Image=r[&quot;RID&quot;], QualityScore_Type=&quot;Good&quot;) for r in rows]
+
+# Online: stage and upload
+with ml.create_execution(online_config) as exe:
+    exe.add_features(pending)
+exe.upload_execution_outputs()
+</code></pre>
+<p>!!! note
+    <code>restructure_assets</code> for organizing bag files into ML framework directory layouts is covered in Chapter 5 (Working offline). That chapter also covers the <code>value_selector</code> parameter for resolving multi-value features during asset restructuring.</p>
+<h2 id="when-to-reach-for-feature_values-vs-denormalizer">When to reach for <code>feature_values</code> vs <code>Denormalizer</code></h2>
+<p>Both tools produce tabular output from catalog data, but they answer different questions.</p>
+<p><strong>Use <code>feature_values(table, feature_name, selector=...)</code></strong> when:</p>
+<ul>
+<li>You want the values for one specific feature.</li>
+<li>You want typed <code>FeatureRecord</code> objects with provenance attributes.</li>
+<li>You want selector reduction (one value per target RID after filtering by workflow, annotator, or recency).</li>
+<li>You want to iterate over records and process them in Python before converting to a DataFrame.</li>
+</ul>
+<pre><code class="language-python"># feature_values: typed records for one feature, selector-reduced
+selector = FeatureRecord.select_by_workflow(&quot;Manual_Annotation&quot;, container=ml)
+labels = {
+    rec.Image: rec.Diagnosis_Type
+    for rec in ml.feature_values(&quot;Image&quot;, &quot;Diagnosis&quot;, selector=selector)
+}
+</code></pre>
+<p><strong>Use <code>Denormalizer</code></strong> when:</p>
+<ul>
+<li>You want a wide DataFrame combining columns from multiple tables in a single call.</li>
+<li>You want structural joins (e.g., <code>Subject → Observation → Image</code>) that are not feature-based.</li>
+<li>You want feature tables to participate as leaves in a multi-table join alongside domain tables.</li>
+<li>You want pandas output directly.</li>
+</ul>
+<pre><code class="language-python"># Denormalizer: wide DataFrame joining Subject, Image, and a feature table
+from deriva_ml.local_db.denormalize import Denormalizer
+
+d = Denormalizer(dataset)
+df = d.as_dataframe([&quot;Subject&quot;, &quot;Image&quot;, &quot;Execution_Image_Diagnosis&quot;])
+# df has Subject columns, Image columns, and Diagnosis columns — one row per feature value
+</code></pre>
+<p>The same question — "give me the diagnosis for each image, with subject context" — answered both ways:</p>
+<pre><code class="language-python"># feature_values approach: start from the feature, join subject in Python
+records = {r.Image: r.Diagnosis_Type for r in ml.feature_values(
+    &quot;Image&quot;, &quot;Diagnosis&quot;, selector=FeatureRecord.select_newest
+)}
+# Then join with a subject lookup if needed
+
+# Denormalizer approach: one call, pandas output with all context columns
+df = dataset.get_denormalized_as_dataframe(
+    [&quot;Subject&quot;, &quot;Observation&quot;, &quot;Image&quot;, &quot;Execution_Image_Diagnosis&quot;]
+)
+</code></pre>
+<p>Use <code>feature_values</code> when you care about provenance, selectors, or typed access. Use <code>Denormalizer</code> when you care about wide joins and pandas integration.</p>
+<h2 id="migrating-from-pre-s2-apis">Migrating from pre-S2 APIs</h2>
+<p>If your code uses any of the following, it will raise <code>DerivaMLException</code> with a migration pointer:</p>
+<table>
+<thead>
+<tr>
+<th>Retired API</th>
+<th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ml.add_features(records)</code></td>
+<td><code>exe.add_features(records)</code> inside an execution context</td>
+</tr>
+<tr>
+<td><code>ml.fetch_table_features(...)</code></td>
+<td><code>ml.feature_values(table, name)</code> or <code>Denormalizer</code></td>
+</tr>
+<tr>
+<td><code>bag.fetch_table_features(...)</code></td>
+<td><code>bag.feature_values(table, name)</code></td>
+</tr>
+<tr>
+<td><code>ml.list_feature_values(...)</code></td>
+<td><code>ml.feature_values(...)</code> (renamed, same signature)</td>
+</tr>
+<tr>
+<td><code>bag.list_feature_values(...)</code></td>
+<td><code>bag.feature_values(...)</code> (renamed, same signature)</td>
+</tr>
+<tr>
+<td><code>ml.select_by_workflow(records, workflow)</code></td>
+<td><code>FeatureRecord.select_by_workflow(workflow, container=ml)</code></td>
+</tr>
+</tbody>
+</table>
+<p>The retired APIs raise immediately with a specific message naming the replacement. There are no silent fallbacks.</p>
+<h2 id="common-pitfalls">Common pitfalls</h2>
+<p>!!! warning "feature_values materializes all rows before yielding"
+    Despite being iterator-shaped, <code>feature_values</code> fetches every row for the feature from the catalog in one call before yielding the first record. For features with very large value tables, apply a selector to reduce the output, or filter in your caller. This behavior is documented in the method's docstring and is by design — stream-safe is a future enhancement.</p>
+<p>!!! warning "exe.add_features stages to SQLite, not to the catalog"
+    Records passed to <code>exe.add_features</code> are not visible in the catalog until <code>upload_execution_outputs()</code> completes. If you query <code>feature_values</code> on the live catalog before calling <code>upload_execution_outputs()</code>, the records from the current execution will not appear. This is intentional: partial execution output should not be visible to other readers.</p>
+<p>!!! warning "Workflow deduplication affects select_by_workflow"
+    Workflows are deduplicated by checksum. If you run the same script multiple times, <code>create_workflow</code> returns the same workflow RID each time. <code>FeatureRecord.select_by_workflow("My_Workflow", container=ml)</code> will therefore match feature values from all runs of that script. If you need to distinguish runs, use <code>select_by_execution</code> with a specific execution RID, or create a new workflow for each run by changing the script or passing an explicit <code>checksum</code>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><strong>API reference:</strong> <code>DerivaML.create_feature</code>, <code>DerivaML.feature_values</code>, <code>DerivaML.find_features</code>, <code>DerivaML.lookup_feature</code> in the Library Documentation.</li>
+<li><strong><a href="../datasets/">Chapter 2 (Datasets)</a>:</strong> how dataset versioning interacts with feature values via catalog snapshots.</li>
+<li><strong><a href="../executions/">Chapter 4 (Executions)</a>:</strong> <code>create_execution</code>, <code>upload_execution_outputs</code>, <code>resume_execution</code>, and the full execution lifecycle.</li>
+<li><strong><a href="../offline/">Chapter 5 (Working offline)</a>:</strong> <code>restructure_assets</code> with <code>value_selector</code> for feature-based file organization in offline ML workflows.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../datasets/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Working with datasets">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Working with datasets
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../executions/" class="md-footer__link md-footer__link--next" aria-label="Next: Running an experiment">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Running an experiment
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
