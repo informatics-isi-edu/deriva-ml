@@ -2,6 +2,82 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Sort + materialize_limit + execution_rids on find_*/feature_values
+
+### Added
+
+- **`find_executions(sort=...)`, `find_datasets(sort=...)`, `find_workflows(sort=...)`**
+  accept an optional `sort=` parameter with three-state semantics:
+  - `None` (default): no sort applied -- backend returns rows in its
+    own order. Existing callers see no behavior change.
+  - `True`: method's documented default applies. For all three
+    activity-log methods this is "newest-first by record creation
+    time" (`RCT desc`). Recommended for "show me recent..." queries.
+  - Callable `(path) -> sort_keys`: caller-supplied override. The
+    callable receives the path-builder context for the entity-table
+    and returns one or more path-builder sort keys (e.g.
+    `path.RCT.desc`, or `[path.Status, path.RCT.desc]`).
+
+- **`feature_values(materialize_limit=..., execution_rids=...)`**
+  accepts two new optional parameters on `DerivaML`, `Dataset`, and
+  `DatasetBag`:
+  - `materialize_limit: int | None = None` -- caller-controlled cap
+    on rows materialized into memory. When the result set exceeds
+    the limit, raises `DerivaMLMaterializeLimitExceeded`. Default
+    `None` preserves existing unbounded behavior; downstream
+    consumers (e.g. `deriva-ml-mcp`) can set sensible defaults.
+  - `execution_rids: list[str] | None = None` -- server-side filter
+    (online) or Python-side filter (offline) restricting results to
+    feature rows whose `Execution` value is in the list. Lets
+    compare-runs workflows fetch values across N executions in one
+    catalog round-trip rather than N sequential queries. Empty list
+    short-circuits to an empty result.
+
+- **`DerivaMLMaterializeLimitExceeded`** exception class
+  (subclass of `DerivaMLValidationError`). Carries `actual_count`
+  and `limit` attributes; the message names both numbers and
+  suggests three remediations (raise the limit, narrow the query
+  via `execution_rids`, switch to a streaming consumer).
+
+- **`deriva_ml.core.sort`** module -- `SortSpec` type alias and
+  `resolve_sort` helper. Centralises the three-state sort semantics
+  so each `find_*` impl just supplies its own default-sort callable.
+  Pure-Python helper, fully unit-tested without a catalog.
+
+### Changed
+
+- **`interfaces.py` Protocol declarations** for `find_executions`,
+  `find_datasets`, `find_workflows`, `list_dataset_members`,
+  `list_dataset_parents`, `list_dataset_children`, and
+  `feature_values` extended with the new optional parameters. All
+  parameters default to `None` / current behavior, so concrete
+  classes that haven't been updated still satisfy the protocol.
+
+- For `list_dataset_*` Protocol declarations, `sort=` is reserved
+  for forward-compat. Current `Dataset` and `DatasetBag` impls
+  accept it via `**kwargs` and ignore it. Future commits may
+  implement actual sort semantics on these methods.
+
+### Wire shape impact
+
+**None.** All new parameters default to current behavior. Existing
+callers see no change in row order, materialization size, or
+exception surface.
+
+### Migration notes
+
+- "Show me the N most recent executions" was previously expensive
+  (paginate to the end of an unsorted result set, or rely on RAG
+  freshness). Use `ml.find_executions(sort=True, limit=N)` instead.
+- Cross-execution metric comparison ("which of these 5 runs got the
+  best F1?") was previously N+1 round-trips
+  (`feature_values()` per execution). Use
+  `ml.feature_values("Image", "F1", execution_rids=[exec_rids])`
+  for a single-round-trip filter.
+- The MCP plugin (`deriva-ml-mcp`) v3.1.0 will consume these new
+  parameters and ship `compare_metrics` and a default
+  `materialize_limit` on the `list_feature_values` tool.
+
 ## Unreleased — Bug E.2: asset uploads honor pre-leased RIDs
 
 ### Fixed
