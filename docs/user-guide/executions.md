@@ -502,6 +502,66 @@ The CLI tools handle Jupyter kernel detection, `nbstripout`-based checksum compu
     Commit before running. `DERIVA_ML_ALLOW_DIRTY=true` suppresses the warning but is
     intended for tests only — using it in production pollutes your provenance record.
 
+## How to trace an artifact's lineage
+
+DerivaML records the full provenance graph for every artifact: which Execution produced
+it, what inputs that Execution consumed, what Executions produced those inputs, and so
+on back to the original raw data. To answer "how did this come to exist?" for any
+Dataset, Asset, Feature value, or Execution RID, use `lookup_lineage()`:
+
+```python
+from deriva_ml import DerivaML
+
+ml = DerivaML(hostname="data.example.org", catalog_id="1")
+
+# Single call walks the full chain back to the root.
+lineage = ml.lookup_lineage("2-PRED1")    # the predictions.csv asset RID
+
+print(lineage.root.type, lineage.root.description)
+# Asset Trained-model predictions on test set v0.4.0
+
+print(f"Walked {lineage.executions_visited} executions; complete={lineage.walked_complete}")
+```
+
+The returned `LineageResult` is a Pydantic tree where each `LineageNode` carries a
+summary of its producing Execution (RID, description, workflow name, status), the
+input Datasets and Assets that Execution consumed, and the recursive `parents` list of
+producing Executions for each input.
+
+**Common patterns.**
+
+| Question | Call |
+|---|---|
+| What produced this asset/dataset/feature? | `ml.lookup_lineage(rid)` — read `lineage.root.producing_execution` |
+| What's the full chain back to the raw data? | `ml.lookup_lineage(rid)` — walk `lineage.lineage.parents` recursively |
+| Just the immediate producer, no parent chain | `ml.lookup_lineage(rid, depth=0)` |
+| Two generations back, no further | `ml.lookup_lineage(rid, depth=2)` |
+
+**Bounds and safety.** The walk is unbounded by default — provenance traversal is an
+infrequent, deliberate request, not a hot path. Cycle detection is mandatory: if the
+catalog is corrupted with a true execution-chain cycle, the response sets
+`cycle_detected=True` and the walk aborts on that branch. A `max_executions=500` hard
+cap prevents pathological runaway walks; if hit, `walked_complete=False`.
+
+**Diamond DAGs.** When the same parent Execution is reachable via two different
+inputs, it appears once in the tree and subsequent encounters are marked
+`already_shown=True` to keep the response compact and the structure honest.
+
+**Data-flow only.** `lookup_lineage` walks data-flow parents (the Executions that
+produced this Execution's consumed inputs). It does **not** walk
+`Execution_Execution` (orchestration parent-child links — the "this Execution called
+that Execution" relationship). For the orchestration view, use
+`list_nested_executions` instead. The two views answer different questions and are
+kept separate by design (see ADR-0001 in `docs/adr/`).
+
+**No producer.** If the artifact has no producing-execution link (manually-inserted
+data, or data loaded outside an execution), the call still succeeds:
+`lineage.root.producing_execution` is `None` and `lineage.lineage` is `None`. "It has
+no recorded producer" is a valid answer to "how did this come to exist?".
+
+For the full method signature and the Pydantic model definitions, see
+[API Reference — Lineage](../api-reference/lineage.md).
+
 ## See also
 
 - [Chapter 3 — Defining and using features](features.md): creating feature definitions, `FeatureRecord` classes, and asset-based features.
