@@ -30,6 +30,12 @@ if TYPE_CHECKING:
     from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.execution.lineage import (
+        LineageNode,
+        LineageResult,
+        RootDescriptor,
+        WorkflowSummary,
+    )
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
     from deriva_ml.execution.upload_engine import UploadReport
     from deriva_ml.execution.upload_job import UploadJob
@@ -807,3 +813,399 @@ class ExecutionMixin:
             execution_rids=execution_rids,
             retry_failed=retry_failed,
         )
+
+    # ------------------------------------------------------------------
+    # Lineage walk
+    # ------------------------------------------------------------------
+
+    def lookup_lineage(
+        self,
+        rid: RID,
+        *,
+        depth: int | None = None,
+        max_executions: int = 500,
+    ) -> "LineageResult":
+        """Walk the data-flow provenance chain behind an artifact.
+
+        Given a Dataset, Asset, Feature value, or Execution RID,
+        returns a tree of producing executions and their consumed
+        inputs back to the natural root of every branch. Replaces
+        what would otherwise be 5-15 client round-trips through
+        typed read methods with one call.
+
+        The walk follows **data-flow parents only**: for each
+        execution node, the parents are the producing executions of
+        its consumed datasets and assets (asset_role="Input"). This
+        method explicitly does NOT walk ``Execution_Execution``
+        (orchestration links) — that's a different question
+        (``ExecutionRecord.list_execution_parents`` /
+        ``list_execution_children``). See
+        ``docs/adr/0001-lineage-walks-data-flow-not-orchestration.md``
+        for the rationale.
+
+        For Dataset roots, the producer is taken from the **current**
+        version's ``Dataset_Version.Execution`` row. Walking a
+        historical version is a future enhancement.
+
+        Args:
+            rid: RID of any Dataset, Asset, Feature value, or
+                Execution. Workflow RIDs are not lineage-shaped and
+                raise :class:`DerivaMLException`.
+            depth: Number of parent levels to walk from the immediate
+                producing execution. ``None`` (default) walks to the
+                root. ``0`` returns only the immediate producing
+                execution node. ``N>0`` walks ``N`` levels up.
+            max_executions: Defensive cap on distinct executions the
+                walk will expand. Default 500. If exceeded,
+                ``walked_complete`` is set to False and the partial
+                tree is returned.
+
+        Returns:
+            A :class:`~deriva_ml.execution.lineage.LineageResult`
+            with the producing-execution tree plus transparency
+            flags (``walked_complete``, ``cycle_detected``,
+            ``depth_capped``, ``executions_visited``).
+
+        Raises:
+            DerivaMLException: If ``rid`` does not exist, points at a
+                Workflow row, or points at a row whose table cannot
+                be classified as Dataset / Asset / Feature value /
+                Execution.
+
+        Example:
+            Trace an output asset back to its training dataset::
+
+                >>> result = ml.lookup_lineage("3JSE")  # doctest: +SKIP
+                >>> assert result.walked_complete
+                >>> for ds in result.lineage.consumed_datasets:
+                ...     print(ds.rid, ds.version)
+
+            Just the immediate producer (one round-trip)::
+
+                >>> result = ml.lookup_lineage(  # doctest: +SKIP
+                ...     "3JSE", depth=0,
+                ... )
+                >>> producer = result.lineage.execution
+
+            For the orchestration view (which execution called
+            which), use ``record.list_execution_parents()`` /
+            ``list_execution_children()`` on an
+            :class:`~deriva_ml.execution.execution_record.ExecutionRecord`.
+        """
+        from deriva_ml.execution.lineage import LineageResult
+
+        # 1. Classify the root RID with a single resolve_rid call.
+        root_descriptor, producer_rid = self._classify_rid(rid)
+
+        if producer_rid is None:
+            # No producer — return a valid result with an empty walk.
+            return LineageResult(root=root_descriptor)
+
+        # 2. Walk iteratively from the producing execution.
+        visited_global: set[RID] = set()
+        in_progress: set[RID] = set()
+        flags = {"cycle_detected": False, "depth_capped": False, "walked_complete": True}
+
+        lineage_root_node = self._walk_node(
+            execution_rid=producer_rid,
+            depth_remaining=depth,
+            max_executions=max_executions,
+            visited_global=visited_global,
+            in_progress=in_progress,
+            flags=flags,
+        )
+
+        # The producing-execution summary on the root descriptor matches
+        # the top-most execution node we just expanded.
+        if lineage_root_node is not None:
+            root_descriptor = root_descriptor.model_copy(update={"producing_execution": lineage_root_node.execution})
+
+        return LineageResult(
+            root=root_descriptor,
+            lineage=lineage_root_node,
+            executions_visited=len(visited_global),
+            walked_complete=flags["walked_complete"],
+            cycle_detected=flags["cycle_detected"],
+            depth_capped=flags["depth_capped"],
+        )
+
+    # -- private helpers -------------------------------------------------
+
+    def _classify_rid(self, rid: RID) -> "tuple[RootDescriptor, RID | None]":
+        """Classify ``rid`` and return ``(root_descriptor, producer_rid)``.
+
+        ``producer_rid`` is the immediate producing-execution RID, or
+        None if the artifact has no recorded producer. For an
+        Execution root, it's the execution itself.
+
+        Raises ``DerivaMLException`` for Workflow RIDs and for
+        anything else not in the supported shape table.
+        """
+        from deriva_ml.execution.lineage import RootDescriptor
+
+        resolved = self.resolve_rid(rid)
+        table = resolved.table
+        table_name = table.name
+
+        if table_name == "Workflow":
+            raise DerivaMLException(
+                f"RID '{rid}' refers to a Workflow, which is not "
+                f"lineage-shaped. Workflows describe what to run, "
+                f"not a produced artifact."
+            )
+
+        if table_name == "Execution":
+            row = self._retrieve_rid(rid)
+            return (
+                RootDescriptor(
+                    rid=rid,
+                    type="Execution",
+                    description=row.get("Description"),
+                    producing_execution=None,  # filled in by caller
+                ),
+                rid,
+            )
+
+        if table_name == "Dataset":
+            row = self._retrieve_rid(rid)
+            producer_rid = self._producer_of_dataset(rid)
+            return (
+                RootDescriptor(
+                    rid=rid,
+                    type="Dataset",
+                    description=row.get("Description"),
+                ),
+                producer_rid,
+            )
+
+        if self.model.is_asset(table):
+            row = self._retrieve_rid(rid)
+            producer_rid = self._producer_of_asset(rid, table)
+            return (
+                RootDescriptor(
+                    rid=rid,
+                    type="Asset",
+                    description=row.get("Description"),
+                ),
+                producer_rid,
+            )
+
+        # Feature value: a row in a feature association table has
+        # both a "Feature_Name" column and an "Execution" column.
+        col_names = {c.name for c in table.columns}
+        if "Feature_Name" in col_names and "Execution" in col_names:
+            row = self._retrieve_rid(rid)
+            producer_rid = row.get("Execution")
+            return (
+                RootDescriptor(
+                    rid=rid,
+                    type="Feature",
+                    description=None,
+                ),
+                producer_rid,
+            )
+
+        raise DerivaMLException(
+            f"RID '{rid}' refers to a {table_name} row, which is not "
+            f"lineage-shaped. lookup_lineage accepts Dataset, Asset, "
+            f"Feature-value, or Execution RIDs."
+        )
+
+    def _producer_of_dataset(self, dataset_rid: RID) -> RID | None:
+        """Return the Execution RID that produced the current version of ``dataset_rid``.
+
+        Returns None if the dataset has no Dataset_Version rows yet
+        or no version row carries an Execution link.
+        """
+        pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows = list(version_path.filter(version_path.Dataset == dataset_rid).entities().fetch())
+        if not rows:
+            return None
+
+        # Pick the row with the highest semver-style Version. The catalog
+        # stores Version as text (e.g. "0.1.0"); sort lexically as a
+        # tuple of ints so "1.10.0" beats "1.2.0".
+        def _key(row: dict[str, Any]) -> tuple[int, ...]:
+            v = row.get("Version") or "0.0.0"
+            try:
+                return tuple(int(p) for p in v.split("."))
+            except ValueError:
+                return (0,)
+
+        latest = max(rows, key=_key)
+        return latest.get("Execution")
+
+    def _producer_of_asset(self, asset_rid: RID, asset_table: Any) -> RID | None:
+        """Return the Execution RID that produced ``asset_rid`` (asset_role="Output").
+
+        Returns None if the asset has no Output association in any
+        ``<AssetTable>_Execution`` row.
+        """
+        try:
+            assoc_table, asset_fk, _exec_fk = self.model.find_association(asset_table, "Execution")
+        except Exception:
+            return None
+
+        pb = self.pathBuilder()
+        assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
+        rows = list(
+            assoc_path.filter(assoc_path.columns[asset_fk] == asset_rid)
+            .filter(assoc_path.Asset_Role == "Output")
+            .entities()
+            .fetch()
+        )
+        if not rows:
+            return None
+        # If multiple Output associations exist (rare), the first one
+        # is fine — they all point at executions that wrote this asset.
+        return rows[0].get("Execution")
+
+    def _walk_node(
+        self,
+        *,
+        execution_rid: RID,
+        depth_remaining: int | None,
+        max_executions: int,
+        visited_global: set[RID],
+        in_progress: set[RID],
+        flags: dict[str, bool],
+    ) -> "LineageNode | None":
+        """Expand one execution node and recurse on its data-flow parents.
+
+        Mutates ``visited_global``, ``in_progress``, and ``flags``.
+        Returns None only if the execution couldn't be looked up
+        (defensive).
+        """
+        from deriva_ml.execution.lineage import (
+            AssetSummary,
+            DatasetSummary,
+            ExecutionSummary,
+            LineageNode,
+            WorkflowSummary,
+        )
+
+        # Cycle on the active path: do not expand, set flag, return a
+        # leaf-style marker.
+        if execution_rid in in_progress:
+            flags["cycle_detected"] = True
+            return LineageNode(
+                execution=ExecutionSummary(
+                    rid=execution_rid,
+                    description=None,
+                    workflow=None,
+                    status="Unknown",
+                ),
+                already_shown=True,
+            )
+
+        # Diamond DAG: this execution was already expanded somewhere
+        # else in the tree. Mark and don't recurse.
+        if execution_rid in visited_global:
+            return LineageNode(
+                execution=ExecutionSummary(
+                    rid=execution_rid,
+                    description=None,
+                    workflow=None,
+                    status="Unknown",
+                ),
+                already_shown=True,
+            )
+
+        # Defensive cap on total expansions.
+        if len(visited_global) >= max_executions:
+            flags["walked_complete"] = False
+            return None
+
+        # Look up the execution and its inputs.
+        try:
+            record = self.lookup_execution(execution_rid)
+        except DerivaMLException:
+            # An input pointed at an Execution that no longer exists;
+            # treat as missing rather than failing the whole walk.
+            return None
+
+        visited_global.add(execution_rid)
+        in_progress.add(execution_rid)
+
+        try:
+            wf_summary: "WorkflowSummary | None" = None
+            if record.workflow is not None and record.workflow.rid is not None:
+                wf_summary = WorkflowSummary(
+                    rid=record.workflow.rid,
+                    name=record.workflow.name,
+                )
+
+            execution_summary = ExecutionSummary(
+                rid=execution_rid,
+                description=record.description,
+                workflow=wf_summary,
+                status=record.status.value if record.status else "Unknown",
+            )
+
+            # Consumed inputs.
+            consumed_datasets: list[DatasetSummary] = []
+            parent_rids: set[RID] = set()
+            for ds in record.list_input_datasets():
+                ds_version = None
+                try:
+                    ds_version = str(ds.current_version)
+                except Exception:
+                    pass
+                consumed_datasets.append(
+                    DatasetSummary(
+                        rid=ds.dataset_rid,
+                        description=ds.description or None,
+                        version=ds_version,
+                    )
+                )
+                producer = self._producer_of_dataset(ds.dataset_rid)
+                if producer:
+                    parent_rids.add(producer)
+
+            consumed_assets: list[AssetSummary] = []
+            for asset in record.list_assets(asset_role="Input"):
+                consumed_assets.append(
+                    AssetSummary(
+                        rid=asset.asset_rid,
+                        filename=asset.filename or None,
+                        asset_table=asset.asset_table,
+                    )
+                )
+                try:
+                    asset_table_obj = self.model.name_to_table(asset.asset_table)
+                    producer = self._producer_of_asset(asset.asset_rid, asset_table_obj)
+                    if producer:
+                        parent_rids.add(producer)
+                except Exception:
+                    # If we can't resolve the producer of one asset,
+                    # keep walking the rest of the inputs.
+                    pass
+
+            # Recurse on parents.
+            parents: list[LineageNode] = []
+            if depth_remaining is None or depth_remaining > 0:
+                next_depth = None if depth_remaining is None else depth_remaining - 1
+                for pr in parent_rids:
+                    child = self._walk_node(
+                        execution_rid=pr,
+                        depth_remaining=next_depth,
+                        max_executions=max_executions,
+                        visited_global=visited_global,
+                        in_progress=in_progress,
+                        flags=flags,
+                    )
+                    if child is not None:
+                        parents.append(child)
+            elif parent_rids:
+                # We had parents but depth said stop. Mark depth_capped.
+                flags["depth_capped"] = True
+
+            return LineageNode(
+                execution=execution_summary,
+                consumed_datasets=consumed_datasets,
+                consumed_assets=consumed_assets,
+                parents=parents,
+            )
+        finally:
+            in_progress.discard(execution_rid)

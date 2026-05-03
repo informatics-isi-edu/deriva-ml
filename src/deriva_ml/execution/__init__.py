@@ -8,6 +8,9 @@ full provenance tracking.
 
 from typing import TYPE_CHECKING
 
+# Re-export AssetSpec and AssetSpecConfig from their canonical location
+from deriva_ml.asset.aux_classes import AssetSpec, AssetSpecConfig
+
 # Safe imports - no circular dependencies
 from deriva_ml.execution.base_config import (
     BaseConfig,
@@ -23,9 +26,15 @@ from deriva_ml.execution.base_config import (
     with_description,
 )
 from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
-
-# Re-export AssetSpec and AssetSpecConfig from their canonical location
-from deriva_ml.asset.aux_classes import AssetSpec, AssetSpecConfig
+from deriva_ml.execution.lineage import (
+    AssetSummary,
+    DatasetSummary,
+    ExecutionSummary,
+    LineageNode,
+    LineageResult,
+    RootDescriptor,
+    WorkflowSummary,
+)
 from deriva_ml.execution.model_protocol import DerivaMLModel
 from deriva_ml.execution.multirun_config import (
     MultirunSpec,
@@ -80,4 +89,12 @@ __all__ = [
     "get_multirun_config",
     "list_multirun_configs",
     "get_all_multirun_configs",
+    # Lineage models (lookup_lineage)
+    "AssetSummary",
+    "DatasetSummary",
+    "ExecutionSummary",
+    "LineageNode",
+    "LineageResult",
+    "RootDescriptor",
+    "WorkflowSummary",
 ]
