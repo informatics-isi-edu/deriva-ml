@@ -264,6 +264,40 @@ uv run deriva-ml-run \
 - The reproduced execution gets a new RID — it is a new record linked to the same workflow and dataset versions, not an alias of the original.
 - If the original execution used input assets (`AssetSpec`), include those in the new configuration using their RIDs.
 
+## How to trace what an artifact was produced from
+
+Reproducing a run is one direction; tracing an artifact backwards through its
+provenance chain is the other. When you're staring at a model output and want to
+verify "did this prediction trace back to the dataset I expected?", use
+`lookup_lineage()`:
+
+```python
+ml = DerivaML(hostname="catalog.example.org", catalog_id="1")
+lineage = ml.lookup_lineage("2-PRED1")    # the prediction asset RID
+
+# What was the immediate producing execution?
+print(lineage.root.producing_execution.description)
+# "Train ResNet-50 on chest X-ray dataset 1-ABC4 v1.2.0..."
+
+# What dataset versions did that execution actually consume?
+for ds in lineage.lineage.consumed_datasets:
+    print(f"  {ds.rid} {ds.version} — {ds.name}")
+
+# Walk further back: which executions produced those datasets?
+for parent in lineage.lineage.parents:
+    print(parent.execution.description)
+```
+
+The full chain is walked server-side in one call, replacing what would otherwise be
+5–15 manual `lookup_execution` / `find_executions` round-trips. Lineage is the
+**verification** half of reproducibility: re-running gives you a new artifact;
+tracing tells you which inputs and code produced an existing artifact, so you can
+confirm a reproduction matches the original.
+
+See [Running an experiment — How to trace an artifact's lineage](executions.md#how-to-trace-an-artifacts-lineage)
+for the full reference, including depth control, cycle handling, and the
+data-flow-vs-orchestration distinction (recorded in ADR-0001).
+
 !!! note "Common pitfalls"
     **`DERIVA_ML_ALLOW_DIRTY=true` in production.** This is the most dangerous reproducibility mistake. The execution record looks complete, but the workflow URL does not match the code that ran. Future auditors (including you) cannot tell. Reserve it for tests.
 

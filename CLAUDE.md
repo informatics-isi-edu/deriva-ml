@@ -316,6 +316,30 @@ When in doubt, pick Pydantic — "too many interfaces" is the failure mode to av
 
 ## Best Practices & Patterns
 
+### Pull-Request Workflow (required)
+
+**All changes to `deriva-ml` go through a pull request — including
+spawned-agent work.** Do not commit directly to `main`. The standard
+sequence:
+
+```bash
+git checkout -b feature/<short-name>
+# ... commit work on the branch ...
+git push -u origin feature/<short-name>
+gh pr create --title "..." --body "..."
+# wait for review or self-merge with:
+gh pr merge --squash --delete-branch
+```
+
+The PR is part of the deliverable; "shipped without a PR" is
+incomplete work. This applies even for solo developers and even for
+spawned subagents — the PR creates the durable review record that
+`git log` alone doesn't.
+
+The `bump-version` step happens AFTER merge, on `main`, in a clean
+working tree (so the bump-commit lands on `main` directly and the
+tag points at it). Never bump from a feature branch.
+
 ### Version Bumping
 
 Use the `bump-version` script for releases - it handles the complete workflow:
@@ -324,6 +348,8 @@ uv run bump-version patch  # or minor, major
 ```
 This fetches tags, bumps the version, creates a tag, and pushes everything in one command.
 Don't use `bump-my-version` directly as it doesn't push changes.
+
+Run `bump-version` only on `main`, after the feature PR has merged.
 
 ### Asset Upload
 

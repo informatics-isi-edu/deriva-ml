@@ -72,6 +72,7 @@ nav:
           - Execution: api-reference/execution.md
           - ExecutionConfiguration: api-reference/execution_configuration.md
           - Workflow: api-reference/workflow.md
+          - Lineage: api-reference/lineage.md
       - Features:
           - Feature: api-reference/feature.md
       - Utilities:
