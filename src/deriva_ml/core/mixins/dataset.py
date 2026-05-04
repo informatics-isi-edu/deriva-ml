@@ -16,14 +16,24 @@ Table = _ermrest_model.Table
 
 from pydantic import ConfigDict, validate_call
 
+from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.validation import (
+    AssetSpecResult,
+    CrossSpecIssue,
+    DatasetSpecResult,
+    DatasetSpecValidationReport,
+    ExecutionConfigurationValidationReport,
+    WorkflowSpecResult,
+)
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset import Dataset
     from deriva_ml.dataset.dataset_bag import DatasetBag
+    from deriva_ml.execution.execution_configuration import ExecutionConfiguration
     from deriva_ml.model.catalog import DerivaModel
 
 
@@ -528,3 +538,420 @@ class DatasetMixin:
             timeout=dataset.timeout,
             fetch_concurrency=dataset.fetch_concurrency,
         )
+
+    # ------------------------------------------------------------------
+    # Pre-flight validation (metadata-only; cf. dry_run for full path).
+    # ------------------------------------------------------------------
+
+    def validate_dataset_specs(
+        self,
+        specs: list[DatasetSpec | str | dict[str, Any]],
+    ) -> DatasetSpecValidationReport:
+        """Validate a list of :class:`DatasetSpec` against the catalog.
+
+        Replaces the per-RID ``ml.lookup_dataset(rid)`` +
+        ``ds.dataset_history()`` cross-check loop a user would
+        otherwise write while iterating on ``src/configs/datasets.py``.
+        Each spec is checked for three orthogonal failure modes —
+        ``rid_not_found``, ``not_a_dataset``, ``version_not_found`` —
+        and all three are reported per spec rather than stopping at
+        the first.
+
+        This is a metadata-only catalog query. For the heavier
+        full-path check (which materializes bags) see
+        :meth:`Execution.dry_run`. ADR-0002 captures the rationale
+        for keeping the two surfaces distinct.
+
+        Input shorthands are accepted for ergonomics: a plain RID
+        string is parsed via :meth:`DatasetSpec.from_shorthand` (so
+        ``"1-XYZ@1.0.0"`` and ``"1-XYZ"`` both work), and a dict is
+        coerced via ``DatasetSpec(**d)``.
+
+        Duplicate specs in the input are validated independently
+        (no deduplication). Cross-spec duplicate detection lives on
+        the composite :meth:`validate_execution_configuration`.
+
+        Args:
+            specs: List of dataset specifications to validate. Each
+                element may be a :class:`DatasetSpec`, a shorthand
+                string parseable by :meth:`DatasetSpec.from_shorthand`,
+                or a dict that coerces to :class:`DatasetSpec`.
+
+        Returns:
+            A :class:`DatasetSpecValidationReport` with one
+            :class:`DatasetSpecResult` per input spec (in the same
+            order) plus a top-level ``all_valid`` convenience flag.
+
+        Raises:
+            pydantic.ValidationError: If any input element cannot be
+                coerced to a :class:`DatasetSpec` (e.g. malformed
+                version string, missing required fields).
+
+        Example:
+            Validate two specs, one good and one with a typo'd version::
+
+                >>> from deriva_ml.dataset.aux_classes import DatasetSpec
+                >>> report = ml.validate_dataset_specs(specs=[  # doctest: +SKIP
+                ...     DatasetSpec(rid="2-B4C8", version="0.4.0"),
+                ...     DatasetSpec(rid="2-B4C8", version="9.9.9"),
+                ... ])
+                >>> report.all_valid  # doctest: +SKIP
+                False
+                >>> bad = report.results[1]  # doctest: +SKIP
+                >>> bad.reasons  # doctest: +SKIP
+                ['version_not_found']
+                >>> bad.available_versions  # doctest: +SKIP
+                ['0.4.0', '0.3.0']
+        """
+        # Coerce inputs once so cached lookups can use the canonical form.
+        coerced: list[DatasetSpec] = [self._coerce_dataset_spec(s) for s in specs]
+
+        # Per-RID caches so duplicate-RID inputs cost one round-trip each,
+        # not N. The values mirror the partial state assembled during a
+        # validation pass.
+        rid_cache: dict[str, dict[str, Any]] = {}
+
+        results = [self._validate_one_dataset_spec(s, rid_cache) for s in coerced]
+        return DatasetSpecValidationReport(
+            all_valid=all(r.valid for r in results),
+            results=results,
+        )
+
+    def validate_execution_configuration(
+        self,
+        config: "ExecutionConfiguration",
+    ) -> ExecutionConfigurationValidationReport:
+        """Pre-flight validation for an :class:`ExecutionConfiguration`.
+
+        Walks the contained ``datasets`` and ``assets`` lists, validates
+        the workflow RID, and reports per-spec results plus cross-spec
+        issues (duplicate RIDs across the dataset list, dataset-version
+        conflicts, asset role conflicts). Designed to be cheap to run
+        repeatedly while iterating on a config — only catalog metadata
+        is touched, no bags are materialized.
+
+        This method is the lightweight complement to
+        :meth:`Execution.dry_run`. ``dry_run`` is the heavier full-path
+        test that exercises the bag-download + materialization pipeline;
+        ``validate_execution_configuration`` answers the cheaper
+        upstream question of *"do the RIDs in this config refer to
+        things that exist in the catalog the way I think they do?"*.
+        See ADR-0002 for the full rationale.
+
+        The dataset half of the work is delegated to
+        :meth:`validate_dataset_specs` — the two methods share the
+        per-spec dataset validation logic.
+
+        Args:
+            config: The execution configuration to validate. Its
+                ``datasets``, ``assets``, and ``workflow`` fields are
+                walked; other fields (``description``, ``argv``,
+                ``config_choices``) are ignored.
+
+        Returns:
+            A :class:`ExecutionConfigurationValidationReport` with
+            per-spec results, an optional workflow result (None if
+            the config has no workflow set), cross-spec issues, and
+            an ``all_valid`` convenience flag.
+
+        Raises:
+            pydantic.ValidationError: If ``config`` is not an
+                :class:`ExecutionConfiguration`.
+
+        Example:
+            Validate a config before invoking ``deriva-ml-run``::
+
+                >>> from deriva_ml.execution import ExecutionConfiguration
+                >>> from deriva_ml.dataset.aux_classes import DatasetSpec
+                >>> from deriva_ml.asset.aux_classes import AssetSpec
+                >>> config = ExecutionConfiguration(  # doctest: +SKIP
+                ...     workflow=workflow,
+                ...     datasets=[DatasetSpec(rid="2-B4C8", version="0.4.0")],
+                ...     assets=[AssetSpec(rid="3JSE")],
+                ... )
+                >>> report = ml.validate_execution_configuration(config)  # doctest: +SKIP
+                >>> if not report.all_valid:  # doctest: +SKIP
+                ...     for issue in report.cross_spec_issues:
+                ...         print(issue.detail)
+        """
+        # Dataset half — delegate to the singular method.
+        dataset_report = self.validate_dataset_specs(specs=list(config.datasets))
+
+        # Asset half — per-spec.
+        asset_results = [self._validate_asset_spec(a) for a in config.assets]
+
+        # Workflow.
+        workflow_result: WorkflowSpecResult | None
+        if config.workflow is not None and config.workflow.rid is not None:
+            workflow_result = self._validate_workflow_rid(config.workflow.rid)
+        else:
+            workflow_result = None
+
+        # Cross-spec issues.
+        cross_spec_issues = self._collect_cross_spec_issues(
+            dataset_specs=list(config.datasets),
+            asset_specs=list(config.assets),
+        )
+
+        all_valid = (
+            dataset_report.all_valid
+            and all(r.valid for r in asset_results)
+            and (workflow_result is None or workflow_result.valid)
+            and not cross_spec_issues
+        )
+
+        return ExecutionConfigurationValidationReport(
+            all_valid=all_valid,
+            dataset_results=dataset_report.results,
+            asset_results=asset_results,
+            workflow_result=workflow_result,
+            cross_spec_issues=cross_spec_issues,
+        )
+
+    # -- private helpers ------------------------------------------------
+
+    @staticmethod
+    def _coerce_dataset_spec(value: DatasetSpec | str | dict[str, Any]) -> DatasetSpec:
+        """Coerce one input into a :class:`DatasetSpec`.
+
+        See :meth:`validate_dataset_specs` for the supported shorthands.
+        """
+        if isinstance(value, DatasetSpec):
+            return value
+        if isinstance(value, str):
+            return DatasetSpec.from_shorthand(value)
+        if isinstance(value, dict):
+            return DatasetSpec(**value)
+        # Fall through: let DatasetSpec raise a clear ValidationError.
+        return DatasetSpec.model_validate(value)
+
+    def _validate_one_dataset_spec(
+        self,
+        spec: DatasetSpec,
+        rid_cache: dict[str, dict[str, Any]],
+    ) -> DatasetSpecResult:
+        """Validate one already-coerced :class:`DatasetSpec`.
+
+        Uses ``rid_cache`` to amortize repeated lookups for the same
+        RID across two specs. Mutates the cache.
+        """
+        cached = rid_cache.get(spec.rid)
+        if cached is None:
+            cached = self._lookup_dataset_metadata(spec.rid)
+            rid_cache[spec.rid] = cached
+
+        # rid_not_found short-circuits everything else.
+        if cached["status"] == "rid_not_found":
+            return DatasetSpecResult(
+                spec=spec,
+                valid=False,
+                reasons=["rid_not_found"],
+            )
+
+        # not_a_dataset short-circuits version checking.
+        if cached["status"] == "not_a_dataset":
+            return DatasetSpecResult(
+                spec=spec,
+                valid=False,
+                reasons=["not_a_dataset"],
+                actual_table=cached["actual_table"],
+            )
+
+        # We have a real dataset. Now check the version.
+        requested_version = str(spec.version)
+        available_versions: list[str] = cached["versions"]
+        warnings: list[str] = []
+        if cached["deleted"]:
+            warnings.append("dataset_deleted")
+
+        if requested_version not in available_versions:
+            # Cap at 20, newest first. Versions in cached["versions"] are
+            # already in newest-first order.
+            return DatasetSpecResult(
+                spec=spec,
+                valid=False,
+                reasons=["version_not_found"],
+                warnings=warnings,
+                available_versions=available_versions[:20],
+            )
+
+        return DatasetSpecResult(
+            spec=spec,
+            valid=True,
+            warnings=warnings,
+            resolved_version=requested_version,
+            dataset_name=cached["description"],
+        )
+
+    def _lookup_dataset_metadata(self, rid: str) -> dict[str, Any]:
+        """Resolve a RID and gather just enough metadata to validate it.
+
+        Returns a dict with ``status`` of ``rid_not_found``,
+        ``not_a_dataset``, or ``ok``. When ``ok``, the dict also
+        carries ``description``, ``deleted``, and ``versions`` (newest
+        first). When ``not_a_dataset``, it carries ``actual_table``.
+        """
+        try:
+            resolved = self.resolve_rid(rid)  # type: ignore[attr-defined]
+        except DerivaMLException:
+            return {"status": "rid_not_found"}
+
+        table = resolved.table
+        if table.name != "Dataset":
+            return {"status": "not_a_dataset", "actual_table": table.name}
+
+        # Fetch the dataset row and its version history in two cheap queries.
+        try:
+            row = list(resolved.datapath.entities().fetch())[0]
+        except (IndexError, DerivaMLException):
+            return {"status": "rid_not_found"}
+
+        pb = self.pathBuilder()
+        version_path = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        version_rows = list(version_path.filter(version_path.Dataset == rid).entities().fetch())
+
+        # Sort newest-first (semver-aware) so the head of the slice is
+        # the most useful piece of context for "did you mean..." UX.
+        def _semver_key(v: str) -> tuple[int, ...]:
+            try:
+                return tuple(int(p) for p in v.split("."))
+            except ValueError:
+                return (0,)
+
+        versions = sorted(
+            (vr["Version"] for vr in version_rows if vr.get("Version")),
+            key=_semver_key,
+            reverse=True,
+        )
+
+        return {
+            "status": "ok",
+            "description": row.get("Description"),
+            "deleted": bool(row.get("Deleted")),
+            "versions": versions,
+        }
+
+    def _validate_asset_spec(self, spec: AssetSpec) -> AssetSpecResult:
+        """Validate one :class:`AssetSpec` against the catalog.
+
+        Mirrors the ``rid_not_found`` / ``not_an_asset`` checks that
+        :meth:`AssetMixin.lookup_asset` performs internally, but
+        returns a structured per-spec result instead of raising.
+        """
+        try:
+            resolved = self.resolve_rid(spec.rid)  # type: ignore[attr-defined]
+        except DerivaMLException:
+            return AssetSpecResult(spec=spec, valid=False, reasons=["rid_not_found"])
+
+        table = resolved.table
+        if not self.model.is_asset(table):
+            return AssetSpecResult(
+                spec=spec,
+                valid=False,
+                reasons=["not_an_asset"],
+                actual_table=table.name,
+            )
+
+        try:
+            row = list(resolved.datapath.entities().fetch())[0]
+        except (IndexError, DerivaMLException):
+            return AssetSpecResult(spec=spec, valid=False, reasons=["rid_not_found"])
+
+        return AssetSpecResult(
+            spec=spec,
+            valid=True,
+            asset_table=table.name,
+            filename=row.get("Filename"),
+        )
+
+    def _validate_workflow_rid(self, rid: str) -> WorkflowSpecResult:
+        """Validate that ``rid`` points at a Workflow row."""
+        try:
+            resolved = self.resolve_rid(rid)  # type: ignore[attr-defined]
+        except DerivaMLException:
+            return WorkflowSpecResult(rid=rid, valid=False, reasons=["rid_not_found"])
+
+        table = resolved.table
+        if table.name != "Workflow":
+            return WorkflowSpecResult(
+                rid=rid,
+                valid=False,
+                reasons=["not_a_workflow"],
+                actual_table=table.name,
+            )
+
+        try:
+            row = list(resolved.datapath.entities().fetch())[0]
+        except (IndexError, DerivaMLException):
+            return WorkflowSpecResult(rid=rid, valid=False, reasons=["rid_not_found"])
+
+        return WorkflowSpecResult(
+            rid=rid,
+            valid=True,
+            workflow_name=row.get("Name"),
+        )
+
+    @staticmethod
+    def _collect_cross_spec_issues(
+        dataset_specs: list[DatasetSpec],
+        asset_specs: list[AssetSpec],
+    ) -> list[CrossSpecIssue]:
+        """Compute cross-spec inconsistencies for the composite report.
+
+        Detects:
+            - duplicate dataset RIDs (with the same version)
+            - dataset version conflicts (same RID, different versions)
+            - duplicate asset RIDs (same role)
+            - role conflicts (same asset RID with both Input and Output)
+        """
+        issues: list[CrossSpecIssue] = []
+
+        # Datasets: group by RID, then by version-string.
+        ds_by_rid: dict[str, list[str]] = {}
+        for s in dataset_specs:
+            ds_by_rid.setdefault(s.rid, []).append(str(s.version))
+
+        for rid, versions in ds_by_rid.items():
+            distinct = set(versions)
+            if len(distinct) > 1:
+                issues.append(
+                    CrossSpecIssue(
+                        issue="version_conflict",
+                        rids=[rid],
+                        detail=(f"Dataset {rid} listed with conflicting versions: {sorted(distinct)}."),
+                    )
+                )
+            elif len(versions) > 1:
+                issues.append(
+                    CrossSpecIssue(
+                        issue="duplicate_rid",
+                        rids=[rid],
+                        detail=(f"Dataset {rid} listed {len(versions)} times with the same version {versions[0]!r}."),
+                    )
+                )
+
+        # Assets: group by RID, then by role.
+        as_by_rid: dict[str, list[str]] = {}
+        for s in asset_specs:
+            as_by_rid.setdefault(s.rid, []).append(s.asset_role)
+
+        for rid, roles in as_by_rid.items():
+            distinct = set(roles)
+            if len(distinct) > 1:
+                issues.append(
+                    CrossSpecIssue(
+                        issue="role_conflict",
+                        rids=[rid],
+                        detail=(f"Asset {rid} listed with conflicting roles: {sorted(distinct)}."),
+                    )
+                )
+            elif len(roles) > 1:
+                issues.append(
+                    CrossSpecIssue(
+                        issue="duplicate_rid",
+                        rids=[rid],
+                        detail=(f"Asset {rid} listed {len(roles)} times with role {roles[0]!r}."),
+                    )
+                )
+
+        return issues
