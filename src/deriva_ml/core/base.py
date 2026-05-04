@@ -381,17 +381,30 @@ class DerivaML(
     def __del__(self) -> None:
         """Cleanup method to handle incomplete executions.
 
-        Best-effort abort on DerivaML shutdown. The previous implementation
-        used the legacy `Status` enum; the new `ExecutionStatus` lifecycle
-        separates Stopped/Uploaded/Aborted/Failed. Here we only attempt to
-        abort if the execution hasn't already reached a terminal state —
-        InvalidTransitionError from the state machine covers the rest.
+        Best-effort abort on DerivaML shutdown — only for executions that
+        died mid-flight (i.e., still in ``Created`` or ``Running``). Any
+        post-Running status (``Stopped``, ``Failed``, ``Pending_Upload``,
+        ``Uploaded``, ``Aborted``) is treated as terminal here: the user
+        has either committed cleanly via the context manager or
+        explicitly transitioned the execution, and a forced abort would
+        either be a no-op or a wrongful state change.
+
+        Forcing a transition during ``__del__`` is also unsafe at object-
+        teardown time: Python's GC ordering means the underlying
+        ``ErmrestCatalog`` HTTP session may already be finalized, in
+        which case the catalog PUT would crash with ``'NoneType' object
+        has no attribute 'get'`` (the catalog's ``_session`` reads as
+        ``None``). Limiting the abort to non-terminal states avoids the
+        common case where ``__exit__`` already moved the execution to
+        ``Stopped`` and ``__del__`` would otherwise re-transition to
+        ``Aborted`` against a dead session.
         """
         # Inline import to avoid a circular (core.base ↔ execution.state_store) import.
         try:
             from deriva_ml.execution.state_store import ExecutionStatus
 
-            if self._execution and self._execution.status is not ExecutionStatus.Aborted:
+            non_terminal = {ExecutionStatus.Created, ExecutionStatus.Running}
+            if self._execution and self._execution.status in non_terminal:
                 self._execution.update_status(ExecutionStatus.Aborted, error="Execution Aborted")
         except Exception:
             # Any failure here (catalog unreachable, InvalidTransition, etc.)
