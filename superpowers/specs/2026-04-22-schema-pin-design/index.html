@@ -1,0 +1,2441 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-22-schema-pin-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Schema-Pin Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#schema-pin-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Schema-Pin Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-idiom-rationale-per-claudemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Idiom rationale (per CLAUDE.md)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cache-file-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Cache file format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-component-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Component details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Component details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-pinstatus-in-schema_cachepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 PinStatus (in schema_cache.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-schemacachepin-unpin-pin_status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 SchemaCache.pin / .unpin / .pin_status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-schemadiff-records-in-schema_diffpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 SchemaDiff records (in schema_diff.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-compute_diff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 compute_diff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-derivaml-public-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 DerivaML public methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-new-exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 New exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-pin_schemareason-online" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 pin_schema(reason) online
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-pin_schemareason-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 pin_schema(reason) offline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-refresh_schema-pinned-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 refresh_schema pinned-guard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-diff_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 diff_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-pin-pending-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Pin + pending rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#66-concurrency-crash-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.6 Concurrency / crash safety
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-error-handling-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Error handling summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-testing-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Testing plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Testing plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-unit-tests-no-catalog-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Unit tests — no catalog needed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-integration-tests-gated-on-deriva_host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Integration tests — gated on DERIVA_HOST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-optional-manual-smoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Optional manual smoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Rollout
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="schema-pin-design">Schema-Pin Design</h1>
+<p><strong>Status:</strong> Draft · <strong>Date:</strong> 2026-04-22 · <strong>Subsystem:</strong> Schema pinning + diff (built on S4's SchemaCache)</p>
+<h2 id="1-goal">1. Goal</h2>
+<p>Give users a first-class way to freeze the <code>SchemaCache</code> at a specific snapshot (pin) and inspect what differs between the cached schema and the live catalog (diff). S4 introduced the cache and a warn-on-drift-but-don't-auto-refresh policy; this subsystem adds explicit pin state and programmatic access to drift information.</p>
+<p><strong>Scope is deliberately narrow: pin and diff only. No migration.</strong> A future subsystem can add map operations that rewrite staged SQLite state against a new schema; this one does not.</p>
+<h2 id="2-scope">2. Scope</h2>
+<p><strong>In scope:</strong>
+- <code>ml.pin_schema(reason: str | None = None) -&gt; SchemaDiff | None</code> — freeze the cache; return the diff if the cache is behind live.
+- <code>ml.unpin_schema() -&gt; None</code> — clear the pin.
+- <code>ml.pin_status() -&gt; PinStatus</code> — structured read of current pin state.
+- <code>ml.diff_schema() -&gt; SchemaDiff</code> — show differences between cached and live schemas (online only).
+- <code>refresh_schema()</code> refuses when the cache is pinned (even with <code>force=True</code>).
+- New exception <code>DerivaMLSchemaPinned</code>.
+- New Pydantic models <code>PinStatus</code> and <code>SchemaDiff</code> (plus fine-grained diff records).
+- Extended cache file format: optional <code>"pin"</code> object at the top level.
+- New helper method <code>SchemaCache._write_atomic(payload)</code> extracted from existing <code>write()</code> so <code>pin</code>/<code>unpin</code> can reuse it.</p>
+<p><strong>Explicitly out of scope:</strong>
+- <strong>Map operations</strong> (<code>pin_to_snapshot(snapshot_id)</code>, <code>migrate_schema(column_map=...)</code>, etc.) — deferred to a later subsystem if needed. The diff this subsystem produces is the foundation a future migration subsystem would build on.
+- <strong>Staged-data rewriting.</strong> If a user refreshes a schema and their SQLite pending rows reference old columns, the upload will fail — same as S4. This subsystem doesn't touch that.
+- <strong>Non-FK keys, annotations, ACLs, column nullability/defaults, comments.</strong> Diff is intentionally narrow: schemas, tables, columns (including type changes), foreign keys. Adding more diff dimensions later is a matter of extending the Pydantic model.
+- <strong>CLI exposure.</strong> Python API only; users wrap in their own scripts if they want a CLI.</p>
+<h2 id="3-architecture">3. Architecture</h2>
+<p>Three units, same separation-of-concerns boundary the rest of the codebase uses:</p>
+<p><strong>1. <code>SchemaCache</code> extensions</strong> (<code>src/deriva_ml/core/schema_cache.py</code>)
+- New methods: <code>pin(reason)</code>, <code>unpin()</code>, <code>pin_status() -&gt; PinStatus</code>.
+- <code>PinStatus</code> Pydantic model defined here (it projects the cache file).
+- Cache file format extended: optional top-level <code>"pin"</code> object.
+- Private <code>_write_atomic(payload)</code> helper extracted from existing <code>write()</code>; <code>pin</code>/<code>unpin</code> reuse it.</p>
+<p><strong>2. <code>schema_diff.py</code></strong> — new file at <code>src/deriva_ml/core/schema_diff.py</code>
+- <code>SchemaDiff</code> Pydantic model + fine-grained diff records (<code>AddedTable</code>, <code>RemovedTable</code>, <code>AddedColumn</code>, <code>RemovedColumn</code>, <code>ColumnTypeChange</code>, <code>AddedForeignKey</code>, <code>RemovedForeignKey</code>).
+- <code>compute_diff(cached: dict, live: dict) -&gt; SchemaDiff</code> function.</p>
+<p><strong>3. <code>DerivaML</code> public methods</strong> (<code>src/deriva_ml/core/base.py</code>)
+- Four new methods — thin wrappers delegating to <code>SchemaCache</code> and <code>compute_diff</code>.
+- <code>refresh_schema()</code> modified to consult <code>pin_status()</code> before its existing pending-rows guard.</p>
+<h3 id="31-idiom-rationale-per-claudemd">3.1 Idiom rationale (per <code>CLAUDE.md</code>)</h3>
+<p>All new user-facing types are Pydantic <code>BaseModel</code> with <code>ConfigDict(frozen=True)</code>:
+- <code>PinStatus</code> — returned from <code>pin_status()</code>; user may serialize for logs/reports.
+- <code>SchemaDiff</code> and all record types — returned from <code>pin_schema</code> / <code>diff_schema</code>; may be serialized, has a <code>.render()</code> method, must be user-inspectable.</p>
+<p>Matches the H3 decision to make <code>ExecutionSnapshot</code> Pydantic for the same reasons.</p>
+<h2 id="4-cache-file-format">4. Cache file format</h2>
+<p><strong>Before:</strong></p>
+<pre><code class="language-json">{
+  &quot;snapshot_id&quot;: &quot;...&quot;,
+  &quot;hostname&quot;: &quot;...&quot;,
+  &quot;catalog_id&quot;: &quot;...&quot;,
+  &quot;ml_schema&quot;: &quot;...&quot;,
+  &quot;schema&quot;: { ... }
+}
+</code></pre>
+<p><strong>After:</strong></p>
+<pre><code class="language-json">{
+  &quot;snapshot_id&quot;: &quot;...&quot;,
+  &quot;hostname&quot;: &quot;...&quot;,
+  &quot;catalog_id&quot;: &quot;...&quot;,
+  &quot;ml_schema&quot;: &quot;...&quot;,
+  &quot;schema&quot;: { ... },
+  &quot;pin&quot;: {                             ← optional
+    &quot;at&quot;: &quot;2026-04-22T20:30:00Z&quot;,
+    &quot;reason&quot;: &quot;reproducing 2025 paper analysis&quot;
+  }
+}
+</code></pre>
+<p>Presence of the <code>"pin"</code> key means pinned; absence means not pinned. <code>reason</code> may be <code>null</code>. No sentinel <code>pinned: false</code> field — eliminates a possible inconsistent state (<code>pinned: true</code> with <code>pinned_at: null</code>).</p>
+<p><strong>Backward compatibility:</strong> unpinned caches written by S4 are valid here without change (no <code>pin</code> key; <code>pin_status()</code> correctly reports <code>pinned=False</code>).</p>
+<h2 id="5-component-details">5. Component details</h2>
+<h3 id="51-pinstatus-in-schema_cachepy">5.1 <code>PinStatus</code> (in <code>schema_cache.py</code>)</h3>
+<pre><code class="language-python">from pydantic import BaseModel, ConfigDict
+
+class PinStatus(BaseModel):
+    &quot;&quot;&quot;Current pin state of a SchemaCache. Frozen Pydantic snapshot.&quot;&quot;&quot;
+
+    model_config = ConfigDict(frozen=True)
+
+    pinned: bool
+    pinned_at: datetime | None
+    pin_reason: str | None
+    pinned_snapshot_id: str   # the cache's current snapshot_id; always present
+</code></pre>
+<h3 id="52-schemacachepin-unpin-pin_status">5.2 <code>SchemaCache.pin</code> / <code>.unpin</code> / <code>.pin_status</code></h3>
+<pre><code class="language-python">def pin(self, reason: str | None = None) -&gt; None:
+    &quot;&quot;&quot;Mark the cache pinned at its current snapshot.
+
+    Idempotent: pinning an already-pinned cache updates ``pinned_at``
+    and ``reason`` to reflect the most recent call. Atomic write.
+
+    Raises:
+        FileNotFoundError: If the cache doesn't exist.
+    &quot;&quot;&quot;
+
+def unpin(self) -&gt; None:
+    &quot;&quot;&quot;Clear pin state. No-op if already unpinned. Atomic write when needed.&quot;&quot;&quot;
+
+def pin_status(self) -&gt; PinStatus:
+    &quot;&quot;&quot;Return current pin state.
+
+    Raises:
+        FileNotFoundError: If the cache doesn't exist.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="53-schemadiff-records-in-schema_diffpy">5.3 <code>SchemaDiff</code> records (in <code>schema_diff.py</code>)</h3>
+<pre><code class="language-python">class AddedTable(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+
+class RemovedTable(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+
+class AddedColumn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+    column: str
+    type: str
+
+class RemovedColumn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+    column: str
+
+class ColumnTypeChange(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+    column: str
+    cached_type: str
+    live_type: str
+
+class AddedForeignKey(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+    columns: list[str]
+    referenced_schema: str
+    referenced_table: str
+    referenced_columns: list[str]
+
+class RemovedForeignKey(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    schema_name: str
+    table: str
+    columns: list[str]
+    referenced_schema: str
+    referenced_table: str
+    referenced_columns: list[str]
+
+
+class SchemaDiff(BaseModel):
+    &quot;&quot;&quot;Structured diff between a cached schema and a live schema.&quot;&quot;&quot;
+
+    model_config = ConfigDict(frozen=True)
+
+    added_schemas: list[str]
+    removed_schemas: list[str]
+    added_tables: list[AddedTable]
+    removed_tables: list[RemovedTable]
+    added_columns: list[AddedColumn]
+    removed_columns: list[RemovedColumn]
+    column_type_changes: list[ColumnTypeChange]
+    added_fkeys: list[AddedForeignKey]
+    removed_fkeys: list[RemovedForeignKey]
+
+    def is_empty(self) -&gt; bool: ...
+    def render(self) -&gt; str: ...    # human-readable; empty for empty diffs
+    def __str__(self) -&gt; str: return self.render()
+</code></pre>
+<h3 id="54-compute_diff">5.4 <code>compute_diff</code></h3>
+<pre><code class="language-python">def compute_diff(cached: dict, live: dict) -&gt; SchemaDiff:
+    &quot;&quot;&quot;Compare two ERMrest /schema payloads.
+
+    Walks both deterministically (sorted keys) and emits typed records.
+    V1 dimensions: schemas (add/remove), tables (add/remove), columns
+    (add/remove + type change), foreign keys (add/remove). Out of
+    scope for V1: non-FK keys, annotations, ACLs, column nullability
+    and defaults, comments.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="55-derivaml-public-methods">5.5 <code>DerivaML</code> public methods</h3>
+<p>Full docstrings are embedded in the plan (§2.3 of the component details section). Brief signatures:</p>
+<pre><code class="language-python">def pin_schema(self, reason: str | None = None) -&gt; &quot;SchemaDiff | None&quot;: ...
+def unpin_schema(self) -&gt; None: ...
+def pin_status(self) -&gt; &quot;PinStatus&quot;: ...
+def diff_schema(self) -&gt; &quot;SchemaDiff&quot;: ...   # raises DerivaMLReadOnlyError offline
+def refresh_schema(self, *, force: bool = False) -&gt; None:
+    # Extended: raises DerivaMLSchemaPinned if pinned, before pending-rows check.
+</code></pre>
+<h3 id="56-new-exception">5.6 New exception</h3>
+<p>In <code>src/deriva_ml/core/exceptions.py</code>:</p>
+<pre><code class="language-python">class DerivaMLSchemaPinned(DerivaMLConfigurationError):
+    &quot;&quot;&quot;refresh_schema() called on a pinned cache.
+
+    The cache has been explicitly pinned via pin_schema(). Call
+    unpin_schema() first if you really want to refresh. ``force=True``
+    does NOT bypass a pin — it only bypasses the pending-rows guard.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Subclass of <code>DerivaMLConfigurationError</code>, parallel to <code>DerivaMLSchemaRefreshBlocked</code>.</p>
+<h2 id="6-data-flow">6. Data flow</h2>
+<h3 id="61-pin_schemareason-online">6.1 <code>pin_schema(reason)</code> online</h3>
+<pre><code>pin_schema(reason)
+  → if offline: skip to 6.2
+  → live_snapshot_id = self.catalog.get(&quot;/&quot;).json()[&quot;snaptime&quot;]
+  → cached = SchemaCache.load()
+  → if cached.snapshot_id != live_snapshot_id:
+       → live_schema = self.catalog.get(&quot;/schema&quot;).json()
+       → diff = compute_diff(cached[&quot;schema&quot;], live_schema)
+       → logger.warning(&quot;pinning at %s; live is at %s — see returned SchemaDiff&quot;, ...)
+       → result = diff if not diff.is_empty() else None
+     else:
+       → result = None
+  → cache.pin(reason)
+  → return result
+</code></pre>
+<p><strong>Subtlety:</strong> If snapshot ids differ but content doesn't (rare — snapshot bumped by row-level change), <code>compute_diff</code> returns empty and we return <code>None</code>. From the user's perspective there's no <em>schema</em> drift, which is what they asked about.</p>
+<h3 id="62-pin_schemareason-offline">6.2 <code>pin_schema(reason)</code> offline</h3>
+<pre><code>pin_schema(reason)
+  → self._mode is offline
+  → cache.pin(reason)
+  → return None  # no live to compare
+</code></pre>
+<h3 id="63-refresh_schema-pinned-guard">6.3 <code>refresh_schema</code> pinned-guard</h3>
+<pre><code>refresh_schema(force=False)
+  → if offline: raise DerivaMLReadOnlyError
+  → cache = SchemaCache(self.working_dir)
+  → if cache.pin_status().pinned:
+       → raise DerivaMLSchemaPinned(...)
+  → count = store.count_pending_rows()
+  → if count &gt; 0 and not force: raise DerivaMLSchemaRefreshBlocked
+  → [existing refresh logic unchanged]
+</code></pre>
+<p>Pin check is <strong>before</strong> the pending-rows check — pin is the stronger guard.</p>
+<h3 id="64-diff_schema">6.4 <code>diff_schema</code></h3>
+<pre><code>diff_schema()
+  → if offline: raise DerivaMLReadOnlyError
+  → cached = cache.load()
+  → live_schema = self.catalog.get(&quot;/schema&quot;).json()
+  → return compute_diff(cached[&quot;schema&quot;], live_schema)
+</code></pre>
+<p>Always returns a <code>SchemaDiff</code>, possibly empty. Consistent with the diff-shape convention.</p>
+<h3 id="65-pin-pending-rows">6.5 Pin + pending rows</h3>
+<p><code>pin_schema</code> and <code>unpin_schema</code> ignore the pending-rows count — pin only sets a flag, and a flag doesn't invalidate staged data. In fact, pinning is often the <em>right</em> move when pending rows exist: it guarantees the schema can't drift out from under them. <code>refresh_schema</code> is the operation that cares about pending rows, and its guard still applies after unpin.</p>
+<h3 id="66-concurrency-crash-safety">6.6 Concurrency / crash safety</h3>
+<p>Inherits S4's atomic-write guarantee: every <code>pin</code> / <code>unpin</code> / <code>refresh_schema</code> writes a tmp file + fsync + rename. A crash during <code>pin</code> leaves the cache file untouched. The <code>_write_atomic(payload)</code> helper extracted from <code>write()</code> ensures the three write paths share the same on-disk discipline.</p>
+<p>No locking. <code>SchemaCache</code> has no concurrent-writer protection and this subsystem introduces no concurrent writers.</p>
+<h2 id="7-error-handling-summary">7. Error handling summary</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Exception / behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pin_schema</code> in any mode, cache doesn't exist</td>
+<td><code>FileNotFoundError</code></td>
+</tr>
+<tr>
+<td><code>pin_schema</code> offline, cache exists</td>
+<td>Returns <code>None</code>, pin persisted</td>
+</tr>
+<tr>
+<td><code>pin_schema</code> online, no drift</td>
+<td>Returns <code>None</code>, pin persisted</td>
+</tr>
+<tr>
+<td><code>pin_schema</code> online, drift detected</td>
+<td>Returns <code>SchemaDiff</code>, warning logged, pin persisted</td>
+</tr>
+<tr>
+<td><code>unpin_schema</code> when not pinned</td>
+<td>No-op, no error</td>
+</tr>
+<tr>
+<td><code>unpin_schema</code> when pinned</td>
+<td>Pin cleared, cache file rewritten</td>
+</tr>
+<tr>
+<td><code>pin_status</code> any mode</td>
+<td>Returns <code>PinStatus</code>; <code>FileNotFoundError</code> propagates if no cache</td>
+</tr>
+<tr>
+<td><code>diff_schema</code> offline</td>
+<td><code>DerivaMLReadOnlyError</code></td>
+</tr>
+<tr>
+<td><code>diff_schema</code> online</td>
+<td>Returns <code>SchemaDiff</code> (possibly empty)</td>
+</tr>
+<tr>
+<td><code>refresh_schema</code> on pinned cache (any <code>force</code> value)</td>
+<td><code>DerivaMLSchemaPinned</code></td>
+</tr>
+<tr>
+<td><code>refresh_schema(force=False)</code> unpinned, with pending rows</td>
+<td><code>DerivaMLSchemaRefreshBlocked</code> (S4 existing)</td>
+</tr>
+<tr>
+<td><code>refresh_schema(force=True)</code> unpinned, with pending rows</td>
+<td>Succeeds (S4 existing)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-testing-plan">8. Testing plan</h2>
+<h3 id="81-unit-tests-no-catalog-needed">8.1 Unit tests — no catalog needed</h3>
+<p><strong><code>tests/core/test_schema_cache.py</code></strong> (extend existing file):
+1. <code>test_pin_on_unpinned_cache_sets_fields</code>
+2. <code>test_pin_without_reason</code>
+3. <code>test_pin_idempotent_updates_metadata</code>
+4. <code>test_unpin_clears_fields</code>
+5. <code>test_unpin_on_unpinned_is_no_op</code>
+6. <code>test_pin_status_on_missing_cache_raises</code>
+7. <code>test_pin_persists_across_instances</code>
+8. <code>test_pin_atomic_write_crash_recovery</code>
+9. <code>test_cache_file_format_has_nested_pin_object</code></p>
+<p><strong><code>tests/core/test_schema_diff.py</code></strong> (new file):
+10. <code>test_empty_diff_when_schemas_identical</code>
+11. <code>test_added_schema</code>
+12. <code>test_removed_schema</code>
+13. <code>test_added_table</code>
+14. <code>test_removed_table</code>
+15. <code>test_added_column</code>
+16. <code>test_removed_column</code>
+17. <code>test_column_type_change</code>
+18. <code>test_added_fkey</code>
+19. <code>test_removed_fkey</code>
+20. <code>test_diff_render_produces_human_readable</code>
+21. <code>test_diff_determinism</code></p>
+<p><strong><code>tests/core/test_exceptions.py</code></strong> (or wherever exception tests live):
+22. <code>test_derivaml_schema_pinned_inherits_configuration_error</code></p>
+<h3 id="82-integration-tests-gated-on-deriva_host">8.2 Integration tests — gated on <code>DERIVA_HOST</code></h3>
+<p><strong><code>tests/core/test_schema_pin.py</code></strong> (new file):
+23. <code>test_pin_schema_online_no_drift_returns_none</code>
+24. <code>test_pin_schema_online_with_drift_returns_diff_and_logs_warning</code>
+25. <code>test_pin_schema_offline_returns_none</code>
+26. <code>test_unpin_schema_works_offline</code>
+27. <code>test_pin_status_reflects_cache_state</code>
+28. <code>test_refresh_schema_refuses_when_pinned</code>
+29. <code>test_refresh_schema_refuses_when_pinned_even_with_force</code>
+30. <code>test_unpin_then_refresh_succeeds</code>
+31. <code>test_diff_schema_offline_raises</code>
+32. <code>test_diff_schema_online_returns_diff</code></p>
+<h3 id="83-regression">8.3 Regression</h3>
+<ul>
+<li>Existing S4 tests (<code>tests/core/test_schema_cache.py</code>, <code>tests/core/test_offline_init.py</code>, <code>tests/core/test_connection_mode.py</code>) must still pass — unpinned path behavior is unchanged.</li>
+<li><code>refresh_schema</code> tests from S4 must still pass; the pinned-guard is a pre-check.</li>
+<li>Hygiene-batch's <code>test_resume_execution_offline_skips_reconcile</code> / <code>test_create_execution_offline_raises</code> / <code>test_offline_workspace_skips_lease_reconcile</code> must still pass — none of them pin.</li>
+</ul>
+<h3 id="84-optional-manual-smoke">8.4 Optional manual smoke</h3>
+<p>A paste-into-PR demonstration showing the full round-trip:</p>
+<pre><code class="language-python">ml = DerivaML(host, catalog_id, working_dir=&quot;/tmp/smoke&quot;, mode=&quot;online&quot;)
+print(ml.pin_status())                # pinned=False
+result = ml.pin_schema(reason=&quot;paper repro&quot;)
+print(result)                          # None (no drift)
+print(ml.pin_status())                # pinned=True, pin_reason=&quot;paper repro&quot;
+try:
+    ml.refresh_schema()
+except DerivaMLSchemaPinned as e:
+    print(&quot;correctly refused:&quot;, e)
+ml.unpin_schema()
+print(ml.pin_status())                # pinned=False
+ml.refresh_schema()                    # now succeeds
+</code></pre>
+<p>Not required in CI.</p>
+<h2 id="9-risks">9. Risks</h2>
+<ol>
+<li>
+<p><strong><code>compute_diff</code> determinism.</strong> Walking dicts with non-sorted iteration would produce different diff-list orders between runs, breaking programmatic equality. Mitigation: explicit <code>sorted()</code> at every dict-iteration site in the walker. Test <code>test_diff_determinism</code> guards against regressions.</p>
+</li>
+<li>
+<p><strong>ERMrest <code>/schema</code> payload shape drift across deriva-py versions.</strong> The diff walker reads specific keys (<code>schemas</code>, <code>tables</code>, <code>columns</code>, <code>type</code>, <code>foreign_keys</code>, <code>foreign_key_columns</code>, <code>referenced_columns</code>). If a future deriva-py version reshapes <code>/schema</code>, the walker would silently produce wrong diffs. Mitigation: unit tests use hand-constructed dicts with the current shape, so a deriva-py version bump that changes shape would fail our own tests first (before reaching users). Not defending against this more aggressively — it's a standard dependency-pinning risk.</p>
+</li>
+<li>
+<p><strong><code>pin_atomic_write_crash_recovery</code> test fragility.</strong> Stubbing <code>os.replace</code> mid-write to simulate a crash is OS-ish. Mitigation: use <code>monkeypatch.setattr</code> with a function that raises <code>OSError</code> — same pattern as S4's existing cache atomic-write test, which has been stable.</p>
+</li>
+<li>
+<p><strong>Pin-state + offline-mode interaction edge cases.</strong> Offline init reads the cache; if the cache is pinned and someone calls <code>refresh_schema</code> while offline, the <code>DerivaMLReadOnlyError</code> fires first (before the pin check). Intentional: offline is the stronger constraint. Covered by <code>test_diff_schema_offline_raises</code> and implicit in the refresh logic.</p>
+</li>
+</ol>
+<h2 id="10-rollout">10. Rollout</h2>
+<p>Single PR against <code>main</code>. No feature flag. No breaking change:</p>
+<ul>
+<li>Existing unpinned cache files remain valid (no <code>"pin"</code> key → <code>pin_status()</code> returns <code>pinned=False</code>).</li>
+<li><code>refresh_schema</code> gains a new failure mode (<code>DerivaMLSchemaPinned</code>) but only when the user has explicitly pinned, which doesn't happen in pre-S-pin code.</li>
+<li>All four new methods are additive.</li>
+</ul>
+<p>CHANGELOG entry under a new "Unreleased — Schema pin + diff" section.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

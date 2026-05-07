@@ -1,0 +1,3051 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-23-user-guide-content-inventory/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>User-Guide Content Inventory - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#user-guide-content-inventory" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              User-Guide Content Inventory
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#destination-introduction-docsindexmd-rewrite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Introduction (docs/index.md rewrite)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Introduction (docs/index.md rewrite)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsoverviewmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/overview.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedquick-startmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/quick-start.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedinstallmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/install.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedproject-setupmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/project-setup.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-1-exploring-a-catalog-docsuser-guideexploringmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 1 — Exploring a catalog (docs/user-guide/exploring.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 1 — Exploring a catalog (docs/user-guide/exploring.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsoverviewmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/overview.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsidentifiersmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/identifiers.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedproject-setupmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/project-setup.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdatasetsmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/datasets.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsfeaturesmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/features.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docscli-referencemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/cli-reference.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#net-new-content-for-chapter-1-chapter-author-must-source-from-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net-new content for Chapter 1 (chapter-author must source from code)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-2-working-with-datasets-docsuser-guidedatasetsmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 2 — Working with datasets (docs/user-guide/datasets.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 2 — Working with datasets (docs/user-guide/datasets.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdatasetsmd-primary-770-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/datasets.md (primary — 770 lines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docscli-referencemd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/cli-reference.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-3-defining-and-using-features-docsuser-guidefeaturesmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 3 — Defining and using features (docs/user-guide/features.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 3 — Defining and using features (docs/user-guide/features.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsfeaturesmd-primary-460-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/features.md (primary — 460 lines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdenormalizationmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/denormalization.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-4-running-an-experiment-docsuser-guideexecutionsmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 4 — Running an experiment (docs/user-guide/executions.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 4 — Running an experiment (docs/user-guide/executions.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd-primary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md (primary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsfile-assetsmd-asset-creation-and-upload-sections-lines-41-224" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/file-assets.md (asset creation and upload sections — lines 41-224)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsrunning-modelsmd-cli-subsection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/running-models.md (CLI subsection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docscli-referencemd_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/cli-reference.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-5-working-offline-docsuser-guideofflinemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 5 — Working offline (docs/user-guide/offline.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 5 — Working offline (docs/user-guide/offline.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdatasetsmd-bag-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/datasets.md (bag sections)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsfeaturesmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/features.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-6-sharing-and-collaboration-docsuser-guidesharingmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 6 — Sharing and collaboration (docs/user-guide/sharing.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 6 — Sharing and collaboration (docs/user-guide/sharing.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsfile-assetsmd-partial-bag-related-and-provenance-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/file-assets.md (partial — bag-related and provenance sections)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdatasetsmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/datasets.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#net-new-content-explicit-source-citations-for-chapter-author-subagents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net-new content (explicit source citations for chapter-author subagents)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-7-reproducibility-docsuser-guidereproducibilitymd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 7 — Reproducibility (docs/user-guide/reproducibility.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 7 — Reproducibility (docs/user-guide/reproducibility.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsgit-and-versioningmd-primary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/git-and-versioning.md (primary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdatasetsmd-version-pinning-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/datasets.md (version pinning sections)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docscli-referencemd_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/cli-reference.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destination-chapter-8-integrating-with-hydra-zen-docsuser-guidehydra-zenmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destination: Chapter 8 — Integrating with hydra-zen (docs/user-guide/hydra-zen.md)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Destination: Chapter 8 — Integrating with hydra-zen (docs/user-guide/hydra-zen.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsrunning-modelsmd-primary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/running-models.md (primary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docscli-referencemd_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/cli-reference.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedproject-setupmd_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/project-setup.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retirements-content-deliberately-dropped-with-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retirements (content deliberately dropped with rationale)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retirements (content deliberately dropped with rationale)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedquick-startmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/quick-start.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedinstallmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/install.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsgetting-startedproject-setupmd_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/getting-started/project-setup.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsoverviewmd_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/overview.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsidentifiersmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/identifiers.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsannotationsmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/annotations.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsconceptsdenormalizationmd_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/concepts/denormalization.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsrunning-modelsmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/running-models.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsgit-and-versioningmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/git-and-versioning.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docsworkflowsexecution-lifecyclemd_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/workflows/execution-lifecycle.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-docscli-referencemd_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From docs/cli-reference.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spot-check-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spot-Check Verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spot-Check Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spot-check-1-docsconceptsidentifiersmd-19-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spot-check 1: docs/concepts/identifiers.md (19 lines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spot-check-2-docsconceptsfeaturesmd-460-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spot-check 2: docs/concepts/features.md (460 lines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spot-check-3-docsworkflowsgit-and-versioningmd-197-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spot-check 3: docs/workflows/git-and-versioning.md (197 lines)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#content-items-requiring-chapter-author-attention-ambiguous-or-needs-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Content items requiring chapter-author attention (ambiguous or needs verification)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="user-guide-content-inventory">User-Guide Content Inventory</h1>
+<p><strong>Purpose:</strong> migration map from cut-list pages to User Guide chapters.
+Every source sentence has a destination (or a retirement rationale).
+Used as source-of-truth during chapter drafting.</p>
+<hr />
+<h2 id="destination-introduction-docsindexmd-rewrite">Destination: Introduction (docs/index.md rewrite)</h2>
+<h3 id="from-docsconceptsoverviewmd">From docs/concepts/overview.md</h3>
+<ul>
+<li>Four-object mental model table: Dataset / Workflow / Execution / Execution Asset (adapt to Catalog / Dataset / Execution / Feature)</li>
+<li>ERD image reference (<code>docs/assets/ERD.png</code>) — keep on Introduction page</li>
+<li>Domain schema vs ML schema explanation (two-schema architecture)</li>
+<li><code>deriva-ml</code> library description: execution lifecycle management, context manager, output upload with provenance</li>
+<li>Domain-specific library pattern (DerivaML subclass, e.g., EyeAI)</li>
+<li>RETIRED from overview: "Next Steps" nav links — replaced by new nav structure</li>
+</ul>
+<h3 id="from-docsgetting-startedquick-startmd">From docs/getting-started/quick-start.md</h3>
+<ul>
+<li>RETIRED: all content — onramp story (install, template repo, run model, run notebook) is owned by the template repo. Introduction will contain a single pointer to the template repo.</li>
+</ul>
+<h3 id="from-docsgetting-startedinstallmd">From docs/getting-started/install.md</h3>
+<ul>
+<li>RETIRED: all content — install instructions (uv, <code>uv add deriva-ml</code>, Globus auth, Jupyter kernel) are owned by the template repo. One pointer from Introduction suffices.</li>
+</ul>
+<h3 id="from-docsgetting-startedproject-setupmd">From docs/getting-started/project-setup.md</h3>
+<ul>
+<li>RETIRED: all content — project structure, config layout, DerivaML subclass pattern, dependency groups, notebook setup, <code>uv.lock</code> are owned by the template repo. The DerivaML subclass pattern (a short code sketch) may be re-homed to Chapter 1 as a "what you'll see in real projects" note.</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-1-exploring-a-catalog-docsuser-guideexploringmd">Destination: Chapter 1 — Exploring a catalog (docs/user-guide/exploring.md)</h2>
+<h3 id="from-docsconceptsoverviewmd_1">From docs/concepts/overview.md</h3>
+<ul>
+<li>Connecting to a catalog: <code>DerivaML(hostname, catalog_id)</code> constructor</li>
+<li>Brief description of domain-specific DerivaML subclasses as what users encounter in real projects (see also project-setup.md)</li>
+<li>ML schema tables list (Dataset, Workflow, Execution, Execution Asset, Execution Metadata) — use as "what you can find" orientation</li>
+</ul>
+<h3 id="from-docsconceptsidentifiersmd">From docs/concepts/identifiers.md</h3>
+<ul>
+<li>ALL content: RID concept — global unique identifiers, FAIR principle motivation</li>
+<li>RID format: dash-separated four-character blocks (e.g., <code>1-000C</code>)</li>
+<li>Unqualified RID refers to current catalog values</li>
+<li>Snapshot-qualified RID: <code>1-000C@32S-W6DS-GAMG</code> — refers to a specific point in time</li>
+<li>URI form: <code>https://www.eye-ai.org/id/1-000C@32S-W6DS-GAMG</code> — for cross-catalog references</li>
+<li><code>DerivaML.cite()</code> method — obtains URI form of a RID (cross-ref to API Reference)</li>
+<li>Fix spelling errors in source ("seperated", "unqualified") when re-homing</li>
+</ul>
+<h3 id="from-docsgetting-startedproject-setupmd_1">From docs/getting-started/project-setup.md</h3>
+<ul>
+<li>DerivaML subclass pattern — short code sketch showing <code>class EyeAI(DerivaML)</code> and <code>get_oct_images()</code> as what users encounter in domain catalogs</li>
+</ul>
+<h3 id="from-docsworkflowsexecution-lifecyclemd">From docs/workflows/execution-lifecycle.md</h3>
+<ul>
+<li><code>find_workflows()</code> — listing all workflows in the catalog (lines 196-201)</li>
+<li><code>lookup_workflow()</code> by RID (lines 189-190)</li>
+<li><code>lookup_workflow_by_url()</code> (lines 192-193)</li>
+<li>Workflow_Type vocabulary terms (Training, Inference, Preprocessing, Evaluation, Annotation table)</li>
+<li><code>ml.add_term(table="Workflow_Type", ...)</code> for custom types</li>
+</ul>
+<h3 id="from-docsconceptsdatasetsmd">From docs/concepts/datasets.md</h3>
+<ul>
+<li><code>ml.find_datasets()</code> — listing all datasets with RID, description, version (lines 747-754)</li>
+<li><code>ml.lookup_dataset(rid)</code> — finding a specific dataset by RID (line 755)</li>
+</ul>
+<h3 id="from-docsconceptsfeaturesmd">From docs/concepts/features.md</h3>
+<ul>
+<li><code>ml.find_features(target_table)</code> — listing feature definitions for a table (lines 274-283)</li>
+<li><code>ml.find_features()</code> — listing all features in the catalog (line 284)</li>
+<li><code>ml.lookup_feature(target_table, feature_name)</code> — inspecting a feature's schema (lines 286-298)</li>
+</ul>
+<h3 id="from-docscli-referencemd">From docs/cli-reference.md</h3>
+<ul>
+<li><code>deriva-ml-check-catalog-schema</code> — for checking catalog schema validity (administration tool, note as such)</li>
+<li><code>deriva-ml-create-schema</code> — for setting up a new catalog (administration tool, note as such)</li>
+</ul>
+<h3 id="net-new-content-for-chapter-1-chapter-author-must-source-from-code">Net-new content for Chapter 1 (chapter-author must source from code)</h3>
+<ul>
+<li><code>get_chaise_url(table_name)</code> — jump from Python to Chaise web UI for a table; chapter author must read from <code>src/deriva_ml/core/mixins/</code> [NET-NEW from src/]</li>
+<li><code>ml.pathBuilder()</code> — low-level catalog query API; one short example showing entity lookup; chapter author should draw from source and CLAUDE.md patterns [EXPAND from src/]</li>
+<li><code>find_executions()</code> — listing executions in the catalog; referenced in spec's Chapter 1 outline but absent from all 14 source pages; chapter author must add from API source reading (<code>src/deriva_ml/core/mixins/</code>) [NET-NEW from src/]</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-2-working-with-datasets-docsuser-guidedatasetsmd">Destination: Chapter 2 — Working with datasets (docs/user-guide/datasets.md)</h2>
+<h3 id="from-docsconceptsdatasetsmd-primary-770-lines">From docs/concepts/datasets.md (primary — 770 lines)</h3>
+<p><strong>Concept setup:</strong>
+- What a dataset is: versioned collection of objects, heterogeneous types, identified by RID
+- Datasets can reference objects via multiple paths (subject + observation that references subjects)
+- Dataset types assigned from <code>Dataset_Type</code> controlled vocabulary (orthogonal tagging)</p>
+<p><strong>Creating and populating datasets:</strong>
+- Code example: <code>ml.add_term(MLVocab.dataset_type, ...)</code> for defining dataset types (lines 13-17)
+- Code example: create dataset within execution context using <code>exe.create_dataset(dataset_types=[...], description=...)</code> (lines 30-58)
+- Code example: create dataset directly via <code>ml.create_dataset(...)</code> (lines 64-69)
+- <code>dataset.list_dataset_element_types()</code> — what element types are available (lines 75-80)
+- <code>ml.add_dataset_element_type("Subject")</code> — registering a new element type (lines 82-87)
+- Code example: <code>dataset.add_dataset_members(members=[...])</code> by RID list (lines 93-101)
+- <code>dataset.add_dataset_members(members=..., execution_rid=...)</code> — with execution tracking</p>
+<p><strong>Listing and browsing:</strong>
+- <code>dataset.list_dataset_members()</code> — all members of current version (lines 107-112)
+- <code>dataset.list_dataset_members(version="1.0.0")</code> — members at a specific version (lines 113-116)</p>
+<p><strong>Nested datasets:</strong>
+- Code example: parent/child dataset hierarchy (lines 119-139)
+- <code>parent_dataset.add_dataset_members(members=[child.dataset_rid, ...])</code> — nesting via member addition
+- <code>parent_dataset.list_dataset_children()</code> — navigating down
+- <code>training_dataset.list_dataset_parents()</code> — navigating up</p>
+<p><strong>Splitting datasets:</strong>
+- <code>split_dataset</code> conceptual hierarchy diagrams (two-way and three-way, lines 149-167)
+- <code>SplitResult</code> and <code>PartitionInfo</code> return types
+- Code example: simple random 80/20 split (lines 174-184)
+- Code example: fixed-count split (lines 186-194)
+- Code example: three-way train/validation/test split (lines 198-213)
+- Code example: labeled splits with <code>training_types=["Labeled"]</code> (lines 219-234)
+- Code example: stratified split with <code>stratify_by_column</code> (lines 237-252)
+- <code>!!! note</code>: scikit-learn required for stratified splitting (line 252-254)
+- Code example: custom selection function with <code>SelectionFunction</code> protocol (lines 257-283)
+- Code example: dry run with <code>dry_run=True</code> (lines 289-302)
+- <code>stratify_by_column</code> format: <code>{TableName}_{ColumnName}</code> — document explicitly as a pitfall
+- Auto-detection of element table when only one type present (lines 330-339)
+- <code>element_table</code> parameter required when dataset has multiple element types</p>
+<p><strong>Versioning:</strong>
+- Semantic versioning: major.minor.patch semantics (schema change / new elements / minor alterations)
+- Auto-assignment of <code>0.1.0</code> on creation, auto-increment of minor on member add
+- Code example: <code>dataset.current_version</code>, <code>dataset.dataset_history()</code> (lines 352-368)
+- Code example: <code>dataset.increment_dataset_version(component=VersionPart.minor, ...)</code> (lines 363-369)
+- Version snapshots: each version tied to a catalog snapshot for reproducibility
+- Code example: <code>dataset.set_version("1.0.0")</code> — dataset bound to that snapshot (lines 375-381)</p>
+<p><strong>Downloading datasets:</strong>
+- Code example: <code>dataset.download_dataset_bag()</code> — current version (line 390)
+- Code example: <code>dataset.download_dataset_bag(version="1.0.0")</code> — specific version (line 393)
+- Code example: <code>dataset.download_dataset_bag(materialize=True)</code> — with asset files (line 396)
+- Download timeouts — <code>timeout=(10, 1800)</code> for large datasets (lines 403-424)
+- <code>DatasetSpec</code> with <code>timeout</code> for execution configurations (lines 415-424)
+- <code>dataset.estimate_bag_size(version=...)</code> — row counts and asset size before downloading (lines 428-445)
+- Bag export FK traversal behavior: stops at other dataset element types, traverses non-element tables normally (lines 447-455, important edge case)
+- Code example: automatic download in executions with <code>DatasetSpec</code> in <code>ExecutionConfiguration</code> (lines 458-477)
+- <code>materialize=False</code> flag — metadata only, faster for large datasets</p>
+<p><strong>Working with DatasetBag (Chapter 2 primary — download + immediate metadata):</strong>
+- <code>bag.dataset_rid</code>, <code>bag.version</code> — metadata access (lines 483-487)
+- <code>bag.get_table_as_dataframe("Subject")</code> — tables as DataFrames (lines 488-490)
+- <code>bag.path</code> — local filesystem path (line 492)</p>
+<p><strong>Assets in datasets:</strong>
+- Asset characteristics: versioned URL, Length, MD5, Asset_Type (lines 499-503)
+- <code>bag.get_table_as_dataframe("Image")</code> — asset table access (lines 507-513)
+- Asset organization after materialization: same-type assets in same directory (lines 519-525)
+- Symlinks as efficient reorganization option (line 525)</p>
+<p><strong>restructure_assets: covered in Chapter 5 (offline), cross-reference only</strong>
+- <code>bag.restructure_assets()</code> full API (group_by, use_symlinks, type_selector, value_selector, enforce_vocabulary, FK traversal, Unknown folder, prediction scenarios) — primary coverage in Chapter 5; Chapter 2 adds a one-line pointer.</p>
+<p><strong>Delete:</strong>
+- <code>ml.delete_dataset(dataset)</code> — soft delete (lines 763-770)
+- <code>ml.delete_dataset(dataset, recurse=True)</code> — recursive delete</p>
+<h3 id="from-docsworkflowsexecution-lifecyclemd_1">From docs/workflows/execution-lifecycle.md</h3>
+<ul>
+<li>Dataset versioning interplay with executions: <code>exe.create_dataset(...)</code> for provenance-tracked dataset creation (lines 627-644)</li>
+<li>Resuming executions to access previously created datasets (lines 648-657)</li>
+</ul>
+<h3 id="from-docscli-referencemd_1">From docs/cli-reference.md</h3>
+<ul>
+<li><code>deriva-ml-split-dataset</code> CLI — full synopsis and arguments table (lines 275-329)</li>
+<li>All <code>deriva-ml-split-dataset</code> examples (lines 310-329)</li>
+<li><code>deriva-ml-split-dataset --dry-run</code> flag</li>
+<li><code>deriva-ml-split-dataset --val-size</code> argument for three-way split — Python API supports <code>val_size</code>; CLI reference shows <code>--test-size</code> and <code>--train-size</code> but not <code>--val-size</code> explicitly [VERIFY CLI flag from src/deriva_ml/cli/ or <code>--help</code> output]</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-3-defining-and-using-features-docsuser-guidefeaturesmd">Destination: Chapter 3 — Defining and using features (docs/user-guide/features.md)</h2>
+<h3 id="from-docsconceptsfeaturesmd-primary-460-lines">From docs/concepts/features.md (primary — 460 lines)</h3>
+<p><strong>What a feature is:</strong>
+- Four properties: tracks provenance, uses controlled vocabularies, supports multiple values, versioned (lines 9-13)
+- Common use cases table: ground truth labels, model predictions, quality scores, derived measurements, related assets (lines 16-22)</p>
+<p><strong>Feature types:</strong>
+- Term-based features — controlled vocabulary, consistency, hierarchy queries (lines 30-45)
+- Code example: <code>ml.create_vocabulary(...)</code> + <code>ml.add_term(...)</code> + <code>ml.create_feature(target_table, feature_name, terms=[...])</code> (lines 33-45)
+- Asset-based features — segmentation masks, embeddings, computed files (lines 48-64)
+- Code example: <code>ml.create_asset(...)</code> + <code>ml.create_feature(..., assets=[...])</code> (lines 52-64)
+- FeatureRecord class auto-generated: accepts file path or asset RID; paths replaced with RIDs on upload (lines 63-65)
+- Mixed features: terms + assets (lines 67-68)</p>
+<p><strong>Creating feature values:</strong>
+- Workflow: get FeatureRecord class → create instances → <code>execution.add_features()</code> (lines 73-75)
+- Code example: full term-based feature value creation in execution context (lines 79-113)
+- <code>ml.feature_record_class("Image", "Diagnosis")</code> — getting the FeatureRecord class (line 87)
+- Code example: asset-based feature values with <code>exe.asset_file_path()</code> + file path in FeatureRecord (lines 120-153)
+- Upload process: 1) upload asset files 2) replace file paths with RIDs 3) insert feature records (lines 155-161)</p>
+<p><strong>Querying feature values:</strong>
+- <code>ml.feature_values("Image", "Diagnosis")</code> — streaming iterator of typed FeatureRecord instances (lines 165-176)
+- FeatureRecord attributes: <code>Image</code>, <code>Diagnosis_Type</code>, <code>Execution</code>, <code>RCT</code> (lines 182-188)
+- Converting to pandas DataFrame with <code>model_dump()</code> (lines 190-196)
+- Selector pattern: <code>(list[FeatureRecord]) -&gt; FeatureRecord</code> callable signature (lines 200-206)
+- <code>FeatureRecord.select_newest</code> — most common selector, picks latest RCT (lines 208-220)
+- Custom selector example: <code>select_highest_confidence</code> (lines 222-237)
+- <code>FeatureRecord.select_by_workflow(workflow_or_type, container=ml)</code> — selector factory (lines 239-268)
+- <code>select_by_workflow</code> accepts workflow RID or Workflow_Type name (lines 261-267)
+- Silent omission when no records match the workflow (lines 268-270)
+- <code>ml.find_features("Image")</code> — feature definitions for a table (lines 273-283)
+- <code>ml.find_features()</code> — all features in catalog (line 284)
+- <code>ml.lookup_feature("Image", "Diagnosis")</code> — schema descriptor (lines 286-298)
+- Feature.<code>term_columns</code>, <code>asset_columns</code>, <code>value_columns</code> inspection (lines 294-297)
+- <code>feature.feature_record_class()</code> — get FeatureRecord class from Feature object (lines 299-302)</p>
+<p><strong>Feature tables structure:</strong>
+- Association table columns: TargetTable RID, Feature_Name, Execution RID, VocabTable RID, AssetTable RID (lines 311-319)
+- Enables: querying all values, finding producing execution, joining vocab, many-to-many (lines 320-325)</p>
+<p><strong>Best practices:</strong>
+- Descriptive feature names (lines 331-333)
+- Feature names are Feature_Name vocabulary terms (line 333)
+- Same feature name can be used across tables (line 334)
+- Create vocabularies before features (lines 337-340)
+- Always create feature values within an Execution context (lines 343-346)</p>
+<p><strong>Multiple values / multi-annotator scenarios:</strong>
+- Common cases: multiple annotators, model runs at different times, different analysis versions (lines 349-353)
+- Code example: querying multiple values for a specific image (lines 355-363)
+- Code example: <code>FeatureRecord.select_newest</code> deduplication (lines 366-370)
+- Code example: <code>FeatureRecord.select_by_workflow("Manual_Annotation", ...)</code> (lines 371-381)
+- <code>value_selector</code> in <code>restructure_assets</code> (lines 384-401)
+- <code>FeatureValueRecord</code> attributes table (lines 403-411)
+- Majority vote custom selector example (lines 413-425)</p>
+<p><strong>Deleting features:</strong>
+- <code>ml.delete_feature("Image", "Diagnosis")</code> — warning: permanent, removes feature table + all values + provenance (lines 429-434)</p>
+<p><strong>Features in datasets:</strong>
+- Feature tables exported as CSVs in BDBag (line 443)
+- Feature values loaded into local SQLite on bag download (line 444)
+- Versioning via catalog snapshots (line 445)
+- <code>bag.feature_values(...)</code> — same API as live catalog (lines 449-460)
+- <code>FeatureRecord.select_by_workflow(..., container=bag)</code> — workflow lookup scoped to bag (lines 459-460)</p>
+<h3 id="from-docsconceptsdenormalizationmd">From docs/concepts/denormalization.md</h3>
+<ul>
+<li>ALL content re-homed here as a "When to use Denormalization vs. feature_values" subsection</li>
+<li>Mental model: one row per leaf, star-schema denormalization (lines 18-32)</li>
+<li>Example table output showing hoisted columns (lines 34-50)</li>
+<li>Dataset membership as filter (lines 52-59)</li>
+<li>API: <code>ds.get_denormalized_as_dataframe(include_tables=[...])</code> (lines 62-76)</li>
+<li><code>ds.get_denormalized_as_dict(...)</code> — streaming rows (line 73)</li>
+<li>Preview methods: <code>ds.list_denormalized_columns(...)</code>, <code>ds.describe_denormalized(...)</code>, <code>ds.list_schema_paths()</code> (lines 78-99)</li>
+<li><code>Denormalizer.from_rids(rids, ml=ml_instance)</code> — arbitrary RID anchors without a dataset (lines 101-121)</li>
+<li>Parameters: <code>include_tables</code>, <code>row_per</code>, <code>via</code>, <code>ignore_unrelated_anchors</code> (lines 123-162)</li>
+<li>Rules 1-7 covering edge cases: row cardinality, auto-inference, column projection, column hoisting, downstream rejection, path ambiguity, orphan anchors (lines 164-226)</li>
+<li>Examples by use case: hoisting upward, all diagnoses per subject, diamond path with <code>via</code>, feature values on images, heterogeneous datasets with orphan members, arbitrary anchors (lines 229-287)</li>
+<li>Exploration workflow: <code>list_schema_paths</code> → <code>list_denormalized_columns</code> → <code>describe_denormalized</code> → <code>get_denormalized_as_dataframe</code> (lines 290-315)</li>
+<li>API rename table (earlier names vs. current names) (lines 317-329)</li>
+<li>Two behavioral changes: ambiguous FK paths now error; feature tables fully supported as leaves (lines 331-338)</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-4-running-an-experiment-docsuser-guideexecutionsmd">Destination: Chapter 4 — Running an experiment (docs/user-guide/executions.md)</h2>
+<h3 id="from-docsworkflowsexecution-lifecyclemd-primary">From docs/workflows/execution-lifecycle.md (primary)</h3>
+<p><strong>Workflow / Execution / Workflow_Type hierarchy:</strong>
+- Conceptual hierarchy diagram: Workflow_Type → Workflow → Execution (lines 19-34)
+- <code>ml.create_workflow(name, workflow_type, description)</code> (lines 38-48)
+- Deduplication: same URL/checksum reuses existing workflow RID (lines 49-64)
+- Implicit workflow creation via hydra-zen (lines 67-94) — pointer to Chapter 8
+- Automatic source code detection: Python scripts (lines 108-126)
+- Automatic source code detection: Jupyter notebooks + nbstripout (lines 128-147)
+- Automatic source code detection: Docker containers + env vars table (lines 148-163)
+- Overriding detection with explicit <code>url</code> and <code>checksum</code> (lines 165-181)
+- <code>ml.lookup_workflow(rid)</code>, <code>ml.lookup_workflow_by_url(url)</code>, <code>ml.find_workflows()</code> (lines 186-201)
+- Updating workflow <code>description</code> and <code>workflow_type</code> on bound workflows (lines 204-210)
+- Workflow types: built-in categories + <code>ml.add_term("Workflow_Type", ...)</code> for custom (lines 213-238)
+- Two ways to provide workflow to execution (Option 1 in config, Option 2 as arg) (lines 241-263)</p>
+<p><strong>Execution status lifecycle:</strong>
+- ASCII state diagram: created → initializing → pending → running → completed / failed (lines 267-301)
+- Status values table with when-set and description (lines 302-315)
+- Context manager handles transitions automatically (lines 316-317)
+- <code>exe.update_status(Status.running, "message")</code> for progress reporting (lines 318-325)</p>
+<p><strong>Execution metadata:</strong>
+- Catalog records created: Execution, Dataset_Execution, Execution_Asset_Execution (lines 329-342)
+- Automatic metadata files table: Deriva_Config, Hydra_Config, Execution_Config, Runtime_Env (lines 344-353)
+- Metadata uploaded during initialization (before model runs) (lines 355-356)
+- <code>config_choices</code> field in ExecutionConfiguration for Hydra group selections (lines 358-371)</p>
+<p><strong>ExecutionConfiguration:</strong>
+- Code example: <code>ExecutionConfiguration(workflow, description, datasets, assets)</code> (lines 381-404)
+- <code>DatasetSpec</code> options table: <code>rid</code>, <code>version</code>, <code>materialize</code> (lines 406-419)
+- DatasetSpec examples: materialize, metadata only, specific version (lines 420-424)
+- <code>AssetSpec</code> with <code>cache=True/False</code> — MD5-based caching for large immutable assets (lines 425-469)
+- Asset caching behavior table (lines 451-454)
+- <code>AssetSpecConfig</code> for hydra-zen configurations (lines 462-469)</p>
+<p><strong>Running an execution:</strong>
+- Code example: full context manager pattern with bag download, processing, asset registration (lines 471-502)
+- Context manager behavior: entry sets status "running", exit records stop time, exception sets "failed" (lines 504-510)
+- Why upload is separate from context manager: async, inspection, retry, partial results (lines 512-518)
+- <code>upload_execution_outputs()</code> tuning parameters: <code>timeout</code>, <code>chunk_size</code>, <code>max_retries</code>, <code>retry_delay</code> (lines 520-558)
+- <code>!!! note</code>: urllib3 uses connect_timeout for write socket timeout (lines 548-551)
+- Upload parameters table (lines 553-558)</p>
+<p><strong>Registering output files:</strong>
+- Code example: five <code>asset_file_path()</code> methods (new path, stage existing, rename, apply types, provide metadata) (lines 561-603)
+- <code>path.set_metadata(key, value)</code> — post-registration metadata update (line 601)
+- <code>path.set_asset_types([...])</code> — post-registration type update</p>
+<p><strong>Status updates:</strong>
+- Code example: <code>exe.update_status(Status.running, "message")</code> in training loop (lines 606-623)</p>
+<p><strong>Creating output datasets:</strong>
+- Code example: <code>exe.create_dataset(description, dataset_types)</code> + <code>add_dataset_members</code> (lines 625-644)</p>
+<p><strong>Resuming executions:</strong>
+- <code>ml.resume_execution("1-XYZ")</code> — resume by RID (lines 646-657)</p>
+<p><strong>Nested executions:</strong>
+- Conceptual hierarchy: parent as container for parameter sweeps/cross-validation (lines 659-679)
+- Automatic nesting with multirun: <code>multirun_config()</code> in <code>configs/multiruns.py</code> (lines 681-718)
+- Manual nesting: <code>parent.add_nested_execution(child, sequence=fold)</code> (lines 719-746)
+- <code>parent.list_nested_executions()</code>, <code>list_nested_executions(recurse=True)</code> (lines 747-764)</p>
+<p><strong>Complete example:</strong>
+- Code example: full training run from connect to upload (lines 766-817) — preserve in chapter</p>
+<h3 id="from-docsconceptsfile-assetsmd-asset-creation-and-upload-sections-lines-41-224">From docs/concepts/file-assets.md (asset creation and upload sections — lines 41-224)</h3>
+<p><strong>Creating asset tables (lines 41-85):</strong>
+- <code>ml.create_asset(asset_name, comment)</code> — basic asset table creation (lines 44-55)
+- <code>ml.create_asset(asset_name, column_defs=[...])</code> — asset table with metadata columns: <code>ColumnDefinition</code>, <code>BuiltinTypes</code> (lines 57-71)
+- <code>ml.create_asset(asset_name, referenced_tables=[...])</code> — asset table with FK to domain tables (lines 73-85)</p>
+<p><strong>Uploading assets in executions (lines 87-190):</strong>
+- <code>exe.asset_file_path(asset_name, file_name)</code> — basic registration pattern; returns a path to write to (lines 96-121) [NET-NEW from docs/concepts/file-assets.md]
+- <code>exe.asset_file_path(..., description=...)</code> — adding a human-readable description to the asset record (lines 123-135)
+- <code>exe.asset_file_path(..., metadata={...})</code> + <code>path.set_metadata(key, value)</code> — registering with domain column metadata (lines 141-158)
+- <code>exe.asset_file_path(..., copy_file=True, rename_file=...)</code> — staging existing files with optional rename (lines 160-172)
+- <code>exe.asset_file_path(..., asset_types=[...])</code> + <code>path.set_asset_types([...])</code> — registering with asset type tags (lines 174-190)</p>
+<p><strong>Asset Manifest (lines 192-210):</strong>
+- Internal mechanism: <code>asset-manifest.json</code> written with fsync per mutation; per-asset status (<code>pending</code> → <code>uploaded</code>/<code>failed</code>); enables crash-safe resume — document as context for "what happens during upload" (lines 192-210). This is internal detail; expose only the user-visible benefit (crash recovery via <code>resume_execution</code>), not the manifest file format itself.</p>
+<p><strong>Listing assets (lines 212-224):</strong>
+- <code>ml.list_assets("Image")</code> — iterate all assets in a table with RID, Filename, URL, Length, MD5, Asset_Type (lines 214-224) — belongs in Chapter 4 as a "checking what was uploaded" introspection step</p>
+<h3 id="from-docsworkflowsrunning-modelsmd-cli-subsection">From docs/workflows/running-models.md (CLI subsection)</h3>
+<ul>
+<li><code>deriva-ml-run</code> basic usage: run defaults, override group, override param, dry run, --info (lines 135-155)</li>
+<li><code>--host</code> / <code>--catalog</code> override from command line (lines 157-163)</li>
+<li>Model function protocol: <code>ml_instance</code> + <code>execution</code> injected, configurable params from hydra (lines 55-92)</li>
+<li><code>execution.datasets</code>, <code>execution.asset_paths</code> — accessing downloaded inputs inside model function (lines 70-79)</li>
+<li>Troubleshooting section: "Config directory not found", "Uncommitted changes" warning, "Kernel not found", override syntax errors, "Notebook ignores Hydra overrides" (lines 288-305) — keep as common pitfalls</li>
+</ul>
+<h3 id="from-docscli-referencemd_2">From docs/cli-reference.md</h3>
+<ul>
+<li><code>deriva-ml-run</code> full synopsis, arguments table, all examples (lines 31-90)</li>
+<li><code>deriva-ml-run-notebook</code> full synopsis, arguments table, environment variables table, all examples (lines 92-165)</li>
+<li><code>deriva-ml-install-kernel</code> synopsis (lines 225-261) — may belong in an appendix note</li>
+<li><code>bump-version</code> synopsis + examples (lines 170-221) — belongs in Chapter 7 (reproducibility); cross-reference here</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-5-working-offline-docsuser-guideofflinemd">Destination: Chapter 5 — Working offline (docs/user-guide/offline.md)</h2>
+<h3 id="from-docsconceptsdatasetsmd-bag-sections">From docs/concepts/datasets.md (bag sections)</h3>
+<ul>
+<li><code>dataset.download_dataset_bag()</code> / <code>download_dataset_bag(version=..., materialize=True/False)</code>: covered in Chapter 2 (downloading datasets), cross-reference only</li>
+<li>Download timeouts (<code>timeout</code> tuple): covered in Chapter 2, cross-reference only</li>
+<li><code>dataset.estimate_bag_size()</code>: covered in Chapter 2 (pre-download sizing), cross-reference only</li>
+<li>Bag FK traversal behavior (boundary-aware export): covered in Chapter 2, cross-reference only</li>
+<li><code>DatasetBag</code> object: <code>bag.dataset_rid</code>, <code>bag.version</code>, <code>bag.path</code> (lines 483-492) — Chapter 5 primary: reading a downloaded bag offline</li>
+<li><code>bag.get_table_as_dataframe("Subject")</code> — tables as DataFrames (lines 488-490) — Chapter 5 primary</li>
+<li>API parity with live Dataset: bags provide same interface without catalog connection (CLAUDE.md §"Bags Should Behave Like Catalog Connections")</li>
+<li><code>restructure_assets()</code> return type: <code>dict[Path, Path]</code> — manifest, not a Path (CLAUDE.md) — Chapter 5 primary</li>
+<li>All <code>restructure_assets()</code> subsections (Chapter 5 primary owner):</li>
+<li>Code example: <code>bag.restructure_assets(asset_table, output_dir, group_by)</code> (lines 531-543)</li>
+<li>Output directory structure diagram (<code>ml_data/Complete/Training/positive/image1.jpg</code>) (lines 545-561)</li>
+<li><code>group_by</code> with column names and feature names (lines 563-588)</li>
+<li><code>use_symlinks=True/False</code> — symlinks vs copies (lines 591-609)</li>
+<li><code>type_selector</code> lambda for custom type selection (lines 612-622)</li>
+<li><code>Unknown</code> folder for missing grouping values (lines 624-635)</li>
+<li>Prediction scenarios: datasets without types treated as Testing (lines 638-668)</li>
+<li>FK path traversal: <code>bag.restructure_assets</code> finds assets via indirect FK paths (lines 671-689)</li>
+<li><code>value_selector</code> for multiple feature values per asset (lines 691-723)</li>
+<li><code>FeatureValueRecord</code> attributes: <code>target_rid</code>, <code>feature_name</code>, <code>value</code>, <code>execution_rid</code>, <code>raw_record</code> (lines 713-722)</li>
+<li><code>enforce_vocabulary=True/False</code> — vocabulary-based grouping validation (lines 726-744)</li>
+</ul>
+<h3 id="from-docsconceptsfeaturesmd_1">From docs/concepts/features.md</h3>
+<ul>
+<li><code>bag.feature_values(...)</code> — same API as live catalog (lines 449-460)</li>
+<li><code>FeatureRecord.select_by_workflow(..., container=bag)</code> — workflow lookup scoped to bag (lines 459-460)</li>
+<li><code>bag.lookup_feature(...)</code> — returns Feature whose <code>feature_record_class()</code> works offline (implied by API parity)</li>
+</ul>
+<h3 id="from-docsworkflowsexecution-lifecyclemd_2">From docs/workflows/execution-lifecycle.md</h3>
+<ul>
+<li><code>exe.download_dataset_bag(DatasetSpec(...))</code> — download inside execution (lines 471-502, partial)</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-6-sharing-and-collaboration-docsuser-guidesharingmd">Destination: Chapter 6 — Sharing and collaboration (docs/user-guide/sharing.md)</h2>
+<h3 id="from-docsconceptsfile-assetsmd-partial-bag-related-and-provenance-sections">From docs/concepts/file-assets.md (partial — bag-related and provenance sections)</h3>
+<ul>
+<li>Asset characteristics: URL (Hatrac), Filename, Length, MD5, Description columns (lines 7-17)</li>
+<li><code>Asset_Type</code> vocabulary: filtering, Chaise UI, consistent categorization (lines 20-39)</li>
+<li>Assets-and-provenance section: <code>{Asset}_Execution</code> table linking assets to executions with Input/Output role (lines 228-248)</li>
+<li>Querying assets produced by an execution via <code>pathBuilder()</code> (lines 239-248)</li>
+<li>Assets in datasets: <code>ml.add_dataset_element_type("Image")</code>, <code>dataset.add_dataset_members(image_rids)</code> (lines 251-261)</li>
+<li>Bag download with <code>materialize=True/False</code> (lines 262-276)</li>
+<li>Working directory layout: <code>asset-manifest.json</code>, <code>assets/{Table}/</code> (lines 279-292)</li>
+<li>Crash recovery with <code>ml.resume_execution(execution_rid)</code> + <code>upload_execution_outputs()</code> (lines 293-300)</li>
+</ul>
+<h3 id="from-docsconceptsdatasetsmd_1">From docs/concepts/datasets.md</h3>
+<ul>
+<li>MINID creation: <code>download_dataset_bag(use_minid=True)</code> — creates a citable identifier for the bag; chapter author must verify exact parameter name from source code (<code>src/deriva_ml/dataset/dataset.py</code>) [VERIFY parameter name from src/]</li>
+<li>BDBag format context: archives for offline use and sharing (lines 384-398)</li>
+</ul>
+<h3 id="net-new-content-explicit-source-citations-for-chapter-author-subagents">Net-new content (explicit source citations for chapter-author subagents)</h3>
+<ul>
+<li><code>create_ml_workspace</code> — partial catalog clones, three-stage approach (schema without FKs → async data copy → FK application with orphan handling), export annotation parsing for guided table discovery (source: <code>src/deriva_ml/catalog/clone.py</code>, conceptual overview in <code>CLAUDE.md §"Catalog Cloning"</code>)</li>
+<li>Orphan strategies: FAIL, DELETE, NULLIFY — for handling incoherent row-level policies during clone (source: <code>src/deriva_ml/catalog/clone.py</code>)</li>
+<li><code>localize_assets</code> — copying Hatrac assets from source to local Hatrac after cloning with <code>asset_mode=REFERENCES</code> (source: <code>src/deriva_ml/catalog/localize.py</code>)</li>
+<li><code>create_ml_schema</code> CASCADE warning: <code>create_ml_schema()</code> drops the existing <code>deriva-ml</code> schema with CASCADE if it already exists — never call on a catalog that has data in <code>deriva-ml</code> (source: <code>src/deriva_ml/schema/create_schema.py</code>, warning documented in <code>CLAUDE.md §"create_ml_schema CASCADE Warning"</code>)</li>
+<li>Access control: brief note + link to Deriva/Globus docs</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-7-reproducibility-docsuser-guidereproducibilitymd">Destination: Chapter 7 — Reproducibility (docs/user-guide/reproducibility.md)</h2>
+<h3 id="from-docsworkflowsgit-and-versioningmd-primary">From docs/workflows/git-and-versioning.md (primary)</h3>
+<ul>
+<li>Core principle: always commit before running (lines 7-20)</li>
+<li>Warning behavior: uncommitted changes causes warning; execution record may not reflect actual code (lines 21-24)</li>
+<li>Debugging workflow: dry run pattern + commit before real run (lines 26-43)</li>
+<li><code>dry_run=true</code> — downloads data, skips catalog writes (lines 30-32)</li>
+<li>Branching strategy guidance (lines 47-70)</li>
+<li>Semantic versioning: major/minor/patch semantics table (lines 75-84)</li>
+<li><code>bump-version patch/minor/major</code> command (lines 86-98)</li>
+<li>Version check: <code>uv run python -m setuptools_scm</code> (lines 100-113)</li>
+<li>When to version: before important runs, before sweeps, during development (lines 115-128)</li>
+<li><code>nbstripout --install</code> — strip notebook output cells for reproducibility (lines 137-144)</li>
+<li>Notebook structure guidelines: sequential cells, Papermill parameters cell, restart+run-all test (lines 146-154)</li>
+<li>Commit before running notebooks (lines 156-163)</li>
+<li>Don't commit large files to Git — use DerivaML assets and datasets instead (lines 165-177)</li>
+<li>What DerivaML records per execution: git commit hash, version tag, repository URL, branch name (lines 179-184)</li>
+</ul>
+<h3 id="from-docsworkflowsexecution-lifecyclemd_3">From docs/workflows/execution-lifecycle.md</h3>
+<ul>
+<li>Automatic source code detection full description (scripts, notebooks, Docker) (lines 108-163)</li>
+<li>Docker env vars: <code>DERIVA_MCP_IMAGE_DIGEST</code>, <code>DERIVA_MCP_IMAGE_NAME</code>, <code>DERIVA_MCP_GIT_COMMIT</code>, <code>DERIVA_MCP_VERSION</code> (lines 151-163)</li>
+<li><code>configuration.json</code> content: fully resolved ExecutionConfiguration as JSON (line 348-350)</li>
+<li><code>uv.lock</code> capture as <code>Execution_Config</code> asset type (line 352)</li>
+<li><code>environment_snapshot_&lt;timestamp&gt;.txt</code> — Python version, packages, OS, GPU, env vars (line 353-354)</li>
+<li><code>config_choices</code> field — Hydra group selections for exact run reproduction (lines 358-371)</li>
+</ul>
+<h3 id="from-docsconceptsdatasetsmd-version-pinning-sections">From docs/concepts/datasets.md (version pinning sections)</h3>
+<ul>
+<li>Version snapshots: catalog snapshot tied to each version ensures same rows always (lines 373-381)</li>
+<li><code>dataset.set_version("1.0.0")</code> — bind dataset to specific version (lines 375-381)</li>
+<li><code>DatasetSpec(rid, version="1.0.0")</code> — pinning in execution configuration (lines 416-419)</li>
+</ul>
+<h3 id="from-docscli-referencemd_3">From docs/cli-reference.md</h3>
+<ul>
+<li><code>bump-version</code> synopsis and examples (re-home here, cross-reference from Chapter 4) (lines 170-221)</li>
+</ul>
+<hr />
+<h2 id="destination-chapter-8-integrating-with-hydra-zen-docsuser-guidehydra-zenmd">Destination: Chapter 8 — Integrating with hydra-zen (docs/user-guide/hydra-zen.md)</h2>
+<h3 id="from-docsworkflowsrunning-modelsmd-primary">From docs/workflows/running-models.md (primary)</h3>
+<ul>
+<li>What hydra-zen does: composable Python-first config, no YAML (lines 1-10)</li>
+<li>Project layout with <code>src/configs/</code> structure (lines 17-37)</li>
+<li>How configuration discovery works: <code>load_configs()</code>, <code>pkgutil.iter_modules()</code>, alphabetical order, <code>experiments.py</code> last (lines 42-51)</li>
+<li>Model function protocol: <code>ml_instance</code> + <code>execution</code> injected at runtime (lines 53-92)</li>
+<li><code>base.py</code> with <code>create_model_config()</code> wiring (lines 97-128)</li>
+<li><code>create_model_config(EyeAI)</code> for domain subclasses (lines 126-129)</li>
+<li>Complete walkthrough steps 1-6 (lines 168-285) — condensed for chapter; full detail stays in template repo</li>
+<li>Troubleshooting section (lines 288-305) — include as common pitfalls / See also</li>
+</ul>
+<h3 id="from-docsworkflowsexecution-lifecyclemd_4">From docs/workflows/execution-lifecycle.md</h3>
+<ul>
+<li>Implicit workflow creation via hydra-zen config in <code>configs/workflow.py</code> (lines 67-94)</li>
+<li>Hydra multirun nesting: <code>multirun_config()</code>, parent+child execution creation (lines 681-718)</li>
+<li><code>config_choices</code> captured in ExecutionConfiguration (lines 358-371)</li>
+</ul>
+<h3 id="from-docscli-referencemd_4">From docs/cli-reference.md</h3>
+<ul>
+<li><code>deriva-ml-run</code> full CLI reference (re-home partial here; full detail in Chapter 4) (lines 31-90)</li>
+<li><code>deriva-ml-run-notebook</code> full CLI reference (lines 92-165)</li>
+</ul>
+<h3 id="from-docsgetting-startedproject-setupmd_2">From docs/getting-started/project-setup.md</h3>
+<ul>
+<li>Config modules list: <code>deriva.py</code>, <code>datasets.py</code>, <code>assets.py</code>, <code>workflow.py</code>, <code>my_model.py</code>, <code>experiments.py</code>, <code>multiruns.py</code> (lines 31-43) — orients reader to config group names</li>
+<li>NOTE: full project setup belongs to template repo; this chapter only orients to the config surface</li>
+</ul>
+<hr />
+<h2 id="retirements-content-deliberately-dropped-with-rationale">Retirements (content deliberately dropped with rationale)</h2>
+<h3 id="from-docsgetting-startedquick-startmd_1">From docs/getting-started/quick-start.md</h3>
+<ul>
+<li>All content (Steps 1-5: uv install, template repo setup, Globus auth, <code>deriva-ml-run</code>, <code>deriva-ml-run-notebook</code>, Next Steps links) — template repo owns the onramp story; Introduction contains the pointer.</li>
+</ul>
+<h3 id="from-docsgetting-startedinstallmd_1">From docs/getting-started/install.md</h3>
+<ul>
+<li>All content (Python 3.12 prereq, <code>uv add deriva-ml</code>, <code>uv pip install</code>, Globus auth, <code>deriva-ml-install-kernel</code>, <code>nbstripout --install</code>, version check, upgrade) — template repo owns install. Python 3.12 requirement may be worth one line in Introduction but is not a user-guide chapter concern.</li>
+</ul>
+<h3 id="from-docsgetting-startedproject-setupmd_3">From docs/getting-started/project-setup.md</h3>
+<ul>
+<li>Project structure layout with <code>src/configs/</code>, <code>src/models/</code>, <code>notebooks/</code> directories — belongs to template repo README; user guide just orients to the config group names.</li>
+<li>Dependency groups: <code>uv sync --group=jupyter/pytorch/docs</code> — template repo concern.</li>
+<li><code>default-groups</code> in <code>pyproject.toml</code> — template repo concern.</li>
+<li>Notebook setup commands (install kernel, nbstripout, verify kernelspec) — covered in Chapter 4 (notebook note) and Chapter 7 (reproducibility); not worth a standalone section in user guide.</li>
+<li><code>uv sync --upgrade-package</code>, <code>uv lock --upgrade</code> — template repo concern; not deriva-ml-specific.</li>
+<li>"Next Steps" nav links — replaced by new nav.</li>
+</ul>
+<h3 id="from-docsconceptsoverviewmd_2">From docs/concepts/overview.md</h3>
+<ul>
+<li>"Next Steps" nav links — replaced by new nav.</li>
+<li>The existing table of ML schema tables (Dataset, Workflow, Execution, Execution Asset, Execution Metadata) is partially stale relative to S2 (Feature is now a first-class object, not in the table); incorporate accurate version into Introduction and Chapter 1, drop the stale table.</li>
+</ul>
+<h3 id="from-docsconceptsidentifiersmd_1">From docs/concepts/identifiers.md</h3>
+<ul>
+<li>Spelling errors ("seperated", "unqualified" used incorrectly) — fix when re-homing, do not preserve errors.</li>
+<li>Cross-reference link to <code>../code-docs/deriva_ml_base.md#...</code> — rewrite to <code>../api-reference/deriva_ml_base.md#...</code> when re-homing.</li>
+</ul>
+<h3 id="from-docsconceptsannotationsmd">From docs/concepts/annotations.md</h3>
+<ul>
+<li>ALL content — the annotation builder API (<code>TableHandle</code>, <code>Display</code>, <code>VisibleColumns</code>, <code>TableDisplay</code>, <code>ColumnDisplay</code>, <code>VisibleForeignKeys</code>, <code>PseudoColumn</code>, <code>Facet</code>, Handlebars templates) is a <strong>schema administration</strong> concern, not a user-guide concern. This belongs in a developer/admin reference section, not the user guide. The annotation builders are not part of the ML workflow. RETIRE to API Reference or a future "Schema Administration" section. Not re-homed into any chapter. Rationale: the spec's Chapter outlines make no mention of catalog annotations; this is Chaise configuration work that ML practitioners do not need to do themselves.</li>
+<li>The <code>!!! note</code> about <code>ml.get_chaise_url("TableName")</code> — the <em>method call</em> is worth a one-liner in Chapter 1 ("Jumping to Chaise"); the annotation configuration context is not.</li>
+<li>API Reference cross-links to <code>annotations.md</code> and <code>handles.md</code> — those code-docs pages will be renamed to <code>api-reference/</code>; links will be corrected in Task 11.</li>
+</ul>
+<h3 id="from-docsconceptsdenormalizationmd_1">From docs/concepts/denormalization.md</h3>
+<ul>
+<li>"Related concepts" links at the bottom (lines 340-345) — internal links rewritten per Task 12.</li>
+<li>Link to <code>../superpowers/specs/2026-04-15-unified-local-db-design.md</code> — this is an internal design doc, not user-facing; drop from chapter.</li>
+<li>Earlier API name table (lines 317-329) — include in Chapter 3 as a historical note for users upgrading from pre-S2 (one paragraph, not a full section).</li>
+</ul>
+<h3 id="from-docsworkflowsrunning-modelsmd">From docs/workflows/running-models.md</h3>
+<ul>
+<li>"See Also" cross-reference section at the bottom — rewritten to point at new chapter locations.</li>
+<li>"How Configuration Discovery Works" — belongs in Chapter 8 (hydra-zen) as an implementation detail note, not a standalone section in Chapter 4.</li>
+<li>Complete walkthrough (Steps 1-6) content — condensed in Chapter 8; the template repo owns the full project-setup walkthrough.</li>
+</ul>
+<h3 id="from-docsworkflowsgit-and-versioningmd">From docs/workflows/git-and-versioning.md</h3>
+<ul>
+<li>"See Also" section — rewritten to point at new chapter locations.</li>
+<li>Branching strategy guidance (lines 47-70) — RETIRE. Generic Git workflow advice is not deriva-ml-specific. One sentence in Chapter 7 ("use feature branches; all runs on a branch share the same tagged version") is sufficient. The detailed branching diagram is out of scope for the user guide.</li>
+</ul>
+<h3 id="from-docsworkflowsexecution-lifecyclemd_5">From docs/workflows/execution-lifecycle.md</h3>
+<ul>
+<li>"See Also" cross-reference sections — rewritten to point at new chapter locations.</li>
+<li>The ASCII execution lifecycle overview diagram (lines 267-288) — preserved in Chapter 4 as the execution flow overview; the status state diagram (lines 300-315) is a more precise replacement for the ASCII art and should be rendered as a Mermaid diagram.</li>
+</ul>
+<h3 id="from-docscli-referencemd_5">From docs/cli-reference.md</h3>
+<ul>
+<li><code>create-demo-catalog</code> command — RETIRE to a developer/testing note. This is a testing utility for DerivaML development itself, not for end users. A brief mention in CLAUDE.md or developer docs is sufficient.</li>
+<li><code>deriva-ml-table-comments-utils</code> — RETIRE to developer/admin reference. This is a schema maintenance utility for catalog administrators, not for ML practitioners.</li>
+<li><code>deriva-ml-create-schema</code> and <code>deriva-ml-check-catalog-schema</code> — RETIRE from main user-guide flow; brief mention in Chapter 1 as admin tools (if a user needs to set up a catalog from scratch, they are an admin, not a typical user of these docs).</li>
+<li><code>deriva-ml-install-kernel</code> — RETIRE from user guide. Belongs in project setup (template repo) and is already covered in the Getting Started section being dropped. One-line mention in Chapter 4 CLI subsection is sufficient.</li>
+<li>The "Command Overview" table (lines 13-26) — re-home the execution-relevant commands into Chapters 4 and 8; admin commands into a footnote.</li>
+</ul>
+<hr />
+<h2 id="spot-check-verification">Spot-Check Verification</h2>
+<h3 id="spot-check-1-docsconceptsidentifiersmd-19-lines">Spot-check 1: docs/concepts/identifiers.md (19 lines)</h3>
+<ul>
+<li>RID concept, format, snapshot-qualified form, URI form, <code>DerivaML.cite()</code> — all mapped to Chapter 1.</li>
+<li>Spelling errors noted for correction. Every paragraph accounted for. PASS.</li>
+</ul>
+<h3 id="spot-check-2-docsconceptsfeaturesmd-460-lines">Spot-check 2: docs/concepts/features.md (460 lines)</h3>
+<ul>
+<li>What a feature is (Chapter 3) ✓</li>
+<li>Feature types: term-based, asset-based, mixed (Chapter 3) ✓</li>
+<li>Creating feature values in execution context (Chapter 3) ✓</li>
+<li>Asset-based feature values + upload process (Chapter 3) ✓</li>
+<li><code>feature_values()</code> iterator + selectors (Chapter 3) ✓</li>
+<li><code>select_by_workflow</code> factory (Chapter 3) ✓</li>
+<li><code>find_features</code>, <code>lookup_feature</code> (Chapter 1 for discovery; Chapter 3 for creation context) ✓</li>
+<li>Feature tables structure (Chapter 3) ✓</li>
+<li>Best practices (Chapter 3) ✓</li>
+<li>Multiple values / multi-annotator (Chapter 3) ✓</li>
+<li><code>value_selector</code> in <code>restructure_assets</code> (Chapter 5) ✓</li>
+<li><code>FeatureValueRecord</code> (Chapter 5) ✓</li>
+<li>Majority vote selector (Chapter 3) ✓</li>
+<li><code>ml.delete_feature()</code> (Chapter 3) ✓</li>
+<li>Features in datasets / bag API parity (Chapter 5) ✓</li>
+<li>Every paragraph accounted for. PASS.</li>
+</ul>
+<h3 id="spot-check-3-docsworkflowsgit-and-versioningmd-197-lines">Spot-check 3: docs/workflows/git-and-versioning.md (197 lines)</h3>
+<ul>
+<li>Core principle + commit before running (Chapter 7) ✓</li>
+<li>Dry run debugging workflow (Chapter 7) ✓</li>
+<li>Branching strategy (RETIRED) ✓ with rationale</li>
+<li>Semantic versioning table (Chapter 7) ✓</li>
+<li><code>bump-version</code> command (Chapter 7) ✓</li>
+<li>Version check with setuptools_scm (Chapter 7) ✓</li>
+<li>When to version (Chapter 7) ✓</li>
+<li>nbstripout (Chapter 7) ✓</li>
+<li>Notebook structure guidelines (Chapter 7) ✓</li>
+<li>Commit before running notebooks (Chapter 7) ✓</li>
+<li>Large files to DerivaML assets (Chapter 7) ✓</li>
+<li>What DerivaML records per execution (Chapter 7) ✓</li>
+<li>"See Also" links (RETIRED/rewritten) ✓</li>
+<li>Every paragraph accounted for. PASS.</li>
+</ul>
+<hr />
+<h2 id="content-items-requiring-chapter-author-attention-ambiguous-or-needs-verification">Content items requiring chapter-author attention (ambiguous or needs verification)</h2>
+<p>Items 1, 2, 5, and 6 are also tracked as <code>[NET-NEW]</code>/<code>[EXPAND]</code>/<code>[VERIFY]</code> placeholder bullets in their respective chapter sections above.</p>
+<ol>
+<li>
+<p><strong><code>get_chaise_url()</code> method</strong> — referenced in spec's Chapter 1 outline but absent from all 14 source pages. Chapter author must add from API source reading (<code>src/deriva_ml/core/mixins/</code>) or API reference. See Chapter 1 <code>[NET-NEW from src/]</code> placeholder.</p>
+</li>
+<li>
+<p><strong><code>ml.pathBuilder()</code> usage</strong> — referenced in spec's Chapter 1 outline and in <code>file-assets.md</code> (one example, lines 239-248), but not deeply covered in concepts pages. Chapter author should draw from source code and CLAUDE.md patterns. See Chapter 1 <code>[EXPAND from src/]</code> placeholder.</p>
+</li>
+<li>
+<p><strong>MINID creation parameter</strong> — <code>use_minid=True</code> in <code>download_dataset_bag</code> is referenced in Chapter 6 plan but not explicitly shown in any of the 14 source pages. Chapter author must verify parameter name from source code (<code>src/deriva_ml/dataset/dataset.py</code>). See Chapter 6 <code>[VERIFY parameter name from src/]</code> placeholder.</p>
+</li>
+<li>
+<p><strong><code>bag.lookup_feature()</code> offline behavior</strong> — implied by API parity principle (CLAUDE.md) but not demonstrated in any source page. Chapter author should verify from source and tests.</p>
+</li>
+<li>
+<p><strong><code>deriva-ml-split-dataset --val-size</code> flag</strong> — the Python API supports <code>val_size</code> but the CLI reference does not show this flag explicitly. Chapter author should verify CLI completeness from source. See Chapter 2 <code>[VERIFY CLI flag]</code> placeholder.</p>
+</li>
+<li>
+<p><strong><code>find_executions()</code> method</strong> — referenced in spec's Chapter 1 outline ("find_datasets, find_features, find_workflows, find_executions") but not in any source page. Chapter author must add from API source reading (<code>src/deriva_ml/core/mixins/</code>). See Chapter 1 <code>[NET-NEW from src/]</code> placeholder.</p>
+</li>
+<li>
+<p><strong><code>docs/concepts/annotations.md</code> retirement</strong> — the full page is retired as admin-only content. If a future "Schema Administration" section is added to the docs, this entire page maps cleanly to it. Flag for the nav rewrite step.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

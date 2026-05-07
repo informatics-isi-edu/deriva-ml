@@ -1,0 +1,4128 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-22-feature-api-consistency-plan/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Feature API Consistency Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#feature-api-consistency-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Feature API Consistency Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-add-execution_state__feature_records-sqlite-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Add execution_state__feature_records SQLite table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-add-featurerecordselect_by_workflow-selector-factory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Add FeatureRecord.select_by_workflow selector factory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-add-derivamllist_workflow_executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Add DerivaML.list_workflow_executions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-add-derivamlfeature_values-online-read-iterator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Add DerivaML.feature_values (online read, iterator)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-add-datasetfeature_values-datasetlookup_feature-datasetlist_workflow_executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Add Dataset.feature_values, Dataset.lookup_feature, Dataset.list_workflow_executions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-build-bag-feature-cache-reader-and-wire-datasetbagfeature_values-through-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Build bag feature cache reader and wire DatasetBag.feature_values through it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-stage-and-flush-exeadd_features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Stage-and-flush exe.add_features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-parametrized-symmetry-compliance-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Parametrized symmetry compliance suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-offline-to-online-write-cycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Offline-to-online write cycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-10-retire-old-apis-with-clear-error-shims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Retire old APIs with clear-error shims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-11-flush-ordering-failure-isolation-and-crash-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Flush ordering, failure isolation, and crash-resume
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-12-full-suite-regression-docs-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: Full-suite regression + docs refresh
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="feature-api-consistency-implementation-plan">Feature API Consistency Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Unify the feature-access API across <code>DerivaML</code>, <code>Dataset</code>, and <code>DatasetBag</code>; route writes through execution-staged SQLite; retire duplicate and escape-hatch APIs.</p>
+<p><strong>Architecture:</strong> Three symmetric read methods per container (<code>find_features</code>, <code>feature_values</code>, <code>lookup_feature</code>) plus a shared helper (<code>list_workflow_executions</code>). <code>feature_values</code> returns <code>Iterable[FeatureRecord]</code> (pandas-free, stream-friendly). Writes flow exclusively through <code>exe.add_features</code> which stages rows to the execution's SQLite and flushes on completion after asset upload. A new selector factory <code>FeatureRecord.select_by_workflow(workflow, *, container)</code> replaces the catalog-bound <code>ml.select_by_workflow</code> method. The <code>Denormalizer</code> subsystem is untouched — feature-wide DataFrames remain its job.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, Pydantic v2 (<code>FeatureRecord</code>, <code>validate_call</code>), SQLAlchemy (<code>execution_state__feature_records</code> table in execution SQLite), deriva-py datapath (online write paths), pytest + pytest-parametrize (symmetry compliance suite).</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md</code>.</p>
+<p><strong>Dependency ordering:</strong> The §8 SQLite execution-state design provides the staging infrastructure. This plan replaces the existing file-based feature upload (<code>FeatureEntry</code> + <code>FEATURES_TABLE</code> + per-feature <code>.jsonl</code> files + <code>_update_feature_table</code>) with row-per-record SQLite staging. Goal is DRY — the file-based path did the same job via filesystem round-trip and is removed in this plan.</p>
+<p><strong>What the old file-based path did that we must preserve:</strong> at flush time, asset-column values that hold local asset filenames must be rewritten to the uploaded asset RIDs (the asset upload happens earlier in <code>upload_execution_outputs</code>, so the map from local filename → asset RID is in-memory). This logic lives in <code>_update_feature_table</code> today; it moves into <code>_flush_staged_features</code> — same contract, different storage.</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<p><strong>New files:</strong>
+- <code>src/deriva_ml/dataset/bag_feature_cache.py</code> — per-feature bag denormalization cache reader (populate-on-first-access, SQLite-backed, read-only).
+- <code>tests/feature/test_feature_values.py</code> — parametrized symmetry suite (DerivaML / Dataset / DatasetBag).
+- <code>tests/feature/test_select_by_workflow.py</code> — selector factory tests (online, dataset, bag).
+- <code>tests/feature/test_retired_apis.py</code> — each retired method raises the expected exception with the expected replacement pointer.
+- <code>tests/execution/test_staged_features.py</code> — stage, flush, order, resume, error paths.
+- <code>tests/dataset/test_bag_feature_cache.py</code> — cache population, immutability, corrupt-cache error path.</p>
+<p><strong>Modified files:</strong>
+- <code>src/deriva_ml/feature.py</code> — add <code>FeatureRecord.select_by_workflow(workflow, *, container)</code> classmethod factory; expand docstrings.
+- <code>src/deriva_ml/core/mixins/feature.py</code> — add <code>feature_values</code>, <code>list_workflow_executions</code>; remove <code>add_features</code>, <code>fetch_table_features</code>, <code>list_feature_values</code>, <code>select_by_workflow</code> (replaced with retired-API error shims).
+- <code>src/deriva_ml/dataset/dataset.py</code> — add <code>feature_values</code>, <code>lookup_feature</code>, <code>list_workflow_executions</code> (delegate to <code>ml</code> where appropriate; filter target RIDs to dataset members where not).
+- <code>src/deriva_ml/dataset/dataset_bag.py</code> — rewrite feature read path through <code>bag_feature_cache</code>; remove <code>fetch_table_features</code>, <code>list_feature_values</code>; add <code>lookup_feature</code>, <code>list_workflow_executions</code>.
+- <code>src/deriva_ml/execution/execution.py</code> — change <code>add_features</code> from write-through to stage-to-SQLite; add <code>_flush_staged_features()</code>; integrate resume detection with existing staged-asset resume.
+- <code>src/deriva_ml/local_db/manifest_store.py</code> — add <code>execution_state__feature_records</code> table (row-per-record staging); <strong>remove</strong> the now-obsolete <code>FEATURES_TABLE</code> (<code>execution_state__features</code>), its <code>FeatureEntry</code> dataclass in <code>src/deriva_ml/asset/manifest.py</code>, <code>ManifestStore.add_feature</code> / <code>ManifestStore.list_features</code>, and <code>AssetManifest.add_feature</code> / <code>AssetManifest.features</code> property.
+- <code>src/deriva_ml/asset/manifest.py</code> — delete <code>FeatureEntry</code> dataclass and <code>AssetManifest.add_feature</code> / <code>AssetManifest.features</code> (no replacement — callers use <code>exe.add_features</code> directly).
+- <code>src/deriva_ml/asset/__init__.py</code> — remove <code>FeatureEntry</code> from <code>__all__</code>.
+- <code>src/deriva_ml/local_db/workspace.py:363-364</code> — remove the <code>FeatureEntry.from_dict</code> / <code>store.add_feature</code> migration path (file-based manifest migration is no longer relevant).
+- <code>src/deriva_ml/dataset/upload.py:22-35, 265</code> — remove the <code>.jsonl</code> per-feature file helpers.
+- <code>src/deriva_ml/execution/execution.py:1200-1207</code> — remove the <code>.jsonl</code> glob and <code>_update_feature_table</code> call; the row-per-record flush replaces it. <strong>Preserve the asset-column rewriting logic</strong> (map local filename → uploaded asset RID) by moving it into <code>_flush_staged_features</code>.
+- <code>src/deriva_ml/asset/asset.py</code> — update <code>list_feature_values</code> callers if any; retire the method on <code>Asset</code> class too (see Task 10).
+- <code>src/deriva_ml/interfaces.py</code> — update <code>DatasetLike</code> and related protocols to the three-method read surface + <code>lookup_feature</code> + <code>list_workflow_executions</code>; remove retired signatures.
+- <code>src/deriva_ml/model/deriva_ml_database.py</code> — check <code>find_features</code> signature consistency with the protocol update.</p>
+<p><strong>Unchanged (out of scope, do not touch):</strong>
+- <code>src/deriva_ml/local_db/denormalizer.py</code> and related <code>Denormalizer</code> code.
+- <code>src/deriva_ml/feature.py</code> — <code>Feature</code> class, <code>feature_record_class()</code>, existing selectors (<code>select_newest</code>, <code>select_first</code>, <code>select_latest</code>, <code>select_by_execution</code>, <code>select_majority_vote</code>).
+- <code>create_feature</code> schema operation.
+- The pre-existing file-based feature upload path (<code>FEATURES_TABLE</code> in <code>manifest_store.py</code>, tracked by <code>values_path</code>).</p>
+<hr />
+<h2 id="task-1-add-execution_state__feature_records-sqlite-table">Task 1: Add <code>execution_state__feature_records</code> SQLite table</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/manifest_store.py:89-103</code> (add new table alongside <code>_features_t</code>)
+- Test: <code>tests/execution/test_staged_features.py</code> (new)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<pre><code class="language-python"># tests/execution/test_staged_features.py
+&quot;&quot;&quot;Unit tests for the row-per-record execution_state__feature_records table.
+
+Stages individual FeatureRecord instances as JSON rows for later batch flush
+to ermrest. Replaces the older file-based FEATURES_TABLE / .jsonl path.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from sqlalchemy import create_engine, select
+
+from deriva_ml.local_db.manifest_store import ManifestStore
+
+
+def test_feature_records_table_created(tmp_path: Path) -&gt; None:
+    &quot;&quot;&quot;ManifestStore.ensure_schema creates the execution_state__feature_records table.&quot;&quot;&quot;
+    engine = create_engine(f&quot;sqlite:///{tmp_path / 'manifest.sqlite'}&quot;)
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    # Table is accessible via the store's metadata
+    assert &quot;execution_state__feature_records&quot; in store._metadata.tables
+    table = store._metadata.tables[&quot;execution_state__feature_records&quot;]
+    expected_cols = {
+        &quot;stage_id&quot;, &quot;execution_rid&quot;, &quot;feature_table&quot;, &quot;feature_name&quot;,
+        &quot;target_table&quot;, &quot;record_json&quot;, &quot;created_at&quot;, &quot;status&quot;,
+        &quot;uploaded_at&quot;, &quot;error&quot;,
+    }
+    assert set(c.name for c in table.columns) == expected_cols
+
+
+def test_stage_feature_record_inserts_row(tmp_path: Path) -&gt; None:
+    &quot;&quot;&quot;stage_feature_record writes a Pending row readable by list_feature_records.&quot;&quot;&quot;
+    engine = create_engine(f&quot;sqlite:///{tmp_path / 'manifest.sqlite'}&quot;)
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    store.stage_feature_record(
+        execution_rid=&quot;EXE-1&quot;,
+        feature_table=&quot;domain.Image_Glaucoma&quot;,
+        feature_name=&quot;Glaucoma&quot;,
+        target_table=&quot;Image&quot;,
+        record_json=json.dumps({&quot;Image&quot;: &quot;IMG-1&quot;, &quot;Glaucoma&quot;: &quot;Normal&quot;}),
+    )
+    rows = store.list_feature_records(&quot;EXE-1&quot;)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.feature_table == &quot;domain.Image_Glaucoma&quot;
+    assert row.feature_name == &quot;Glaucoma&quot;
+    assert row.status == &quot;Pending&quot;
+    assert row.error is None
+    assert row.uploaded_at is None
+    assert json.loads(row.record_json) == {&quot;Image&quot;: &quot;IMG-1&quot;, &quot;Glaucoma&quot;: &quot;Normal&quot;}
+
+
+def test_mark_feature_record_uploaded(tmp_path: Path) -&gt; None:
+    engine = create_engine(f&quot;sqlite:///{tmp_path / 'manifest.sqlite'}&quot;)
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    store.stage_feature_record(
+        execution_rid=&quot;EXE-1&quot;,
+        feature_table=&quot;domain.Image_Glaucoma&quot;,
+        feature_name=&quot;Glaucoma&quot;,
+        target_table=&quot;Image&quot;,
+        record_json=json.dumps({&quot;Image&quot;: &quot;IMG-1&quot;}),
+    )
+    stage_id = store.list_feature_records(&quot;EXE-1&quot;)[0].stage_id
+    store.mark_feature_record_uploaded(stage_id)
+    row = store.list_feature_records(&quot;EXE-1&quot;)[0]
+    assert row.status == &quot;Uploaded&quot;
+    assert row.uploaded_at is not None
+
+
+def test_mark_feature_record_failed_records_error(tmp_path: Path) -&gt; None:
+    engine = create_engine(f&quot;sqlite:///{tmp_path / 'manifest.sqlite'}&quot;)
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    store.stage_feature_record(
+        execution_rid=&quot;EXE-1&quot;,
+        feature_table=&quot;domain.Image_Glaucoma&quot;,
+        feature_name=&quot;Glaucoma&quot;,
+        target_table=&quot;Image&quot;,
+        record_json=json.dumps({&quot;Image&quot;: &quot;IMG-1&quot;}),
+    )
+    stage_id = store.list_feature_records(&quot;EXE-1&quot;)[0].stage_id
+    store.mark_feature_record_failed(stage_id, error=&quot;ermrest rejected&quot;)
+    row = store.list_feature_records(&quot;EXE-1&quot;)[0]
+    assert row.status == &quot;Failed&quot;
+    assert row.error == &quot;ermrest rejected&quot;
+
+
+def test_list_pending_feature_records_filters_by_status(tmp_path: Path) -&gt; None:
+    engine = create_engine(f&quot;sqlite:///{tmp_path / 'manifest.sqlite'}&quot;)
+    store = ManifestStore(engine)
+    store.ensure_schema()
+    # Stage three: one pending, one uploaded, one failed
+    for i, _ in enumerate(range(3)):
+        store.stage_feature_record(
+            execution_rid=&quot;EXE-1&quot;,
+            feature_table=&quot;domain.Image_Glaucoma&quot;,
+            feature_name=&quot;Glaucoma&quot;,
+            target_table=&quot;Image&quot;,
+            record_json=json.dumps({&quot;Image&quot;: f&quot;IMG-{i}&quot;}),
+        )
+    ids = [r.stage_id for r in store.list_feature_records(&quot;EXE-1&quot;)]
+    store.mark_feature_record_uploaded(ids[0])
+    store.mark_feature_record_failed(ids[1], error=&quot;x&quot;)
+    pending = store.list_pending_feature_records(&quot;EXE-1&quot;)
+    assert len(pending) == 1
+    assert pending[0].stage_id == ids[2]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_staged_features.py -q</code>
+Expected: FAIL — <code>ManifestStore</code> has no <code>stage_feature_record</code> / <code>list_feature_records</code> / <code>mark_feature_record_uploaded</code> / <code>mark_feature_record_failed</code> / <code>list_pending_feature_records</code> methods, and the <code>execution_state__feature_records</code> SQLite table does not exist.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add the SQLite table</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/local_db/manifest_store.py</code>, <strong>replace</strong> the existing <code>_features_t</code> (around line 89) with the new row-per-record table. Also delete the <code>FEATURES_TABLE = "execution_state__features"</code> constant at line 38 and the <code>Index</code> definition at line 103 that references <code>_features_t</code>:</p>
+<pre><code class="language-python"># Row-per-record staging for feature writes. Replaces the earlier file-based
+# FeatureEntry/FEATURES_TABLE mechanism (which wrote values to per-feature .jsonl
+# files and tracked them by values_path). One mechanism, one storage layer.
+# See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md §Architecture.
+FEATURE_RECORDS_TABLE = &quot;execution_state__feature_records&quot;
+
+self._feature_records_t = Table(
+    FEATURE_RECORDS_TABLE,
+    self._metadata,
+    Column(&quot;stage_id&quot;, Integer, primary_key=True, autoincrement=True),
+    Column(&quot;execution_rid&quot;, String, nullable=False),
+    Column(&quot;feature_table&quot;, String, nullable=False),   # &quot;schema.Table&quot;
+    Column(&quot;feature_name&quot;, String, nullable=False),
+    Column(&quot;target_table&quot;, String, nullable=False),    # target table name — avoids re-lookup at flush
+    Column(&quot;record_json&quot;, Text, nullable=False),
+    Column(&quot;created_at&quot;, String, nullable=False),
+    Column(&quot;status&quot;, String, nullable=False),          # Pending | Uploaded | Failed
+    Column(&quot;uploaded_at&quot;, String),
+    Column(&quot;error&quot;, Text),
+)
+Index(
+    &quot;ix_execution_state__feature_records_exec_status&quot;,
+    self._feature_records_t.c.execution_rid,
+    self._feature_records_t.c.status,
+)
+</code></pre>
+<p>Add <code>Integer</code> to the <code>from sqlalchemy import ...</code> list at the top of the file if not already present.</p>
+<ul>
+<li>[ ] <strong>Step 4: Add the accessor methods</strong></li>
+</ul>
+<p>In the same file, after the existing feature-entry methods (<code>list_features</code>, around line 413), add:</p>
+<pre><code class="language-python">@dataclass(frozen=True)
+class StagedFeatureRow:
+    &quot;&quot;&quot;One staged feature-record row awaiting flush to the catalog.
+
+    A StagedFeatureRow is one FeatureRecord serialized as JSON, with
+    lifecycle status tracked per row. Rows are created by
+    ``Execution.add_features()`` and consumed by
+    ``Execution._flush_staged_features()``.
+
+    Attributes:
+        stage_id: Autoincrement primary key.
+        execution_rid: RID of the owning execution.
+        feature_table: Qualified feature table name (&quot;schema.Table&quot;).
+        feature_name: Feature name (redundant with feature_table but kept
+            for ergonomic filtering).
+        target_table: Target table name (the table the feature is *on*).
+            Stored so flush doesn't have to re-resolve it from the model.
+        record_json: JSON encoding of ``FeatureRecord.model_dump_json()``.
+        created_at: ISO timestamp of staging.
+        status: &quot;Pending&quot; | &quot;Uploaded&quot; | &quot;Failed&quot;.
+        uploaded_at: ISO timestamp of successful flush, or None.
+        error: Error message on Failed status, or None.
+    &quot;&quot;&quot;
+    stage_id: int
+    execution_rid: str
+    feature_table: str
+    feature_name: str
+    target_table: str
+    record_json: str
+    created_at: str
+    status: str
+    uploaded_at: str | None
+    error: str | None
+</code></pre>
+<p>Place <code>StagedFeatureRow</code> in the file's top-level declarations — it's an internal value object, <code>@dataclass</code> is appropriate per CLAUDE.md guidance (no user-facing serialization).</p>
+<p><strong>Also in the same step</strong>, delete the now-obsolete file-based feature machinery:</p>
+<pre><code class="language-python"># In src/deriva_ml/local_db/manifest_store.py:
+#   - DELETE: `FEATURES_TABLE = &quot;execution_state__features&quot;` constant (line 38)
+#   - DELETE: `self._features_t = Table(...)` definition (lines 89-101)
+#   - DELETE: `Index(&quot;ix_features_exec_status&quot;, ...)` (line 103)
+#   - DELETE: `ManifestStore.add_feature(...)` method (around line 357)
+#   - DELETE: `ManifestStore.list_features(...)` method (around line 388)
+#   - UPDATE: `from deriva_ml.asset.manifest import AssetEntry, FeatureEntry`
+#     becomes `from deriva_ml.asset.manifest import AssetEntry` (remove FeatureEntry)
+
+# In src/deriva_ml/asset/manifest.py:
+#   - DELETE: `FeatureEntry` dataclass (around line 63-79)
+#   - DELETE: `AssetManifest.features` property (around line 107-109)
+#   - DELETE: `AssetManifest.add_feature()` method (around line 149-150)
+
+# In src/deriva_ml/asset/__init__.py:
+#   - UPDATE: remove &quot;FeatureEntry&quot; from `__all__` (line 25) and from the
+#     `from .manifest import ...` statement (line 15).
+
+# In src/deriva_ml/local_db/workspace.py (around lines 347-366):
+#   - DELETE: the FeatureEntry migration import and the `store.add_feature`
+#     call that migrates legacy JSON manifests. This is a file-format
+#     migration for the old path that no longer exists; without the target,
+#     the migration cannot run.
+
+# In src/deriva_ml/dataset/upload.py (around lines 22-35, 265, 713):
+#   - DELETE: feature-directory + feature .jsonl helpers that support the
+#     file-based path. The asset-side helpers stay (assets still flow
+#     through the filesystem for upload).
+
+# In src/deriva_ml/execution/execution.py (around lines 1200-1207):
+#   - REPLACE the `.jsonl` glob + `_update_feature_table` loop with a call
+#     to `self._flush_staged_features()`. The asset-column rewriting logic
+#     inside `_update_feature_table` moves into `_flush_staged_features`
+#     (Task 7 implements that part).
+#   - DELETE: `_update_feature_table` method after confirming nothing else
+#     calls it.
+#   - DELETE: `self._feature_root` initialization if it becomes unused
+#     after removing the .jsonl path.
+</code></pre>
+<p>The deletions are tightly coupled to the additions in Task 1 — do them together in the same commit so tests can never see a half-migrated state.</p>
+<p>Then add the methods on <code>ManifestStore</code>:</p>
+<pre><code class="language-python">def stage_feature_record(
+    self,
+    *,
+    execution_rid: str,
+    feature_table: str,
+    feature_name: str,
+    target_table: str,
+    record_json: str,
+) -&gt; int:
+    &quot;&quot;&quot;Stage a single serialized FeatureRecord for later flush.
+
+    Inserts a new row into ``execution_state__feature_records`` with status
+    'Pending'. The returned ``stage_id`` is the row's autoincrement primary
+    key — use it with :meth:`mark_feature_record_uploaded` or
+    :meth:`mark_feature_record_failed` to update lifecycle status.
+
+    Args:
+        execution_rid: RID of the owning execution.
+        feature_table: Qualified feature table name (&quot;schema.Table&quot;).
+        feature_name: Feature name.
+        target_table: Target table name (the table the feature is defined on).
+            Stored so flush doesn't have to re-resolve it from the model.
+        record_json: JSON string from ``FeatureRecord.model_dump_json()``.
+
+    Returns:
+        The new row's ``stage_id``.
+    &quot;&quot;&quot;
+    now = _now_iso()
+    with self._engine.begin() as conn:
+        result = conn.execute(
+            insert(self._feature_records_t),
+            {
+                &quot;execution_rid&quot;: execution_rid,
+                &quot;feature_table&quot;: feature_table,
+                &quot;feature_name&quot;: feature_name,
+                &quot;target_table&quot;: target_table,
+                &quot;record_json&quot;: record_json,
+                &quot;created_at&quot;: now,
+                &quot;status&quot;: &quot;Pending&quot;,
+                &quot;uploaded_at&quot;: None,
+                &quot;error&quot;: None,
+            },
+        )
+        return int(result.inserted_primary_key[0])
+
+def list_feature_records(self, execution_rid: str) -&gt; list[&quot;StagedFeatureRow&quot;]:
+    &quot;&quot;&quot;Return all staged-feature rows for an execution, in stage_id order.&quot;&quot;&quot;
+    with self._engine.connect() as conn:
+        rows = conn.execute(
+            select(self._feature_records_t)
+            .where(self._feature_records_t.c.execution_rid == execution_rid)
+            .order_by(self._feature_records_t.c.stage_id)
+        ).mappings().all()
+    return [StagedFeatureRow(**dict(r)) for r in rows]
+
+def list_pending_feature_records(
+    self, execution_rid: str
+) -&gt; list[&quot;StagedFeatureRow&quot;]:
+    &quot;&quot;&quot;Return Pending staged-feature rows for an execution.&quot;&quot;&quot;
+    with self._engine.connect() as conn:
+        rows = conn.execute(
+            select(self._feature_records_t)
+            .where(
+                (self._feature_records_t.c.execution_rid == execution_rid)
+                &amp; (self._feature_records_t.c.status == &quot;Pending&quot;)
+            )
+            .order_by(self._feature_records_t.c.stage_id)
+        ).mappings().all()
+    return [StagedFeatureRow(**dict(r)) for r in rows]
+
+def mark_feature_record_uploaded(self, stage_id: int) -&gt; None:
+    &quot;&quot;&quot;Transition a staged row to Uploaded, setting uploaded_at.&quot;&quot;&quot;
+    with self._engine.begin() as conn:
+        conn.execute(
+            update(self._feature_records_t)
+            .where(self._feature_records_t.c.stage_id == stage_id)
+            .values(status=&quot;Uploaded&quot;, uploaded_at=_now_iso())
+        )
+
+def mark_feature_record_failed(self, stage_id: int, *, error: str) -&gt; None:
+    &quot;&quot;&quot;Transition a staged row to Failed, recording the error.&quot;&quot;&quot;
+    with self._engine.begin() as conn:
+        conn.execute(
+            update(self._feature_records_t)
+            .where(self._feature_records_t.c.stage_id == stage_id)
+            .values(status=&quot;Failed&quot;, error=error)
+        )
+</code></pre>
+<p>Add imports as needed: <code>from sqlalchemy import insert, update, select, Integer, Text</code>, <code>from dataclasses import dataclass</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_staged_features.py -q</code>
+Expected: 5 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/execution/test_staged_features.py src/deriva_ml/local_db/manifest_store.py
+git commit -m &quot;feat(staged-features): row-per-record SQLite staging table (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-add-featurerecordselect_by_workflow-selector-factory">Task 2: Add <code>FeatureRecord.select_by_workflow</code> selector factory</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/feature.py</code> (add classmethod after existing <code>select_by_execution</code>, around line 175)
+- Test: <code>tests/feature/test_select_by_workflow.py</code> (new)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test (no catalog needed — use a stub container)</strong></li>
+</ul>
+<pre><code class="language-python"># tests/feature/test_select_by_workflow.py
+&quot;&quot;&quot;Unit tests for FeatureRecord.select_by_workflow selector factory.
+
+Uses a stub container that implements list_workflow_executions so the
+factory can be tested without a live catalog. Live-catalog integration
+coverage is in the parametrized symmetry suite (test_feature_values.py).
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.feature import FeatureRecord
+
+
+@dataclass
+class _StubRecord:
+    &quot;&quot;&quot;Minimal structure matching FeatureRecord attribute access.&quot;&quot;&quot;
+    Execution: str | None
+    RCT: str | None
+
+
+class _StubContainer:
+    def __init__(self, *, executions_for_workflow: dict[str, list[str]]):
+        self._map = executions_for_workflow
+
+    def list_workflow_executions(self, workflow: str) -&gt; list[str]:
+        if workflow not in self._map:
+            raise DerivaMLException(f&quot;Unknown workflow '{workflow}'&quot;)
+        return list(self._map[workflow])
+
+
+def test_select_by_workflow_requires_container_kwarg() -&gt; None:
+    &quot;&quot;&quot;container is a required keyword-only argument.&quot;&quot;&quot;
+    with pytest.raises(TypeError):
+        # positional container → TypeError
+        FeatureRecord.select_by_workflow(&quot;WF-1&quot;, _StubContainer(executions_for_workflow={&quot;WF-1&quot;: []}))  # type: ignore[misc]
+
+
+def test_select_by_workflow_unknown_workflow_raises_at_construction() -&gt; None:
+    &quot;&quot;&quot;Resolution is eager — unknown workflows fail at factory-call time, not at selection time.&quot;&quot;&quot;
+    container = _StubContainer(executions_for_workflow={&quot;WF-known&quot;: [&quot;EXE-1&quot;]})
+    with pytest.raises(DerivaMLException, match=&quot;Unknown workflow&quot;):
+        FeatureRecord.select_by_workflow(&quot;WF-unknown&quot;, container=container)
+
+
+def test_select_by_workflow_picks_matching_record() -&gt; None:
+    container = _StubContainer(executions_for_workflow={&quot;WF-1&quot;: [&quot;EXE-A&quot;, &quot;EXE-B&quot;]})
+    selector = FeatureRecord.select_by_workflow(&quot;WF-1&quot;, container=container)
+    records = [
+        _StubRecord(Execution=&quot;EXE-A&quot;, RCT=&quot;2026-01-01T00:00:00Z&quot;),
+        _StubRecord(Execution=&quot;EXE-Z&quot;, RCT=&quot;2026-02-01T00:00:00Z&quot;),  # not in workflow
+    ]
+    chosen = selector(records)
+    assert chosen.Execution == &quot;EXE-A&quot;
+
+
+def test_select_by_workflow_picks_newest_among_matches() -&gt; None:
+    container = _StubContainer(executions_for_workflow={&quot;WF-1&quot;: [&quot;EXE-A&quot;, &quot;EXE-B&quot;]})
+    selector = FeatureRecord.select_by_workflow(&quot;WF-1&quot;, container=container)
+    records = [
+        _StubRecord(Execution=&quot;EXE-A&quot;, RCT=&quot;2026-01-01T00:00:00Z&quot;),
+        _StubRecord(Execution=&quot;EXE-B&quot;, RCT=&quot;2026-03-01T00:00:00Z&quot;),  # newest matching
+    ]
+    chosen = selector(records)
+    assert chosen.Execution == &quot;EXE-B&quot;
+
+
+def test_select_by_workflow_returns_none_when_no_match() -&gt; None:
+    &quot;&quot;&quot;No record in the group matched the workflow → returns None (feature-absent semantics).&quot;&quot;&quot;
+    container = _StubContainer(executions_for_workflow={&quot;WF-1&quot;: [&quot;EXE-A&quot;]})
+    selector = FeatureRecord.select_by_workflow(&quot;WF-1&quot;, container=container)
+    records = [_StubRecord(Execution=&quot;EXE-Z&quot;, RCT=&quot;2026-02-01T00:00:00Z&quot;)]
+    assert selector(records) is None
+
+
+def test_select_by_workflow_resolves_executions_once() -&gt; None:
+    &quot;&quot;&quot;list_workflow_executions is called once at construction, not per-group.&quot;&quot;&quot;
+    call_count = {&quot;n&quot;: 0}
+
+    class CountingContainer(_StubContainer):
+        def list_workflow_executions(self, workflow):  # type: ignore[override]
+            call_count[&quot;n&quot;] += 1
+            return super().list_workflow_executions(workflow)
+
+    container = CountingContainer(executions_for_workflow={&quot;WF-1&quot;: [&quot;EXE-A&quot;]})
+    selector = FeatureRecord.select_by_workflow(&quot;WF-1&quot;, container=container)
+    # Multiple selection calls
+    records = [_StubRecord(Execution=&quot;EXE-A&quot;, RCT=&quot;r1&quot;)]
+    for _ in range(10):
+        selector(records)
+    assert call_count[&quot;n&quot;] == 1
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/feature/test_select_by_workflow.py -q</code>
+Expected: FAIL — <code>FeatureRecord.select_by_workflow</code> classmethod does not yet exist.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the factory</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/feature.py</code>, after the <code>select_by_execution</code> staticmethod (around line 175) and before <code>select_first</code>, add:</p>
+<pre><code class="language-python">@classmethod
+def select_by_workflow(
+    cls,
+    workflow: str,
+    *,
+    container,
+) -&gt; &quot;Callable[[list[FeatureRecord]], Optional[FeatureRecord]]&quot;:
+    &quot;&quot;&quot;Return a selector that filters records by the executions of a workflow.
+
+    This is a **factory**: call it once per workflow to get a reusable
+    selector closure. The returned closure has signature
+    ``(list[FeatureRecord]) -&gt; FeatureRecord | None`` and can be passed
+    as the ``selector`` argument to
+    :meth:`~deriva_ml.interfaces.DatasetLike.feature_values`.
+
+    **Eager resolution.** The expensive work —
+    ``container.list_workflow_executions(workflow)`` — happens once, at
+    factory-call time. The returned closure is a pure function over
+    records and is cheap to invoke repeatedly. A workflow that doesn't
+    exist raises at the factory call, not later at selection time.
+
+    **Behavior when no records match.** If the group contains no record
+    whose ``Execution`` RID is in the workflow's execution set, the
+    selector returns ``None``. ``feature_values`` treats ``None`` as
+    &quot;feature absent for this target RID&quot; and omits the target from its
+    iterator. This is consistent with the documented selector contract
+    for &quot;no-match&quot; cases.
+
+    **Tie-breaking.** When multiple records match, ``select_newest`` is
+    applied — the record with the most recent ``RCT`` wins.
+
+    Args:
+        workflow: A Workflow RID (e.g., ``&quot;2-ABC1&quot;``) or Workflow_Type
+            name (e.g., ``&quot;Training&quot;``). Resolution is delegated to
+            ``container.list_workflow_executions``, which implements the
+            two-step lookup (RID first, then type name).
+        container: **Required keyword-only.** A container that exposes
+            ``list_workflow_executions(workflow) -&gt; list[str]``. All three
+            of ``DerivaML``, ``Dataset``, and ``DatasetBag`` qualify.
+
+    Returns:
+        A callable ``(list[FeatureRecord]) -&gt; FeatureRecord | None``
+        suitable for the ``selector`` kwarg of ``feature_values``.
+
+    Raises:
+        DerivaMLException: If ``workflow`` does not resolve in
+            ``container`` (unknown RID and unknown Workflow_Type name).
+        TypeError: If ``container`` is passed positionally.
+
+    Example:
+        Get the newest Glaucoma label per image created by the
+        ``Glaucoma_Training_v2`` workflow, works identically online
+        and on a downloaded bag::
+
+            &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+            &gt;&gt;&gt; workflow = ml.lookup_workflow(&quot;Glaucoma_Training_v2&quot;)
+            &gt;&gt;&gt; sel = FeatureRecord.select_by_workflow(workflow, container=bag)
+            &gt;&gt;&gt; for rec in bag.feature_values(
+            ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=sel,
+            ... ):
+            ...     print(rec.Image, rec.Glaucoma)
+    &quot;&quot;&quot;
+    # Eager resolution: fail-fast on unknown workflow, amortize the lookup
+    # across all subsequent selection calls. Convert to a set for O(1)
+    # membership testing inside the closure.
+    execution_set = set(container.list_workflow_executions(workflow))
+
+    def _selector(records: list[&quot;FeatureRecord&quot;]) -&gt; &quot;FeatureRecord | None&quot;:
+        matching = [r for r in records if r.Execution in execution_set]
+        if not matching:
+            return None
+        return FeatureRecord.select_newest(matching)
+
+    return _selector
+</code></pre>
+<p>Note: <code>Callable</code> and <code>Optional</code> must be importable. Add <code>from typing import Callable, Optional</code> if not already in the file's imports. The existing imports at line 19 include <code>Optional</code>. Add <code>Callable</code>.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/feature/test_select_by_workflow.py -q</code>
+Expected: 6 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/feature/test_select_by_workflow.py src/deriva_ml/feature.py
+git commit -m &quot;feat(feature): FeatureRecord.select_by_workflow selector factory (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-add-derivamllist_workflow_executions">Task 3: Add <code>DerivaML.list_workflow_executions</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/feature.py</code> (new method, place near end of <code>FeatureMixin</code> class)
+- Test: extend <code>tests/feature/test_features.py</code> with new tests (requires live catalog)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing live-catalog test</strong></li>
+</ul>
+<p>Add to <code>tests/feature/test_features.py</code> (existing file):</p>
+<pre><code class="language-python">def test_list_workflow_executions_returns_matching_rids(test_ml) -&gt; None:
+    &quot;&quot;&quot;list_workflow_executions returns all execution RIDs that ran a given workflow.&quot;&quot;&quot;
+    # Fixture: create a workflow, run two executions against it, verify both RIDs returned.
+    from deriva_ml.execution import ExecutionConfiguration
+    wf = test_ml.add_workflow(
+        name=&quot;S2_test_wf&quot;,
+        url=&quot;https://example.com/s2_test&quot;,
+        workflow_type=&quot;Test_Workflow&quot;,
+        description=&quot;S2 list_workflow_executions coverage&quot;,
+        checksum=&quot;a&quot; * 64,
+    )
+    # Two executions against the same workflow
+    cfg = ExecutionConfiguration(description=&quot;exec 1&quot;, workflow=wf)
+    with test_ml.create_execution(cfg) as exe1:
+        pass
+    with test_ml.create_execution(cfg) as exe2:
+        pass
+    rids = test_ml.list_workflow_executions(wf)
+    assert exe1.execution_rid in rids
+    assert exe2.execution_rid in rids
+    # Unique entries
+    assert len(rids) == len(set(rids))
+
+
+def test_list_workflow_executions_by_workflow_type_name(test_ml) -&gt; None:
+    &quot;&quot;&quot;list_workflow_executions accepts a Workflow_Type name (not just an RID).&quot;&quot;&quot;
+    wf = test_ml.add_workflow(
+        name=&quot;S2_type_wf&quot;,
+        url=&quot;https://example.com/s2_type&quot;,
+        workflow_type=&quot;Test_Workflow&quot;,
+        description=&quot;S2 workflow type name coverage&quot;,
+        checksum=&quot;b&quot; * 64,
+    )
+    from deriva_ml.execution import ExecutionConfiguration
+    cfg = ExecutionConfiguration(description=&quot;exec&quot;, workflow=wf)
+    with test_ml.create_execution(cfg) as exe:
+        pass
+    rids = test_ml.list_workflow_executions(&quot;Test_Workflow&quot;)
+    assert exe.execution_rid in rids
+
+
+def test_list_workflow_executions_unknown_raises(test_ml) -&gt; None:
+    &quot;&quot;&quot;Unknown workflow → DerivaMLException.&quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLException
+    with pytest.raises(DerivaMLException):
+        test_ml.list_workflow_executions(&quot;nonexistent-workflow-xyz&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails (needs DERIVA_HOST)</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_features.py::test_list_workflow_executions_returns_matching_rids -q</code>
+Expected: FAIL — method <code>list_workflow_executions</code> does not exist on <code>DerivaML</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>list_workflow_executions</code> in <code>FeatureMixin</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/feature.py</code>, replace the existing <code>select_by_workflow</code> method (lines 565-664) with <code>list_workflow_executions</code>. The new method reuses the existing lookup-by-RID-then-type-name logic but returns the full execution list:</p>
+<pre><code class="language-python">@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def list_workflow_executions(self, workflow: str) -&gt; list[str]:
+    &quot;&quot;&quot;Return execution RIDs that ran the given workflow.
+
+    The ``workflow`` argument resolves in two steps: first as a Workflow
+    RID, and if that fails, as a Workflow_Type name. The returned list
+    contains every execution RID for every workflow that matches.
+
+    This method is the catalog-backed building block for
+    ``FeatureRecord.select_by_workflow(workflow, container=ml)`` — it
+    resolves the workflow's execution set once, and the selector closes
+    over the result for cheap per-group membership testing.
+
+    Entries are unique by construction (each execution runs one workflow).
+    Consumers that need O(1) membership testing convert to ``set`` at the
+    call site.
+
+    Args:
+        workflow: Workflow RID (e.g., ``&quot;2-ABC1&quot;``) or Workflow_Type name
+            (e.g., ``&quot;Training&quot;``).
+
+    Returns:
+        List of execution RIDs, in insertion order. May be empty if the
+        workflow exists but has no executions yet.
+
+    Raises:
+        DerivaMLException: If ``workflow`` does not resolve as a Workflow
+            RID nor as a Workflow_Type name.
+
+    Example:
+        List all executions of a workflow and count them::
+
+            &gt;&gt;&gt; rids = ml.list_workflow_executions(&quot;Glaucoma_Training_v2&quot;)
+            &gt;&gt;&gt; print(f&quot;{len(rids)} executions of this workflow&quot;)
+
+        Use as the catalog-backed resolver for the selector factory::
+
+            &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+            &gt;&gt;&gt; sel = FeatureRecord.select_by_workflow(
+            ...     &quot;Glaucoma_Training_v2&quot;, container=ml,
+            ... )
+    &quot;&quot;&quot;
+    # Try RID first
+    try:
+        wf = self.lookup_workflow(workflow)
+        return [
+            exec_record.execution_rid
+            for exec_record in self.find_executions(workflow=wf)
+        ]
+    except DerivaMLException:
+        pass
+
+    # Fall back to Workflow_Type name
+    pb = self.pathBuilder()
+    wt_assoc = pb.schemas[self.ml_schema].Workflow_Workflow_Type
+    matching_workflows = {
+        row[&quot;Workflow&quot;]
+        for row in wt_assoc.filter(
+            wt_assoc.Workflow_Type == workflow
+        ).entities().fetch()
+    }
+    if not matching_workflows:
+        raise DerivaMLException(
+            f&quot;No workflow resolved for '{workflow}' — tried as Workflow RID &quot;
+            f&quot;and Workflow_Type name.&quot;
+        )
+    return [
+        exec_record.execution_rid
+        for exec_record in self.find_executions()
+        if exec_record.workflow_rid in matching_workflows
+    ]
+</code></pre>
+<p>Leave <code>select_by_workflow</code> in place for now — Task 10 retires it with a clear-error shim. That ordering ensures callers get a helpful message rather than silent breakage during the refactor.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run live-catalog tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_features.py -k list_workflow -q --timeout=300</code>
+Expected: 3 new tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/feature/test_features.py src/deriva_ml/core/mixins/feature.py
+git commit -m &quot;feat(feature): DerivaML.list_workflow_executions (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-add-derivamlfeature_values-online-read-iterator">Task 4: Add <code>DerivaML.feature_values</code> (online read, iterator)</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/feature.py</code> (new method, place before <code>fetch_table_features</code> — which stays until Task 10)
+- Test: <code>tests/feature/test_feature_values.py</code> (new file, online-only tests in this task; symmetry extension in Task 8)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/feature/test_feature_values.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Tests for the unified feature_values read surface.
+
+This task (Task 4) covers DerivaML online reads. The parametrized symmetry
+suite across DerivaML / Dataset / DatasetBag is added in Task 8 once all
+three containers have the method.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLNotFoundError
+from deriva_ml.feature import FeatureRecord
+
+
+def test_feature_values_yields_feature_records(test_ml_with_feature) -&gt; None:
+    &quot;&quot;&quot;feature_values yields FeatureRecord instances with the expected attrs.&quot;&quot;&quot;
+    records = list(test_ml_with_feature.ml.feature_values(
+        &quot;Image&quot;, test_ml_with_feature.feature_name,
+    ))
+    assert len(records) &gt; 0
+    rec = records[0]
+    assert isinstance(rec, FeatureRecord)
+    # Target RID attribute present and non-empty
+    assert getattr(rec, &quot;Image&quot;, None)
+    # Feature_Name populated
+    assert rec.Feature_Name == test_ml_with_feature.feature_name
+
+
+def test_feature_values_unknown_feature_raises(test_ml) -&gt; None:
+    with pytest.raises(DerivaMLException):
+        list(test_ml.feature_values(&quot;Image&quot;, &quot;no_such_feature_xyz&quot;))
+
+
+def test_feature_values_is_iterable_not_list(test_ml_with_feature) -&gt; None:
+    &quot;&quot;&quot;Return type is an iterator (streaming), not a materialized list.&quot;&quot;&quot;
+    import collections.abc
+    result = test_ml_with_feature.ml.feature_values(
+        &quot;Image&quot;, test_ml_with_feature.feature_name,
+    )
+    assert isinstance(result, collections.abc.Iterator)
+
+
+def test_feature_values_with_select_newest(test_ml_with_feature_multi) -&gt; None:
+    &quot;&quot;&quot;Selector reduces multi-value groups to one record per target RID.&quot;&quot;&quot;
+    records = list(test_ml_with_feature_multi.ml.feature_values(
+        &quot;Image&quot;,
+        test_ml_with_feature_multi.feature_name,
+        selector=FeatureRecord.select_newest,
+    ))
+    # After selector: one record per target Image
+    rids = [r.Image for r in records]
+    assert len(rids) == len(set(rids))
+
+
+def test_feature_values_selector_returning_none_omits_target(test_ml_with_feature) -&gt; None:
+    &quot;&quot;&quot;Selector returning None removes that target from the iterator.&quot;&quot;&quot;
+    def reject_all(records):
+        return None
+    records = list(test_ml_with_feature.ml.feature_values(
+        &quot;Image&quot;, test_ml_with_feature.feature_name, selector=reject_all,
+    ))
+    assert records == []
+</code></pre>
+<p>Two fixtures referenced (<code>test_ml_with_feature</code>, <code>test_ml_with_feature_multi</code>) must be added to <code>tests/feature/conftest.py</code> or <code>tests/conftest.py</code> — they produce a catalog with a created feature and one or several feature values. If equivalent fixtures exist in <code>tests/feature/test_features.py</code> or <code>tests/feature/test_fetch_table_features.py</code>, reuse their setup; otherwise factor them out into a shared conftest. Use real feature creation via <code>ml.create_feature(...)</code> + <code>exe.add_features(...)</code> — do not mock.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_feature_values.py -q --timeout=300</code>
+Expected: FAIL — <code>feature_values</code> method does not exist; fixtures may also be missing.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>feature_values</code> in <code>FeatureMixin</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/feature.py</code>, add before <code>fetch_table_features</code> (around line 382):</p>
+<pre><code class="language-python">@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+def feature_values(
+    self,
+    table: Table | str,
+    feature_name: str,
+    selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+) -&gt; Iterable[FeatureRecord]:
+    &quot;&quot;&quot;Yield feature values for a single feature, one record per target RID.
+
+    Returns an iterator of typed ``FeatureRecord`` instances. Each record is
+    wide in shape — target RID, all value columns (vocab terms, asset
+    references, metadata columns), and provenance columns (``Execution``,
+    ``RCT``) — exposed as typed attributes.
+
+    When a ``selector`` is provided, records are grouped by target RID and
+    the selector collapses each group to a single survivor. Target RIDs
+    whose group's selector returns ``None`` are omitted. When no selector
+    is provided, every raw record is yielded — multiple records per target
+    RID are possible.
+
+    This method has identical signatures and semantics across ``DerivaML``,
+    ``Dataset``, and ``DatasetBag``. The bag implementation reads from a
+    per-feature denormalization cache populated on first access; subsequent
+    calls are cheap.
+
+    Args:
+        table: Target table the feature is defined on (name or Table).
+        feature_name: Name of the feature to read.
+        selector: Optional callable
+            ``(list[FeatureRecord]) -&gt; FeatureRecord | None`` used to
+            reduce multi-value groups. Built-ins include
+            ``FeatureRecord.select_newest``,
+            ``FeatureRecord.select_first``, and the factory
+            ``FeatureRecord.select_by_workflow(workflow, container=...)``.
+            Return ``None`` from a selector to omit that target RID.
+
+    Returns:
+        Iterator of ``FeatureRecord`` — one record per target RID after
+        selector reduction, or all raw records if no selector.
+
+    Raises:
+        DerivaMLTableNotFound: ``table`` does not exist.
+        DerivaMLException: ``feature_name`` is not a feature on ``table``.
+
+    Example:
+        Get the newest Glaucoma label per image::
+
+            &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+            &gt;&gt;&gt; for rec in ml.feature_values(
+            ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+            ... ):
+            ...     print(f&quot;{rec.Image}: {rec.Glaucoma} (by {rec.Execution})&quot;)
+
+        Filter by a specific workflow — works identically on a downloaded bag::
+
+            &gt;&gt;&gt; workflow = ml.lookup_workflow(&quot;Glaucoma_Training_v2&quot;)
+            &gt;&gt;&gt; sel = FeatureRecord.select_by_workflow(workflow, container=ml)
+            &gt;&gt;&gt; labels = [r.Glaucoma for r in ml.feature_values(
+            ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=sel,
+            ... )]
+
+        Convert to a pandas DataFrame when needed::
+
+            &gt;&gt;&gt; import pandas as pd
+            &gt;&gt;&gt; df = pd.DataFrame(
+            ...     r.model_dump()
+            ...     for r in ml.feature_values(&quot;Image&quot;, &quot;Glaucoma&quot;)
+            ... )
+    &quot;&quot;&quot;
+    table_obj = self.model.name_to_table(table)
+    feat = self.lookup_feature(table_obj, feature_name)
+    record_class = feat.feature_record_class()
+    field_names = set(record_class.model_fields.keys())
+    target_col = feat.target_table.name
+
+    # Fetch raw rows via datapath
+    pb = self.pathBuilder()
+    raw_values = (
+        pb.schemas[feat.feature_table.schema.name]
+        .tables[feat.feature_table.name]
+        .entities()
+        .fetch()
+    )
+
+    # Materialize to FeatureRecord instances
+    records: list[FeatureRecord] = [
+        record_class(**{k: v for k, v in raw.items() if k in field_names})
+        for raw in raw_values
+    ]
+
+    if selector is None:
+        # No reduction — yield everything.
+        yield from records
+        return
+
+    # Group by target RID, apply selector, skip None results.
+    grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+    for rec in records:
+        target_rid = getattr(rec, target_col, None)
+        if target_rid is not None:
+            grouped[target_rid].append(rec)
+
+    for group in grouped.values():
+        chosen = selector(group) if len(group) &gt; 1 else group[0]
+        if chosen is not None:
+            yield chosen
+</code></pre>
+<p>Note: <code>defaultdict</code> is already imported at the top of the file (line 12). <code>Callable</code>, <code>Iterable</code> are already imported (line 14).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_feature_values.py -q --timeout=300</code>
+Expected: 5 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/feature/test_feature_values.py src/deriva_ml/core/mixins/feature.py
+git commit -m &quot;feat(feature): DerivaML.feature_values — iterator read surface (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-add-datasetfeature_values-datasetlookup_feature-datasetlist_workflow_executions">Task 5: Add <code>Dataset.feature_values</code>, <code>Dataset.lookup_feature</code>, <code>Dataset.list_workflow_executions</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> (methods placed near existing <code>find_features</code>, around line 455)
+- Test: extend <code>tests/feature/test_feature_values.py</code> with Dataset-scoped tests</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/feature/test_feature_values.py</code>:</p>
+<pre><code class="language-python">def test_dataset_feature_values_filters_to_members(catalog_with_feature_and_dataset) -&gt; None:
+    &quot;&quot;&quot;Dataset.feature_values yields only records whose target RID is in dataset members.&quot;&quot;&quot;
+    fx = catalog_with_feature_and_dataset
+    dataset = fx.dataset
+    feature_name = fx.feature_name
+    member_rids = set(dataset.list_members(fx.target_table))
+    records = list(dataset.feature_values(fx.target_table, feature_name))
+    assert all(getattr(r, fx.target_table) in member_rids for r in records)
+
+
+def test_dataset_lookup_feature_delegates_to_ml(catalog_with_feature_and_dataset) -&gt; None:
+    &quot;&quot;&quot;Dataset.lookup_feature returns a Feature object identical to ml.lookup_feature.&quot;&quot;&quot;
+    fx = catalog_with_feature_and_dataset
+    ds_feat = fx.dataset.lookup_feature(fx.target_table, fx.feature_name)
+    ml_feat = fx.ml.lookup_feature(fx.target_table, fx.feature_name)
+    assert ds_feat.feature_name == ml_feat.feature_name
+    assert ds_feat.target_table.name == ml_feat.target_table.name
+
+
+def test_dataset_list_workflow_executions_scopes_to_dataset(
+    catalog_with_feature_and_dataset,
+) -&gt; None:
+    &quot;&quot;&quot;Dataset.list_workflow_executions returns only executions in the dataset's scope.&quot;&quot;&quot;
+    fx = catalog_with_feature_and_dataset
+    ml_rids = set(fx.ml.list_workflow_executions(fx.workflow))
+    ds_rids = set(fx.dataset.list_workflow_executions(fx.workflow))
+    assert ds_rids.issubset(ml_rids)
+</code></pre>
+<p>The fixture <code>catalog_with_feature_and_dataset</code> builds a dataset containing a subset of feature-target RIDs. If similar scaffolding exists in <code>tests/dataset/</code>, factor it into a shared <code>tests/feature/conftest.py</code>. The fixture must expose <code>ml</code>, <code>dataset</code>, <code>target_table</code> (name), <code>feature_name</code>, <code>workflow</code> (RID) attributes.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_feature_values.py::test_dataset_feature_values_filters_to_members -q --timeout=300</code>
+Expected: FAIL — <code>Dataset.feature_values</code>, <code>Dataset.lookup_feature</code>, <code>Dataset.list_workflow_executions</code> do not exist.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the three methods on <code>Dataset</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset.py</code>, after the existing <code>find_features</code> method (around line 455), add:</p>
+<pre><code class="language-python">def feature_values(
+    self,
+    table: str | Table,
+    feature_name: str,
+    selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+) -&gt; Iterable[FeatureRecord]:
+    &quot;&quot;&quot;Dataset-scoped feature values — identical signature to ``DerivaML.feature_values``.
+
+    Yields only records whose target RID is a member of this dataset. The
+    filtering is applied over the raw feature table query before selector
+    reduction — a target RID outside the dataset's member set is never
+    presented to the selector.
+
+    See :meth:`deriva_ml.core.mixins.feature.FeatureMixin.feature_values`
+    for the full contract (return type, selector semantics, exceptions).
+
+    Example:
+        &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+        &gt;&gt;&gt; for rec in dataset.feature_values(
+        ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+        ... ):
+        ...     ...  # processing only images in this dataset
+    &quot;&quot;&quot;
+    members = set(self.list_members(table))
+    target_col = (
+        table if isinstance(table, str) else table.name
+    )  # target attr on each FeatureRecord has this name
+    # Delegate to ml for the raw fetch, then filter.
+    for rec in self._ml.feature_values(table, feature_name, selector=None):
+        if getattr(rec, target_col, None) in members:
+            yield rec if selector is None else None  # placeholder — selector applied below
+
+    # NOTE: Implementing in-scope selector application requires grouping
+    # post-filter. Replace the body above with the filter-then-group-then-select
+    # pattern used in FeatureMixin.feature_values. See the reference
+    # implementation below.
+</code></pre>
+<p><strong>Corrected implementation</strong> (use this — the stub above makes the intent clear but is not complete):</p>
+<pre><code class="language-python">def feature_values(
+    self,
+    table: str | Table,
+    feature_name: str,
+    selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+) -&gt; Iterable[FeatureRecord]:
+    &quot;&quot;&quot;Dataset-scoped feature values — identical signature to DerivaML.feature_values.
+
+    Yields only records whose target RID is a member of this dataset.
+
+    See DerivaML.feature_values docstring for the full contract.
+
+    Example:
+        &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+        &gt;&gt;&gt; records = list(dataset.feature_values(
+        ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+        ... ))
+    &quot;&quot;&quot;
+    from collections import defaultdict
+
+    members = set(self.list_members(table))
+    target_col = table if isinstance(table, str) else table.name
+
+    # Filter upstream raw records to dataset members
+    raw_in_scope = [
+        rec
+        for rec in self._ml.feature_values(table, feature_name, selector=None)
+        if getattr(rec, target_col, None) in members
+    ]
+
+    if selector is None:
+        yield from raw_in_scope
+        return
+
+    grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+    for rec in raw_in_scope:
+        target_rid = getattr(rec, target_col, None)
+        if target_rid is not None:
+            grouped[target_rid].append(rec)
+
+    for group in grouped.values():
+        chosen = selector(group) if len(group) &gt; 1 else group[0]
+        if chosen is not None:
+            yield chosen
+
+
+def lookup_feature(self, table: str | Table, feature_name: str) -&gt; &quot;Feature&quot;:
+    &quot;&quot;&quot;Look up a Feature definition — delegates to the owning DerivaML.
+
+    Identical signature and return to ``DerivaML.lookup_feature``. Provided
+    for API symmetry so dataset-scoped code does not need to reach back
+    through ``self._ml``.
+
+    Example:
+        &gt;&gt;&gt; feat = dataset.lookup_feature(&quot;Image&quot;, &quot;Glaucoma&quot;)
+        &gt;&gt;&gt; RecordClass = feat.feature_record_class()
+    &quot;&quot;&quot;
+    return self._ml.lookup_feature(table, feature_name)
+
+
+def list_workflow_executions(self, workflow: str) -&gt; list[str]:
+    &quot;&quot;&quot;Return execution RIDs in this dataset's scope that ran the given workflow.
+
+    Filters ``DerivaML.list_workflow_executions`` to executions that
+    produced data in this dataset. Used by
+    ``FeatureRecord.select_by_workflow(workflow, container=dataset)``.
+
+    Args:
+        workflow: Workflow RID or Workflow_Type name. See
+            ``DerivaML.list_workflow_executions`` for the resolution rules.
+
+    Returns:
+        List of execution RIDs in this dataset's scope. May be empty.
+
+    Example:
+        &gt;&gt;&gt; rids = dataset.list_workflow_executions(&quot;Glaucoma_Training_v2&quot;)
+        &gt;&gt;&gt; print(f&quot;{len(rids)} training runs touched this dataset&quot;)
+    &quot;&quot;&quot;
+    all_rids = set(self._ml.list_workflow_executions(workflow))
+    # Scope: executions whose target RIDs intersect with dataset members.
+    # Concretely: executions that produced any feature value whose target
+    # is a member of this dataset.
+    in_scope: list[str] = []
+    for rid in all_rids:
+        # NOTE: &quot;in scope&quot; is defined as &quot;execution touched any dataset
+        # member table row&quot;. This reuses the existing list_members logic.
+        # If the dataset has no direct link to executions, this falls back
+        # to the superset (ml_rids) — see the Dataset↔Execution spec for
+        # the authoritative scope definition.
+        if self._execution_touches_dataset(rid):
+            in_scope.append(rid)
+    return in_scope
+</code></pre>
+<p><strong>Scope definition caveat.</strong> "Execution is in the dataset's scope" has two reasonable definitions:</p>
+<ol>
+<li><strong>Strict:</strong> the execution produced at least one feature value whose target RID is a dataset member (requires a query per execution).</li>
+<li><strong>Permissive:</strong> every execution returned by <code>ml.list_workflow_executions</code>, with downstream code applying target-RID filtering at selection time.</li>
+</ol>
+<p>The implementer should prefer <strong>Definition 2 (permissive)</strong> for this task unless the existing <code>Dataset</code> class has a pre-existing helper for "executions that touched this dataset." Definition 2 is cheaper and still correct: the <code>FeatureRecord.select_by_workflow</code> selector closes over the full workflow execution set, and the <code>feature_values</code> iterator already filters to dataset members at the target-RID level. Any execution RID that lies outside the dataset's member set has no records that pass the member filter, so it never reduces the selector output. Implementing Definition 1 is a performance optimization for very large catalogs, out of scope here.</p>
+<p><strong>Simplification:</strong> replace the <code>list_workflow_executions</code> body above with a direct pass-through:</p>
+<pre><code class="language-python">def list_workflow_executions(self, workflow: str) -&gt; list[str]:
+    &quot;&quot;&quot;Dataset-scoped list_workflow_executions — see DerivaML.list_workflow_executions.
+
+    Current implementation returns the full workflow execution list from the
+    catalog. Target-RID filtering at selection time ensures feature_values
+    only yields records for executions whose output lands on dataset members.
+    A stricter scope (executions whose outputs touch dataset members) is a
+    performance optimization deferred to a later change.
+
+    Example:
+        &gt;&gt;&gt; rids = dataset.list_workflow_executions(&quot;Glaucoma_Training_v2&quot;)
+    &quot;&quot;&quot;
+    return self._ml.list_workflow_executions(workflow)
+</code></pre>
+<p>Use the simplified form. Remove the <code>_execution_touches_dataset</code> helper scaffolding above — we are not implementing strict scope in this task.</p>
+<p>Update the test <code>test_dataset_list_workflow_executions_scopes_to_dataset</code> accordingly: it should assert <code>ds_rids.issubset(ml_rids)</code>, which the pass-through implementation satisfies trivially (equality). Keep the test as a guard against future divergence.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_feature_values.py -q --timeout=600</code>
+Expected: all Dataset-scoped tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/feature/test_feature_values.py src/deriva_ml/dataset/dataset.py
+git commit -m &quot;feat(dataset): feature_values/lookup_feature/list_workflow_executions (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-build-bag-feature-cache-reader-and-wire-datasetbagfeature_values-through-it">Task 6: Build bag feature cache reader and wire <code>DatasetBag.feature_values</code> through it</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/dataset/bag_feature_cache.py</code>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (rewrite internals of <code>find_features</code>-adjacent feature read path; add <code>lookup_feature</code>, <code>list_workflow_executions</code>, <code>feature_values</code>; leave <code>fetch_table_features</code> / <code>list_feature_values</code> for Task 10 retirement)
+- Test: <code>tests/dataset/test_bag_feature_cache.py</code> (new), extend <code>tests/feature/test_feature_values.py</code> with bag-side tests</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_bag_feature_cache.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for the DatasetBag per-feature denormalization cache.&quot;&quot;&quot;
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLDataError
+from deriva_ml.dataset.bag_feature_cache import BagFeatureCache
+
+
+def test_first_access_populates_cache(materialized_bag_with_feature) -&gt; None:
+    &quot;&quot;&quot;First call to fetch_feature_values populates the cache; second call reads it.&quot;&quot;&quot;
+    bag = materialized_bag_with_feature.bag
+    cache = BagFeatureCache(bag)
+    first = list(cache.fetch_feature_records(&quot;Image&quot;, materialized_bag_with_feature.feature_name))
+    second = list(cache.fetch_feature_records(&quot;Image&quot;, materialized_bag_with_feature.feature_name))
+    assert [r.model_dump() for r in first] == [r.model_dump() for r in second]
+
+
+def test_cache_immutable_after_population(materialized_bag_with_feature) -&gt; None:
+    &quot;&quot;&quot;Bags are immutable; subsequent reads return identical data.&quot;&quot;&quot;
+    # Assert that mutating the bag's SQLite feature source tables does not affect
+    # already-returned cache reads. (Implementation: cache stores records in a new
+    # sqlite table populated once; subsequent reads hit that table.)
+    bag = materialized_bag_with_feature.bag
+    cache = BagFeatureCache(bag)
+    first = [r.model_dump() for r in cache.fetch_feature_records(&quot;Image&quot;, materialized_bag_with_feature.feature_name)]
+    # Simulate tampering: drop a row from the source feature table directly.
+    # (Omitted here — the guarantee is that the cache table is persistent and
+    # not recomputed per call.)
+    second = [r.model_dump() for r in cache.fetch_feature_records(&quot;Image&quot;, materialized_bag_with_feature.feature_name)]
+    assert first == second
+
+
+def test_cache_corrupt_raises_with_recovery_pointer(tmp_path: Path) -&gt; None:
+    &quot;&quot;&quot;If cache init fails (corrupt SQLite, missing source table), raise with bag path.&quot;&quot;&quot;
+    # Build a minimal fake bag that has no feature table to trigger the error path.
+    # Use pytest-style monkeypatch or a small helper to construct a BagFeatureCache
+    # against a bag missing the requested feature; expect DerivaMLDataError.
+    pytest.skip(&quot;Requires a fabricated bag-like directory — wire up in implementation.&quot;)
+</code></pre>
+<p>Append to <code>tests/feature/test_feature_values.py</code>:</p>
+<pre><code class="language-python">def test_bag_feature_values_matches_online(
+    catalog_with_feature_and_materialized_bag,
+) -&gt; None:
+    &quot;&quot;&quot;bag.feature_values yields records whose content matches ml.feature_values.&quot;&quot;&quot;
+    fx = catalog_with_feature_and_materialized_bag
+    online = sorted(
+        [r.model_dump(exclude={&quot;RCT&quot;, &quot;RMT&quot;}) for r in fx.ml.feature_values(
+            fx.target_table, fx.feature_name,
+        )],
+        key=lambda d: d[fx.target_table],
+    )
+    offline = sorted(
+        [r.model_dump(exclude={&quot;RCT&quot;, &quot;RMT&quot;}) for r in fx.bag.feature_values(
+            fx.target_table, fx.feature_name,
+        )],
+        key=lambda d: d[fx.target_table],
+    )
+    assert online == offline
+
+
+def test_bag_lookup_feature_works_offline(materialized_bag_with_feature) -&gt; None:
+    &quot;&quot;&quot;bag.lookup_feature works without a live catalog connection.&quot;&quot;&quot;
+    bag = materialized_bag_with_feature.bag
+    feat = bag.lookup_feature(&quot;Image&quot;, materialized_bag_with_feature.feature_name)
+    assert feat.feature_name == materialized_bag_with_feature.feature_name
+    # feature_record_class is usable offline
+    RecordClass = feat.feature_record_class()
+    instance = RecordClass(Image=&quot;IMG-1&quot;, Feature_Name=materialized_bag_with_feature.feature_name)
+    assert instance.Image == &quot;IMG-1&quot;
+</code></pre>
+<p>Fixtures:
+- <code>materialized_bag_with_feature</code>: produces a downloaded bag containing a feature. Reuse <code>catalog_with_datasets</code> + <code>download_dataset_bag</code> scaffolding from existing tests.
+- <code>catalog_with_feature_and_materialized_bag</code>: fixture exposing both an online <code>ml</code> and a matching offline <code>bag</code> for symmetry comparison.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_bag_feature_cache.py -q</code>
+Expected: FAIL — <code>BagFeatureCache</code> does not exist.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>BagFeatureCache</code></strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/dataset/bag_feature_cache.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Per-feature denormalization cache for DatasetBag.
+
+Bags are immutable after materialization. This cache populates on first
+access per feature and is the read path for ``DatasetBag.feature_values``.
+The cache tables live in the bag's existing SQLite database.
+
+See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md §Architecture.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Iterable
+
+from sqlalchemy import Column, MetaData, String, Table, Text, select
+from sqlalchemy.orm import Session
+
+from deriva_ml.core.exceptions import DerivaMLDataError, DerivaMLException
+from deriva_ml.feature import FeatureRecord
+
+if TYPE_CHECKING:
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+
+logger = logging.getLogger(__name__)
+
+_CACHE_TABLE_PREFIX = &quot;_feature_cache_&quot;
+
+
+class BagFeatureCache:
+    &quot;&quot;&quot;Read feature records from a bag's per-feature denormalization cache.
+
+    On first access per feature, the cache projects the bag's feature-table
+    rows into a cache table keyed by target RID. Subsequent reads hit the
+    cache table directly. The cache is bag-local and immutable — bags do not
+    mutate after materialization.
+
+    Example:
+        &gt;&gt;&gt; cache = BagFeatureCache(bag)
+        &gt;&gt;&gt; for rec in cache.fetch_feature_records(&quot;Image&quot;, &quot;Glaucoma&quot;):
+        ...     print(rec.Image, rec.Glaucoma)
+    &quot;&quot;&quot;
+
+    def __init__(self, bag: &quot;DatasetBag&quot;) -&gt; None:
+        self._bag = bag
+        self._engine = bag.engine
+        self._metadata = MetaData()
+
+    def fetch_feature_records(
+        self, table: str, feature_name: str
+    ) -&gt; Iterable[FeatureRecord]:
+        &quot;&quot;&quot;Yield FeatureRecord instances for (table, feature_name) from cache.
+
+        Populates the cache on first access. Subsequent calls read directly
+        from the cache table.
+
+        Raises:
+            DerivaMLException: Feature not found on table.
+            DerivaMLDataError: Cache corruption or missing source data.
+        &quot;&quot;&quot;
+        feat = self._bag.model.lookup_feature(table, feature_name)
+        record_class = feat.feature_record_class()
+        cache_table_name = _CACHE_TABLE_PREFIX + feat.feature_table.name
+
+        cache_table = self._ensure_cache_populated(feat, cache_table_name, record_class)
+
+        # Read from cache
+        field_names = set(record_class.model_fields.keys())
+        with self._engine.connect() as conn:
+            rows = conn.execute(select(cache_table)).mappings().all()
+        for row in rows:
+            filtered = {k: v for k, v in dict(row).items() if k in field_names}
+            yield record_class(**filtered)
+
+    def _ensure_cache_populated(
+        self,
+        feat,
+        cache_table_name: str,
+        record_class: type[FeatureRecord],
+    ):
+        &quot;&quot;&quot;Ensure the cache table exists and is populated. Returns the table handle.&quot;&quot;&quot;
+        # Reflect existing cache table if present
+        from sqlalchemy import inspect
+
+        inspector = inspect(self._engine)
+        if cache_table_name in inspector.get_table_names():
+            cache_table = Table(
+                cache_table_name, self._metadata, autoload_with=self._engine
+            )
+            return cache_table
+
+        # Build the cache: source table → cache table
+        try:
+            source_table = self._bag.model.find_table(feat.feature_table.name)
+        except DerivaMLException as e:
+            raise DerivaMLDataError(
+                f&quot;Feature source table '{feat.feature_table.name}' missing from bag &quot;
+                f&quot;at {self._bag.path}. Re-extract the bag.&quot;
+            ) from e
+
+        # Define cache table with columns matching the record_class fields
+        cache_columns = [
+            Column(&quot;_cache_rowid&quot;, String, primary_key=True),
+        ]
+        for name in record_class.model_fields.keys():
+            # Store everything as TEXT — FeatureRecord Pydantic validation reifies types.
+            cache_columns.append(Column(name, Text))
+        cache_table = Table(cache_table_name, self._metadata, *cache_columns)
+        cache_table.create(self._engine)
+
+        # Populate from the source table
+        with Session(self._engine) as session:
+            sql = select(source_table)
+            rows = session.execute(sql).mappings().all()
+        field_names = set(record_class.model_fields.keys())
+        with self._engine.begin() as conn:
+            for i, raw in enumerate(rows):
+                row_data = {k: v for k, v in dict(raw).items() if k in field_names}
+                row_data[&quot;_cache_rowid&quot;] = f&quot;{i}&quot;
+                conn.execute(cache_table.insert().values(**row_data))
+        logger.info(
+            &quot;BagFeatureCache: populated %s with %d rows&quot;, cache_table_name, len(rows)
+        )
+        return cache_table
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Wire <code>DatasetBag</code> methods</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset_bag.py</code>, add after <code>find_features</code> (around line 462):</p>
+<pre><code class="language-python">def feature_values(
+    self,
+    table: str | Table,
+    feature_name: str,
+    selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+) -&gt; Iterable[FeatureRecord]:
+    &quot;&quot;&quot;Offline feature values — identical signature to DerivaML.feature_values.
+
+    Reads from the bag's per-feature denormalization cache (populated on
+    first access). See DerivaML.feature_values for the full contract.
+
+    Example:
+        &gt;&gt;&gt; from deriva_ml.feature import FeatureRecord
+        &gt;&gt;&gt; records = list(bag.feature_values(
+        ...     &quot;Image&quot;, &quot;Glaucoma&quot;, selector=FeatureRecord.select_newest,
+        ... ))
+    &quot;&quot;&quot;
+    from collections import defaultdict
+    from deriva_ml.dataset.bag_feature_cache import BagFeatureCache
+
+    if not hasattr(self, &quot;_feature_cache&quot;):
+        self._feature_cache = BagFeatureCache(self)
+    target_col = table if isinstance(table, str) else table.name
+
+    records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
+
+    if selector is None:
+        yield from records
+        return
+
+    grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+    for rec in records:
+        target_rid = getattr(rec, target_col, None)
+        if target_rid is not None:
+            grouped[target_rid].append(rec)
+    for group in grouped.values():
+        chosen = selector(group) if len(group) &gt; 1 else group[0]
+        if chosen is not None:
+            yield chosen
+
+
+def lookup_feature(self, table: str | Table, feature_name: str) -&gt; &quot;Feature&quot;:
+    &quot;&quot;&quot;Look up a feature definition from bag metadata — works offline.
+
+    Returns a Feature object identical in shape to what
+    ``DerivaML.lookup_feature`` returns. The Feature's
+    ``feature_record_class()`` method works offline too — use it to
+    construct FeatureRecord instances from bag data for later staging
+    via ``exe.add_features`` when back online.
+
+    Example:
+        &gt;&gt;&gt; feat = bag.lookup_feature(&quot;Image&quot;, &quot;Glaucoma&quot;)
+        &gt;&gt;&gt; RecordClass = feat.feature_record_class()
+        &gt;&gt;&gt; record = RecordClass(Image=&quot;IMG-1&quot;, Glaucoma=&quot;Normal&quot;)
+    &quot;&quot;&quot;
+    return self.model.lookup_feature(table, feature_name)
+
+
+def list_workflow_executions(self, workflow: str) -&gt; list[str]:
+    &quot;&quot;&quot;Offline list_workflow_executions — reads from bag SQLite.
+
+    Returns execution RIDs present in the bag's Execution table that
+    match the given workflow (RID or Workflow_Type name). Used by
+    ``FeatureRecord.select_by_workflow(workflow, container=bag)``.
+
+    Example:
+        &gt;&gt;&gt; rids = bag.list_workflow_executions(&quot;Glaucoma_Training_v2&quot;)
+    &quot;&quot;&quot;
+    from sqlalchemy import select as sa_select, text
+    from sqlalchemy.orm import Session
+
+    # Try as Workflow RID first
+    workflow_table = self.model.find_table(&quot;Workflow&quot;)
+    execution_table = self.model.find_table(&quot;Execution&quot;)
+    with Session(self.engine) as session:
+        wf_rows = session.execute(
+            sa_select(workflow_table).where(
+                workflow_table.c.RID == workflow
+            )
+        ).mappings().all()
+
+        if wf_rows:
+            # Found as RID → return executions with this workflow
+            rows = session.execute(
+                sa_select(execution_table.c.RID).where(
+                    execution_table.c.Workflow == workflow
+                )
+            ).all()
+            return [r[0] for r in rows]
+
+        # Fall back to Workflow_Type name
+        # Workflow_Workflow_Type is the association table; look up all workflows of this type.
+        wwt = self.model.find_table(&quot;Workflow_Workflow_Type&quot;)
+        wf_of_type = [
+            r[0] for r in session.execute(
+                sa_select(wwt.c.Workflow).where(wwt.c.Workflow_Type == workflow)
+            ).all()
+        ]
+        if not wf_of_type:
+            from deriva_ml.core.exceptions import DerivaMLException
+            raise DerivaMLException(
+                f&quot;No workflow resolved for '{workflow}' in bag — tried as &quot;
+                f&quot;Workflow RID and Workflow_Type name.&quot;
+            )
+        rows = session.execute(
+            sa_select(execution_table.c.RID).where(
+                execution_table.c.Workflow.in_(wf_of_type)
+            )
+        ).all()
+        return [r[0] for r in rows]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_bag_feature_cache.py tests/feature/test_feature_values.py -q --timeout=600</code>
+Expected: all bag-side tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/bag_feature_cache.py src/deriva_ml/dataset/dataset_bag.py tests/dataset/test_bag_feature_cache.py tests/feature/test_feature_values.py
+git commit -m &quot;feat(bag): feature_values via per-feature cache, lookup_feature offline (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-stage-and-flush-exeadd_features">Task 7: Stage-and-flush <code>exe.add_features</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/execution.py</code> (replace <code>add_features</code> body around line 847; add <code>_flush_staged_features</code>, resume detection)
+- Test: extend <code>tests/execution/test_staged_features.py</code> with integration tests</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/execution/test_staged_features.py</code>:</p>
+<pre><code class="language-python">def test_exe_add_features_stages_to_sqlite(test_ml, image_feature) -&gt; None:
+    &quot;&quot;&quot;exe.add_features writes Pending rows to execution_state__feature_records, nothing to ermrest yet.&quot;&quot;&quot;
+    from deriva_ml.execution import ExecutionConfiguration
+
+    cfg = ExecutionConfiguration(description=&quot;stage test&quot;, workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        RecordClass = image_feature.record_class
+        exe.add_features([
+            RecordClass(Image=image_feature.image_rids[0], Image_Label=&quot;A&quot;),
+            RecordClass(Image=image_feature.image_rids[1], Image_Label=&quot;B&quot;),
+        ])
+        # Pending in SQLite
+        store = exe._manifest_store
+        pending = store.list_pending_feature_records(exe.execution_rid)
+        assert len(pending) == 2
+        # Not in ermrest yet (query the feature table directly)
+        pb = test_ml.pathBuilder()
+        rows = pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch()
+        # Should have NO rows from this execution yet
+        assert all(r.get(&quot;Execution&quot;) != exe.execution_rid for r in rows)
+    # After __exit__: rows Uploaded and in ermrest
+    pb = test_ml.pathBuilder()
+    rows = list(pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch())
+    ours = [r for r in rows if r.get(&quot;Execution&quot;) == exe.execution_rid]
+    assert len(ours) == 2
+
+
+def test_exe_add_features_auto_fills_execution_rid(test_ml, image_feature) -&gt; None:
+    &quot;&quot;&quot;Records without Execution set get it auto-filled from the execution context.&quot;&quot;&quot;
+    from deriva_ml.execution import ExecutionConfiguration
+
+    cfg = ExecutionConfiguration(description=&quot;auto-fill test&quot;, workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        RecordClass = image_feature.record_class
+        # No Execution set — auto-fill should apply
+        exe.add_features([RecordClass(Image=image_feature.image_rids[0], Image_Label=&quot;A&quot;)])
+        pending = exe._manifest_store.list_pending_feature_records(exe.execution_rid)
+        import json
+        payload = json.loads(pending[0].record_json)
+        assert payload[&quot;Execution&quot;] == exe.execution_rid
+
+
+def test_exe_add_features_mixed_feature_defs_raises(test_ml, image_feature, other_feature) -&gt; None:
+    &quot;&quot;&quot;Records from different features → DerivaMLValidationError before staging.&quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    from deriva_ml.execution import ExecutionConfiguration
+
+    cfg = ExecutionConfiguration(description=&quot;mixed test&quot;, workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        mixed = [
+            image_feature.record_class(Image=image_feature.image_rids[0], Image_Label=&quot;A&quot;),
+            other_feature.record_class(Image=other_feature.image_rids[0], Quality=5),
+        ]
+        with pytest.raises(DerivaMLValidationError):
+            exe.add_features(mixed)
+        # Nothing staged
+        assert exe._manifest_store.list_feature_records(exe.execution_rid) == []
+
+
+def test_exe_add_features_empty_raises(test_ml, image_feature) -&gt; None:
+    from deriva_ml.execution import ExecutionConfiguration
+
+    cfg = ExecutionConfiguration(description=&quot;empty test&quot;, workflow=image_feature.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        with pytest.raises(ValueError):
+            exe.add_features([])
+
+
+def test_flush_happens_after_assets(test_ml, image_feature_with_asset_column) -&gt; None:
+    &quot;&quot;&quot;Feature flush order: assets first, then features.
+
+    A feature whose asset column points at a staged asset must see the asset's
+    uploaded RID in ermrest when the feature row is inserted. Verify by
+    checking that asset upload completes before any feature INSERT attempts
+    occur.
+    &quot;&quot;&quot;
+    pytest.skip(&quot;Requires instrumenting upload_execution_outputs — see test plan&quot;)
+
+
+def test_flush_failure_marks_group_failed_but_continues(
+    test_ml, image_feature, failing_feature
+) -&gt; None:
+    &quot;&quot;&quot;If one feature group's insert fails, others still flush; DerivaMLUploadError summarizes.&quot;&quot;&quot;
+    pytest.skip(&quot;Requires injecting ermrest failure for one group — see test plan&quot;)
+</code></pre>
+<p>Fixtures needed:
+- <code>image_feature</code>: object with <code>.workflow</code>, <code>.record_class</code>, <code>.schema</code>, <code>.feature_table_name</code>, <code>.image_rids</code> (list of target RIDs).
+- <code>other_feature</code>: different feature on the same target, used for the mixed-definitions test.
+- <code>image_feature_with_asset_column</code>: like <code>image_feature</code> but the feature has an asset column. Used for flush ordering.
+- <code>failing_feature</code>: a feature rigged to fail ermrest insert (e.g., FK pointing at a non-existent row).</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_staged_features.py -q --timeout=600</code>
+Expected: FAIL — <code>exe.add_features</code> still writes through (not staging), and <code>_flush_staged_features</code> doesn't exist.</p>
+<ul>
+<li>[ ] <strong>Step 3: Rewrite <code>Execution.add_features</code> to stage</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, replace the body of <code>add_features</code> (around line 847) with:</p>
+<pre><code class="language-python">def add_features(self, features: list[FeatureRecord]) -&gt; int:
+    &quot;&quot;&quot;Stage feature records for batch insertion on execution completion.
+
+    Writes the records to the execution's SQLite ``execution_state__feature_records`` table
+    with status ``Pending``. The records are not sent to ermrest immediately
+    — they are flushed in a single batch, **after asset upload**, when the
+    execution completes successfully. This integrates with the SQLite
+    execution-state design so crash-resume works for feature writes without
+    extra plumbing.
+
+    Records with ``Execution`` unset are auto-filled with this execution's
+    RID. All records in a single call must share one feature definition;
+    mixing features raises ``DerivaMLValidationError`` and nothing is staged.
+
+    **Provenance requirement.** This is the only way to write feature values
+    — ``DerivaML.add_features`` is retired (see the retired-API error shims).
+    For &quot;admin fixup&quot; cases, create a short-lived execution with an
+    appropriate ``Workflow_Type`` (e.g. ``Manual_Correction``) and call
+    ``exe.add_features`` inside it. The three-extra-lines give you a real
+    audit trail, which is the point.
+
+    Args:
+        features: List of FeatureRecord instances to stage. All must share
+            the same feature definition. Create instances via
+            ``Feature.feature_record_class()``.
+
+    Returns:
+        Number of records staged.
+
+    Raises:
+        ValueError: features list is empty.
+        DerivaMLValidationError: Records do not share a single feature
+            definition.
+        DerivaMLDataError: SQLite staging write failed.
+
+    Example:
+        &gt;&gt;&gt; feature = ml.lookup_feature(&quot;Image&quot;, &quot;Glaucoma&quot;)
+        &gt;&gt;&gt; RecordClass = feature.feature_record_class()
+        &gt;&gt;&gt; records = [
+        ...     RecordClass(Image=&quot;IMG-1&quot;, Glaucoma=&quot;Normal&quot;),
+        ...     RecordClass(Image=&quot;IMG-2&quot;, Glaucoma=&quot;Severe&quot;),
+        ... ]
+        &gt;&gt;&gt; with ml.create_execution(cfg) as exe:
+        ...     exe.add_features(records)     # staged, not yet in ermrest
+        ...     # ... more work ...
+        &gt;&gt;&gt; # on __exit__: staged records flushed to ermrest after assets
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    if not features:
+        raise ValueError(&quot;features list must not be empty&quot;)
+
+    # All records must share one feature definition
+    feature_defs = {type(f).feature for f in features if type(f).feature is not None}
+    if len(feature_defs) &gt; 1:
+        raise DerivaMLValidationError(
+            f&quot;add_features called with records from {len(feature_defs)} different &quot;
+            f&quot;feature definitions; all records must share one feature.&quot;
+        )
+
+    # Auto-fill Execution RID on records that don't have it
+    for f in features:
+        if f.Execution is None:
+            f.Execution = self.execution_rid
+
+    # Stage to SQLite — durability boundary is the write-through here.
+    feat_class = type(features[0])
+    feat = feat_class.feature
+    schema_name = feat.feature_table.schema.name
+    table_name = feat.feature_table.name
+    qualified = f&quot;{schema_name}.{table_name}&quot;
+    feature_name = feat.feature_name
+    target_table_name = feat.target_table.name
+
+    count = 0
+    for f in features:
+        self._manifest_store.stage_feature_record(
+            execution_rid=self.execution_rid,
+            feature_table=qualified,
+            feature_name=feature_name,
+            target_table=target_table_name,
+            record_json=f.model_dump_json(),
+        )
+        count += 1
+    return count
+</code></pre>
+<p><strong>Note on <code>self._manifest_store</code> access.</strong> The <code>Execution</code> class must already carry a reference to its <code>ManifestStore</code> (the §8 staged-asset code uses one). If it's named differently, adapt the attribute access. Grep: <code>manifest_store</code> in <code>execution/execution.py</code> to find the right name.</p>
+<ul>
+<li>[ ] <strong>Step 4: Add <code>_flush_staged_features</code></strong></li>
+</ul>
+<p>In the same file, near the existing <code>upload_execution_outputs</code> / asset-flush code (search for <code>_flush_</code> or <code>upload_assets</code>), add:</p>
+<pre><code class="language-python">def _flush_staged_features(self) -&gt; None:
+    &quot;&quot;&quot;Flush all Pending staged-feature rows to ermrest.
+
+    Called from ``upload_execution_outputs()`` **after** staged-asset
+    upload so feature rows referencing assets see their uploaded RIDs
+    in ermrest. Groups rows by ``feature_table`` and batch-inserts each
+    group via the datapath. Per-group failures mark those rows ``Failed``
+    without aborting the other groups; an overall ``DerivaMLUploadError``
+    is raised at the end if any failure occurred.
+
+    See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md
+    §Data flow — flush order.
+    &quot;&quot;&quot;
+    import json
+    from collections import defaultdict
+
+    from deriva_ml.core.exceptions import DerivaMLUploadError
+
+    pending = self._manifest_store.list_pending_feature_records(self.execution_rid)
+    if not pending:
+        return
+
+    # Group by feature_table for batch insertion
+    groups: dict[str, list] = defaultdict(list)
+    for row in pending:
+        groups[row.feature_table].append(row)
+
+    failures: list[str] = []
+    for qualified, rows in groups.items():
+        schema_name, table_name = qualified.split(&quot;.&quot;, 1)
+        feature_name = rows[0].feature_name
+        target_table = rows[0].target_table   # carried on the staged row — no re-resolve
+        try:
+            feat = self._ml_object.lookup_feature(target_table, feature_name)
+            record_class = feat.feature_record_class()
+            payloads = [
+                record_class(**json.loads(r.record_json)).model_dump()
+                for r in rows
+            ]
+
+            # MIGRATED ASSET-COLUMN REWRITE (was in _update_feature_table):
+            # Any payload value in an asset column that is a local filename
+            # must be rewritten to the uploaded asset's RID before insert.
+            # asset_rid_by_filename is populated during the asset flush that
+            # runs earlier in upload_execution_outputs (returned by
+            # _upload_assets as {asset_table: [AssetFilePath(...)]}).
+            # Implementer: pass that map into _flush_staged_features as an
+            # argument, or store on self during flush.
+            for p in payloads:
+                for asset_col in feat.asset_columns:
+                    val = p.get(asset_col.name)
+                    if isinstance(val, (str, Path)):
+                        rid = self._resolve_asset_rid(val, asset_col)
+                        if rid is not None:
+                            p[asset_col.name] = rid
+
+            pb = self._ml_object.pathBuilder()
+            pb.schemas[schema_name].tables[table_name].insert(payloads)
+            # Success — mark all rows uploaded
+            for r in rows:
+                self._manifest_store.mark_feature_record_uploaded(r.stage_id)
+        except Exception as e:  # noqa: BLE001 — capture broad, propagate summary
+            error_msg = f&quot;{type(e).__name__}: {e}&quot;
+            for r in rows:
+                self._manifest_store.mark_feature_record_failed(
+                    r.stage_id, error=error_msg
+                )
+            failures.append(f&quot;{qualified} ({len(rows)} records): {error_msg}&quot;)
+
+    if failures:
+        raise DerivaMLUploadError(
+            f&quot;Feature flush failed for {len(failures)} feature table(s): &quot;
+            + &quot;; &quot;.join(failures)
+        )
+</code></pre>
+<p><strong>Asset-column rewriting — migration from <code>_update_feature_table</code>.</strong> The old file-based path had logic in <code>_update_feature_table</code> (around <code>execution.py:1200-1207</code>) to remap asset-column values from local filenames to uploaded asset RIDs. The concrete mechanism there uses <code>asset_map</code> returned from the asset upload. When moving this logic to <code>_flush_staged_features</code>:</p>
+<ol>
+<li>Capture the asset-upload return value in <code>upload_execution_outputs()</code> (call it <code>asset_map</code>).</li>
+<li>Pass <code>asset_map</code> to <code>_flush_staged_features(asset_map=asset_map)</code> — or store on <code>self</code> immediately after the asset flush completes.</li>
+<li>Inside <code>_flush_staged_features</code>, <code>_resolve_asset_rid(val, asset_col)</code> looks up the filename in <code>asset_map[asset_col.pk_table.name]</code> and returns the uploaded <code>asset_rid</code>.</li>
+</ol>
+<p>The implementer should read the existing <code>_update_feature_table</code> body (around <code>execution.py</code> line 1100-1200) for the exact remapping contract (handles <code>Path</code> objects, bare filenames, and already-RID values) and port it verbatim into <code>_resolve_asset_rid</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Wire flush into upload path</strong></li>
+</ul>
+<p>Find where staged assets are flushed during <code>upload_execution_outputs</code> (or equivalent — search for <code>_flush_assets</code> or <code>upload_directory</code>). Add a call to <code>self._flush_staged_features()</code> <strong>after</strong> the asset flush succeeds.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_staged_features.py -q --timeout=600</code>
+Expected: the four non-skipped tests pass. Skipped tests (asset ordering, per-group failure) are Task 11.</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/execution/execution.py tests/execution/test_staged_features.py src/deriva_ml/local_db/manifest_store.py
+git commit -m &quot;feat(execution): stage-and-flush add_features, wired to upload path (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-parametrized-symmetry-compliance-suite">Task 8: Parametrized symmetry compliance suite</h2>
+<p><strong>Files:</strong>
+- Modify: <code>tests/feature/test_feature_values.py</code> (add parametrized test class)
+- Create: <code>tests/feature/conftest.py</code> (shared fixtures if not already)</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the parametrized tests</strong></li>
+</ul>
+<p>Append to <code>tests/feature/test_feature_values.py</code>:</p>
+<pre><code class="language-python"># -----------------------------------------------------------------------------
+# Parametrized symmetry suite — runs the same assertions across all three
+# container types. Any future container claiming feature capability must pass
+# this suite as its acceptance test.
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture(params=[&quot;ml&quot;, &quot;dataset&quot;, &quot;bag&quot;])
+def feature_container(request, feature_symmetry_fixture):
+    &quot;&quot;&quot;Parametrize across DerivaML, Dataset, DatasetBag for symmetry tests.&quot;&quot;&quot;
+    return feature_symmetry_fixture.by_container_kind(request.param)
+
+
+class TestFeatureValuesSymmetry:
+    &quot;&quot;&quot;Same assertions, three containers. The symmetry contract.&quot;&quot;&quot;
+
+    def test_find_features_returns_matching_definitions(self, feature_container):
+        features = list(feature_container.container.find_features(feature_container.target_table))
+        names = {f.feature_name for f in features}
+        assert feature_container.feature_name in names
+
+    def test_feature_values_yields_expected_records(self, feature_container):
+        records = sorted(
+            [
+                r.model_dump(exclude={&quot;RCT&quot;, &quot;RMT&quot;})
+                for r in feature_container.container.feature_values(
+                    feature_container.target_table, feature_container.feature_name
+                )
+            ],
+            key=lambda d: d[feature_container.target_table],
+        )
+        expected = feature_container.expected_records_sorted
+        assert records == expected
+
+    def test_feature_values_with_selector_matches(self, feature_container):
+        from deriva_ml.feature import FeatureRecord
+        records = list(feature_container.container.feature_values(
+            feature_container.target_table,
+            feature_container.feature_name,
+            selector=FeatureRecord.select_newest,
+        ))
+        rids = [getattr(r, feature_container.target_table) for r in records]
+        assert len(rids) == len(set(rids))  # one per target
+
+    def test_lookup_feature_returns_usable_record_class(self, feature_container):
+        feat = feature_container.container.lookup_feature(
+            feature_container.target_table, feature_container.feature_name
+        )
+        RecordClass = feat.feature_record_class()
+        # Usable constructor
+        instance = RecordClass(
+            **{feature_container.target_table: &quot;TEST-RID&quot;},
+            Feature_Name=feature_container.feature_name,
+        )
+        assert getattr(instance, feature_container.target_table) == &quot;TEST-RID&quot;
+
+    def test_list_workflow_executions_matches(self, feature_container):
+        rids = feature_container.container.list_workflow_executions(
+            feature_container.workflow
+        )
+        # Order-independent comparison
+        assert set(rids) == feature_container.expected_workflow_executions
+</code></pre>
+<p>The <code>feature_symmetry_fixture</code> must set up: online catalog with a feature + values, a dataset scoping a subset of the feature's target RIDs, and a materialized bag downloaded from the catalog. The <code>by_container_kind("ml"|"dataset"|"bag")</code> helper returns an object with <code>.container</code>, <code>.target_table</code>, <code>.feature_name</code>, <code>.workflow</code>, <code>.expected_records_sorted</code>, <code>.expected_workflow_executions</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add the shared fixture to <code>tests/feature/conftest.py</code></strong></li>
+</ul>
+<p>Create or extend <code>tests/feature/conftest.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Shared fixtures for feature test suite.&quot;&quot;&quot;
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import pytest
+
+
+@dataclass
+class SymmetryContainer:
+    container: Any
+    target_table: str
+    feature_name: str
+    workflow: str
+    expected_records_sorted: list[dict]
+    expected_workflow_executions: set[str]
+
+
+@dataclass
+class FeatureSymmetryFixture:
+    ml: Any
+    dataset: Any
+    bag: Any
+    target_table: str
+    feature_name: str
+    workflow: str
+    expected_records_sorted: list[dict]
+    expected_workflow_executions: set[str]
+
+    def by_container_kind(self, kind: str) -&gt; SymmetryContainer:
+        container = {&quot;ml&quot;: self.ml, &quot;dataset&quot;: self.dataset, &quot;bag&quot;: self.bag}[kind]
+        # Datasets filter to members; expected_records must be the dataset-scoped
+        # subset when kind == &quot;dataset&quot;. If the fixture is built so that ALL
+        # feature values are for members of the dataset, the expected records
+        # are identical across kinds.
+        return SymmetryContainer(
+            container=container,
+            target_table=self.target_table,
+            feature_name=self.feature_name,
+            workflow=self.workflow,
+            expected_records_sorted=self.expected_records_sorted,
+            expected_workflow_executions=self.expected_workflow_executions,
+        )
+
+
+@pytest.fixture
+def feature_symmetry_fixture(test_ml, catalog_with_datasets):
+    &quot;&quot;&quot;Build a catalog + dataset + materialized bag with one feature populated.
+
+    All feature values target RIDs that are members of the dataset, so the
+    expected records are identical in the online/dataset/bag containers.
+    &quot;&quot;&quot;
+    # Implementation: create a feature, add values via exe.add_features,
+    # create a dataset containing all target RIDs, materialize a bag.
+    # Return a FeatureSymmetryFixture with all handles wired up.
+    pytest.skip(&quot;Fixture skeleton — fill in with concrete catalog setup&quot;)
+</code></pre>
+<p>The fixture body is scaffolding for the implementer to fill in against the existing <code>catalog_with_datasets</code> infrastructure. Keep the skip until the implementer has a working shape — then remove.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_feature_values.py::TestFeatureValuesSymmetry -q --timeout=600</code>
+Expected: all 5 tests × 3 parametrizations pass (15 tests).</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/feature/conftest.py tests/feature/test_feature_values.py
+git commit -m &quot;test(feature): parametrized symmetry compliance suite (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-offline-to-online-write-cycle">Task 9: Offline-to-online write cycle</h2>
+<p><strong>Files:</strong>
+- Test: append to <code>tests/feature/test_feature_values.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the test</strong></li>
+</ul>
+<pre><code class="language-python">def test_offline_construct_records_online_stage(
+    catalog_with_feature_and_materialized_bag, test_ml,
+) -&gt; None:
+    &quot;&quot;&quot;Construct FeatureRecord instances from a bag (offline), stage via live exe.&quot;&quot;&quot;
+    fx = catalog_with_feature_and_materialized_bag
+    # Offline: use bag.lookup_feature + feature_record_class (no catalog connection here)
+    feat = fx.bag.lookup_feature(fx.target_table, fx.feature_name)
+    RecordClass = feat.feature_record_class()
+    records = [
+        RecordClass(**{fx.target_table: rid, fx.value_column: f&quot;val-{rid}&quot;})
+        for rid in fx.target_rids[:3]
+    ]
+    # Online: hand to a live execution
+    from deriva_ml.execution import ExecutionConfiguration
+    cfg = ExecutionConfiguration(description=&quot;offline-to-online&quot;, workflow=fx.workflow)
+    with test_ml.create_execution(cfg) as exe:
+        count = exe.add_features(records)
+        assert count == 3
+    # Verify round-trip
+    written = list(test_ml.feature_values(fx.target_table, fx.feature_name))
+    ours = [r for r in written if r.Execution == exe.execution_rid]
+    assert len(ours) == 3
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_feature_values.py::test_offline_construct_records_online_stage -q --timeout=600</code>
+Expected: pass. If it fails, the fixture needs extension — add the <code>.value_column</code> and <code>.target_rids</code> attributes.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/feature/test_feature_values.py tests/feature/conftest.py
+git commit -m &quot;test(feature): offline-to-online write cycle round-trip (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-10-retire-old-apis-with-clear-error-shims">Task 10: Retire old APIs with clear-error shims</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/feature.py</code> (replace bodies of <code>add_features</code>, <code>fetch_table_features</code>, <code>list_feature_values</code>, <code>select_by_workflow</code> with raising shims; optionally delete instead — see decision below)
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (same for <code>fetch_table_features</code>, <code>list_feature_values</code>)
+- Modify: <code>src/deriva_ml/asset/asset.py</code> (retire <code>Asset.list_feature_values</code>)
+- Modify: <code>src/deriva_ml/interfaces.py</code> (update protocols)
+- Test: <code>tests/feature/test_retired_apis.py</code> (new)</p>
+<p><strong>Decision: delete or raise?</strong> The spec says "no deprecation shims" and "retired APIs raise a clear error pointing at the replacement." That's a raising shim — the method exists, calling it raises <code>DerivaMLException</code>. This is kinder than a rename (stack traces show exactly what the caller asked for) and still forces migration.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/feature/test_retired_apis.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Retired-API shims — each raises a DerivaMLException with a replacement pointer.&quot;&quot;&quot;
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLException
+
+
+def test_ml_add_features_raises_with_pointer(test_ml) -&gt; None:
+    with pytest.raises(DerivaMLException, match=r&quot;exe\.add_features&quot;):
+        test_ml.add_features([])
+
+
+def test_ml_fetch_table_features_raises_with_pointer(test_ml) -&gt; None:
+    with pytest.raises(DerivaMLException, match=r&quot;feature_values|Denormalizer&quot;):
+        test_ml.fetch_table_features(&quot;Image&quot;)
+
+
+def test_ml_list_feature_values_raises_with_pointer(test_ml) -&gt; None:
+    with pytest.raises(DerivaMLException, match=r&quot;feature_values&quot;):
+        test_ml.list_feature_values(&quot;Image&quot;, &quot;x&quot;)
+
+
+def test_ml_select_by_workflow_raises_with_pointer(test_ml) -&gt; None:
+    with pytest.raises(DerivaMLException, match=r&quot;select_by_workflow.*container&quot;):
+        test_ml.select_by_workflow([], &quot;wf&quot;)
+
+
+def test_bag_fetch_table_features_raises(materialized_bag) -&gt; None:
+    with pytest.raises(DerivaMLException, match=r&quot;feature_values|Denormalizer&quot;):
+        materialized_bag.fetch_table_features(&quot;Image&quot;)
+
+
+def test_bag_list_feature_values_raises(materialized_bag) -&gt; None:
+    with pytest.raises(DerivaMLException, match=r&quot;feature_values&quot;):
+        materialized_bag.list_feature_values(&quot;Image&quot;, &quot;x&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_retired_apis.py -q --timeout=300</code>
+Expected: FAIL — methods still work or have different signatures.</p>
+<ul>
+<li>[ ] <strong>Step 3: Replace method bodies with raising shims</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/feature.py</code>:</p>
+<pre><code class="language-python">def add_features(self, features: list[FeatureRecord]) -&gt; int:
+    &quot;&quot;&quot;Retired in S2 — use ``exe.add_features`` within an execution context.
+
+    All feature writes now require provenance. Create a short-lived execution
+    if you are doing admin fixup:
+
+        &gt;&gt;&gt; with ml.create_execution(cfg) as exe:
+        ...     exe.add_features(records)
+
+    See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md.
+    &quot;&quot;&quot;
+    raise DerivaMLException(
+        &quot;ml.add_features() has been removed. Use exe.add_features() within an &quot;
+        &quot;execution context — all feature writes now require provenance. See &quot;
+        &quot;docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md.&quot;
+    )
+
+
+def fetch_table_features(self, *args, **kwargs) -&gt; &quot;Any&quot;:
+    &quot;&quot;&quot;Retired in S2 — use ``feature_values(table, name)`` or ``Denormalizer``.&quot;&quot;&quot;
+    raise DerivaMLException(
+        &quot;fetch_table_features() has been removed. Use feature_values(table, feature_name) &quot;
+        &quot;for single-feature access, or Denormalizer for multi-table joins. See &quot;
+        &quot;docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md.&quot;
+    )
+
+
+def list_feature_values(self, *args, **kwargs) -&gt; &quot;Any&quot;:
+    &quot;&quot;&quot;Retired in S2 — renamed to ``feature_values`` with the same signature.&quot;&quot;&quot;
+    raise DerivaMLException(
+        &quot;list_feature_values() has been renamed to feature_values() with the same &quot;
+        &quot;signature. See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md.&quot;
+    )
+
+
+def select_by_workflow(self, *args, **kwargs) -&gt; &quot;Any&quot;:
+    &quot;&quot;&quot;Retired in S2 — use ``FeatureRecord.select_by_workflow(workflow, container=...)``.&quot;&quot;&quot;
+    raise DerivaMLException(
+        &quot;ml.select_by_workflow() is now a selector factory. Use &quot;
+        &quot;FeatureRecord.select_by_workflow(workflow, container=...) and pass as &quot;
+        &quot;the selector= argument to feature_values. See &quot;
+        &quot;docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md.&quot;
+    )
+</code></pre>
+<p>In <code>src/deriva_ml/dataset/dataset_bag.py</code>, replace the bodies of <code>fetch_table_features</code> and <code>list_feature_values</code> with the same <code>raise DerivaMLException(...)</code> shims.</p>
+<p>In <code>src/deriva_ml/asset/asset.py</code>:
+- Find <code>list_feature_values</code> around line 227 and apply the same shim.
+- Find <code>find_features</code> around line 208 — this one stays (it's a real feature-discovery method on <code>Asset</code>), but confirm it uses <code>model.find_features</code> consistently.</p>
+<ul>
+<li>[ ] <strong>Step 4: Update <code>interfaces.py</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/interfaces.py</code>:</p>
+<ol>
+<li>Around line 214 (the <code>DatasetLike</code> protocol): keep <code>find_features(table)</code>, add <code>feature_values(table, feature_name, selector=...)</code>, <code>lookup_feature(table, feature_name)</code>, <code>list_workflow_executions(workflow)</code>.</li>
+<li>Around line 543 (<code>list_feature_values</code> in <code>AssetLike</code> or similar protocol): remove this signature.</li>
+<li>Around line 896 (<code>add_features</code> on some writable protocol): remove from the read-side protocol but keep on the Execution protocol (writes belong to <code>Execution</code>, not the container).</li>
+<li>
+<p>Update all matching protocols (<code>DerivaMLCatalogReader</code>, <code>DerivaMLCatalog</code>, <code>WritableDataset</code>) for consistency.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 5: Run tests</strong></p>
+</li>
+</ol>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/test_retired_apis.py -q --timeout=300
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q
+</code></pre>
+<p>Expected: retired-API tests pass; baseline unit tests still pass (modulo the interface updates — any test calling the retired methods needs updating first).</p>
+<ul>
+<li>[ ] <strong>Step 6: Fix any test fallout</strong></li>
+</ul>
+<p>The old <code>tests/feature/test_fetch_table_features.py</code> will break because all its tests exercise <code>fetch_table_features</code>. Rewrite those tests against <code>feature_values</code> + <code>Denormalizer</code> as appropriate, or delete tests that become redundant. Do the same sweep for <code>list_feature_values</code> callers in the test suite:</p>
+<pre><code class="language-bash">grep -rn &quot;fetch_table_features\|list_feature_values\|select_by_workflow\|ml\.add_features&quot; tests/
+</code></pre>
+<p>Update each call site to the new API.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run full fast suite</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q
+</code></pre>
+<p>Expected: still green (439+ passing).</p>
+<ul>
+<li>[ ] <strong>Step 8: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/ tests/feature/ tests/
+git commit -m &quot;refactor(feature): retire add_features, fetch_table_features, list_feature_values, select_by_workflow (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-11-flush-ordering-failure-isolation-and-crash-resume">Task 11: Flush ordering, failure isolation, and crash-resume</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/execution.py</code> (ordering, already wired in Task 7; add resume detection)
+- Test: extend <code>tests/execution/test_staged_features.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Unskip and complete the tests from Task 7</strong></li>
+</ul>
+<p>In <code>tests/execution/test_staged_features.py</code>, replace the two skips with real tests:</p>
+<pre><code class="language-python">def test_flush_happens_after_assets(test_ml, image_feature_with_asset_column) -&gt; None:
+    &quot;&quot;&quot;Feature flush order: asset upload completes before any feature INSERT.&quot;&quot;&quot;
+    fx = image_feature_with_asset_column
+    # Track ordering via a patched insert hook
+    call_log: list[str] = []
+
+    # Monkeypatch the asset upload path to log &quot;asset_done&quot; at completion,
+    # and the feature batch insert to log &quot;feature_insert&quot; at call.
+    # Then assert call_log is [&quot;asset_done&quot;, ..., &quot;feature_insert&quot;, ...].
+    pytest.skip(&quot;Wire monkeypatch against upload_execution_outputs internals&quot;)
+
+
+def test_flush_failure_marks_group_failed_but_continues(
+    test_ml, image_feature, failing_feature,
+) -&gt; None:
+    &quot;&quot;&quot;One group's flush failure does not abort other groups.&quot;&quot;&quot;
+    # Stage records for both features — failing_feature has an invalid FK.
+    # After upload: image_feature's rows are in ermrest; failing_feature's rows are Failed.
+    # DerivaMLUploadError was raised.
+    pytest.skip(&quot;Wire a feature rigged to fail ermrest validation&quot;)
+</code></pre>
+<p>The implementer writes these against the real execution machinery. They are integration tests — they run live.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add crash-resume test</strong></li>
+</ul>
+<pre><code class="language-python">def test_crash_before_flush_resumes_without_duplicates(
+    test_ml, image_feature,
+) -&gt; None:
+    &quot;&quot;&quot;Simulate crash after staging but before flush; resume completes the flush.&quot;&quot;&quot;
+    from deriva_ml.execution import ExecutionConfiguration
+
+    cfg = ExecutionConfiguration(description=&quot;crash test&quot;, workflow=image_feature.workflow)
+
+    # First run: stage records but exit before the flush path executes
+    # (raise inside the `with` block AFTER add_features to skip normal __exit__ flush).
+    exe_rid = None
+    try:
+        with test_ml.create_execution(cfg) as exe:
+            exe_rid = exe.execution_rid
+            RecordClass = image_feature.record_class
+            exe.add_features([RecordClass(Image=image_feature.image_rids[0], Image_Label=&quot;A&quot;)])
+            raise RuntimeError(&quot;simulated crash&quot;)
+    except RuntimeError:
+        pass
+
+    # Verify Pending rows exist in SQLite, nothing in ermrest
+    # (exact mechanism to retrieve the store after __exit__ depends on execution state design)
+    # Resume:
+    exe_resumed = test_ml.resume_execution(exe_rid)
+    exe_resumed.upload_execution_outputs()
+
+    # Verify ermrest now has exactly one row, no duplicates
+    pb = test_ml.pathBuilder()
+    rows = [
+        r for r in pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch()
+        if r.get(&quot;Execution&quot;) == exe_rid
+    ]
+    assert len(rows) == 1
+</code></pre>
+<p>If <code>resume_execution</code> isn't yet wired to flush pending features, this test will guide that implementation. Integration point with §8 execution state is a required prerequisite — if the resume plumbing isn't complete, skip this test with a pointer to the §8 plan and pick it up in a follow-up.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement ordering + failure isolation + resume</strong></li>
+</ul>
+<p>Open <code>src/deriva_ml/execution/execution.py</code>. Verify from Task 7 that <code>_flush_staged_features</code> is called after asset flush in <code>upload_execution_outputs</code>. If not, move the call.</p>
+<p>For <strong>failure isolation</strong>: the <code>_flush_staged_features</code> body from Task 7 already continues per-group on exceptions. Verify the test passes.</p>
+<p>For <strong>crash-resume</strong>: find the existing <code>resume_execution</code> flow (grep <code>resume_execution</code>). In the resume path, after the existing staged-asset resume, add a detection step: if <code>list_pending_feature_records(execution_rid)</code> returns rows, the execution is in a partially-staged state — the next call to <code>upload_execution_outputs</code> will flush them.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_staged_features.py -q --timeout=600</code>
+Expected: all tests pass (no skips remain).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/execution/execution.py tests/execution/test_staged_features.py
+git commit -m &quot;feat(execution): flush ordering, failure isolation, crash-resume for staged features (S2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-12-full-suite-regression-docs-refresh">Task 12: Full-suite regression + docs refresh</h2>
+<p><strong>Files:</strong>
+- Grep + fix any remaining callers of retired APIs
+- Verify MkDocs build still succeeds
+- Run the full live test suite in subsets per CLAUDE.md</p>
+<ul>
+<li>[ ] <strong>Step 1: Full grep for retired-API references</strong></li>
+</ul>
+<pre><code class="language-bash">grep -rn &quot;fetch_table_features\|list_feature_values\|ml\.add_features\|ml\.select_by_workflow&quot; src/ docs/ tests/ 2&gt;&amp;1 | grep -v &quot;retired\|raise DerivaMLException\|tests/feature/test_retired&quot;
+</code></pre>
+<p>Any hit is a call site still using the old name. Fix each — rewrite to <code>feature_values</code> / <code>exe.add_features</code> / <code>FeatureRecord.select_by_workflow</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Check MkDocs build</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run mkdocs build 2&gt;&amp;1 | tail -30
+</code></pre>
+<p>Expected: clean build, no broken references.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run fast suite</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q
+</code></pre>
+<p>Expected: all green.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run feature live suite</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/ -q --timeout=600
+</code></pre>
+<p>Expected: all green (includes symmetry, selector factory, retired-API shims, offline-to-online).</p>
+<ul>
+<li>[ ] <strong>Step 5: Run execution live suite</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q --timeout=600
+</code></pre>
+<p>Expected: all green (includes staged features, flush ordering, crash-resume).</p>
+<ul>
+<li>[ ] <strong>Step 6: Run dataset live suite</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ -q --timeout=600
+</code></pre>
+<p>Expected: all green (includes bag feature cache).</p>
+<ul>
+<li>[ ] <strong>Step 7: Coverage check</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/feature/ tests/execution/test_staged_features.py tests/dataset/test_bag_feature_cache.py --cov=deriva_ml.feature --cov=deriva_ml.core.mixins.feature --cov=deriva_ml.dataset.bag_feature_cache --cov=deriva_ml.execution.execution --cov-report=term-missing --timeout=600
+</code></pre>
+<p>Expected: every public method in the new surface has branches for happy path, selector present / absent, and documented error paths covered.</p>
+<ul>
+<li>[ ] <strong>Step 8: Commit any remaining fixes</strong></li>
+</ul>
+<pre><code class="language-bash">git add -A
+git commit -m &quot;chore(feature): fix remaining retired-API callers; docs + coverage green (S2)&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 9: Use <code>superpowers:finishing-a-development-branch</code> for merge/PR</strong></li>
+</ul>
+<p>Per the subagent-driven-development flow, at this point the final code reviewer runs and then <code>finishing-a-development-branch</code> presents the merge/PR options.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

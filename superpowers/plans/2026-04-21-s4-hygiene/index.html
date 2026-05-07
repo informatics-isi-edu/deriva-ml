@@ -1,0 +1,3435 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-21-s4-hygiene/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>S4 Hygiene Bundle Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#s4-hygiene-bundle-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              S4 Hygiene Bundle Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-order-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Order Rationale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-a-h2-finish-the-status-migration-scoped-out-already-done-on-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part A — H2: Finish the Status migration (scoped out — already done on main)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-b-h1-cache-backed-offline-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part B — H1: Cache-backed offline mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part B — H1: Cache-backed offline mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-5-add-count_pending_rows-to-executionstatestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Add count_pending_rows() to ExecutionStateStore
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-derivamlschemarefreshblocked-exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: DerivaMLSchemaRefreshBlocked exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-catalogstub-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: CatalogStub class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-schemacache-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: SchemaCache class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-9-derivamodelfrom_cached-classmethod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: DerivaModel.from_cached classmethod
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-10-mode-branched-derivaml__init__-refresh_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Mode-branched DerivaML.__init__ + refresh_schema()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-11-additional-offline-init-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Additional offline-init integration tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-12-regression-audit-selfcatalog-is-none-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: Regression audit — self.catalog is None usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-13-changelog-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 13: CHANGELOG entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-checklist-controller-pre-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review Checklist (controller, pre-dispatch)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Self-Review Checklist (controller, pre-dispatch)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spec-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#placeholder-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Placeholder scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type consistency
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="s4-hygiene-bundle-implementation-plan">S4 Hygiene Bundle Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Close two loose ends from earlier Phase 2 subsystems: finish the S1a <code>Status</code>-enum migration (H2, purely mechanical) and make <code>ConnectionMode.offline</code> actually work without network (H1, real design work).</p>
+<p><strong>Architecture:</strong> Part A (H2) replaces ~10 legacy <code>Status</code> call sites with <code>ExecutionStatus</code> values or plain strings, scrubs docstring references, and lands a grep-gate test that fails CI if any new <code>Status</code> reference leaks in. Part B (H1) introduces a <code>SchemaCache</code> class owning one workspace file, a <code>CatalogStub</code> that raises <code>DerivaMLReadOnlyError</code> on any attribute access, and a mode-branched <code>DerivaML.__init__</code> plus a new <code>refresh_schema(force=False)</code> method. Drift is warn-only; cache is authoritative.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, deriva-py (<code>deriva.core.ermrest_model.Model</code>, <code>ErmrestCatalog.get('/')</code>), SQLAlchemy Core (existing <code>ExecutionStateStore</code>), pytest.</p>
+<p><strong>Tech details pinned from spec §9 risks (verified in deriva-py):</strong>
+- Model-from-dict: <code>Model(catalog, schema_dict)</code> constructor. <code>schema_dict</code> is the JSON returned by <code>catalog.get('/schema').json()</code>, top level keys <code>{schemas, acls, annotations}</code>. <code>Model.fromcatalog(catalog)</code> does this exact thing; we replicate offline by passing a <code>CatalogStub</code> as catalog plus a cached dict.
+- Snapshot id fetch: <code>catalog.get('/').json()['snaptime']</code>. Used internally by <code>ErmrestCatalog.latest_snapshot()</code>.
+- <code>ExecutionStateStore.count_pending_rows()</code> does NOT exist; <code>count_pending_by_kind(execution_rid=...)</code> does but is per-execution. We add a workspace-wide <code>count_pending_rows()</code> in Task 5.</p>
+<h2 id="file-structure">File Structure</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+<th>Created/Modified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tests/test_migration_complete.py</code></td>
+<td>Grep-gate: fail CI on new <code>Status.xxx</code> references in <code>src/</code></td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/base.py</code></td>
+<td><code>Status.pending/completed/aborted</code> → <code>ExecutionStatus.Created/Uploaded/Aborted</code>; terminal-state set check in <code>__del__</code></td>
+<td>MODIFY (3 sites around lines 353, 380–381)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset.py</code></td>
+<td><code>Status</code> import → remove; <code>update_status</code> closure param <code>Status</code> → plain <code>str</code>; <code>Status.running</code> → <code>"Running"</code></td>
+<td>MODIFY (4 sites around lines 87, 2649, 2656, 2666, 2672)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/mixins/execution.py</code></td>
+<td>Docstring examples: <code>Status.completed</code> → <code>ExecutionStatus.Uploaded</code></td>
+<td>MODIFY (3 docstrings around lines 283, 602, 615)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/interfaces.py</code></td>
+<td>Remove unused <code>from deriva_ml.core.enums import Status</code> TYPE_CHECKING import</td>
+<td>MODIFY (line 86)</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/catalog_stub.py</code></td>
+<td><code>CatalogStub</code> class — raises <code>DerivaMLReadOnlyError</code> on any attribute</td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>tests/core/test_catalog_stub.py</code></td>
+<td>Unit test for CatalogStub</td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/schema_cache.py</code></td>
+<td><code>SchemaCache</code> class — owns <code>&lt;workspace&gt;/schema-cache.json</code></td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>tests/core/test_schema_cache.py</code></td>
+<td>Unit tests for SchemaCache</td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/exceptions.py</code></td>
+<td>Add <code>DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError)</code></td>
+<td>MODIFY</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/state_store.py</code></td>
+<td>Add workspace-wide <code>count_pending_rows()</code> method</td>
+<td>MODIFY</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/model/catalog.py</code></td>
+<td>Add <code>DerivaModel.from_cached(schema_dict, ...)</code> classmethod</td>
+<td>MODIFY</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/base.py</code></td>
+<td>Mode-branched <code>__init__</code>: <code>_init_online</code>/<code>_init_offline</code> helpers; <code>refresh_schema()</code> method</td>
+<td>MODIFY</td>
+</tr>
+<tr>
+<td><code>tests/core/test_offline_init.py</code></td>
+<td>Integration tests: offline init, drift warning, refresh_schema, host/catalog mismatch</td>
+<td><strong>CREATE</strong></td>
+</tr>
+<tr>
+<td><code>CHANGELOG.md</code></td>
+<td>"Unreleased — Phase 2 Subsystem 4" entry documenting both parts + API change note for <code>ml.catalog</code> type</td>
+<td>MODIFY</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-order-rationale">Task Order Rationale</h2>
+<p>Part A first (Tasks 1–4): small, mechanical, purely local to each file. Lands the grep-gate that enforces the migration going forward. Any test that regressed because of a typo here surfaces immediately on a fast unit run.</p>
+<p>Part B tasks are ordered by dependency: primitives first (<code>CatalogStub</code>, <code>SchemaCache</code>, <code>DerivaMLSchemaRefreshBlocked</code>, <code>count_pending_rows</code>, <code>DerivaModel.from_cached</code>), then the big <code>__init__</code> refactor + <code>refresh_schema()</code> that uses them, then integration tests that exercise the full path.</p>
+<hr />
+<h2 id="part-a-h2-finish-the-status-migration-scoped-out-already-done-on-main">Part A — H2: Finish the Status migration <em>(scoped out — already done on main)</em></h2>
+<p>The S1a Status-enum migration was completed on <code>main</code> in commit 8313953
+(<code>refactor(core): migrate base.py + mixins to ExecutionStatus.Aborted</code>),
+and the grep-gate test <code>tests/test_migration_complete.py</code> was landed
+separately. Verification on starting S4 execution found zero <code>Status.xxx</code>
+references in <code>src/deriva_ml/</code> and the grep-gate passing (<code>2 passed</code>).</p>
+<p>Tasks 1–4 were specified in the original plan for reference but are NOT
+executed. Task numbering below continues with Task 5 for continuity with
+the plan's internal cross-references and the controller's TodoWrite.</p>
+<h2 id="part-b-h1-cache-backed-offline-mode">Part B — H1: Cache-backed offline mode</h2>
+<h3 id="task-5-add-count_pending_rows-to-executionstatestore">Task 5: Add <code>count_pending_rows()</code> to ExecutionStateStore</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/state_store.py</code> (add one method after <code>count_pending_by_kind</code>)
+- Modify: <code>tests/execution/test_state_store.py</code> (add one test)</p>
+<ul>
+<li>[ ] <strong>Step 5.1: Write the failing test</strong></li>
+</ul>
+<p>Add to <code>tests/execution/test_state_store.py</code> (at the end of the file):</p>
+<pre><code class="language-python">def test_count_pending_rows_workspace_wide(tmp_path):
+    &quot;&quot;&quot;count_pending_rows counts non-terminal rows across ALL executions.&quot;&quot;&quot;
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+
+    from deriva_ml.execution.state_store import (
+        ExecutionStateStore, PendingRowStatus,
+    )
+
+    db = tmp_path / &quot;test.db&quot;
+    engine = create_engine(f&quot;sqlite:///{db}&quot;)
+    store = ExecutionStateStore(engine)
+    store.create_all()
+
+    now = datetime.now(timezone.utc)
+
+    # Two executions; insert rows in various states.
+    for exe in (&quot;EXE-A&quot;, &quot;EXE-B&quot;):
+        store.insert_execution(
+            execution_rid=exe,
+            created_at=now,
+        )
+
+    # EXE-A: 2 staged, 1 uploaded (terminal, not counted)
+    store.insert_pending_row(
+        execution_rid=&quot;EXE-A&quot;, key=&quot;a1&quot;,
+        target_schema=&quot;s&quot;, target_table=&quot;t&quot;,
+        metadata_json=&quot;{}&quot;, created_at=now,
+        status=PendingRowStatus.staged,
+    )
+    store.insert_pending_row(
+        execution_rid=&quot;EXE-A&quot;, key=&quot;a2&quot;,
+        target_schema=&quot;s&quot;, target_table=&quot;t&quot;,
+        metadata_json=&quot;{}&quot;, created_at=now,
+        status=PendingRowStatus.leased,
+    )
+    pid = store.insert_pending_row(
+        execution_rid=&quot;EXE-A&quot;, key=&quot;a3&quot;,
+        target_schema=&quot;s&quot;, target_table=&quot;t&quot;,
+        metadata_json=&quot;{}&quot;, created_at=now,
+        status=PendingRowStatus.staged,
+    )
+    store.update_pending_row(pid, status=PendingRowStatus.uploaded)
+
+    # EXE-B: 1 failed (counted), 1 uploaded (terminal)
+    store.insert_pending_row(
+        execution_rid=&quot;EXE-B&quot;, key=&quot;b1&quot;,
+        target_schema=&quot;s&quot;, target_table=&quot;t&quot;,
+        metadata_json=&quot;{}&quot;, created_at=now,
+        status=PendingRowStatus.failed,
+    )
+    pid2 = store.insert_pending_row(
+        execution_rid=&quot;EXE-B&quot;, key=&quot;b2&quot;,
+        target_schema=&quot;s&quot;, target_table=&quot;t&quot;,
+        metadata_json=&quot;{}&quot;, created_at=now,
+        status=PendingRowStatus.staged,
+    )
+    store.update_pending_row(pid2, status=PendingRowStatus.uploaded)
+
+    # Total non-terminal: 2 (EXE-A staged+leased) + 1 (EXE-B failed) = 3
+    assert store.count_pending_rows() == 3
+
+
+def test_count_pending_rows_empty_store(tmp_path):
+    from sqlalchemy import create_engine
+    from deriva_ml.execution.state_store import ExecutionStateStore
+
+    db = tmp_path / &quot;test.db&quot;
+    engine = create_engine(f&quot;sqlite:///{db}&quot;)
+    store = ExecutionStateStore(engine)
+    store.create_all()
+
+    assert store.count_pending_rows() == 0
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5.2: Run the test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_store.py::test_count_pending_rows_workspace_wide -v</code></p>
+<p>Expected: FAIL with <code>AttributeError: 'ExecutionStateStore' object has no attribute 'count_pending_rows'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5.3: Read the existing <code>count_pending_by_kind</code> to match style</strong></li>
+</ul>
+<p>Run: <code>sed -n '530,600p' src/deriva_ml/execution/state_store.py</code></p>
+<p>Expected: see the existing <code>count_pending_by_kind</code> method; note the <code>from sqlalchemy import select, func</code> pattern at the top of the file and its use of <code>str(PendingRowStatus.x)</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5.4: Implement <code>count_pending_rows</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/state_store.py</code>, add this method after <code>count_pending_by_kind</code> (the exact location doesn't matter as long as it's inside the <code>ExecutionStateStore</code> class body):</p>
+<pre><code class="language-python">    def count_pending_rows(self) -&gt; int:
+        &quot;&quot;&quot;Count non-terminal pending rows across ALL executions.
+
+        Non-terminal means status is one of staged/leasing/leased/
+        uploading/failed. Rows in status='uploaded' are not counted.
+
+        Used by refresh_schema() to decide whether to refuse a
+        schema refresh (terminal=safe, non-terminal=blocked unless
+        force=True).
+
+        Returns:
+            Integer count; 0 if the pending_rows table is empty.
+        &quot;&quot;&quot;
+        from sqlalchemy import func, select
+
+        non_terminal = [
+            str(PendingRowStatus.staged),
+            str(PendingRowStatus.leasing),
+            str(PendingRowStatus.leased),
+            str(PendingRowStatus.uploading),
+            str(PendingRowStatus.failed),
+        ]
+        with self.engine.begin() as conn:
+            return int(conn.scalar(
+                select(func.count()).select_from(self.pending_rows).where(
+                    self.pending_rows.c.status.in_(non_terminal)
+                )
+            ) or 0)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5.5: Run both tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_state_store.py::test_count_pending_rows_workspace_wide tests/execution/test_state_store.py::test_count_pending_rows_empty_store -v</code></p>
+<p>Expected: both PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5.6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/execution/state_store.py tests/execution/test_state_store.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(state_store): add workspace-wide count_pending_rows()
+
+Part B of S4 (H1). refresh_schema() needs to refuse when the
+workspace has pending work across any execution; existing
+count_pending_by_kind is per-execution and requires a RID.
+
+This is a thin SQL COUNT() gated on non-terminal statuses (staged,
+leasing, leased, uploading, failed). Two unit tests cover a multi-
+execution happy path and an empty store.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-derivamlschemarefreshblocked-exception">Task 6: <code>DerivaMLSchemaRefreshBlocked</code> exception</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/exceptions.py</code> (add one subclass)</p>
+<ul>
+<li>[ ] <strong>Step 6.1: Read the existing exception hierarchy</strong></li>
+</ul>
+<p>Run: <code>grep -n "class DerivaML" src/deriva_ml/core/exceptions.py</code></p>
+<p>Expected: see the hierarchy listed in the project's CLAUDE.md — <code>DerivaMLException</code>, <code>DerivaMLConfigurationError</code>, etc.</p>
+<ul>
+<li>[ ] <strong>Step 6.2: Add the new exception class</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/exceptions.py</code>, find the <code>DerivaMLConfigurationError</code> definition. Add this class right after it (or anywhere after its definition, as long as the subclass syntax resolves):</p>
+<pre><code class="language-python">class DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError):
+    &quot;&quot;&quot;`refresh_schema()` was called while the workspace had staged work.
+
+    Drain the workspace first (`ml.upload_pending()`) or call
+    `refresh_schema(force=True)` to discard local state. Draining
+    is the safer choice — a forced refresh may leave rows whose
+    metadata references columns or types no longer in the new
+    schema, causing catalog-insert failures on the next upload.
+    &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6.3: Verify the import path</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">uv run python -c &quot;from deriva_ml.core.exceptions import DerivaMLSchemaRefreshBlocked, DerivaMLConfigurationError; assert issubclass(DerivaMLSchemaRefreshBlocked, DerivaMLConfigurationError); print('ok')&quot;
+</code></pre>
+<p>Expected: <code>ok</code></p>
+<ul>
+<li>[ ] <strong>Step 6.4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/core/exceptions.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(exceptions): add DerivaMLSchemaRefreshBlocked
+
+Part B of S4 (H1). refresh_schema(force=False) needs a distinct
+exception type so callers can catch it separately from other
+configuration errors (e.g., to show a &quot;drain workspace first&quot;
+hint). Subclass of DerivaMLConfigurationError per the project's
+exception hierarchy convention.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-catalogstub-class">Task 7: <code>CatalogStub</code> class</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/core/catalog_stub.py</code>
+- Create: <code>tests/core/test_catalog_stub.py</code></p>
+<ul>
+<li>[ ] <strong>Step 7.1: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/core/test_catalog_stub.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for CatalogStub — the offline-mode ErmrestCatalog stand-in.&quot;&quot;&quot;
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.core.catalog_stub import CatalogStub
+from deriva_ml.core.exceptions import DerivaMLReadOnlyError
+
+
+def test_attribute_access_raises_read_only_error():
+    stub = CatalogStub()
+    with pytest.raises(DerivaMLReadOnlyError) as ei:
+        stub.getCatalogModel()
+    assert &quot;getCatalogModel&quot; in str(ei.value)
+    assert &quot;offline&quot; in str(ei.value).lower()
+
+
+def test_method_call_raises_read_only_error():
+    stub = CatalogStub()
+    with pytest.raises(DerivaMLReadOnlyError) as ei:
+        stub.connect_ermrest(&quot;42&quot;)
+    assert &quot;connect_ermrest&quot; in str(ei.value)
+
+
+def test_repr_is_readable():
+    stub = CatalogStub()
+    assert repr(stub) == &quot;CatalogStub(offline)&quot;
+
+
+def test_dunder_access_does_not_raise():
+    &quot;&quot;&quot;Python internals can probe dunders freely — we only guard real attrs.
+
+    A raise on every dunder would break print(), repr(), copy.copy(), etc.
+    The contract is &quot;raise on attribute access that LOOKS like user code
+    reaching into the catalog&quot;; dunders are Python plumbing.
+    &quot;&quot;&quot;
+    stub = CatalogStub()
+    # These must NOT raise
+    s = repr(stub)
+    d = str(stub)
+    assert &quot;CatalogStub&quot; in s
+    assert &quot;CatalogStub&quot; in d
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7.2: Run the test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_catalog_stub.py -v</code></p>
+<p>Expected: FAIL with <code>ModuleNotFoundError: No module named 'deriva_ml.core.catalog_stub'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 7.3: Implement <code>CatalogStub</code></strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/core/catalog_stub.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Offline-mode stand-in for ErmrestCatalog.
+
+In `ConnectionMode.offline`, `DerivaML.__init__` sets `self.catalog`
+to an instance of this class instead of constructing a real
+`ErmrestCatalog`. Any user code that tries to reach through
+`ml.catalog.&lt;something&gt;` gets a loud `DerivaMLReadOnlyError`
+instead of an `AttributeError: 'NoneType' object has no attribute
+'...'`.
+
+This keeps the mixin code simple: nothing has to check `if
+self._mode is offline` before using `self.catalog`; the stub fails
+exactly where an online-mode catalog operation would run.
+
+Dunders pass through to `object` (via `__getattribute__`) so
+`repr()`, `print()`, copy protocol, etc. still work. Only
+attribute NAMES that don't start with `_` raise.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from deriva_ml.core.exceptions import DerivaMLReadOnlyError
+
+
+class CatalogStub:
+    &quot;&quot;&quot;Placeholder for ErmrestCatalog in offline mode.&quot;&quot;&quot;
+
+    def __getattr__(self, name: str):
+        # __getattr__ is only called when normal lookup fails, so
+        # this fires for user code reaching for real catalog methods.
+        # Dunders are resolved via __getattribute__ on `object` and
+        # never reach here (unless they don't exist on object either,
+        # in which case raising AttributeError here is correct —
+        # convert it to DerivaMLReadOnlyError only for non-dunder
+        # attrs so Python plumbing works.
+        if name.startswith(&quot;_&quot;):
+            raise AttributeError(name)
+        raise DerivaMLReadOnlyError(
+            f&quot;catalog.{name} requires online mode; &quot;
+            f&quot;this DerivaML instance was constructed with mode=offline&quot;
+        )
+
+    def __repr__(self) -&gt; str:
+        return &quot;CatalogStub(offline)&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7.4: Run the test</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_catalog_stub.py -v</code></p>
+<p>Expected: all 4 tests PASS.</p>
+<ul>
+<li>[ ] <strong>Step 7.5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/core/catalog_stub.py tests/core/test_catalog_stub.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(core): CatalogStub for offline mode
+
+Part B of S4 (H1). In ConnectionMode.offline, DerivaML.catalog is
+set to a CatalogStub instead of a real ErmrestCatalog. Any non-
+dunder attribute access raises DerivaMLReadOnlyError with the
+attribute name in the message. Dunders pass through normally so
+repr(), print(), copy protocol etc. still work.
+
+This avoids the alternative of auditing every `self.catalog.X`
+call site across 10+ mixins and keeps offline-mode semantics
+local to this one class.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-schemacache-class">Task 8: <code>SchemaCache</code> class</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/core/schema_cache.py</code>
+- Create: <code>tests/core/test_schema_cache.py</code></p>
+<ul>
+<li>[ ] <strong>Step 8.1: Write failing tests</strong></li>
+</ul>
+<p>Create <code>tests/core/test_schema_cache.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for SchemaCache — the workspace-backed schema store.&quot;&quot;&quot;
+from __future__ import annotations
+
+import json
+
+import pytest
+
+
+def test_exists_false_when_missing(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    assert cache.exists() is False
+
+
+def test_snapshot_id_none_when_missing(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    assert cache.snapshot_id() is None
+
+
+def test_write_then_load_round_trip(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    schema = {&quot;schemas&quot;: {&quot;deriva-ml&quot;: {}}, &quot;acls&quot;: {}, &quot;annotations&quot;: {}}
+    cache.write(
+        snapshot_id=&quot;2026-04-21T18:00:00Z&quot;,
+        hostname=&quot;example.org&quot;,
+        catalog_id=&quot;42&quot;,
+        ml_schema=&quot;deriva-ml&quot;,
+        schema=schema,
+    )
+    assert cache.exists() is True
+    assert cache.snapshot_id() == &quot;2026-04-21T18:00:00Z&quot;
+    loaded = cache.load()
+    assert loaded[&quot;snapshot_id&quot;] == &quot;2026-04-21T18:00:00Z&quot;
+    assert loaded[&quot;hostname&quot;] == &quot;example.org&quot;
+    assert loaded[&quot;catalog_id&quot;] == &quot;42&quot;
+    assert loaded[&quot;ml_schema&quot;] == &quot;deriva-ml&quot;
+    assert loaded[&quot;schema&quot;] == schema
+
+
+def test_load_missing_raises(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        cache.load()
+
+
+def test_corrupt_cache_raises_configuration_error(tmp_path):
+    from deriva_ml.core.schema_cache import SchemaCache
+    from deriva_ml.core.exceptions import DerivaMLConfigurationError
+    cache = SchemaCache(tmp_path)
+    # Write garbage where the cache file should live
+    cache._path.write_text(&quot;{ this is not valid json&quot;)
+    with pytest.raises(DerivaMLConfigurationError) as ei:
+        cache.load()
+    assert &quot;corrupt&quot; in str(ei.value).lower()
+
+
+def test_write_is_atomic_no_partial_file_on_crash(tmp_path, monkeypatch):
+    &quot;&quot;&quot;If os.rename fails mid-write, the old cache remains intact.&quot;&quot;&quot;
+    from deriva_ml.core.schema_cache import SchemaCache
+    cache = SchemaCache(tmp_path)
+
+    # Populate a valid initial cache
+    cache.write(
+        snapshot_id=&quot;v1&quot;, hostname=&quot;h&quot;, catalog_id=&quot;c&quot;,
+        ml_schema=&quot;ml&quot;, schema={&quot;a&quot;: 1},
+    )
+    assert cache.snapshot_id() == &quot;v1&quot;
+
+    # Simulate a crash: make os.replace raise after the tmp is written.
+    import os as os_mod
+    original_replace = os_mod.replace
+
+    def crashing_replace(*args, **kwargs):
+        raise OSError(&quot;simulated crash during rename&quot;)
+
+    monkeypatch.setattr(os_mod, &quot;replace&quot;, crashing_replace)
+
+    with pytest.raises(OSError, match=&quot;simulated&quot;):
+        cache.write(
+            snapshot_id=&quot;v2&quot;, hostname=&quot;h&quot;, catalog_id=&quot;c&quot;,
+            ml_schema=&quot;ml&quot;, schema={&quot;a&quot;: 2},
+        )
+
+    # After restore, the OLD cache is still intact.
+    monkeypatch.setattr(os_mod, &quot;replace&quot;, original_replace)
+    assert cache.snapshot_id() == &quot;v1&quot;
+    assert cache.load()[&quot;schema&quot;] == {&quot;a&quot;: 1}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 8.2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_schema_cache.py -v</code></p>
+<p>Expected: FAIL with <code>ModuleNotFoundError: No module named 'deriva_ml.core.schema_cache'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 8.3: Implement <code>SchemaCache</code></strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/core/schema_cache.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Workspace-backed cache of the catalog schema.
+
+Offline mode reads from this cache; online mode detects drift by
+comparing the live catalog's snapshot id to the cached one and
+warns the user without auto-refreshing.
+
+File layout on disk at `&lt;workspace&gt;/schema-cache.json`:
+
+    {
+        &quot;snapshot_id&quot;: &quot;&lt;ERMrest snapshot id (snaptime)&gt;&quot;,
+        &quot;hostname&quot;: &quot;example.org&quot;,
+        &quot;catalog_id&quot;: &quot;42&quot;,
+        &quot;ml_schema&quot;: &quot;deriva-ml&quot;,
+        &quot;schema&quot;: { ... full ermrest /schema payload ... }
+    }
+
+Writes are atomic: the new contents go to `schema-cache.json.tmp`,
+get fsync'd, then `os.replace` moves the tmp over the original. If
+anything crashes mid-write, the old file remains intact.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+from deriva_ml.core.exceptions import DerivaMLConfigurationError
+
+
+class SchemaCache:
+    &quot;&quot;&quot;Single-file schema cache at &lt;workspace&gt;/schema-cache.json.&quot;&quot;&quot;
+
+    def __init__(self, workspace_root: Path):
+        self._path = Path(workspace_root) / &quot;schema-cache.json&quot;
+
+    def exists(self) -&gt; bool:
+        &quot;&quot;&quot;True iff the cache file exists on disk.&quot;&quot;&quot;
+        return self._path.is_file()
+
+    def snapshot_id(self) -&gt; str | None:
+        &quot;&quot;&quot;Snapshot id stored in the cache, or None if no cache exists.&quot;&quot;&quot;
+        if not self.exists():
+            return None
+        try:
+            return self.load()[&quot;snapshot_id&quot;]
+        except (KeyError, DerivaMLConfigurationError):
+            return None
+
+    def load(self) -&gt; dict:
+        &quot;&quot;&quot;Read and parse the cache.
+
+        Raises:
+            FileNotFoundError: If the cache file doesn't exist.
+            DerivaMLConfigurationError: If the file is unparseable
+                JSON (e.g., partial write from before atomic writes
+                were added, or manual corruption).
+        &quot;&quot;&quot;
+        if not self.exists():
+            raise FileNotFoundError(self._path)
+        try:
+            return json.loads(self._path.read_text())
+        except json.JSONDecodeError as exc:
+            raise DerivaMLConfigurationError(
+                f&quot;schema cache at {self._path} is corrupt &quot;
+                f&quot;({exc.__class__.__name__}: {exc}); delete the file &quot;
+                f&quot;and re-run online to regenerate.&quot;
+            ) from exc
+
+    def write(
+        self, *,
+        snapshot_id: str,
+        hostname: str,
+        catalog_id: str,
+        ml_schema: str,
+        schema: dict,
+    ) -&gt; None:
+        &quot;&quot;&quot;Atomically overwrite the cache.
+
+        The new contents are written to a sibling `.tmp` file, fsync'd,
+        then moved over the original via `os.replace`. If any step
+        fails, the original file is unchanged.
+        &quot;&quot;&quot;
+        payload = {
+            &quot;snapshot_id&quot;: snapshot_id,
+            &quot;hostname&quot;: hostname,
+            &quot;catalog_id&quot;: catalog_id,
+            &quot;ml_schema&quot;: ml_schema,
+            &quot;schema&quot;: schema,
+        }
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(&quot;.json.tmp&quot;)
+        with open(tmp, &quot;w&quot;) as fp:
+            json.dump(payload, fp, indent=2)
+            fp.flush()
+            os.fsync(fp.fileno())
+        os.replace(tmp, self._path)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 8.4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_schema_cache.py -v</code></p>
+<p>Expected: all 6 tests PASS.</p>
+<ul>
+<li>[ ] <strong>Step 8.5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/core/schema_cache.py tests/core/test_schema_cache.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(core): SchemaCache for offline-mode schema persistence
+
+Part B of S4 (H1). Workspace-backed cache of the catalog schema
+at &lt;workspace&gt;/schema-cache.json. Offline mode reads from it;
+online mode populates it on first run and checks drift on
+subsequent runs. Writes are atomic via tmp+fsync+replace so a
+crash mid-write leaves the old cache intact.
+
+Six unit tests: exists/snapshot_id-none, round-trip, load-missing,
+corrupt-file-error, atomic-write crash recovery.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-9-derivamodelfrom_cached-classmethod">Task 9: <code>DerivaModel.from_cached</code> classmethod</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/model/catalog.py</code> (add classmethod)
+- Modify: <code>tests/model/</code> (add a unit test — create <code>test_derivamodel_from_cached.py</code>)</p>
+<ul>
+<li>[ ] <strong>Step 9.1: Inspect <code>DerivaModel.__init__</code> to know what we need</strong></li>
+</ul>
+<p>Run: <code>sed -n '170,210p' src/deriva_ml/model/catalog.py</code></p>
+<p>Expected: see the <code>DerivaModel.__init__</code> signature — it takes a deriva-py <code>Model</code> object as first positional arg, plus <code>ml_schema</code>, <code>domain_schemas</code>, <code>default_schema</code> kwargs (or similar). Note the exact param names for the next step.</p>
+<ul>
+<li>[ ] <strong>Step 9.2: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/model/test_derivamodel_from_cached.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit test for DerivaModel.from_cached — offline model construction.&quot;&quot;&quot;
+from __future__ import annotations
+
+
+def test_from_cached_constructs_model_without_network():
+    &quot;&quot;&quot;from_cached(schema_dict) builds a DerivaModel using a
+    CatalogStub; no network call is made.&quot;&quot;&quot;
+    from deriva_ml.core.catalog_stub import CatalogStub
+    from deriva_ml.model.catalog import DerivaModel
+
+    # Minimal ermrest /schema dict — just enough to instantiate
+    # deriva-py's Model without blowing up.
+    schema_dict = {
+        &quot;schemas&quot;: {
+            &quot;deriva-ml&quot;: {
+                &quot;schema_name&quot;: &quot;deriva-ml&quot;,
+                &quot;tables&quot;: {},
+                &quot;annotations&quot;: {},
+                &quot;comment&quot;: None,
+            },
+        },
+        &quot;acls&quot;: {},
+        &quot;annotations&quot;: {},
+    }
+
+    model = DerivaModel.from_cached(
+        schema_dict,
+        catalog=CatalogStub(),
+        ml_schema=&quot;deriva-ml&quot;,
+        domain_schemas=None,
+        default_schema=None,
+    )
+    assert model is not None
+    # The ml_schema name propagates.
+    assert model.ml_schema == &quot;deriva-ml&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 9.3: Run to verify failure</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/model/test_derivamodel_from_cached.py -v</code></p>
+<p>Expected: FAIL with <code>AttributeError: type object 'DerivaModel' has no attribute 'from_cached'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 9.4: Add the classmethod</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/model/catalog.py</code>, inside the <code>DerivaModel</code> class body (near the end of the class, or alphabetical with other classmethods), add:</p>
+<pre><code class="language-python">    @classmethod
+    def from_cached(
+        cls,
+        schema_dict: dict,
+        *,
+        catalog,
+        ml_schema: str,
+        domain_schemas: &quot;list[str] | None&quot; = None,
+        default_schema: &quot;str | None&quot; = None,
+    ) -&gt; &quot;DerivaModel&quot;:
+        &quot;&quot;&quot;Construct a DerivaModel from a cached ermrest /schema dict.
+
+        No network is touched. The `catalog` argument is passed to
+        deriva-py's Model() constructor as the first positional
+        argument; in offline mode it will be a CatalogStub.
+
+        Args:
+            schema_dict: The JSON payload from a previous
+                `catalog.get('/schema').json()` call, as persisted
+                by SchemaCache.
+            catalog: The catalog object to associate with the
+                Model. Pass a real ErmrestCatalog online, or a
+                CatalogStub offline.
+            ml_schema: ML schema name (typically &quot;deriva-ml&quot;).
+            domain_schemas: Optional list of domain schema names.
+            default_schema: Optional default schema name.
+
+        Returns:
+            DerivaModel wrapping a deriva-py Model reconstructed
+            from the dict.
+        &quot;&quot;&quot;
+        from deriva.core.ermrest_model import Model
+
+        # deriva-py's Model.__init__(catalog, model_doc) takes the
+        # catalog handle plus the /schema dict. Model.fromcatalog()
+        # is the online equivalent of this call; we replicate it
+        # here with our cached dict.
+        model = Model(catalog, schema_dict)
+        return cls(
+            model,
+            ml_schema=ml_schema,
+            domain_schemas=domain_schemas,
+            default_schema=default_schema,
+        )
+</code></pre>
+<p><strong>Note:</strong> the exact kwarg names (<code>ml_schema</code>, <code>domain_schemas</code>, <code>default_schema</code>) must match <code>DerivaModel.__init__</code>'s signature from Step 9.1. Adjust if the real names differ.</p>
+<ul>
+<li>[ ] <strong>Step 9.5: Run the test</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/model/test_derivamodel_from_cached.py -v</code></p>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 9.6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/model/catalog.py tests/model/test_derivamodel_from_cached.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(model): DerivaModel.from_cached for offline construction
+
+Part B of S4 (H1). Replicates Model.fromcatalog()'s behavior but
+takes a pre-fetched /schema dict instead of calling catalog.get().
+The catalog argument is still required (deriva-py's Model() needs
+it for attribute wiring), but passing a CatalogStub offline works
+since only the schema dict drives the table/column construction.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-10-mode-branched-derivaml__init__-refresh_schema">Task 10: Mode-branched <code>DerivaML.__init__</code> + <code>refresh_schema()</code></h3>
+<p>This is the largest task. It reorganizes <code>__init__</code> and adds a new method. Breaking it down into small steps for safety.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/base.py</code> (the whole <code>__init__</code> region + add two helpers + <code>refresh_schema</code>)</p>
+<ul>
+<li>[ ] <strong>Step 10.1: Read the current <code>__init__</code> thoroughly</strong></li>
+</ul>
+<p>Run: <code>sed -n '200,380p' src/deriva_ml/core/base.py</code></p>
+<p>Understand the full flow: credential load, DerivaServer construction, auth check, catalog connect, model fetch, workspace dir setup, logging, and the <code>if self._mode is ConnectionMode.online:</code> lease-reconciliation block.</p>
+<ul>
+<li>[ ] <strong>Step 10.2: Identify working_dir setup location</strong></li>
+</ul>
+<p>Run: <code>grep -n "self.working_dir" src/deriva_ml/core/base.py | head -5</code></p>
+<p>Expected: see <code>self.working_dir = ...</code> assignments around lines 320-324.</p>
+<p><strong>Critical:</strong> Our new <code>__init__</code> needs <code>self.working_dir</code> set BEFORE the SchemaCache can be constructed. If it's currently set AFTER the catalog connection (around line 320+), we need to move the working_dir block up. Note the exact line range of the working_dir block.</p>
+<ul>
+<li>[ ] <strong>Step 10.3: Write the integration test for offline-without-cache (failing test first)</strong></li>
+</ul>
+<p>Create <code>tests/core/test_offline_init.py</code> (new file). For now, add just one test — more land in Task 11:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Integration tests for offline-mode DerivaML.__init__ and
+refresh_schema(). Gated on DERIVA_HOST for the tests that actually
+need a live catalog.&quot;&quot;&quot;
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+
+def test_offline_without_cache_raises(tmp_path):
+    &quot;&quot;&quot;Offline init against a workspace with no cache file raises
+    DerivaMLConfigurationError.&quot;&quot;&quot;
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.core.exceptions import DerivaMLConfigurationError
+
+    with pytest.raises(DerivaMLConfigurationError) as ei:
+        DerivaML(
+            hostname=&quot;example.org&quot;,
+            catalog_id=&quot;1&quot;,
+            mode=ConnectionMode.offline,
+            working_dir=tmp_path,
+        )
+    assert &quot;offline&quot; in str(ei.value).lower()
+    assert &quot;cache&quot; in str(ei.value).lower()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 10.4: Run the test to verify it fails (with the CURRENT pre-refactor code)</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_offline_init.py::test_offline_without_cache_raises -v</code></p>
+<p>Expected: FAIL — but probably with a NETWORK error or auth error, not the <code>DerivaMLConfigurationError</code> we want. (The current <strong>init</strong> tries to connect even in offline mode.) That failure confirms we're testing the pre-refactor state.</p>
+<ul>
+<li>[ ] <strong>Step 10.5: Ensure required imports are present at top of base.py</strong></li>
+</ul>
+<p>Run: <code>grep -n "^from deriva_ml" src/deriva_ml/core/base.py | head -10</code></p>
+<p>Add any of these imports that aren't already present (place with similar existing imports):</p>
+<pre><code class="language-python">from deriva_ml.core.catalog_stub import CatalogStub
+from deriva_ml.core.exceptions import (
+    DerivaMLConfigurationError,
+    DerivaMLReadOnlyError,
+    DerivaMLSchemaRefreshBlocked,
+)
+from deriva_ml.core.schema_cache import SchemaCache
+</code></pre>
+<p>(<code>DerivaMLException</code> and others may already be imported — merge with existing.)</p>
+<ul>
+<li>[ ] <strong>Step 10.6: Move working_dir setup ahead of catalog setup</strong></li>
+</ul>
+<p>If Step 10.2 showed working_dir being set after the catalog connection, cut the working_dir block (the 3-4 lines that set <code>self.working_dir</code> and call <code>mkdir</code>) and paste it immediately after <code>self._mode = ConnectionMode(mode)</code> (approximately line 275).</p>
+<p>After the move, the order in <code>__init__</code> becomes:
+1. <code>self._mode = ConnectionMode(mode)</code>
+2. <code>self.working_dir = ...</code> + <code>mkdir</code> (moved up)
+3. <code>self.credential = ...</code> (unchanged)
+4. <strong>new branch:</strong> <code>cache = SchemaCache(self.working_dir)</code> + mode dispatch
+5. ... everything else that was after the original catalog-connect block (logging setup, etc.)</p>
+<ul>
+<li>[ ] <strong>Step 10.7: Replace the monolithic catalog-setup block with a mode dispatch</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/base.py</code>, find the block that runs from <code>server = DerivaServer(...)</code> through <code>self.model = DerivaModel(...)</code> (approximately lines 281–304 before the working_dir move, possibly shifted a few lines after).</p>
+<p>Replace the whole block with:</p>
+<pre><code class="language-python">        # Mode-branched init: online connects to the catalog and
+        # verifies (or refreshes) the schema cache; offline reads
+        # the cache and skips all network calls.
+        cache = SchemaCache(self.working_dir)
+        if self._mode is ConnectionMode.online:
+            self._init_online(
+                hostname=hostname,
+                catalog_id=catalog_id,
+                check_auth=check_auth,
+                cache=cache,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+        else:
+            self._init_offline(
+                hostname=hostname,
+                catalog_id=catalog_id,
+                cache=cache,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 10.8: Add <code>_init_online</code> helper method</strong></li>
+</ul>
+<p>Add this method to the <code>DerivaML</code> class body (near <code>__init__</code>, or right after it):</p>
+<pre><code class="language-python">    def _init_online(
+        self,
+        *,
+        hostname: str,
+        catalog_id: str,
+        check_auth: bool,
+        cache: &quot;SchemaCache&quot;,
+        ml_schema: str,
+        domain_schemas: &quot;list[str] | None&quot;,
+        default_schema: &quot;str | None&quot;,
+    ) -&gt; None:
+        &quot;&quot;&quot;Online init: connect to server, resolve schema via cache
+        or fresh fetch with drift warning.&quot;&quot;&quot;
+        # Use DerivaModel lazily (import kept local to match the
+        # original __init__ style and avoid circular-import risk).
+        from deriva.core import DerivaServer
+
+        from deriva_ml.model.catalog import DerivaModel
+
+        server = DerivaServer(
+            &quot;https&quot;,
+            hostname,
+            credentials=self.credential,
+            session_config=self._get_session_config(),
+        )
+        try:
+            if check_auth and server.get_authn_session():
+                pass
+        except Exception:
+            raise DerivaMLException(
+                &quot;You are not authorized to access this catalog. &quot;
+                &quot;Please check your credentials and make sure you have logged in.&quot;
+            )
+        self.catalog = server.connect_ermrest(catalog_id)
+
+        # GET / returns {snaptime: ..., ...} — the cheapest way to
+        # learn the catalog's current snapshot id.
+        live_snapshot_id = self.catalog.get(&quot;/&quot;).json()[&quot;snaptime&quot;]
+
+        if cache.exists():
+            cached = cache.load()
+            if cached[&quot;snapshot_id&quot;] != live_snapshot_id:
+                self._logger_pre.warning(
+                    &quot;schema cache is at snapshot %s; live catalog is at %s. &quot;
+                    &quot;Using cached schema. Call ml.refresh_schema() to update.&quot;,
+                    cached[&quot;snapshot_id&quot;], live_snapshot_id,
+                )
+            self.model = DerivaModel.from_cached(
+                cached[&quot;schema&quot;],
+                catalog=self.catalog,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+        else:
+            # First-time online init — populate the cache.
+            live_schema = self.catalog.get(&quot;/schema&quot;).json()
+            cache.write(
+                snapshot_id=live_snapshot_id,
+                hostname=hostname,
+                catalog_id=str(catalog_id),
+                ml_schema=ml_schema,
+                schema=live_schema,
+            )
+            self.model = DerivaModel.from_cached(
+                live_schema,
+                catalog=self.catalog,
+                ml_schema=ml_schema,
+                domain_schemas=domain_schemas,
+                default_schema=default_schema,
+            )
+</code></pre>
+<p>Note: <code>self._logger_pre</code> — at this point in <code>__init__</code> the full logger setup hasn't happened yet (that runs after the mode branch). Use Python's <code>logging.getLogger("deriva_ml")</code> directly for this one warning. Revise the warning call:</p>
+<pre><code class="language-python">                import logging
+                logging.getLogger(&quot;deriva_ml&quot;).warning(
+                    &quot;schema cache is at snapshot %s; live catalog is at %s. &quot;
+                    &quot;Using cached schema. Call ml.refresh_schema() to update.&quot;,
+                    cached[&quot;snapshot_id&quot;], live_snapshot_id,
+                )
+</code></pre>
+<p>(Remove the <code>self._logger_pre</code> reference; replace it with the <code>logging.getLogger(...)</code> line above.)</p>
+<ul>
+<li>[ ] <strong>Step 10.9: Add <code>_init_offline</code> helper method</strong></li>
+</ul>
+<p>Right after <code>_init_online</code>:</p>
+<pre><code class="language-python">    def _init_offline(
+        self,
+        *,
+        hostname: str,
+        catalog_id: str,
+        cache: &quot;SchemaCache&quot;,
+        ml_schema: str,
+        domain_schemas: &quot;list[str] | None&quot;,
+        default_schema: &quot;str | None&quot;,
+    ) -&gt; None:
+        &quot;&quot;&quot;Offline init: read cache; skip all network. Raises if cache
+        is missing or belongs to a different (host, catalog).&quot;&quot;&quot;
+        from deriva_ml.model.catalog import DerivaModel
+
+        if not cache.exists():
+            raise DerivaMLConfigurationError(
+                f&quot;offline mode requires a cached schema at {cache._path}; &quot;
+                f&quot;run online once first (with the same working_dir) to populate the cache.&quot;
+            )
+        cached = cache.load()
+        if cached[&quot;hostname&quot;] != hostname or cached[&quot;catalog_id&quot;] != str(catalog_id):
+            raise DerivaMLConfigurationError(
+                f&quot;cached schema at {cache._path} is for &quot;
+                f&quot;{cached['hostname']}/{cached['catalog_id']}, &quot;
+                f&quot;but __init__ was called with {hostname}/{catalog_id}. &quot;
+                f&quot;Use the matching working_dir or run online to refresh.&quot;
+            )
+        self.catalog = CatalogStub()
+        self.model = DerivaModel.from_cached(
+            cached[&quot;schema&quot;],
+            catalog=self.catalog,
+            ml_schema=ml_schema,
+            domain_schemas=domain_schemas,
+            default_schema=default_schema,
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 10.10: Add <code>refresh_schema</code> method</strong></li>
+</ul>
+<p>Add this method to the <code>DerivaML</code> class body (near the mode property is a good spot):</p>
+<pre><code class="language-python">    def refresh_schema(self, *, force: bool = False) -&gt; None:
+        &quot;&quot;&quot;Fetch the current catalog schema and overwrite the workspace cache.
+
+        Online mode only. Refuses if the workspace has pending rows
+        unless `force=True` is passed; a forced refresh may leave
+        staged rows whose metadata references columns or types no
+        longer in the new schema, causing catalog-insert failures
+        on the next upload.
+
+        Args:
+            force: If True, refresh even when the workspace has
+                pending rows (status staged/leasing/leased/
+                uploading/failed). Default False refuses in that
+                case with DerivaMLSchemaRefreshBlocked.
+
+        Raises:
+            DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLSchemaRefreshBlocked: If `force=False` and the
+                workspace has pending rows.
+        &quot;&quot;&quot;
+        import logging
+
+        from deriva_ml.model.catalog import DerivaModel
+
+        if self._mode is not ConnectionMode.online:
+            raise DerivaMLReadOnlyError(
+                &quot;refresh_schema requires online mode&quot;
+            )
+        store = self.workspace.execution_state_store()
+        count = store.count_pending_rows()
+        if count &gt; 0 and not force:
+            raise DerivaMLSchemaRefreshBlocked(
+                f&quot;refresh_schema requires a drained workspace; &quot;
+                f&quot;{count} pending rows. Run ml.upload_pending() first, &quot;
+                f&quot;or call refresh_schema(force=True) to discard local &quot;
+                f&quot;state (staged rows may become inconsistent with the &quot;
+                f&quot;new schema).&quot;
+            )
+        live_snapshot_id = self.catalog.get(&quot;/&quot;).json()[&quot;snaptime&quot;]
+        live_schema = self.catalog.get(&quot;/schema&quot;).json()
+        cache = SchemaCache(self.working_dir)
+        old_snapshot_id = cache.snapshot_id()
+        cache.write(
+            snapshot_id=live_snapshot_id,
+            hostname=self.host_name,
+            catalog_id=str(self.catalog.catalog_id),
+            ml_schema=self.model.ml_schema,
+            schema=live_schema,
+        )
+        # Reload the in-memory model so this session sees the new schema.
+        self.model = DerivaModel.from_cached(
+            live_schema,
+            catalog=self.catalog,
+            ml_schema=self.model.ml_schema,
+            domain_schemas=getattr(self.model, &quot;domain_schemas&quot;, None),
+            default_schema=getattr(self.model, &quot;default_schema&quot;, None),
+        )
+        logging.getLogger(&quot;deriva_ml&quot;).info(
+            &quot;schema cache refreshed from %s to %s&quot;,
+            old_snapshot_id, live_snapshot_id,
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 10.11: Syntax + smoke check</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">uv run python -c &quot;from deriva_ml import DerivaML; print('ok')&quot;
+uv run python -c &quot;from deriva_ml.core.base import DerivaML; assert hasattr(DerivaML, 'refresh_schema'); assert hasattr(DerivaML, '_init_online'); assert hasattr(DerivaML, '_init_offline'); print('ok')&quot;
+</code></pre>
+<p>Expected: <code>ok</code> printed twice.</p>
+<ul>
+<li>[ ] <strong>Step 10.12: Run the offline-without-cache test (should now pass)</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_offline_init.py::test_offline_without_cache_raises -v</code></p>
+<p>Expected: PASS. The offline branch now refuses without a cache file.</p>
+<ul>
+<li>[ ] <strong>Step 10.13: Run the full fast-unit-test subset to check for regressions</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/ tests/asset/ tests/model/ -q --timeout=60 2&gt;&amp;1 | tail -10</code></p>
+<p>Expected: all pass (or same pass count as baseline from worktree setup, plus our new tests). If any fails with <code>AttributeError</code> around <code>self.catalog</code> or <code>self.model</code>, investigate — the <code>CatalogStub</code> may have a hole we missed, or a mixin might have regressed.</p>
+<ul>
+<li>[ ] <strong>Step 10.14: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/core/base.py tests/core/test_offline_init.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(base): mode-branched __init__ + refresh_schema()
+
+Part B of S4 (H1). DerivaML.__init__ now branches on self._mode:
+- online: connect to server, fetch snapshot_id, then either populate
+  cache on miss or honor cache on hit. Cache/live drift is warn-only.
+- offline: read cache, skip all network. Refuses if cache is missing
+  or if cache (host, catalog_id) doesn't match the call args.
+
+New refresh_schema(force=False) method is online-only; refuses if
+the workspace has pending rows unless force=True, with clear text
+about the risk of stale metadata against a new schema. Updates
+self.model in place so callers see the new schema without
+re-constructing DerivaML.
+
+working_dir setup moved earlier in __init__ so SchemaCache can be
+constructed before the mode branch.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-11-additional-offline-init-integration-tests">Task 11: Additional offline-init integration tests</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/core/test_offline_init.py</code> (add more tests to the file created in Task 10)</p>
+<ul>
+<li>[ ] <strong>Step 11.1: Add the remaining tests</strong></li>
+</ul>
+<p>Append to <code>tests/core/test_offline_init.py</code>:</p>
+<pre><code class="language-python">@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;requires a live catalog at DERIVA_HOST&quot;,
+)
+def test_online_first_populates_cache(tmp_path, test_ml):
+    &quot;&quot;&quot;After an online __init__, schema-cache.json exists in the workspace.&quot;&quot;&quot;
+    # test_ml is constructed online against DERIVA_HOST by conftest.py.
+    # Its working_dir should contain a schema-cache.json.
+    cache_file = Path(test_ml.working_dir) / &quot;schema-cache.json&quot;
+    assert cache_file.is_file(), (
+        f&quot;schema-cache.json not found in {test_ml.working_dir}&quot;
+    )
+    # Sanity-check contents
+    import json as _json
+    data = _json.loads(cache_file.read_text())
+    assert &quot;snapshot_id&quot; in data
+    assert data[&quot;hostname&quot;] == test_ml.host_name
+    assert &quot;schema&quot; in data
+    assert &quot;schemas&quot; in data[&quot;schema&quot;]
+
+
+@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;requires a live catalog at DERIVA_HOST&quot;,
+)
+def test_offline_after_online_succeeds(tmp_path):
+    &quot;&quot;&quot;Online once → cache written → offline init against same workspace works.&quot;&quot;&quot;
+    import os as _os
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.core.catalog_stub import CatalogStub
+
+    host = _os.environ[&quot;DERIVA_HOST&quot;]
+    catalog_id = _os.environ.get(&quot;DERIVA_CATALOG_ID&quot;, &quot;1&quot;)
+
+    # Online once in tmp_path — populates the cache.
+    ml_online = DerivaML(
+        hostname=host,
+        catalog_id=catalog_id,
+        mode=ConnectionMode.online,
+        working_dir=tmp_path,
+    )
+    assert (tmp_path / &quot;schema-cache.json&quot;).is_file()
+
+    # Offline now against the same tmp_path — should work without network.
+    ml_offline = DerivaML(
+        hostname=host,
+        catalog_id=catalog_id,
+        mode=ConnectionMode.offline,
+        working_dir=tmp_path,
+    )
+    assert isinstance(ml_offline.catalog, CatalogStub)
+    assert ml_offline.model is not None
+
+
+def test_offline_hostname_mismatch_raises(tmp_path):
+    &quot;&quot;&quot;Cache written for host A; offline init with host B → error.&quot;&quot;&quot;
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.core.exceptions import DerivaMLConfigurationError
+    from deriva_ml.core.schema_cache import SchemaCache
+
+    # Plant a cache file for host A.
+    cache = SchemaCache(tmp_path)
+    cache.write(
+        snapshot_id=&quot;fake-snap&quot;,
+        hostname=&quot;host-a.example.org&quot;,
+        catalog_id=&quot;99&quot;,
+        ml_schema=&quot;deriva-ml&quot;,
+        schema={&quot;schemas&quot;: {&quot;deriva-ml&quot;: {&quot;schema_name&quot;: &quot;deriva-ml&quot;,
+                                          &quot;tables&quot;: {}, &quot;annotations&quot;: {}, &quot;comment&quot;: None}},
+                &quot;acls&quot;: {}, &quot;annotations&quot;: {}},
+    )
+
+    # Offline init with a DIFFERENT host → error.
+    with pytest.raises(DerivaMLConfigurationError) as ei:
+        DerivaML(
+            hostname=&quot;host-b.example.org&quot;,
+            catalog_id=&quot;99&quot;,
+            mode=ConnectionMode.offline,
+            working_dir=tmp_path,
+        )
+    msg = str(ei.value)
+    assert &quot;host-a.example.org&quot; in msg
+    assert &quot;host-b.example.org&quot; in msg
+
+
+@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;requires a live catalog at DERIVA_HOST&quot;,
+)
+def test_refresh_schema_refuses_with_pending_rows(tmp_path, test_ml):
+    &quot;&quot;&quot;Stage a pending row, call refresh_schema() → DerivaMLSchemaRefreshBlocked.&quot;&quot;&quot;
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import PendingRowStatus
+    from deriva_ml.core.exceptions import DerivaMLSchemaRefreshBlocked
+
+    store = test_ml.workspace.execution_state_store()
+    # Need an execution row that the pending_row FK can reference.
+    store.insert_execution(
+        execution_rid=&quot;EXE-REFRESH-TEST&quot;,
+        created_at=datetime.now(timezone.utc),
+    )
+    store.insert_pending_row(
+        execution_rid=&quot;EXE-REFRESH-TEST&quot;,
+        key=&quot;k&quot;,
+        target_schema=&quot;deriva-ml&quot;, target_table=&quot;Subject&quot;,
+        metadata_json=&quot;{}&quot;,
+        created_at=datetime.now(timezone.utc),
+        status=PendingRowStatus.staged,
+    )
+
+    with pytest.raises(DerivaMLSchemaRefreshBlocked) as ei:
+        test_ml.refresh_schema()
+    assert &quot;drained&quot; in str(ei.value).lower()
+
+
+@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;requires a live catalog at DERIVA_HOST&quot;,
+)
+def test_refresh_schema_force_succeeds(tmp_path, test_ml, caplog):
+    &quot;&quot;&quot;refresh_schema(force=True) succeeds even with pending rows and logs.&quot;&quot;&quot;
+    import logging
+    from datetime import datetime, timezone
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    store = test_ml.workspace.execution_state_store()
+    store.insert_execution(
+        execution_rid=&quot;EXE-REFRESH-FORCE&quot;,
+        created_at=datetime.now(timezone.utc),
+    )
+    store.insert_pending_row(
+        execution_rid=&quot;EXE-REFRESH-FORCE&quot;,
+        key=&quot;k&quot;,
+        target_schema=&quot;deriva-ml&quot;, target_table=&quot;Subject&quot;,
+        metadata_json=&quot;{}&quot;,
+        created_at=datetime.now(timezone.utc),
+        status=PendingRowStatus.staged,
+    )
+
+    with caplog.at_level(logging.INFO, logger=&quot;deriva_ml&quot;):
+        test_ml.refresh_schema(force=True)
+    # Cache file exists after refresh
+    cache_file = Path(test_ml.working_dir) / &quot;schema-cache.json&quot;
+    assert cache_file.is_file()
+    # Log records the transition
+    assert any(
+        &quot;refreshed&quot; in r.getMessage().lower()
+        for r in caplog.records
+    ), f&quot;expected 'refreshed' in log; got {[r.getMessage() for r in caplog.records]}&quot;
+
+
+@pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;requires a live catalog at DERIVA_HOST&quot;,
+)
+def test_online_drift_warning(tmp_path, caplog):
+    &quot;&quot;&quot;Cache at stale snapshot id → re-init online → warning logged; cache unchanged.&quot;&quot;&quot;
+    import json as _json
+    import logging
+    import os as _os
+    from deriva_ml import ConnectionMode, DerivaML
+    from deriva_ml.core.schema_cache import SchemaCache
+
+    host = _os.environ[&quot;DERIVA_HOST&quot;]
+    catalog_id = _os.environ.get(&quot;DERIVA_CATALOG_ID&quot;, &quot;1&quot;)
+
+    # First, online to populate the cache normally.
+    DerivaML(hostname=host, catalog_id=catalog_id,
+             mode=ConnectionMode.online, working_dir=tmp_path)
+
+    # Corrupt the snapshot_id to force drift.
+    cache = SchemaCache(tmp_path)
+    data = cache.load()
+    real_snapshot = data[&quot;snapshot_id&quot;]
+    data[&quot;snapshot_id&quot;] = &quot;fake-drift-snapshot&quot;
+    (tmp_path / &quot;schema-cache.json&quot;).write_text(_json.dumps(data))
+
+    # Re-init online → drift warning.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger=&quot;deriva_ml&quot;):
+        DerivaML(hostname=host, catalog_id=catalog_id,
+                 mode=ConnectionMode.online, working_dir=tmp_path)
+    assert any(
+        &quot;snapshot&quot; in r.getMessage().lower()
+        for r in caplog.records
+    ), f&quot;expected drift-warning log; got {[r.getMessage() for r in caplog.records]}&quot;
+
+    # Cache snapshot_id still says the fake value — we DIDN'T auto-refresh.
+    reloaded = _json.loads((tmp_path / &quot;schema-cache.json&quot;).read_text())
+    assert reloaded[&quot;snapshot_id&quot;] == &quot;fake-drift-snapshot&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 11.2: Run the non-catalog-gated test</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_offline_init.py::test_offline_hostname_mismatch_raises -v</code></p>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 11.3: Run the catalog-gated tests (if a local catalog is available)</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/core/test_offline_init.py -v 2&gt;&amp;1 | tail -15</code></p>
+<p>Expected: all 7 tests PASS (5 catalog-gated + 2 non-gated from Task 10 + this task). If DERIVA_HOST isn't set, 5 tests skip with the expected reason.</p>
+<ul>
+<li>[ ] <strong>Step 11.4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/core/test_offline_init.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+test(core): integration tests for offline init + refresh_schema
+
+Part B of S4 (H1). Six tests covering the new __init__ paths:
+- test_offline_without_cache_raises (non-gated; from Task 10)
+- test_offline_hostname_mismatch_raises (non-gated)
+- test_online_first_populates_cache (catalog-gated)
+- test_offline_after_online_succeeds (catalog-gated)
+- test_refresh_schema_refuses_with_pending_rows (catalog-gated)
+- test_refresh_schema_force_succeeds (catalog-gated)
+- test_online_drift_warning (catalog-gated)
+
+Catalog-gated tests skip when DERIVA_HOST is unset.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-12-regression-audit-selfcatalog-is-none-usage">Task 12: Regression audit — <code>self.catalog is None</code> usage</h3>
+<p><strong>Files:</strong>
+- Audit all of <code>src/</code> and <code>tests/</code>; fix any callers that rely on <code>self.catalog is None</code> to detect offline mode.</p>
+<ul>
+<li>[ ] <strong>Step 12.1: Grep for <code>catalog is None</code> usage</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">git grep -nE &quot;self\.catalog\s+is\s+None|catalog\s+is\s+None&quot; -- src/ tests/ | \
+  grep -v &quot;schema_cache.py\|catalog_stub.py\|test_offline_init.py&quot;
+</code></pre>
+<p>Expected output: ideally empty. Any hit is a caller that expected <code>catalog is None</code> and will now see a <code>CatalogStub</code> instance — <code>is None</code> returns False, behavior silently changes.</p>
+<ul>
+<li>[ ] <strong>Step 12.2: Fix any offenders</strong></li>
+</ul>
+<p>For each offender from Step 12.1:
+- If the intent is "I'm offline, don't touch catalog": change to <code>isinstance(self.catalog, CatalogStub)</code> OR <code>self._mode is ConnectionMode.offline</code>. The latter is more idiomatic.
+- If the intent is "catalog hasn't been constructed yet": revisit — that state shouldn't exist after the S4 refactor.</p>
+<p>Include the fix in the same commit as this task.</p>
+<ul>
+<li>[ ] <strong>Step 12.3: Run the fast-unit-test subset</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/ tests/model/ tests/core/ -q --timeout=60 2&gt;&amp;1 | tail -5</code></p>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 12.4: Commit</strong></li>
+</ul>
+<p>If Step 12.2 found offenders to fix:</p>
+<pre><code class="language-bash">git add &lt;affected files&gt;
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+fix: replace `catalog is None` checks with explicit mode check
+
+Part B of S4 (H1). After S4, self.catalog is never None — it's
+either an ErmrestCatalog (online) or a CatalogStub (offline). Any
+existing `catalog is None` check silently changed semantics.
+Replaces with `self._mode is ConnectionMode.offline` where the
+original intent was &quot;skip catalog work in offline mode.&quot;
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<p>If no offenders were found, no commit.</p>
+<hr />
+<h3 id="task-13-changelog-entry">Task 13: CHANGELOG entry</h3>
+<p><strong>Files:</strong>
+- Modify: <code>CHANGELOG.md</code></p>
+<ul>
+<li>[ ] <strong>Step 13.1: Add entry at top of CHANGELOG</strong></li>
+</ul>
+<p>In <code>CHANGELOG.md</code>, under the topmost (<code>## Unreleased</code> or first H2) section, add a new subsection:</p>
+<pre><code class="language-markdown">## Unreleased — Phase 2 Subsystem 4: Hygiene bundle
+
+### New
+
+- **`DerivaML.refresh_schema(force=False)`** — explicit schema-cache refresh. Online mode only. Refuses when the workspace has pending rows unless `force=True`. Updates `self.model` in place so the calling session sees the new schema without re-constructing `DerivaML`.
+- **`ConnectionMode.offline` now actually works without network.** `DerivaML.__init__` reads the cached schema from `&lt;working_dir&gt;/schema-cache.json` and sets `self.catalog = CatalogStub()`. Any code that tries to reach `self.catalog.&lt;method&gt;` in offline mode raises `DerivaMLReadOnlyError` with a clear message. Offline mode requires a pre-populated cache — run online once in the same `working_dir` first.
+- **`SchemaCache`** (`deriva_ml.core.schema_cache`) — workspace-backed cache of the catalog schema. Atomic writes (tmp + fsync + rename) for crash safety.
+- **`CatalogStub`** (`deriva_ml.core.catalog_stub`) — drop-in replacement for `ErmrestCatalog` in offline mode.
+- **`DerivaMLSchemaRefreshBlocked`** (`deriva_ml.core.exceptions`) — subclass of `DerivaMLConfigurationError`. Raised when `refresh_schema()` is called with pending workspace rows and `force=False`.
+- **`ExecutionStateStore.count_pending_rows()`** — workspace-wide non-terminal row count (existing `count_pending_by_kind` is per-execution).
+- **`DerivaModel.from_cached(schema_dict, *, catalog, ...)`** — classmethod for offline model construction from a cached `/schema` dict; no network.
+
+### Drift behavior (online mode)
+
+On online `__init__`, the library fetches the live catalog's snapshot id (`GET /`) and compares it to the cached id. If they differ, a warning is logged and the **cached schema continues to be used** — the live schema is discarded. Users who want the new schema must call `ml.refresh_schema()` explicitly. Rationale: auto-refresh is unsafe when the workspace has staged data that references the old schema. A future subsystem will add map operations for schema-aware data migration.
+
+### Fixed
+
+- **S1a `Status`-enum migration finished.** `src/deriva_ml/core/base.py`'s `__init__` and `__del__`, and `src/deriva_ml/dataset/dataset.py`'s local `update_status` closure, no longer reference the deleted `Status` enum. Three docstring examples in `mixins/execution.py` updated to `ExecutionStatus`. Dead `TYPE_CHECKING` import removed from `interfaces.py`.
+- **`__del__` no longer force-aborts executions in terminal states.** An execution in `ExecutionStatus.Stopped` (algorithm done, upload pending) or other terminal states is left alone on GC; only non-terminal executions get `update_status(Aborted)`.
+- **`DerivaML.__init__`'s `self.status = Status.pending.value`** is now `ExecutionStatus.Created.value` — the value that actually exists in the `Execution_Status` vocabulary.
+
+### Audit
+
+- **Grep-gate `tests/test_migration_complete.py`** — fails CI if any new `Status.xxx` reference leaks into `src/`. Exempts `execution/execution_record.py` (legacy Pydantic class scheduled for removal in a later subsystem).
+- Three tests in the grep-gate file: the gate itself, a planted-offender sanity check, and an ignores-modern-status-enums check to rule out regex false positives.
+
+### API note (not a breaking change, but worth noting)
+
+Code that relied on `ml.catalog is None` to detect offline mode sees a `CatalogStub` instance instead. The instance is truthy and its methods all raise `DerivaMLReadOnlyError`. Replace `ml.catalog is None` with `ml.mode is ConnectionMode.offline` or `isinstance(ml.catalog, CatalogStub)`.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 13.2: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add CHANGELOG.md
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(changelog): Phase 2 Subsystem 4 — hygiene bundle
+
+Documents both halves of S4:
+
+- H1 (offline-mode init): SchemaCache, CatalogStub,
+  refresh_schema(), DerivaModel.from_cached, workspace-wide
+  count_pending_rows. Drift in online mode is warn-only; cache
+  stays authoritative unless refresh_schema() is called.
+
+- H2 (Status migration): real call sites in base.py and
+  dataset.py, docstring scrubs, dead import removal. Grep-gate
+  lands with documented exempt list for the legacy Pydantic
+  ExecutionRecord island.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="self-review-checklist-controller-pre-dispatch">Self-Review Checklist (controller, pre-dispatch)</h2>
+<h3 id="spec-coverage">Spec coverage</h3>
+<ul>
+<li>§1 Goal (H1+H2) → Tasks 1–11 (plus H2 grep-gate in Task 4) ✓</li>
+<li>§3 Architecture (SchemaCache, CatalogStub, refresh_schema) → Tasks 7, 8, 10 ✓</li>
+<li>§4 Part A (H2) implementation details → Tasks 1, 2, 3, 4 ✓</li>
+<li>§4.3 Grep-gate with exempt list → Task 4 ✓</li>
+<li>§5.1 SchemaCache → Task 8 ✓</li>
+<li>§5.2 CatalogStub → Task 7 ✓</li>
+<li>§5.3 refresh_schema → Task 10 ✓</li>
+<li>§5.4 DerivaMLSchemaRefreshBlocked → Task 6 ✓</li>
+<li>§5.5 Mode-branched <strong>init</strong> → Task 10 ✓</li>
+<li>§5.6 DerivaModel.from_cached → Task 9 ✓</li>
+<li>§5.7 Snapshot-id fetch → Task 10 (pinned to <code>catalog.get('/').json()['snaptime']</code>) ✓</li>
+<li>§5.8 count_pending_rows → Task 5 ✓</li>
+<li>§6 Data flow → covered in implementation tasks' tests ✓</li>
+<li>§7 Error handling → Tasks 6, 7, 10, 11 ✓</li>
+<li>§8 Testing plan → Tasks 4, 7, 8, 9, 11 ✓</li>
+<li>§9 Risks (1, 2 pinned in "Tech details pinned" at top of plan; 3 handled in Task 12; 4 handled by SchemaCache test for corrupt file in Task 8) ✓</li>
+<li>§10 Rollout → Task 13 ✓</li>
+</ul>
+<h3 id="placeholder-scan">Placeholder scan</h3>
+<p>No "TBD", "TODO", "add error handling", "implement later" etc. in the plan. ✓</p>
+<h3 id="type-consistency">Type consistency</h3>
+<ul>
+<li><code>DerivaModel.from_cached(schema_dict, *, catalog, ml_schema, domain_schemas, default_schema)</code> — used same signature in Tasks 9, 10 ✓</li>
+<li><code>SchemaCache.write(*, snapshot_id, hostname, catalog_id, ml_schema, schema)</code> — same in Tasks 8, 10, 11 ✓</li>
+<li><code>ExecutionStateStore.count_pending_rows()</code> — used in Tasks 5, 10 ✓</li>
+<li><code>DerivaMLSchemaRefreshBlocked</code> — subclass of <code>DerivaMLConfigurationError</code>, used in Tasks 6, 10, 11 ✓</li>
+<li><code>CatalogStub</code> — used in Tasks 7, 9, 10, 11, 12 ✓</li>
+</ul>
+<p>All consistent.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

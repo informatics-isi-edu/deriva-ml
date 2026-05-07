@@ -1,0 +1,2936 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-03-20-fix-denormalize-multihop-fk/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Fix Denormalize: Multi-hop FK Joins Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#fix-denormalize-multi-hop-fk-joins-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Fix Denormalize: Multi-hop FK Joins Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-extend-test-schema-with-multi-hop-fk-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Extend test schema with multi-hop FK tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-write-failing-tests-for-multi-hop-fk-denormalization-bag-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Write failing tests for multi-hop FK denormalization (bag-side)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-fix-bag-side-denormalize-to-use-sql-based-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Fix bag-side denormalize to use SQL-based implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-handle-ambiguous-paths-with-actionable-error-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Handle ambiguous paths with actionable error messages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-fix-catalog-side-_denormalize_datapath-with-multi-hop-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Fix catalog-side _denormalize_datapath with multi-hop support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-add-bagcatalog-consistency-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Add bag/catalog consistency test
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-remove-dead-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Remove dead code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-final-integration-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Final integration test
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="fix-denormalize-multi-hop-fk-joins-implementation-plan">Fix Denormalize: Multi-hop FK Joins Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Fix denormalize to follow multi-hop FK chains (e.g., Image → Observation → Subject) instead of returning nulls for non-member tables, and add comprehensive tests for ambiguous path detection and resolution.</p>
+<p><strong>Architecture:</strong> The bag-side fix switches the public API to use the existing <code>_denormalize()</code> SQL method which already builds correct multi-hop JOINs. The catalog-side fix rewrites <code>_denormalize_datapath()</code> to follow FK chains via datapath, supporting multi-hop chains by walking intermediate tables. Both sides get ambiguous path detection with actionable error messages. The test schema is extended with Observation, ClinicalRecord, and ClinicalRecord_Observation tables to exercise multi-hop patterns.</p>
+<p><strong>Tech Stack:</strong> Python, SQLAlchemy ORM, ERMrest datapath API, pytest</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-03-20-fix-denormalize-multihop-fk.md</code></p>
+<hr />
+<h3 id="task-1-extend-test-schema-with-multi-hop-fk-tables">Task 1: Extend test schema with multi-hop FK tables</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/demo_catalog.py:323-361</code> (<code>create_domain_schema</code>)
+- Modify: <code>src/deriva_ml/demo_catalog.py:52-69</code> (<code>populate_demo_catalog</code>)
+- Modify: <code>tests/catalog_manager.py:123-248</code> (<code>reset</code> method)</p>
+<ul>
+<li>[ ] <strong>Step 1: Add Observation, ClinicalRecord, ClinicalRecord_Observation tables to <code>create_domain_schema</code></strong></li>
+</ul>
+<p>After the existing <code>ml_instance.create_asset("Image", ...)</code> and <code>ml_instance.apply_catalog_annotations()</code> calls, add:</p>
+<pre><code class="language-python">from deriva.core.typed import ForeignKeyDef
+
+# Create Observation table with FK to Subject
+domain_schema.create_table(
+    TableDef(
+        name=&quot;Observation&quot;,
+        columns=[
+            ColumnDef(&quot;Observation_Date&quot;, BuiltinType.date),
+            ColumnDef(&quot;Subject&quot;, BuiltinType.text, nullok=False),
+        ],
+        foreign_keys=[
+            ForeignKeyDef(
+                columns=[&quot;Subject&quot;],
+                referenced_schema=sname,
+                referenced_table=&quot;Subject&quot;,
+                referenced_columns=[&quot;RID&quot;],
+            )
+        ],
+    )
+)
+
+# Add FK from Image to Observation (nullable, keeps existing Image → Subject FK)
+# Refresh model to pick up the newly created Observation table
+model = catalog.getCatalogModel()
+domain_schema = model.schemas[sname]
+image_table = domain_schema.tables[&quot;Image&quot;]
+image_table.create_column(ColumnDef(&quot;Observation&quot;, BuiltinType.text, nullok=True))
+image_table.create_fkey(
+    ForeignKeyDef(
+        columns=[&quot;Observation&quot;],
+        referenced_schema=sname,
+        referenced_table=&quot;Observation&quot;,
+        referenced_columns=[&quot;RID&quot;],
+    )
+)
+
+# Create ClinicalRecord table
+domain_schema.create_table(
+    TableDef(
+        name=&quot;ClinicalRecord&quot;,
+        columns=[
+            ColumnDef(&quot;Diagnosis&quot;, BuiltinType.text),
+            ColumnDef(&quot;Notes&quot;, BuiltinType.text, nullok=True),
+        ],
+    )
+)
+
+# Create ClinicalRecord_Observation association table
+domain_schema.create_table(
+    TableDef(
+        name=&quot;ClinicalRecord_Observation&quot;,
+        columns=[
+            ColumnDef(&quot;ClinicalRecord&quot;, BuiltinType.text, nullok=False),
+            ColumnDef(&quot;Observation_Ref&quot;, BuiltinType.text, nullok=False),
+        ],
+        foreign_keys=[
+            ForeignKeyDef(
+                columns=[&quot;ClinicalRecord&quot;],
+                referenced_schema=sname,
+                referenced_table=&quot;ClinicalRecord&quot;,
+                referenced_columns=[&quot;RID&quot;],
+            ),
+            ForeignKeyDef(
+                columns=[&quot;Observation_Ref&quot;],
+                referenced_schema=sname,
+                referenced_table=&quot;Observation&quot;,
+                referenced_columns=[&quot;RID&quot;],
+            ),
+        ],
+    )
+)
+</code></pre>
+<p>Note: <code>ForeignKeyDef</code> is imported from <code>deriva.core.typed</code> and uses <strong>keyword arguments</strong> (<code>columns=</code>, <code>referenced_schema=</code>, <code>referenced_table=</code>, <code>referenced_columns=</code>). See <code>src/deriva_ml/schema/create_schema.py:115-127</code> for working examples. The column name <code>Observation_Ref</code> avoids collision with the <code>Observation</code> table name in path builder.</p>
+<ul>
+<li>[ ] <strong>Step 2: Populate test data for new tables in <code>populate_demo_catalog</code></strong></li>
+</ul>
+<p>After the existing image creation loop, add:</p>
+<pre><code class="language-python"># Create Observations (one per Subject)
+pb = ml_instance.domain_path()
+observation_records = []
+for s in ss:
+    observation_records.append({
+        &quot;Subject&quot;: s[&quot;RID&quot;],
+        &quot;Observation_Date&quot;: datetime.now().date().isoformat(),
+    })
+observation_table = pb.tables[&quot;Observation&quot;]
+observations = list(observation_table.insert(observation_records))
+
+# Link Images to Observations (update Image.Observation FK)
+image_table = pb.tables[&quot;Image&quot;]
+all_images = list(image_table.path.entities().fetch())
+for img, obs in zip(all_images, observations):
+    image_table.path.filter(image_table.RID == img[&quot;RID&quot;]).update([{&quot;RID&quot;: img[&quot;RID&quot;], &quot;Observation&quot;: obs[&quot;RID&quot;]}])
+
+# Create ClinicalRecords
+clinical_records = []
+for i, obs in enumerate(observations):
+    clinical_records.append({
+        &quot;Diagnosis&quot;: f&quot;Diagnosis_{i}&quot;,
+        &quot;Notes&quot;: f&quot;Notes for observation {obs['RID']}&quot;,
+    })
+cr_table = pb.tables[&quot;ClinicalRecord&quot;]
+crs = list(cr_table.insert(clinical_records))
+
+# Create ClinicalRecord_Observation associations
+assoc_records = []
+for cr, obs in zip(crs, observations):
+    assoc_records.append({
+        &quot;ClinicalRecord&quot;: cr[&quot;RID&quot;],
+        &quot;Observation_Ref&quot;: obs[&quot;RID&quot;],
+    })
+cr_obs_table = pb.tables[&quot;ClinicalRecord_Observation&quot;]
+cr_obs_table.insert(assoc_records)
+</code></pre>
+<p>Note: The datapath API uses <code>path.filter().update()</code> for updates, not <code>table.update()</code> directly. Check the existing code patterns in <code>demo_catalog.py</code> for the correct update syntax and adjust accordingly.</p>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>catalog_manager.py</code> reset method for new tables</strong></li>
+</ul>
+<p>Add the new tables to the appropriate reset lists in <code>reset()</code>.</p>
+<p>In the <code>domain_assoc_tables</code> list (line 156, after <code>"Image_Subject"</code>):</p>
+<pre><code class="language-python">&quot;ClinicalRecord_Observation&quot;,
+</code></pre>
+<p>Replace the data tables deletion (line 174, <code>for t in ["Image", "Subject"]:</code>) with:</p>
+<pre><code class="language-python"># Clear data tables in dependency order (FK children before parents)
+for t in [&quot;ClinicalRecord_Observation&quot;, &quot;ClinicalRecord&quot;, &quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]:
+    self._delete_table_data(domain_path, t)
+</code></pre>
+<p>Add the new tables to the test-specific drop lists (after line 240, test_tables):</p>
+<pre><code class="language-python"># New schema extension tables for multi-hop FK testing
+new_assoc_tables = [
+    &quot;ClinicalRecord_Observation&quot;,
+]
+for t in new_assoc_tables:
+    self._drop_table_if_exists(self.domain_schema, t)
+
+new_data_tables = [&quot;ClinicalRecord&quot;, &quot;Observation&quot;]
+for t in new_data_tables:
+    self._drop_table_if_exists(self.domain_schema, t)
+</code></pre>
+<p>Note: <code>Observation</code> must be dropped after <code>ClinicalRecord_Observation</code> (FK dependency) and after <code>Image</code> (Image has FK to Observation). <code>Image</code> is already dropped earlier in the reset sequence.</p>
+<ul>
+<li>[ ] <strong>Step 4: Proactively mark existing ambiguous-path tests as xfail</strong></li>
+</ul>
+<p>The addition of the Image→Observation FK creates an <strong>ambiguous path</strong> from Image to Subject (direct FK AND Image→Observation→Subject). Existing tests that call <code>denormalize(["Image", "Subject"])</code> will now fail because <code>_table_relationship()</code> finds 2 FK paths.</p>
+<p><strong>Before running tests</strong>, find all existing tests that use <code>include_tables=["Image", "Subject"]</code> and mark them:</p>
+<pre><code class="language-python">@pytest.mark.xfail(reason=&quot;Ambiguous Image→Subject path after schema extension — resolved in Task 4&quot;, strict=False)
+</code></pre>
+<p>Use <code>xfail</code> (not <code>skip</code>) so they still run and we can see when they start passing again. Track which tests were marked so Task 4 can remove the markers.</p>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; grep -n '"Image", "Subject"' tests/dataset/test_denormalize.py</code></p>
+<p>Add <code>@pytest.mark.xfail(...)</code> to each matching test method.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run existing tests to verify schema extension doesn't break non-ambiguous tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py -v --timeout=120</code></p>
+<p>Expected: All non-xfail tests pass. xfail tests may fail (expected) or xpass (also fine).</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/demo_catalog.py tests/catalog_manager.py tests/dataset/test_denormalize.py
+git commit -m &quot;feat: add Observation, ClinicalRecord tables to test schema for multi-hop FK testing&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-write-failing-tests-for-multi-hop-fk-denormalization-bag-side">Task 2: Write failing tests for multi-hop FK denormalization (bag-side)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/dataset/test_denormalize.py</code></p>
+<p>These tests target the bag-side <code>denormalize_as_dataframe()</code> and <code>denormalize_as_dict()</code>. All tests should FAIL initially because the current implementation (<code>_denormalize_from_members</code>) doesn't handle non-member tables.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>TestMultiHopDenormalize</code> class with all multi-hop and data integrity tests</strong></li>
+</ul>
+<p>Add after the existing <code>TestCatalogDenormalize</code> class:</p>
+<pre><code class="language-python">class TestMultiHopDenormalize:
+    &quot;&quot;&quot;Test multi-hop FK joins in bag denormalization.
+
+    These tests use the extended schema: Image → Observation → Subject
+    and ClinicalRecord_Observation linking ClinicalRecord ↔ Observation.
+    Image is the only dataset member; other tables are FK-reachable.
+    &quot;&quot;&quot;
+
+    def test_non_member_fk_join(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;M1: Join to a table that is not a dataset member via FK.
+
+        Image (member) has FK to Observation (non-member).
+        Observation columns should be populated, not null.
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+
+        # Should have rows (equal to Image member count)
+        assert len(df) &gt; 0, &quot;Expected rows from denormalization&quot;
+
+        # Observation columns should exist
+        obs_columns = [c for c in df.columns if c.startswith(&quot;Observation.&quot;)]
+        assert len(obs_columns) &gt; 0, &quot;Expected Observation columns&quot;
+
+        # At least some Observation values should be non-null
+        obs_rid_col = &quot;Observation.RID&quot;
+        assert obs_rid_col in df.columns, f&quot;Expected {obs_rid_col} column&quot;
+        non_null_count = df[obs_rid_col].notna().sum()
+        assert non_null_count &gt; 0, (
+            &quot;Observation.RID should be populated for Images with Observation FK. &quot;
+            &quot;Got all nulls — FK join to non-member table is not working.&quot;
+        )
+
+    def test_multihop_chain(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;M2: Multi-hop chain Image → Observation → Subject, all included.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]
+        )
+
+        assert len(df) &gt; 0
+        # All three table prefixes should have columns
+        for prefix in [&quot;Image.&quot;, &quot;Observation.&quot;, &quot;Subject.&quot;]:
+            cols = [c for c in df.columns if c.startswith(prefix)]
+            assert len(cols) &gt; 0, f&quot;Expected columns with prefix {prefix}&quot;
+
+        # Subject should be populated (reached via Observation)
+        subject_rid_col = &quot;Subject.RID&quot;
+        if subject_rid_col in df.columns:
+            non_null = df[subject_rid_col].notna().sum()
+            assert non_null &gt; 0, &quot;Subject.RID should be populated via multi-hop FK chain&quot;
+
+    def test_association_table_join(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;M3: Join through association table (M:N).
+
+        Path: Image → Observation ← ClinicalRecord_Observation → ClinicalRecord
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;ClinicalRecord&quot;]
+        )
+
+        assert len(df) &gt; 0
+        # ClinicalRecord columns should be present
+        cr_cols = [c for c in df.columns if c.startswith(&quot;ClinicalRecord.&quot;)]
+        assert len(cr_cols) &gt; 0, &quot;Expected ClinicalRecord columns&quot;
+
+        # Association table columns should NOT be in output
+        assoc_cols = [c for c in df.columns if c.startswith(&quot;ClinicalRecord_Observation.&quot;)]
+        assert len(assoc_cols) == 0, &quot;Association table columns should not appear in output&quot;
+
+    def test_reverse_fk_direction(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;M4: Reverse FK direction — Observation listed first, Image is the member.
+
+        Image has FK to Observation (so Observation is referenced_by Image).
+        Observation listed first but Image is the member.
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Observation&quot;, &quot;Image&quot;]
+        )
+
+        assert len(df) &gt; 0
+        # Both tables should have columns
+        obs_cols = [c for c in df.columns if c.startswith(&quot;Observation.&quot;)]
+        img_cols = [c for c in df.columns if c.startswith(&quot;Image.&quot;)]
+        assert len(obs_cols) &gt; 0, &quot;Expected Observation columns&quot;
+        assert len(img_cols) &gt; 0, &quot;Expected Image columns&quot;
+
+    def test_full_chain_with_association(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;M5: Full chain Image → Observation ← ClinicalRecord_Observation → ClinicalRecord.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;ClinicalRecord&quot;]
+        )
+
+        assert len(df) &gt; 0
+        # All requested tables should have columns
+        for prefix in [&quot;Image.&quot;, &quot;Observation.&quot;, &quot;ClinicalRecord.&quot;]:
+            cols = [c for c in df.columns if c.startswith(prefix)]
+            assert len(cols) &gt; 0, f&quot;Expected columns with prefix {prefix}&quot;
+
+        # ClinicalRecord should be populated where data exists
+        cr_rid_col = &quot;ClinicalRecord.RID&quot;
+        if cr_rid_col in df.columns:
+            non_null = df[cr_rid_col].notna().sum()
+            assert non_null &gt; 0, &quot;ClinicalRecord.RID should be populated via association table&quot;
+
+    def test_fk_value_integrity(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;D1: FK values are correct in joined rows.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+
+        # For rows where both sides are non-null, FK must match PK
+        if &quot;Image.Observation&quot; in df.columns and &quot;Observation.RID&quot; in df.columns:
+            valid = df.dropna(subset=[&quot;Image.Observation&quot;, &quot;Observation.RID&quot;])
+            for _, row in valid.iterrows():
+                assert row[&quot;Image.Observation&quot;] == row[&quot;Observation.RID&quot;], (
+                    f&quot;FK mismatch: Image.Observation={row['Image.Observation']} &quot;
+                    f&quot;!= Observation.RID={row['Observation.RID']}&quot;
+                )
+
+    def test_row_count_matches_members(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;D2: Row count equals dataset member count, no duplication.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        members = bag.list_dataset_members(recurse=True)
+        image_count = len(members.get(&quot;Image&quot;, []))
+
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+        assert len(df) == image_count, (
+            f&quot;Row count ({len(df)}) should match Image member count ({image_count})&quot;
+        )
+
+    def test_null_fk_outer_join(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;D3: Images with null Observation FK get null Observation columns.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+
+        # Rows where Image.Observation is null should have null Observation.RID
+        if &quot;Image.Observation&quot; in df.columns and &quot;Observation.RID&quot; in df.columns:
+            null_obs_images = df[df[&quot;Image.Observation&quot;].isna()]
+            if len(null_obs_images) &gt; 0:
+                assert null_obs_images[&quot;Observation.RID&quot;].isna().all(), (
+                    &quot;Images with null Observation FK should have null Observation columns&quot;
+                )
+
+    def test_no_data_leakage(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;D4: No data leakage from non-member records.
+
+        Only records FK-reachable from dataset members should appear.
+        Observations not linked to any Image in this dataset should NOT appear.
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+
+        # Get the set of Observation RIDs referenced by Image members
+        if &quot;Image.Observation&quot; in df.columns:
+            expected_obs_rids = set(df[&quot;Image.Observation&quot;].dropna())
+
+            # All Observation RIDs in the output should be in the expected set
+            if &quot;Observation.RID&quot; in df.columns:
+                actual_obs_rids = set(df[&quot;Observation.RID&quot;].dropna())
+                assert actual_obs_rids.issubset(expected_obs_rids), (
+                    f&quot;Leaked Observation RIDs: {actual_obs_rids - expected_obs_rids}&quot;
+                )
+
+    def test_single_table_regression(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;E2: Single-table denormalization unchanged by schema additions.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Single table should still work
+        df_subject = bag.denormalize_as_dataframe(include_tables=[&quot;Subject&quot;])
+        assert isinstance(df_subject, pd.DataFrame)
+        assert len(df_subject) &gt; 0
+
+        df_image = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;])
+        assert isinstance(df_image, pd.DataFrame)
+        assert len(df_image) &gt; 0
+
+    def test_empty_intermediate_table(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;E1: Empty intermediate table — Image rows returned, all Observation columns null.
+
+        This test requires a dataset where no Image has an Observation FK set.
+        If the test data populates all Images with Observations, this test verifies
+        the behavior with a hypothetical empty case by checking that nulls are
+        handled correctly (same as D3 but checking the extreme case).
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Even if Observation table has data, the query should not fail
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) &gt; 0
+
+    def test_all_non_member_tables(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;E3: All non-member tables — should return empty or error.
+
+        Neither Observation nor ClinicalRecord has dataset members.
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Observation&quot;, &quot;ClinicalRecord&quot;]
+        )
+        # Should return empty DataFrame (no primary table with members)
+        assert len(df) == 0, (
+            &quot;Should return empty result when no included table has dataset members&quot;
+        )
+
+    def test_denormalize_matches_members(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;C2: Denormalized RIDs match list_dataset_members for member tables.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        members = bag.list_dataset_members(recurse=True)
+        member_rids = {m[&quot;RID&quot;] for m in members.get(&quot;Image&quot;, [])}
+
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;])
+        denorm_rids = set(df[&quot;Image.RID&quot;].dropna())
+
+        assert member_rids == denorm_rids, (
+            f&quot;Denormalized RIDs should match list_dataset_members. &quot;
+            f&quot;Missing: {member_rids - denorm_rids}, Extra: {denorm_rids - member_rids}&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Add <code>TestAmbiguousPaths</code> class</strong></li>
+</ul>
+<pre><code class="language-python">class TestAmbiguousPaths:
+    &quot;&quot;&quot;Test ambiguous FK path detection and resolution.
+
+    The test schema has two paths from Image to Subject:
+    1. Direct: Image → Subject (via Image.Subject FK)
+    2. Multi-hop: Image → Observation → Subject
+
+    Requesting [&quot;Image&quot;, &quot;Subject&quot;] should raise an error listing both paths.
+    Including Observation should disambiguate.
+    &quot;&quot;&quot;
+
+    def test_ambiguous_paths_raises_error(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;A1: Ambiguous paths produce DerivaMLException with both paths listed.&quot;&quot;&quot;
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        with pytest.raises(DerivaMLException) as exc_info:
+            bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Subject&quot;])
+
+        error_msg = str(exc_info.value)
+        # Error must mention both tables and indicate ambiguity
+        assert &quot;Subject&quot; in error_msg, &quot;Error should mention the ambiguous target table&quot;
+        assert &quot;Image&quot; in error_msg, &quot;Error should mention the source table&quot;
+        assert &quot;ambiguous&quot; in error_msg.lower() or &quot;multiple&quot; in error_msg.lower(), (
+            f&quot;Error should indicate ambiguity. Got: {error_msg}&quot;
+        )
+
+    def test_ambiguous_error_lists_paths(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;A1b: Error message contains enough info to resolve the ambiguity.&quot;&quot;&quot;
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        with pytest.raises(DerivaMLException) as exc_info:
+            bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Subject&quot;])
+
+        error_msg = str(exc_info.value)
+        # Must mention Observation as the intermediate table
+        assert &quot;Observation&quot; in error_msg, (
+            f&quot;Error should mention intermediate table 'Observation' so user knows &quot;
+            f&quot;to include it for disambiguation. Got: {error_msg}&quot;
+        )
+
+    def test_including_intermediate_resolves_ambiguity(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;A2: Including Observation resolves the Image→Subject ambiguity.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # This should NOT raise — Observation disambiguates the path
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]
+        )
+
+        assert len(df) &gt; 0, &quot;Should return rows after disambiguation&quot;
+
+        # All three tables should have populated columns
+        for prefix in [&quot;Image.&quot;, &quot;Observation.&quot;, &quot;Subject.&quot;]:
+            cols = [c for c in df.columns if c.startswith(prefix)]
+            assert len(cols) &gt; 0, f&quot;Expected columns with prefix {prefix}&quot;
+
+        # FK chain should be correct
+        if all(c in df.columns for c in [&quot;Image.Observation&quot;, &quot;Observation.RID&quot;,
+                                          &quot;Observation.Subject&quot;, &quot;Subject.RID&quot;]):
+            valid = df.dropna(subset=[&quot;Image.Observation&quot;, &quot;Observation.RID&quot;,
+                                       &quot;Observation.Subject&quot;, &quot;Subject.RID&quot;])
+            for _, row in valid.iterrows():
+                assert row[&quot;Image.Observation&quot;] == row[&quot;Observation.RID&quot;], (
+                    &quot;Image.Observation should match Observation.RID&quot;
+                )
+                assert row[&quot;Observation.Subject&quot;] == row[&quot;Subject.RID&quot;], (
+                    &quot;Observation.Subject should match Subject.RID&quot;
+                )
+
+    def test_disambiguation_produces_correct_data(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;A2b: Disambiguated path returns correct Subject for each Image.&quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]
+        )
+
+        # Cross-check: the Subject.Name values should be valid test data
+        if all(c in df.columns for c in [&quot;Subject.RID&quot;, &quot;Subject.Name&quot;]):
+            valid = df.dropna(subset=[&quot;Subject.RID&quot;, &quot;Subject.Name&quot;])
+            assert len(valid) &gt; 0, &quot;Should have rows with Subject data&quot;
+            for _, row in valid.iterrows():
+                assert row[&quot;Subject.Name&quot;].startswith(&quot;Thing&quot;), (
+                    f&quot;Unexpected Subject.Name: {row['Subject.Name']}&quot;
+                )
+
+    def test_direct_fk_no_ambiguity(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;A3: Direct FK still works when no ambiguity exists.
+
+        Test with [&quot;Image&quot;, &quot;Observation&quot;] — there's only one FK path
+        (Image.Observation → Observation.RID), so no ambiguity should be raised.
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Should not raise — single path from Image to Observation
+        df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+        assert len(df) &gt; 0
+        # Observation should be populated
+        if &quot;Observation.RID&quot; in df.columns:
+            non_null = df[&quot;Observation.RID&quot;].notna().sum()
+            assert non_null &gt; 0, &quot;Observation.RID should be populated via direct FK&quot;
+
+    def test_association_table_single_path(self, dataset_test, tmp_path):
+        &quot;&quot;&quot;A4: Association table path — if only one path exists, no error.
+
+        Path: Image → Observation ← ClinicalRecord_Observation → ClinicalRecord
+        Only one path exists between Image and ClinicalRecord (through Observation
+        and the association table), so this should NOT raise an ambiguity error.
+        &quot;&quot;&quot;
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # Should work without error — single path through association table
+        df = bag.denormalize_as_dataframe(
+            include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;ClinicalRecord&quot;]
+        )
+        assert len(df) &gt; 0
+</code></pre>
+<p>Note: Test A5 (three-way ambiguity) is omitted as the current test schema only supports two-way ambiguity (Image→Subject direct and Image→Observation→Subject). Adding a third path would require additional schema changes that don't serve the core fix. The A5 case can be added later if needed.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py::TestMultiHopDenormalize -v --timeout=120</code></p>
+<p>Expected: Tests FAIL because <code>_denormalize_from_members()</code> doesn't handle non-member tables.</p>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py::TestAmbiguousPaths -v --timeout=120</code></p>
+<p>Expected: Tests FAIL (ambiguous path test may fail with wrong error type or no error, disambiguation test may return nulls).</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit failing tests</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/dataset/test_denormalize.py
+git commit -m &quot;test: add failing tests for multi-hop FK denormalization and ambiguous paths&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-fix-bag-side-denormalize-to-use-sql-based-implementation">Task 3: Fix bag-side denormalize to use SQL-based implementation</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py:992</code> (<code>denormalize_as_dataframe</code>)
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py:1053</code> (<code>denormalize_as_dict</code>)</p>
+<p>The existing <code>_denormalize()</code> (line 764) builds correct multi-hop SQL JOINs. Switch the public methods to use it.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>denormalize_as_dataframe</code> to use <code>_denormalize()</code></strong></li>
+</ul>
+<p>Replace line 992 (<code>rows = list(self._denormalize_from_members(include_tables=include_tables))</code>) with:</p>
+<pre><code class="language-python">sql_stmt = self._denormalize(include_tables=include_tables)
+with Session(self.engine) as session:
+    result = session.execute(sql_stmt)
+    rows = [dict(row._mapping) for row in result]
+return pd.DataFrame(rows)
+</code></pre>
+<p>Check imports: <code>Session</code> should already be imported from <code>sqlalchemy.orm</code>. If not, add it.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update <code>denormalize_as_dict</code> to use <code>_denormalize()</code> as a streaming generator</strong></li>
+</ul>
+<p>Replace line 1053 (<code>yield from self._denormalize_from_members(include_tables=include_tables)</code>) with:</p>
+<pre><code class="language-python">sql_stmt = self._denormalize(include_tables=include_tables)
+with Session(self.engine) as session:
+    result = session.execute(sql_stmt)
+    for row in result:
+        yield dict(row._mapping)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the multi-hop tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py::TestMultiHopDenormalize -v --timeout=120</code></p>
+<p>Expected: Core join tests (M1, M2, D1, D2, D3, E2) should now PASS. Association tests (M3, M5) may need additional work depending on how <code>_prepare_wide_table</code> handles the ClinicalRecord_Observation path.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run ALL existing denormalize tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py -v --timeout=120</code></p>
+<p>Expected: All existing tests in <code>TestDenormalize</code>, <code>TestDenormalizeSchemaGraph</code>, etc. still pass. If any fail, investigate — column naming may differ between the old and new implementation (dots vs other separators).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/dataset_bag.py
+git commit -m &quot;fix: switch bag denormalize to SQL-based implementation for multi-hop FK support&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-handle-ambiguous-paths-with-actionable-error-messages">Task 4: Handle ambiguous paths with actionable error messages</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/model/catalog.py:636-654</code> (<code>_table_relationship</code>)
+- Modify: <code>src/deriva_ml/model/catalog.py:686-698</code> (<code>_schema_to_paths</code> <code>find_arcs</code>)</p>
+<p>The ambiguity detection already exists in <code>_table_relationship()</code> (line 650: <code>if len(relationships) != 1</code>), but the error message needs enhancement. Additionally, <code>_schema_to_paths()</code> silently skips ambiguous tables (lines 690-698) — this must be reconciled so ambiguity is properly raised when it matters.</p>
+<ul>
+<li>[ ] <strong>Step 1: Enhance the ambiguous path error message in <code>_table_relationship()</code></strong></li>
+</ul>
+<p>Read <code>catalog.py:636-654</code>. The current error (line 651-653) says:</p>
+<pre><code class="language-python">raise DerivaMLException(
+    f&quot;Ambiguous linkage between {table1.name} and {table2.name}: {[(r[0].name, r[1].name) for r in relationships]}&quot;
+)
+</code></pre>
+<p>Enhance to include path suggestions:</p>
+<pre><code class="language-python">if len(relationships) == 0:
+    raise DerivaMLException(
+        f&quot;No FK relationship found between {table1.name} and {table2.name}. &quot;
+        f&quot;These tables may not be directly connected. Check your include_tables list.&quot;
+    )
+if len(relationships) &gt; 1:
+    path_descriptions = []
+    for fk_col, pk_col in relationships:
+        path_descriptions.append(f&quot;  {fk_col.table.name}.{fk_col.name} → {pk_col.table.name}.{pk_col.name}&quot;)
+    # Find intermediate tables that could disambiguate
+    intermediate_tables = set()
+    for fk_col, pk_col in relationships:
+        # If this is a direct FK, the intermediate is any table on alternative paths
+        for other_fk_col, other_pk_col in relationships:
+            if (fk_col, pk_col) != (other_fk_col, other_pk_col):
+                if fk_col.table.name != other_fk_col.table.name:
+                    intermediate_tables.add(fk_col.table.name)
+                    intermediate_tables.add(other_fk_col.table.name)
+    # Remove the two endpoint tables from suggestions
+    intermediate_tables -= {table1.name, table2.name}
+
+    suggestion = &quot;&quot;
+    if intermediate_tables:
+        suggestion = (
+            f&quot; Include an intermediate table in include_tables to disambiguate &quot;
+            f&quot;(e.g., {', '.join(sorted(intermediate_tables))}).&quot;
+        )
+    raise DerivaMLException(
+        f&quot;Ambiguous path between {table1.name} and {table2.name}: &quot;
+        f&quot;found {len(relationships)} FK paths:\n&quot;
+        + &quot;\n&quot;.join(path_descriptions)
+        + f&quot;\n{suggestion}&quot;
+    )
+</code></pre>
+<p>Note: The exact intermediate table detection logic may need refinement based on how <code>_prepare_wide_table()</code> calls <code>_table_relationship()</code>. The key requirement from the spec is that the error message contains: (1) both table names, (2) the paths found, (3) suggestion to add intermediate tables, (4) ideally the names of intermediate tables.</p>
+<ul>
+<li>[ ] <strong>Step 2: Investigate <code>_schema_to_paths()</code> silent skip interaction</strong></li>
+</ul>
+<p><strong>Critical:</strong> <code>_schema_to_paths()</code> at lines 690-698 <strong>silently skips</strong> ambiguous tables during graph traversal. <code>_prepare_wide_table()</code> at line 576 uses <code>_schema_to_paths()</code> to build its table paths, then calls <code>_table_relationship()</code> at line 621 for each adjacent pair in those paths. The question is:</p>
+<p><strong>Does <code>_schema_to_paths()</code> skip Subject from Image's arcs because Image has 2 FKs to Subject (direct + via Observation)?</strong></p>
+<p>Trace the logic:
+1. <code>find_arcs(Image)</code> at line 687 collects <code>[fk.pk_table for fk in Image.foreign_keys]</code>
+2. Image has FKs to: Subject (direct), Observation, and any other tables
+3. <code>Counter(domain_tables)</code> at line 690 counts how many times each table appears
+4. Subject appears ONCE (direct FK) — Image has exactly 1 FK to Subject
+5. Observation appears ONCE — Image has exactly 1 FK to Observation</p>
+<p><strong>Conclusion:</strong> <code>_schema_to_paths()</code> does NOT skip Subject in this case because there's only one direct FK from Image to Subject. The ambiguity comes from <code>_prepare_wide_table()</code> discovering multiple <em>paths</em> to Subject (one direct, one through Observation), not from multiple direct FKs.</p>
+<p>However, the ambiguity detection in <code>_table_relationship()</code> checks for multiple relationships between a PAIR of tables (line 644-648), which counts both <code>foreign_keys</code> AND <code>referenced_by</code>. With the new schema, <code>_table_relationship(Image, Subject)</code> finds:
+- Image.Subject → Subject.RID (direct FK)</p>
+<p>But <code>_prepare_wide_table()</code> may build paths that include both Image→Subject and Image→Observation→Subject. The call to <code>_table_relationship(Image, Subject)</code> at line 621 still only finds 1 direct FK — so <strong>the ambiguity might NOT be detected</strong> by the current mechanism.</p>
+<p><strong>If ambiguity is NOT detected</strong>, you need to add detection in <code>_prepare_wide_table()</code> itself. After building <code>paths_by_element</code> (line 580), check if any element table has multiple paths that include different intermediate tables to reach the same target. Example:</p>
+<pre><code class="language-python"># After building paths_by_element, check for ambiguous endpoints
+for element_table, paths in paths_by_element.items():
+    # Check if multiple paths reach the same endpoint through different intermediates
+    endpoints = defaultdict(list)
+    for path in paths:
+        endpoint = path[-1].name
+        path_names = [p.name for p in path]
+        endpoints[endpoint].append(path_names)
+
+    for endpoint, endpoint_paths in endpoints.items():
+        if len(endpoint_paths) &gt; 1 and endpoint in include_tables:
+            # Multiple paths to same endpoint — check if user included intermediates
+            # to disambiguate
+            path_strs = [&quot; → &quot;.join(p[2:]) for p in endpoint_paths]  # Skip Dataset, Dataset_X prefix
+            raise DerivaMLException(
+                f&quot;Ambiguous path to {endpoint}: found {len(endpoint_paths)} paths:\n&quot;
+                + &quot;\n&quot;.join(f&quot;  {s}&quot; for s in path_strs)
+                + f&quot;\nInclude intermediate tables in include_tables to disambiguate.&quot;
+            )
+</code></pre>
+<p><strong>If ambiguity IS detected</strong> by <code>_table_relationship()</code>, enhance the message as shown in Step 1.</p>
+<p>Read the code, add a print/log statement, and test with <code>["Image", "Subject"]</code> to determine which case applies before writing the fix.</p>
+<ul>
+<li>[ ] <strong>Step 3: Remove xfail markers from existing tests</strong></li>
+</ul>
+<p>Find all tests marked with <code>xfail(reason="Ambiguous Image→Subject path...")</code> from Task 1 and remove the markers. These tests should now pass with the ambiguity handling in place.</p>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; grep -n "Ambiguous Image.*Subject.*path" tests/dataset/test_denormalize.py</code></p>
+<p>Remove each <code>@pytest.mark.xfail(...)</code> decorator found.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run ambiguous path tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py::TestAmbiguousPaths -v --timeout=120</code></p>
+<p>Expected: A1, A1b should PASS (error raised with useful message). A2, A2b should PASS (disambiguation works). A3, A4 should PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run ALL tests including previously-xfailed ones</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py -v --timeout=120</code></p>
+<p>Expected: All tests pass, no xfail markers remain.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/model/catalog.py src/deriva_ml/dataset/dataset_bag.py tests/dataset/test_denormalize.py
+git commit -m &quot;feat: improve ambiguous FK path error messages with path details and disambiguation guidance&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-fix-catalog-side-_denormalize_datapath-with-multi-hop-support">Task 5: Fix catalog-side <code>_denormalize_datapath</code> with multi-hop support</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py:780-881</code> (<code>_denormalize_datapath</code>)</p>
+<p>Rewrite to follow FK chains via the datapath API instead of only joining tables with dataset members. Must support multi-hop chains (e.g., Image → Observation → Subject) by walking through intermediate tables.</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the current implementation and plan the multi-hop approach</strong></li>
+</ul>
+<p>Read <code>dataset.py:780-881</code>. The current approach:
+1. Calls <code>list_dataset_members()</code> for all tables
+2. Iterates over primary table members
+3. For each other table, checks <code>if other_table_name in members</code> (the bug at line 861)
+4. Does single-hop FK lookup via <code>_table_relationship()</code></p>
+<p>The fix needs to:
+1. Keep using <code>list_dataset_members()</code> for the primary table (first table with members)
+2. For other tables, use <code>_table_relationship()</code> to discover the FK path — but handle multi-hop by chaining through intermediate tables
+3. Pre-fetch all records for non-member tables by following FK chains from primary members
+4. Handle ambiguous paths (same as bag-side — <code>_table_relationship()</code> raises the error)</p>
+<p>Multi-hop approach: For Image → Observation → Subject, the algorithm should:
+1. Find FK from Image to Observation → collect Observation RIDs from Image members
+2. Fetch all those Observations from catalog
+3. Find FK from Observation to Subject → collect Subject RIDs from Observations
+4. Fetch all those Subjects from catalog
+5. Build lookup indexes for each hop</p>
+<ul>
+<li>[ ] <strong>Step 2: Implement the multi-hop fix</strong></li>
+</ul>
+<p>Replace the body of <code>_denormalize_datapath()</code> with:</p>
+<pre><code class="language-python">def _denormalize_datapath(
+    self,
+    include_tables: list[str],
+    version: DatasetVersion | str | None = None,
+) -&gt; Generator[dict[str, Any], None, None]:
+    &quot;&quot;&quot;Denormalize dataset members by joining related tables via multi-hop FK chains.&quot;&quot;&quot;
+
+    skip_columns = {&quot;RCT&quot;, &quot;RMT&quot;, &quot;RCB&quot;, &quot;RMB&quot;}
+
+    # Get dataset members for the primary table
+    members = self.list_dataset_members(version=version, recurse=True)
+
+    # Build column lists
+    table_columns: dict[str, list[str]] = {}
+    for table_name in include_tables:
+        table = self._ml_instance.model.name_to_table(table_name)
+        table_columns[table_name] = [
+            c.name for c in table.columns if c.name not in skip_columns
+        ]
+
+    # Find primary table (first table with dataset members)
+    primary_table = None
+    for table_name in include_tables:
+        if table_name in members and members[table_name]:
+            primary_table = table_name
+            break
+
+    if primary_table is None:
+        return
+
+    # Determine join order: topological sort of included tables based on FK relationships
+    # Build a chain from primary table through each intermediate to reach all targets
+    # Use _prepare_wide_table's graph to find the join path
+    primary_table_obj = self._ml_instance.model.name_to_table(primary_table)
+
+    # Build record indexes for each non-member table by following FK chains
+    # Key insight: walk include_tables in FK-chain order from primary
+    record_indexes: dict[str, dict[str, dict]] = {}  # table_name -&gt; {RID -&gt; record}
+    fk_relationships: dict[str, tuple] = {}  # table_name -&gt; (from_table, fk_col, pk_col)
+
+    # Determine the FK chain order by BFS from primary table through include_tables
+    visited = {primary_table}
+    queue = [primary_table]
+    chain_order = []
+
+    while queue:
+        current_name = queue.pop(0)
+        current_table = self._ml_instance.model.name_to_table(current_name)
+
+        for target_name in include_tables:
+            if target_name in visited:
+                continue
+            target_table = self._ml_instance.model.name_to_table(target_name)
+
+            # Check direct FK relationship (will raise DerivaMLException if ambiguous)
+            try:
+                fk_col, pk_col = self._ml_instance.model._table_relationship(
+                    current_table, target_table
+                )
+                visited.add(target_name)
+                queue.append(target_name)
+                chain_order.append(target_name)
+                fk_relationships[target_name] = (current_name, fk_col, pk_col)
+            except DerivaMLException:
+                # Not directly connected — might be reachable via another table
+                continue
+
+    # Now fetch records for each table in chain order
+    # Start with primary table members
+    record_indexes[primary_table] = {
+        m[&quot;RID&quot;]: m for m in members[primary_table]
+    }
+
+    pb = self._ml_instance.domain_path()
+
+    for target_name in chain_order:
+        from_table_name, fk_col, pk_col = fk_relationships[target_name]
+
+        # Collect FK values from the source table
+        fk_values = set()
+        for record in record_indexes.get(from_table_name, {}).values():
+            fk_value = record.get(fk_col.name)
+            if fk_value:
+                fk_values.add(fk_value)
+
+        if not fk_values:
+            record_indexes[target_name] = {}
+            continue
+
+        # Fetch related records from catalog
+        target_path = pb.tables[target_name]
+        # Use batched queries if needed for large FK sets
+        related_records = list(
+            target_path.path.filter(
+                target_path.column_definitions[pk_col.name].in_(list(fk_values))
+            ).entities().fetch()
+        )
+        record_indexes[target_name] = {
+            r[pk_col.name]: r for r in related_records
+        }
+
+    # Build output rows
+    for member in members[primary_table]:
+        row: dict[str, Any] = {}
+
+        # Add primary table columns
+        for col_name in table_columns[primary_table]:
+            row[f&quot;{primary_table}_{col_name}&quot;] = member.get(col_name)
+
+        # Add columns from each joined table
+        for target_name in include_tables:
+            if target_name == primary_table:
+                continue
+
+            other_cols = table_columns[target_name]
+
+            # Initialize to None (outer join)
+            for col_name in other_cols:
+                row[f&quot;{target_name}_{col_name}&quot;] = None
+
+            # Walk the FK chain from primary to this target
+            if target_name in fk_relationships:
+                # Trace through the chain to find the related record
+                current_record = member
+                current_table_name = primary_table
+                found = True
+
+                # Build the path from primary to target
+                path_to_target = []
+                t = target_name
+                while t != primary_table:
+                    path_to_target.append(t)
+                    t = fk_relationships[t][0]
+                path_to_target.reverse()
+
+                for hop_target in path_to_target:
+                    from_name, fk_c, pk_c = fk_relationships[hop_target]
+                    fk_value = current_record.get(fk_c.name)
+                    if fk_value and fk_value in record_indexes.get(hop_target, {}):
+                        current_record = record_indexes[hop_target][fk_value]
+                        current_table_name = hop_target
+                    else:
+                        found = False
+                        break
+
+                if found and current_table_name == target_name:
+                    for col_name in other_cols:
+                        row[f&quot;{target_name}_{col_name}&quot;] = current_record.get(col_name)
+
+        yield row
+</code></pre>
+<p>Note: The <code>filter().entities().fetch()</code> datapath API pattern may need adjustment — check how existing code in <code>dataset.py</code> queries the catalog. The <code>column_definitions[name].in_()</code> call is the ERMrest datapath filter syntax. Verify by reading existing filter patterns in the file.</p>
+<p><strong>Association table handling:</strong> The BFS above only checks direct FK relationships between tables in <code>include_tables</code>. For M:N joins (Observation ↔ ClinicalRecord via ClinicalRecord_Observation), there's no direct FK — the connection goes through an association table not in <code>include_tables</code>.</p>
+<p>To handle this: after the initial BFS, check for any <code>include_tables</code> entries still in <code>visited</code> but not in <code>chain_order</code>. For each, check if it's reachable via an association table by:</p>
+<ol>
+<li>Call <code>self._ml_instance.model.name_to_table(target_name)</code> for unvisited tables</li>
+<li>Use <code>find_associations()</code> on visited tables to discover association tables</li>
+<li>If an association table has FKs to both a visited table and the unvisited target, add it to the chain as a two-hop: visited → association → target</li>
+<li>Pre-fetch both hops during the record-fetching phase</li>
+</ol>
+<p>Alternatively, if this proves complex, the simpler approach is to add association tables to <code>include_tables</code> automatically when they're needed — <code>is_association()</code> from <code>catalog.py</code> can identify them. The bag-side implementation already handles this in <code>_prepare_wide_table()</code> which the catalog-side doesn't use.</p>
+<p>If association table handling proves too complex for this task, document it as a known limitation and add a <code>TODO</code> — the core fix (direct FK chains) is the priority.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add catalog-side multi-hop tests to <code>TestCatalogDenormalize</code></strong></li>
+</ul>
+<p>Add tests mirroring the bag-side tests but using catalog-based denormalization:</p>
+<pre><code class="language-python">def test_catalog_non_member_fk_join(self, catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;Catalog: Join to non-member table via FK.&quot;&quot;&quot;
+    ml_instance, dataset_description = catalog_with_datasets
+    dataset = dataset_description.dataset
+
+    df = dataset.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+
+    assert len(df) &gt; 0
+    obs_cols = [c for c in df.columns if c.startswith(&quot;Observation_&quot;)]
+    assert len(obs_cols) &gt; 0, &quot;Expected Observation columns&quot;
+
+    obs_rid_col = &quot;Observation_RID&quot;
+    if obs_rid_col in df.columns:
+        non_null = df[obs_rid_col].notna().sum()
+        assert non_null &gt; 0, &quot;Observation_RID should be populated&quot;
+
+def test_catalog_multihop_chain(self, catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;Catalog: Multi-hop chain Image → Observation → Subject.&quot;&quot;&quot;
+    ml_instance, dataset_description = catalog_with_datasets
+    dataset = dataset_description.dataset
+
+    df = dataset.denormalize_as_dataframe(
+        include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]
+    )
+
+    assert len(df) &gt; 0
+    for prefix in [&quot;Image_&quot;, &quot;Observation_&quot;, &quot;Subject_&quot;]:
+        cols = [c for c in df.columns if c.startswith(prefix)]
+        assert len(cols) &gt; 0, f&quot;Expected columns with prefix {prefix}&quot;
+
+    # Subject should be populated via multi-hop
+    if &quot;Subject_RID&quot; in df.columns:
+        non_null = df[&quot;Subject_RID&quot;].notna().sum()
+        assert non_null &gt; 0, &quot;Subject_RID should be populated via multi-hop&quot;
+
+def test_catalog_ambiguous_paths_error(self, catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;Catalog: Ambiguous paths raise error.&quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    ml_instance, dataset_description = catalog_with_datasets
+    dataset = dataset_description.dataset
+
+    with pytest.raises(DerivaMLException) as exc_info:
+        dataset.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Subject&quot;])
+
+    error_msg = str(exc_info.value)
+    assert &quot;ambiguous&quot; in error_msg.lower() or &quot;multiple&quot; in error_msg.lower()
+    assert &quot;Observation&quot; in error_msg
+
+def test_catalog_disambiguation(self, catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;Catalog: Including intermediate resolves ambiguity.&quot;&quot;&quot;
+    ml_instance, dataset_description = catalog_with_datasets
+    dataset = dataset_description.dataset
+
+    df = dataset.denormalize_as_dataframe(
+        include_tables=[&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;]
+    )
+
+    assert len(df) &gt; 0
+    for prefix in [&quot;Image_&quot;, &quot;Observation_&quot;, &quot;Subject_&quot;]:
+        cols = [c for c in df.columns if c.startswith(prefix)]
+        assert len(cols) &gt; 0, f&quot;Expected columns with prefix {prefix}&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run all tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py -v --timeout=120</code></p>
+<p>Expected: All tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/dataset.py tests/dataset/test_denormalize.py
+git commit -m &quot;fix: catalog-side denormalize follows multi-hop FK chains for non-member tables&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-add-bagcatalog-consistency-test">Task 6: Add bag/catalog consistency test</h3>
+<p><strong>Files:</strong>
+- Modify: <code>tests/dataset/test_denormalize.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Add consistency tests</strong></li>
+</ul>
+<pre><code class="language-python">def test_bag_catalog_multihop_consistency(self, catalog_with_datasets, tmp_path):
+    &quot;&quot;&quot;C1: Bag and catalog denormalize produce same data for multi-hop joins.&quot;&quot;&quot;
+    ml_instance, dataset_description = catalog_with_datasets
+    dataset = dataset_description.dataset
+    current_version = dataset.current_version
+
+    # Catalog-based
+    catalog_df = dataset.denormalize_as_dataframe(
+        include_tables=[&quot;Image&quot;, &quot;Observation&quot;]
+    )
+
+    # Bag-based
+    bag = dataset.download_dataset_bag(current_version, use_minid=False)
+    bag_df = bag.denormalize_as_dataframe(include_tables=[&quot;Image&quot;, &quot;Observation&quot;])
+
+    # Same row count
+    assert len(catalog_df) == len(bag_df), (
+        f&quot;Row count mismatch: catalog={len(catalog_df)}, bag={len(bag_df)}&quot;
+    )
+
+    # Same Image RIDs (compare sets, ignoring order)
+    catalog_rids = set(catalog_df[&quot;Image_RID&quot;].dropna())
+    bag_rids = set(bag_df[&quot;Image.RID&quot;].dropna())
+    assert catalog_rids == bag_rids, &quot;Image RIDs should match between catalog and bag&quot;
+
+    # Same Observation RIDs
+    catalog_obs = set(catalog_df[&quot;Observation_RID&quot;].dropna())
+    bag_obs = set(bag_df[&quot;Observation.RID&quot;].dropna())
+    assert catalog_obs == bag_obs, &quot;Observation RIDs should match between catalog and bag&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py::TestCatalogDenormalize::test_bag_catalog_multihop_consistency -v --timeout=120</code></p>
+<p>Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/dataset/test_denormalize.py
+git commit -m &quot;test: add bag/catalog consistency test for multi-hop FK denormalization&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-remove-dead-code">Task 7: Remove dead code</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Remove <code>_denormalize_from_members</code> from <code>dataset_bag.py</code></strong></li>
+</ul>
+<p>Delete the entire <code>_denormalize_from_members</code> method (starts at line 830). Verify no other code references it:</p>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; grep -rn "_denormalize_from_members" src/</code></p>
+<p>Expected: No matches (all callers were switched in Task 3).</p>
+<ul>
+<li>[ ] <strong>Step 2: Check if <code>_find_relationship_attr</code> is still used</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; grep -rn "_find_relationship_attr" src/</code></p>
+<p>Check if it's only called by <code>_denormalize_from_members</code> (now deleted). The <code>_denormalize()</code> method at line 792 has its own <code>find_relationship</code> closure that does the same thing. If <code>_find_relationship_attr</code> has no remaining callers, remove it.</p>
+<ul>
+<li>[ ] <strong>Step 3: Check for other dead private methods</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; grep -rn "def _" src/deriva_ml/dataset/dataset_bag.py</code></p>
+<p>For each private method, verify it has callers. Remove any orphaned methods. Be conservative — only remove methods with zero references.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run all tests to verify nothing breaks</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/ -v --timeout=300</code></p>
+<p>Expected: All tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/dataset_bag.py
+git commit -m &quot;chore: remove dead code (_denormalize_from_members, unused private methods)&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-final-integration-test">Task 8: Final integration test</h3>
+<p><strong>Files:</strong>
+- No new files — run full test suite</p>
+<ul>
+<li>[ ] <strong>Step 1: Run complete test suite</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/ -v --timeout=300</code></p>
+<p>Expected: All tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run just the denormalize tests with verbose output</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml &amp;&amp; uv run pytest tests/dataset/test_denormalize.py -v --timeout=120 -s</code></p>
+<p>Expected: All tests pass, no warnings about ambiguous paths in normal (non-ambiguous) test cases.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit any final fixes</strong></li>
+</ul>
+<p>If any tests required fixes, commit them:</p>
+<pre><code class="language-bash">git add -A
+git commit -m &quot;fix: address integration test issues for denormalize multi-hop FK&quot;
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

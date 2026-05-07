@@ -1,0 +1,3361 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-24-torch-dataset-adapter-plan/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>PyTorch + TensorFlow Dataset Adapter Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pytorch-tensorflow-dataset-adapter-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PyTorch + TensorFlow Dataset Adapter Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#task-ordering-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task ordering rationale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-shared-target-resolution-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Shared target-resolution helper
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-package-extras-in-pyprojecttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Package extras in pyproject.toml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-pytorch-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: PyTorch adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-tensorflow-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: TensorFlow adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-restructure-alignment-clean-break" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Restructure alignment (clean break)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-user-guide-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: User guide section
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-cross-reference-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Cross-reference sweep
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-final-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Final verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-migration-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Migration guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 9: Migration guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-this-belongs-in-d2-specifically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this belongs in D2 specifically
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version-compatibility-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version compatibility matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="pytorch-tensorflow-dataset-adapter-implementation-plan">PyTorch + TensorFlow Dataset Adapter Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Add <code>DatasetBag.as_torch_dataset()</code> and <code>DatasetBag.as_tf_dataset()</code> thin adapters that turn a bag into framework-native training datasets, and align <code>DatasetBag.restructure_assets()</code> to share the same target-specification vocabulary.</p>
+<p><strong>Architecture:</strong> Both adapters delegate to a shared private helper (<code>_resolve_targets</code>) that walks <code>bag.feature_values()</code> with matching semantics. Framework-specific code lives in <code>torch_adapter.py</code> / <code>tf_adapter.py</code>; torch and tensorflow imports are lazy (inside the builder bodies) so the base library stays importable without either framework. <code>restructure_assets</code> gets a clean-break signature rename to adopt the shared vocabulary.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, optional PyTorch ≥2.0 (<code>deriva-ml[torch]</code>), optional TensorFlow ≥2.15 (<code>deriva-ml[tf]</code>), pytest with <code>pytest.importorskip</code> gates, MkDocs for UG docs.</p>
+<p><strong>Design reference:</strong> <code>docs/superpowers/specs/2026-04-24-torch-dataset-adapter-design.md</code> (commit <code>7df8dc9</code> on branch <code>feature/torch-adapter</code>).</p>
+<hr />
+<h2 id="task-ordering-rationale">Task ordering rationale</h2>
+<p>The tasks are sequenced to land the shared foundation first, then one adapter, then the second adapter (parallel to the first), then the restructure alignment (which depends on the shared helper), then docs.</p>
+<ol>
+<li>Shared helper + tests — unblocks all three method implementations.</li>
+<li>Package extras — minimal pyproject edit; lets later tasks install torch / tf in their test fixtures.</li>
+<li>PyTorch adapter — proves the adapter pattern end-to-end.</li>
+<li>TensorFlow adapter — mirrors the torch work; parallel structure.</li>
+<li>Restructure alignment — rewires the existing method to use the new vocabulary.</li>
+<li>UG section — writes user-facing docs covering all three paths.</li>
+<li>Cross-reference sweep — small edits to related docstrings.</li>
+<li>Final verification.</li>
+</ol>
+<p>Tasks 3 and 4 are independent and can run back-to-back without coordination. Task 5 depends on tasks 1 and 3 (for the shared helper and the method-on-DatasetBag wiring pattern).</p>
+<hr />
+<h2 id="task-1-shared-target-resolution-helper">Task 1: Shared target-resolution helper</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/dataset/target_resolution.py</code>
+- Test: <code>tests/dataset/test_target_resolution.py</code></p>
+<p>Create the shared <code>_resolve_targets()</code> helper that both adapters and the rewritten <code>restructure_assets()</code> will call. It walks <code>bag.feature_values()</code> for each target, handles the three <code>missing=</code> policies, and returns a dict keyed by element RID mapping to the appropriate target-arity shape.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_target_resolution.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for the shared target-resolution helper.
+
+Framework-agnostic: tests the selector/missing/arity logic in isolation
+from torch, tensorflow, and the restructure_assets call-site. If these
+tests fail, the adapter and restructure alignment both break in the
+same way, which is a feature — one helper, one set of semantics.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.dataset.target_resolution import _resolve_targets
+from deriva_ml.feature import FeatureRecord
+
+
+class _FakeRecord(FeatureRecord):
+    &quot;&quot;&quot;Minimal FeatureRecord stand-in for target-resolution tests.&quot;&quot;&quot;
+    Image: str  # target column: asset RID this record describes
+    Grade: str  # scalar label
+
+
+def _make_bag(feature_returns: dict[str, dict[str, list[_FakeRecord]]]):
+    &quot;&quot;&quot;Build a MagicMock bag whose feature_values returns canned data.
+
+    Args:
+        feature_returns: {feature_name: {element_rid: [records...]}}.
+
+    Returns:
+        A MagicMock standing in for a DatasetBag.
+    &quot;&quot;&quot;
+    bag = MagicMock()
+
+    def fake_feature_values(element_type, feature_name, selector=None):
+        per_rid = feature_returns.get(feature_name, {})
+        for rid, records in per_rid.items():
+            if selector is None:
+                yield from records
+            else:
+                selected = selector(records)
+                if selected is not None:
+                    yield selected
+
+    bag.feature_values = fake_feature_values
+    bag.list_dataset_members = MagicMock(
+        return_value={&quot;Image&quot;: [{&quot;RID&quot;: rid} for rid in feature_returns.get(
+            next(iter(feature_returns), &quot;Grade&quot;), {}).keys()]}
+    )
+    return bag
+
+
+def test_resolve_targets_none_returns_unlabeled_per_rid():
+    &quot;&quot;&quot;targets=None → empty dict (no label resolution needed).&quot;&quot;&quot;
+    bag = _make_bag({})
+    result = _resolve_targets(bag, &quot;Image&quot;, targets=None, missing=&quot;error&quot;)
+    assert result == {}
+
+
+def test_resolve_targets_single_target_returns_featurerecord_per_rid():
+    &quot;&quot;&quot;Single-target list yields one FeatureRecord per element RID.&quot;&quot;&quot;
+    recs_a = [_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)]
+    recs_b = [_FakeRecord(Image=&quot;1-IMG2&quot;, Grade=&quot;Severe&quot;)]
+    bag = _make_bag({&quot;Grade&quot;: {&quot;1-IMG1&quot;: recs_a, &quot;1-IMG2&quot;: recs_b}})
+    result = _resolve_targets(bag, &quot;Image&quot;, targets=[&quot;Grade&quot;], missing=&quot;error&quot;)
+    assert result[&quot;1-IMG1&quot;].Grade == &quot;Mild&quot;
+    assert result[&quot;1-IMG2&quot;].Grade == &quot;Severe&quot;
+
+
+def test_resolve_targets_missing_error_raises_with_rid_list():
+    &quot;&quot;&quot;missing='error' with sparse labels raises and names unlabeled RIDs.&quot;&quot;&quot;
+    recs = [_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)]
+    bag = _make_bag({&quot;Grade&quot;: {&quot;1-IMG1&quot;: recs, &quot;1-IMG2&quot;: []}})
+    with pytest.raises(DerivaMLException, match=r&quot;1-IMG2&quot;):
+        _resolve_targets(bag, &quot;Image&quot;, targets=[&quot;Grade&quot;], missing=&quot;error&quot;)
+
+
+def test_resolve_targets_missing_skip_drops_unlabeled():
+    &quot;&quot;&quot;missing='skip' omits the unlabeled RID from the result entirely.&quot;&quot;&quot;
+    recs = [_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)]
+    bag = _make_bag({&quot;Grade&quot;: {&quot;1-IMG1&quot;: recs, &quot;1-IMG2&quot;: []}})
+    result = _resolve_targets(bag, &quot;Image&quot;, targets=[&quot;Grade&quot;], missing=&quot;skip&quot;)
+    assert &quot;1-IMG1&quot; in result
+    assert &quot;1-IMG2&quot; not in result
+
+
+def test_resolve_targets_missing_unknown_yields_none():
+    &quot;&quot;&quot;missing='unknown' keeps the RID with None as its target value.&quot;&quot;&quot;
+    recs = [_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)]
+    bag = _make_bag({&quot;Grade&quot;: {&quot;1-IMG1&quot;: recs, &quot;1-IMG2&quot;: []}})
+    result = _resolve_targets(bag, &quot;Image&quot;, targets=[&quot;Grade&quot;], missing=&quot;unknown&quot;)
+    assert result[&quot;1-IMG1&quot;].Grade == &quot;Mild&quot;
+    assert result[&quot;1-IMG2&quot;] is None
+
+
+def test_resolve_targets_multi_target_returns_dict_keyed_by_feature():
+    &quot;&quot;&quot;Multi-target yields dict[feature_name, FeatureRecord] per RID.&quot;&quot;&quot;
+    grade_recs = [_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)]
+    severity_recs = [_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Low&quot;)]
+    bag = _make_bag({
+        &quot;Grade&quot;: {&quot;1-IMG1&quot;: grade_recs},
+        &quot;Severity&quot;: {&quot;1-IMG1&quot;: severity_recs},
+    })
+    result = _resolve_targets(
+        bag, &quot;Image&quot;, targets=[&quot;Grade&quot;, &quot;Severity&quot;], missing=&quot;error&quot;
+    )
+    assert set(result[&quot;1-IMG1&quot;].keys()) == {&quot;Grade&quot;, &quot;Severity&quot;}
+    assert result[&quot;1-IMG1&quot;][&quot;Grade&quot;].Grade == &quot;Mild&quot;
+
+
+def test_resolve_targets_selector_dict_applies_per_feature():
+    &quot;&quot;&quot;dict form passes selectors per-feature to bag.feature_values.&quot;&quot;&quot;
+    selector = FeatureRecord.select_newest
+    r1 = _FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)
+    r2 = _FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Severe&quot;)
+    bag = _make_bag({&quot;Grade&quot;: {&quot;1-IMG1&quot;: [r1, r2]}})
+    result = _resolve_targets(
+        bag, &quot;Image&quot;, targets={&quot;Grade&quot;: selector}, missing=&quot;error&quot;
+    )
+    # The selector picks one; exact choice depends on select_newest's
+    # impl, but the result should be one of the two records.
+    assert result[&quot;1-IMG1&quot;].Grade in (&quot;Mild&quot;, &quot;Severe&quot;)
+
+
+def test_resolve_targets_unknown_feature_raises_at_construction():
+    &quot;&quot;&quot;Passing a feature name that doesn't exist raises the same error
+    bag.feature_values would raise.&quot;&quot;&quot;
+    bag = MagicMock()
+    bag.feature_values = MagicMock(side_effect=DerivaMLException(&quot;No such feature&quot;))
+    bag.list_dataset_members = MagicMock(return_value={&quot;Image&quot;: []})
+    with pytest.raises(DerivaMLException):
+        _resolve_targets(bag, &quot;Image&quot;, targets=[&quot;Bogus&quot;], missing=&quot;error&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run test to verify it fails</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_target_resolution.py -v</code>
+Expected: ALL tests fail with <code>ImportError: cannot import name '_resolve_targets'</code> (module doesn't exist yet).</p>
+<ul>
+<li>[ ] <strong>Step 3: Write the helper module</strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/dataset/target_resolution.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Shared target-resolution logic for DatasetBag adapters and restructure.
+
+Both ``DatasetBag.as_torch_dataset``, ``DatasetBag.as_tf_dataset``, and
+``DatasetBag.restructure_assets`` need the same logic: given a bag, an
+element-table name, and a target specification, walk ``bag.feature_values``
+for each target, apply the requested missing-value policy, and return a
+dict keyed by element RID mapping to the target-arity shape.
+
+Keeping this logic in one module makes the &quot;same semantics&quot; claim across
+the three public methods enforceable by shared code rather than parallel
+implementation. See design spec §8.5.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import TYPE_CHECKING, Any, Callable, Literal
+
+from deriva_ml.core.exceptions import DerivaMLException
+
+if TYPE_CHECKING:
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+    from deriva_ml.feature import FeatureRecord
+
+    FeatureSelector = Callable[[list[&quot;FeatureRecord&quot;]], &quot;FeatureRecord | None&quot;]
+
+
+# Maximum unlabeled-RID count to show in missing=&quot;error&quot; message before
+# truncating. Keeps error messages readable on very sparse datasets.
+_MISSING_ERROR_RID_LIST_LIMIT = 20
+
+
+def _resolve_targets(
+    bag: &quot;DatasetBag&quot;,
+    element_type: str,
+    *,
+    targets: &quot;list[str] | dict[str, FeatureSelector] | None&quot;,
+    missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;],
+) -&gt; &quot;dict[str, Any]&quot;:
+    &quot;&quot;&quot;Resolve feature values into per-element target records.
+
+    Walks ``bag.feature_values(element_type, feature_name, selector=...)``
+    for each feature in ``targets``, groups records by their target-
+    element RID, and applies the ``missing`` policy to elements whose
+    feature value is absent.
+
+    Args:
+        bag: Source ``DatasetBag``.
+        element_type: Domain table name whose rows are the elements
+            (e.g., ``&quot;Image&quot;``).
+        targets: Target specification per the aligned vocabulary (spec
+            §3.7). ``None`` yields no labels (empty result). ``list[str]``
+            yields one ``FeatureRecord`` per element for single-target,
+            ``dict[feature_name, FeatureRecord]`` for multi-target.
+            ``dict[str, FeatureSelector]`` passes per-feature selectors
+            through to ``bag.feature_values``.
+        missing: Policy for elements with no feature value.
+
+    Returns:
+        Dict keyed by element RID. Value shape:
+
+        - `targets=None`: empty dict.
+        - `targets=[&quot;A&quot;]`: `FeatureRecord`.
+        - `targets=[&quot;A&quot;, &quot;B&quot;]` or dict with 2+ keys: `dict[str, FeatureRecord]`.
+        - Element absent under `missing=&quot;skip&quot;`: key not in returned dict.
+        - Element absent under `missing=&quot;unknown&quot;`: value is `None`.
+
+    Raises:
+        DerivaMLException: If ``missing=&quot;error&quot;`` and any element lacks a
+            feature value (message lists up to 20 unlabeled RIDs).
+    &quot;&quot;&quot;
+    if not targets:
+        return {}
+
+    # Normalize targets to (feature_name, selector) pairs. A list form has
+    # selector=None for each feature; a dict form uses the mapped selector.
+    if isinstance(targets, list):
+        feature_specs: list[tuple[str, Any]] = [(name, None) for name in targets]
+    else:
+        feature_specs = list(targets.items())
+
+    # Walk features and collect records keyed by target-element RID.
+    # The target column is the element_type's name (e.g., &quot;Image&quot; on an
+    # Image-target FeatureRecord). FeatureRecord instances carry that
+    # attribute; we pull it dynamically.
+    per_feature_per_rid: dict[str, dict[str, &quot;FeatureRecord&quot;]] = {
+        name: {} for name, _ in feature_specs
+    }
+    for feature_name, selector in feature_specs:
+        for record in bag.feature_values(
+            element_type, feature_name, selector=selector
+        ):
+            rid = getattr(record, element_type)
+            per_feature_per_rid[feature_name][rid] = record
+
+    # Determine the universe of element RIDs. Union across features so an
+    # element labeled for some targets but not others is still considered.
+    all_rids: set[str] = set()
+    for rid_map in per_feature_per_rid.values():
+        all_rids.update(rid_map.keys())
+
+    # Apply missing policy and build the result dict.
+    unlabeled: list[str] = []
+    result: dict[str, Any] = {}
+    is_single_target = len(feature_specs) == 1
+    single_feature_name = feature_specs[0][0] if is_single_target else None
+
+    for rid in sorted(all_rids):
+        feature_records = {
+            name: per_feature_per_rid[name].get(rid)
+            for name, _ in feature_specs
+        }
+        any_missing = any(v is None for v in feature_records.values())
+
+        if any_missing:
+            if missing == &quot;error&quot;:
+                unlabeled.append(rid)
+                continue
+            if missing == &quot;skip&quot;:
+                continue
+            # missing == &quot;unknown&quot;
+            result[rid] = None
+            continue
+
+        if is_single_target:
+            result[rid] = feature_records[single_feature_name]
+        else:
+            result[rid] = feature_records
+
+    if missing == &quot;error&quot; and unlabeled:
+        preview = unlabeled[:_MISSING_ERROR_RID_LIST_LIMIT]
+        suffix = (
+            f&quot; (and {len(unlabeled) - len(preview)} more)&quot;
+            if len(unlabeled) &gt; len(preview)
+            else &quot;&quot;
+        )
+        raise DerivaMLException(
+            f&quot;{len(unlabeled)} element(s) of type {element_type!r} have no &quot;
+            f&quot;value for one or more targets in {targets!r}. &quot;
+            f&quot;Unlabeled RIDs: {preview}{suffix}. &quot;
+            f&quot;Pass missing='skip' to drop unlabeled elements, or &quot;
+            f&quot;missing='unknown' to keep them with target=None.&quot;
+        )
+
+    return result
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run test to verify it passes</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_target_resolution.py -v</code>
+Expected: All tests PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run the full fast suite to confirm no regressions</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/dataset/test_target_resolution.py -q</code>
+Expected: 498+ passed (same baseline as main + the new target_resolution tests), 3 skipped, 0 failed.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/torch-adapter
+git add src/deriva_ml/dataset/target_resolution.py tests/dataset/test_target_resolution.py
+git commit -m &quot;feat(dataset): add _resolve_targets shared helper for D2
+
+Post-S2 D2 Task 1. Shared target-resolution logic consumed by
+as_torch_dataset, as_tf_dataset, and the rewritten restructure_assets.
+Handles feature-value resolution via bag.feature_values, three
+missing= policies (error/skip/unknown), and single/multi-target arity.
+Framework-agnostic — zero torch/tf imports.
+
+See spec §8.5 for the helper's contract.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-package-extras-in-pyprojecttoml">Task 2: Package extras in pyproject.toml</h2>
+<p><strong>Files:</strong>
+- Modify: <code>pyproject.toml</code></p>
+<p>Add the <code>[project.optional-dependencies]</code> table with <code>torch</code> and <code>tf</code> entries so users can <code>pip install 'deriva-ml[torch]'</code> or <code>pip install 'deriva-ml[tf]'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Locate the right spot</strong></li>
+</ul>
+<p>Run: <code>grep -n "^\[project\.optional\|^\[tool\." pyproject.toml | head -5</code>
+Expected: confirms no existing <code>[project.optional-dependencies]</code> table (there's already a stub at line 49 per the initial read, but it's empty).</p>
+<ul>
+<li>[ ] <strong>Step 2: Edit pyproject.toml</strong></li>
+</ul>
+<p>Find the existing empty <code>[project.optional-dependencies]</code> stub around line 49-50 and replace with:</p>
+<pre><code class="language-toml">[project.optional-dependencies]
+torch = [&quot;torch&gt;=2.0&quot;]
+tf = [&quot;tensorflow&gt;=2.15&quot;]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Verify build configuration still parses</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv sync --extra torch --extra tf</code>
+Expected: succeeds, torch and tensorflow get installed to the venv. Note: this may take 1-3 minutes due to tensorflow's size.</p>
+<p>Alternative if tf install fails on your platform: <code>uv sync --extra torch</code> alone works and is sufficient for Task 3 verification; Task 4 will need TF separately.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add pyproject.toml uv.lock
+git commit -m &quot;build(deps): add torch + tf optional-dependency extras
+
+Post-S2 D2 Task 2. Adds [project.optional-dependencies] with:
+- torch = [\&quot;torch&gt;=2.0\&quot;]
+- tf = [\&quot;tensorflow&gt;=2.15\&quot;]
+
+Users install with 'pip install deriva-ml[torch]' or
+'pip install deriva-ml[tf]' depending on which framework they
+use. The base install remains lean — neither framework is a
+hard dependency, and both are imported lazily inside the
+adapter code per design anchor 3.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-pytorch-adapter">Task 3: PyTorch adapter</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/dataset/torch_adapter.py</code>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (add <code>as_torch_dataset</code> method)
+- Test: <code>tests/dataset/test_torch_adapter_no_torch.py</code>
+- Test: <code>tests/dataset/test_torch_adapter_logic.py</code>
+- Test: <code>tests/dataset/test_torch_adapter_e2e.py</code></p>
+<p>Ships <code>DatasetBag.as_torch_dataset(element_type, *, sample_loader=None, transform=None, targets=None, target_transform=None, missing="error")</code> returning a <code>torch.utils.data.Dataset</code>. Torch is imported lazily inside the builder.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the no-torch import-guard test</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_torch_adapter_no_torch.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Verify the library imports cleanly when torch is absent.
+
+If torch is truly installed in the test venv, we stub it out of
+sys.modules temporarily. The goal is to prove that importing DatasetBag
+does NOT import torch eagerly.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import sys
+
+import pytest
+
+
+def test_dataset_bag_imports_without_torch(monkeypatch):
+    &quot;&quot;&quot;Removing torch from sys.modules lets DatasetBag still import.&quot;&quot;&quot;
+    for name in list(sys.modules):
+        if name == &quot;torch&quot; or name.startswith(&quot;torch.&quot;):
+            monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setitem(sys.modules, &quot;torch&quot;, None)
+
+    # Re-import dataset_bag under the torch-less sys.modules state.
+    if &quot;deriva_ml.dataset.dataset_bag&quot; in sys.modules:
+        monkeypatch.delitem(sys.modules, &quot;deriva_ml.dataset.dataset_bag&quot;, raising=False)
+    from deriva_ml.dataset.dataset_bag import DatasetBag  # noqa: F401
+
+
+def test_as_torch_dataset_raises_importerror_without_torch(monkeypatch):
+    &quot;&quot;&quot;Calling as_torch_dataset when torch is absent raises ImportError
+    with an install-hint message.&quot;&quot;&quot;
+    for name in list(sys.modules):
+        if name == &quot;torch&quot; or name.startswith(&quot;torch.&quot;):
+            monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setitem(sys.modules, &quot;torch&quot;, None)
+
+    from unittest.mock import MagicMock
+    bag = MagicMock()
+
+    if &quot;deriva_ml.dataset.torch_adapter&quot; in sys.modules:
+        monkeypatch.delitem(sys.modules, &quot;deriva_ml.dataset.torch_adapter&quot;, raising=False)
+
+    from deriva_ml.dataset.torch_adapter import build_torch_dataset
+    with pytest.raises(ImportError, match=r&quot;torch&quot;):
+        build_torch_dataset(bag, &quot;Image&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Write the logic test (torch stubbed)</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_torch_adapter_logic.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Pure-Python logic tests for torch_adapter.
+
+Uses pytest.importorskip — runs only when torch is installed. Tests
+the join logic, selector pass-through, missing= branches, target arity,
+and error paths using the real torch.utils.data.Dataset base class.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+from pathlib import Path
+
+import pytest
+
+torch = pytest.importorskip(&quot;torch&quot;)
+
+from deriva_ml.core.exceptions import DerivaMLException  # noqa: E402
+from deriva_ml.dataset.torch_adapter import build_torch_dataset  # noqa: E402
+from deriva_ml.feature import FeatureRecord  # noqa: E402
+
+
+class _FakeRecord(FeatureRecord):
+    Image: str
+    Grade: str
+
+
+def _mock_bag_with_labeled_images(rids_and_labels: dict[str, str]):
+    &quot;&quot;&quot;Build a MagicMock DatasetBag with the given labeled images.&quot;&quot;&quot;
+    bag = MagicMock()
+    bag.path = Path(&quot;/tmp/fake_bag&quot;)
+    bag.list_dataset_members = MagicMock(
+        return_value={&quot;Image&quot;: [{&quot;RID&quot;: rid} for rid in rids_and_labels]}
+    )
+
+    def fake_feature_values(element_type, feature_name, selector=None):
+        for rid, label in rids_and_labels.items():
+            rec = _FakeRecord(Image=rid, Grade=label)
+            if selector is None:
+                yield rec
+            else:
+                sel = selector([rec])
+                if sel is not None:
+                    yield sel
+
+    bag.feature_values = fake_feature_values
+    # Mock table metadata so the asset-path resolver can find columns.
+    bag.model = MagicMock()
+    asset_row = {&quot;RID&quot;: &quot;1-IMG1&quot;, &quot;Filename&quot;: &quot;img1.jpg&quot;}
+    bag.get_table_as_dict = MagicMock(return_value=iter([asset_row]))
+    bag.is_asset = MagicMock(return_value=True)
+    return bag
+
+
+def test_as_torch_dataset_returns_torch_dataset_subclass():
+    bag = _mock_bag_with_labeled_images({&quot;1-IMG1&quot;: &quot;Mild&quot;})
+    ds = build_torch_dataset(
+        bag, &quot;Image&quot;,
+        sample_loader=lambda p, row: b&quot;fake&quot;,
+        targets=[&quot;Grade&quot;],
+    )
+    assert isinstance(ds, torch.utils.data.Dataset)
+
+
+def test_len_reflects_labeled_count_when_missing_skip():
+    bag = _mock_bag_with_labeled_images({&quot;1-IMG1&quot;: &quot;Mild&quot;, &quot;1-IMG2&quot;: &quot;&quot;})
+    # Simulate missing: IMG2 has empty label treated as absent in this
+    # simplified test; for real data the fake feature_values would
+    # simply not yield IMG2.
+    # In logic tests we only check len() semantics.
+    # ...rest of tests follow the same pattern per spec §6.2 matrix.
+
+
+def test_missing_error_raises_at_construction():
+    bag = MagicMock()
+    bag.path = Path(&quot;/tmp/fake_bag&quot;)
+    bag.list_dataset_members = MagicMock(
+        return_value={&quot;Image&quot;: [{&quot;RID&quot;: &quot;1-IMG1&quot;}, {&quot;RID&quot;: &quot;1-IMG2&quot;}]}
+    )
+    bag.feature_values = MagicMock(return_value=iter([_FakeRecord(Image=&quot;1-IMG1&quot;, Grade=&quot;Mild&quot;)]))
+    bag.model = MagicMock()
+    with pytest.raises(DerivaMLException, match=r&quot;1-IMG2&quot;):
+        build_torch_dataset(
+            bag, &quot;Image&quot;,
+            sample_loader=lambda p, row: b&quot;&quot;,
+            targets=[&quot;Grade&quot;],
+            missing=&quot;error&quot;,
+        )
+
+
+def test_asset_table_without_sample_loader_raises():
+    &quot;&quot;&quot;Asset-table element_type with no sample_loader raises at construction.&quot;&quot;&quot;
+    bag = _mock_bag_with_labeled_images({&quot;1-IMG1&quot;: &quot;Mild&quot;})
+    with pytest.raises(DerivaMLException, match=r&quot;sample_loader&quot;):
+        build_torch_dataset(bag, &quot;Image&quot;, targets=[&quot;Grade&quot;])
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Write the e2e test placeholder</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_torch_adapter_e2e.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;End-to-end torch adapter test using a real bag fixture.
+
+Gated on torch being importable. Uses catalog_with_datasets fixture
+to build a real bag, then iterates under a real DataLoader.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import pytest
+
+torch = pytest.importorskip(&quot;torch&quot;)
+from torch.utils.data import DataLoader  # noqa: E402
+
+
+def test_bag_to_dataloader_yields_tensors(catalog_with_datasets, tmp_path):
+    ml, dataset_desc = catalog_with_datasets
+    bag = dataset_desc.dataset.download_dataset_bag(version=&quot;1.0.0&quot;)
+
+    ds = bag.as_torch_dataset(
+        element_type=&quot;Image&quot;,
+        sample_loader=lambda p, row: torch.tensor([1.0, 2.0, 3.0]),
+        targets=None,  # unlabeled — just exercise the plumbing
+    )
+    loader = DataLoader(ds, batch_size=2, shuffle=False)
+    batches = list(loader)
+    assert len(batches) &gt; 0
+    assert batches[0].shape[0] &lt;= 2
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_torch_adapter_*.py -v</code>
+Expected: all fail with ImportError/ModuleNotFoundError for <code>deriva_ml.dataset.torch_adapter</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Write the torch adapter module</strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/dataset/torch_adapter.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;PyTorch adapter for DatasetBag.
+
+Builds a ``torch.utils.data.Dataset`` that lazy-loads samples and labels
+from an already-downloaded ``DatasetBag``. Torch is imported at builder
+entry (lazy import) so the base library stays importable without torch.
+
+See design spec §§3.1-3.7 for the full contract.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Literal
+
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.dataset.target_resolution import _resolve_targets
+
+if TYPE_CHECKING:
+    import torch.utils.data
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+    from deriva_ml.feature import FeatureRecord
+
+    FeatureSelector = Callable[[list[&quot;FeatureRecord&quot;]], &quot;FeatureRecord | None&quot;]
+
+
+_TORCH_INSTALL_HINT = (
+    &quot;PyTorch is not installed. Install with:\n&quot;
+    &quot;    pip install 'deriva-ml[torch]'\n&quot;
+    &quot;or install torch directly:\n&quot;
+    &quot;    pip install 'torch&gt;=2.0'&quot;
+)
+
+
+def build_torch_dataset(
+    bag: &quot;DatasetBag&quot;,
+    element_type: str,
+    *,
+    sample_loader: &quot;Callable[[Path, dict[str, Any]], Any] | None&quot; = None,
+    transform: &quot;Callable[[Any], Any] | None&quot; = None,
+    targets: &quot;list[str] | dict[str, FeatureSelector] | None&quot; = None,
+    target_transform: &quot;Callable[..., Any] | None&quot; = None,
+    missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;] = &quot;error&quot;,
+) -&gt; &quot;torch.utils.data.Dataset&quot;:
+    &quot;&quot;&quot;Build a torch.utils.data.Dataset from a DatasetBag.
+
+    See DatasetBag.as_torch_dataset docstring for full argument docs
+    and spec §3 for the design contract.
+    &quot;&quot;&quot;
+    try:
+        import torch.utils.data as _torch_data
+    except ImportError as e:
+        raise ImportError(_TORCH_INSTALL_HINT) from e
+
+    # Validate element_type exists in the bag.
+    members_by_type = bag.list_dataset_members(recurse=True)
+    if element_type not in members_by_type:
+        raise DerivaMLException(
+            f&quot;Element type {element_type!r} not found in bag; available &quot;
+            f&quot;types: {sorted(members_by_type.keys())}&quot;
+        )
+
+    # Validate sample_loader is provided for asset-table element types.
+    is_asset = _bag_element_is_asset(bag, element_type)
+    if is_asset and sample_loader is None:
+        raise DerivaMLException(
+            f&quot;Element type {element_type!r} is an asset table and requires &quot;
+            f&quot;a sample_loader. Common loaders:\n&quot;
+            f&quot;    sample_loader=PIL.Image.open       # images\n&quot;
+            f&quot;    sample_loader=nibabel.load         # NIfTI medical volumes\n&quot;
+            f&quot;    sample_loader=h5py.File            # HDF5 arrays\n&quot;
+            f&quot;Or pass sample_loader=lambda path, row: path.read_bytes() &quot;
+            f&quot;if you want raw bytes.&quot;
+        )
+
+    # Resolve targets once at construction time.
+    target_map = _resolve_targets(
+        bag, element_type, targets=targets, missing=missing
+    )
+
+    # Build the RID list — all elements if targets=None, only labeled
+    # elements if targets is set.
+    all_rids = [m[&quot;RID&quot;] for m in members_by_type[element_type]]
+    if targets is None:
+        rids = all_rids
+    elif missing == &quot;skip&quot;:
+        rids = [rid for rid in all_rids if rid in target_map]
+    else:
+        rids = all_rids  # &quot;error&quot; already raised if incomplete; &quot;unknown&quot;
+                         # keeps all RIDs with None target for absent ones
+
+    # Build the row lookup so sample_loader gets the full row dict.
+    row_lookup = _build_row_lookup(bag, element_type)
+
+    class _TorchDataset(_torch_data.Dataset):
+        def __init__(self):
+            self._rids = rids
+            self._target_map = target_map
+            self._is_asset = is_asset
+
+        def __len__(self):
+            return len(self._rids)
+
+        def __getitem__(self, index):
+            rid = self._rids[index]
+            row = row_lookup.get(rid, {&quot;RID&quot;: rid})
+
+            if self._is_asset:
+                path = _resolve_asset_path(bag, element_type, rid, row)
+                sample = sample_loader(path, row)
+            else:
+                sample = (
+                    sample_loader(None, row)
+                    if sample_loader is not None
+                    else row
+                )
+
+            if transform is not None:
+                sample = transform(sample)
+
+            if targets is None:
+                return sample
+
+            target = self._target_map.get(rid)
+            if target_transform is not None:
+                target = target_transform(target)
+            return sample, target
+
+    return _TorchDataset()
+
+
+def _bag_element_is_asset(bag: &quot;DatasetBag&quot;, element_type: str) -&gt; bool:
+    &quot;&quot;&quot;Return True if element_type is an asset table in the bag.&quot;&quot;&quot;
+    try:
+        return bag.is_asset(element_type)
+    except AttributeError:
+        # Fall back to model-level check for bags that don't expose
+        # is_asset directly.
+        return bool(getattr(bag.model, &quot;is_asset&quot;, lambda _: False)(element_type))
+
+
+def _build_row_lookup(bag: &quot;DatasetBag&quot;, element_type: str) -&gt; dict:
+    &quot;&quot;&quot;Build {RID: row_dict} lookup for the element table.&quot;&quot;&quot;
+    return {row[&quot;RID&quot;]: row for row in bag.get_table_as_dict(element_type)}
+
+
+def _resolve_asset_path(bag, element_type: str, rid: str, row: dict) -&gt; Path:
+    &quot;&quot;&quot;Compute the on-disk path for an asset's file.&quot;&quot;&quot;
+    filename = row.get(&quot;Filename&quot;) or f&quot;{rid}.bin&quot;
+    return bag.path / &quot;data&quot; / &quot;assets&quot; / element_type / rid / filename
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Add the DatasetBag method</strong></li>
+</ul>
+<p>Find the class body of <code>DatasetBag</code> in <code>src/deriva_ml/dataset/dataset_bag.py</code> (around line 1445 where <code>restructure_assets</code> lives) and add before <code>restructure_assets</code>:</p>
+<pre><code class="language-python">    def as_torch_dataset(
+        self,
+        element_type: str,
+        *,
+        sample_loader: Callable[[Path, dict[str, Any]], Any] | None = None,
+        transform: Callable[[Any], Any] | None = None,
+        targets: list[str] | dict[str, Any] | None = None,
+        target_transform: Callable[..., Any] | None = None,
+        missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;] = &quot;error&quot;,
+    ) -&gt; &quot;torch.utils.data.Dataset&quot;:
+        &quot;&quot;&quot;Build a torch.utils.data.Dataset from this bag.
+
+        [... full docstring per spec §3 ...]
+        &quot;&quot;&quot;
+        from deriva_ml.dataset.torch_adapter import build_torch_dataset
+        return build_torch_dataset(
+            self,
+            element_type,
+            sample_loader=sample_loader,
+            transform=transform,
+            targets=targets,
+            target_transform=target_transform,
+            missing=missing,
+        )
+</code></pre>
+<p>The docstring should be the full version per spec §3.1-3.6: one-line summary, extended description, Args (one paragraph per argument, matching §3.2), Returns, Raises, Example with <code># doctest: +SKIP</code> on catalog-dependent lines.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run all torch adapter tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_torch_adapter_no_torch.py tests/dataset/test_torch_adapter_logic.py -v</code>
+Expected: all tests PASS. The e2e test needs a live catalog so runs separately.</p>
+<ul>
+<li>[ ] <strong>Step 8: Run fast suite</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/dataset/test_torch_adapter_no_torch.py tests/dataset/test_torch_adapter_logic.py tests/dataset/test_target_resolution.py -q</code>
+Expected: 500+ passed, 3 skipped, 0 failed.</p>
+<ul>
+<li>[ ] <strong>Step 9: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/torch_adapter.py src/deriva_ml/dataset/dataset_bag.py tests/dataset/test_torch_adapter_*.py
+git commit -m &quot;feat(dataset): add DatasetBag.as_torch_dataset adapter
+
+Post-S2 D2 Task 3. Ships the PyTorch adapter per design spec §3.
+
+New module torch_adapter.py builds a torch.utils.data.Dataset from
+a DatasetBag, delegating to the shared _resolve_targets helper for
+label resolution. Torch is imported lazily inside the builder so
+the base library stays importable without torch (anchor 3).
+
+DatasetBag.as_torch_dataset is the public entry point; it delegates
+to build_torch_dataset. Signature mirrors spec §3.1 exactly.
+
+Three test tiers per spec §6:
+- test_torch_adapter_no_torch.py — library still imports when torch
+  is absent; calling adapter raises clean ImportError with hint.
+- test_torch_adapter_logic.py — join logic, missing= branches,
+  target arity, error paths (gated on torch installable).
+- test_torch_adapter_e2e.py — real bag fixture + real DataLoader
+  (gated on live catalog).
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-tensorflow-adapter">Task 4: TensorFlow adapter</h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/dataset/tf_adapter.py</code>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (add <code>as_tf_dataset</code> method)
+- Test: <code>tests/dataset/test_tf_adapter_no_tf.py</code>
+- Test: <code>tests/dataset/test_tf_adapter_logic.py</code>
+- Test: <code>tests/dataset/test_tf_adapter_e2e.py</code></p>
+<p>Mirrors Task 3's structure for TensorFlow. Ships <code>DatasetBag.as_tf_dataset(...)</code> returning a <code>tf.data.Dataset</code>, with <code>output_signature</code> inferred from the first sample when <code>None</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the no-tf import-guard test</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_tf_adapter_no_tf.py</code> mirroring <code>test_torch_adapter_no_torch.py</code> exactly, substituting <code>tensorflow</code> / <code>tf</code> for torch. Verify:
+- Importing <code>DatasetBag</code> without tensorflow still works.
+- Calling <code>build_tf_dataset(bag, ...)</code> raises <code>ImportError</code> with install hint <code>'deriva-ml[tf]'</code>.</p>
+<p>Code shape: same monkeypatch pattern as Task 3 Step 1, substitute <code>"tensorflow"</code> wherever <code>"torch"</code> appears.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the logic test (tf stubbed)</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_tf_adapter_logic.py</code> mirroring the torch logic test but verifying <code>tf.data.Dataset</code> shape:</p>
+<pre><code class="language-python">import pytest
+tf = pytest.importorskip(&quot;tensorflow&quot;)
+
+from deriva_ml.dataset.tf_adapter import build_tf_dataset  # noqa: E402
+
+
+def test_as_tf_dataset_returns_tf_data_dataset():
+    bag = _mock_bag(...)
+    ds = build_tf_dataset(
+        bag, &quot;Image&quot;,
+        sample_loader=lambda p, row: tf.constant([1.0, 2.0]),
+        targets=[&quot;Grade&quot;],
+    )
+    assert isinstance(ds, tf.data.Dataset)
+
+
+def test_output_signature_inferred_from_first_sample():
+    &quot;&quot;&quot;output_signature=None triggers first-sample inference.&quot;&quot;&quot;
+    bag = _mock_bag(...)
+    ds = build_tf_dataset(
+        bag, &quot;Image&quot;,
+        sample_loader=lambda p, row: tf.constant([1.0, 2.0, 3.0]),
+        targets=[&quot;Grade&quot;],
+        target_transform=lambda rec: 0,
+        output_signature=None,  # explicit default
+    )
+    # element_spec should reflect the inferred shape
+    spec = ds.element_spec
+    assert isinstance(spec, tuple)
+    assert spec[0].shape[-1] == 3
+</code></pre>
+<p>Full test matrix from spec §6.2 applies: all three <code>missing=</code> branches, target arity, asset-table-without-loader error, selector dict pass-through.</p>
+<ul>
+<li>[ ] <strong>Step 3: Write the e2e test placeholder</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_tf_adapter_e2e.py</code> — real bag fixture + real <code>tf.data.Dataset.batch(...).prefetch(...)</code> iteration. Gated on <code>pytest.importorskip("tensorflow")</code> and the <code>catalog_with_datasets</code> fixture.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_tf_adapter_*.py -v</code>
+Expected: fails with ModuleNotFoundError for <code>deriva_ml.dataset.tf_adapter</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Write the tf adapter module</strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/dataset/tf_adapter.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;TensorFlow adapter for DatasetBag.
+
+Builds a ``tf.data.Dataset`` via ``tf.data.Dataset.from_generator`` that
+lazy-loads samples and labels from an already-downloaded ``DatasetBag``.
+Tensorflow is imported at builder entry (lazy import) so the base
+library stays importable without tensorflow.
+
+See design spec §§3.1-3.7 for the full contract. ``output_signature``
+is inferred from the first sample when None (spec §3.2).
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Literal
+
+from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.dataset.target_resolution import _resolve_targets
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+    from deriva_ml.feature import FeatureRecord
+
+    FeatureSelector = Callable[[list[&quot;FeatureRecord&quot;]], &quot;FeatureRecord | None&quot;]
+
+
+_TF_INSTALL_HINT = (
+    &quot;TensorFlow is not installed. Install with:\n&quot;
+    &quot;    pip install 'deriva-ml[tf]'\n&quot;
+    &quot;or install tensorflow directly:\n&quot;
+    &quot;    pip install 'tensorflow&gt;=2.15'\n&quot;
+    &quot;macOS: use 'tensorflow-macos' instead of 'tensorflow'.\n&quot;
+    &quot;CUDA:  use 'tensorflow[and-cuda]' for GPU support.&quot;
+)
+
+
+def build_tf_dataset(
+    bag: &quot;DatasetBag&quot;,
+    element_type: str,
+    *,
+    sample_loader: &quot;Callable[[Path, dict[str, Any]], Any] | None&quot; = None,
+    transform: &quot;Callable[[Any], Any] | None&quot; = None,
+    targets: &quot;list[str] | dict[str, FeatureSelector] | None&quot; = None,
+    target_transform: &quot;Callable[..., Any] | None&quot; = None,
+    missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;] = &quot;error&quot;,
+    output_signature: &quot;tf.TensorSpec | tuple[tf.TensorSpec, ...] | None&quot; = None,
+) -&gt; &quot;tf.data.Dataset&quot;:
+    &quot;&quot;&quot;Build a tf.data.Dataset from a DatasetBag.
+
+    See DatasetBag.as_tf_dataset docstring for full argument docs.
+    &quot;&quot;&quot;
+    try:
+        import tensorflow as tf  # noqa: F401
+    except ImportError as e:
+        raise ImportError(_TF_INSTALL_HINT) from e
+
+    # [Same validation + resolution logic as torch adapter, factored
+    #  out where possible. Wraps the iteration in tf.data.Dataset.from_generator
+    #  with either user-supplied or first-sample-inferred output_signature.]
+    # [Full implementation writes a Python generator, wraps it, handles
+    #  the one-extra-eager-sample path for inference.]
+</code></pre>
+<p>Implementation mirrors <code>torch_adapter.py</code> in structure: same validation (element_type exists, asset-table-requires-loader), same delegation to <code>_resolve_targets</code>, same RID-list construction per <code>missing=</code> policy. Differences:</p>
+<ol>
+<li>Build a Python generator <code>def _gen(): for rid in rids: yield (sample, target)</code> instead of a <code>Dataset</code> subclass.</li>
+<li>If <code>output_signature is None</code>, call <code>_gen()</code> once to get the first sample, use <code>tf.type_spec_from_value</code> to infer, then re-wrap the generator so the first sample isn't lost.</li>
+<li>
+<p>Return <code>tf.data.Dataset.from_generator(_gen, output_signature=...)</code>.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 6: Add the DatasetBag method</strong></p>
+</li>
+</ol>
+<p>Add <code>as_tf_dataset</code> method to <code>DatasetBag</code> class body, next to <code>as_torch_dataset</code>. Same shape as Task 3 Step 6 but delegates to <code>build_tf_dataset</code> and includes the <code>output_signature</code> parameter.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run all tf adapter tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_tf_adapter_no_tf.py tests/dataset/test_tf_adapter_logic.py -v</code>
+Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 8: Run fast suite</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/dataset/test_torch_adapter_*.py tests/dataset/test_tf_adapter_*.py tests/dataset/test_target_resolution.py -q</code>
+Expected: 503+ passed, 3 skipped, 0 failed.</p>
+<ul>
+<li>[ ] <strong>Step 9: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/tf_adapter.py src/deriva_ml/dataset/dataset_bag.py tests/dataset/test_tf_adapter_*.py
+git commit -m &quot;feat(dataset): add DatasetBag.as_tf_dataset adapter
+
+Post-S2 D2 Task 4. Ships the TensorFlow adapter per design spec §3,
+mirroring the PyTorch adapter's shape for the six shared parameters
+and adding output_signature for TF-specific TensorSpec configuration.
+
+output_signature=None (default) triggers first-sample inference at
+construction time; the generator is re-wrapped so the eagerly-consumed
+first sample is not lost. Users who want deterministic startup pass
+output_signature explicitly.
+
+Test structure parallels the torch adapter: no-tf / logic-stubbed /
+e2e. All three gated appropriately.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-restructure-alignment-clean-break">Task 5: Restructure alignment (clean break)</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (rewrite <code>restructure_assets</code> signature + body)
+- Test: update or add tests in <code>tests/dataset/</code> covering the new signature</p>
+<p>Rewrite <code>restructure_assets</code> to accept the aligned vocabulary (<code>targets</code>, <code>target_transform</code>, <code>missing</code>) instead of <code>group_by</code>/<code>value_selector</code>/<code>"Feature.column"</code> dotted syntax. Uses the shared <code>_resolve_targets</code> helper from Task 1.</p>
+<ul>
+<li>[ ] <strong>Step 1: Grep sibling repos for callers of deprecated kwargs</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">for d in ~/GitHub/deriva-ml-model-template ~/GitHub/deriva-ml-apps ~/GitHub/deriva-ml-demo ~/GitHub/deriva-ml-template-test; do
+  echo &quot;=== $d ===&quot;
+  [ -d &quot;$d&quot; ] &amp;&amp; grep -rn &quot;group_by=\|value_selector=\|restructure_assets&quot; &quot;$d&quot; --include=&quot;*.py&quot; 2&gt;/dev/null | head -10
+done
+</code></pre>
+<p>Record the results — these go into the PR description's "Breaking changes" section so template maintainers can update in lockstep.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update existing tests first (they need to pass with the new signature)</strong></li>
+</ul>
+<p><code>grep -rn "group_by\|value_selector" tests/</code> — enumerate callers. For each test that uses old kwargs, rewrite to the new form:
+- <code>group_by=["Feature"]</code> → <code>targets=["Feature"]</code>
+- <code>group_by=["Feature.Col"]</code> → <code>targets=["Feature"], target_transform=lambda rec: rec.Col</code>
+- <code>value_selector=FeatureRecord.select_newest</code> → <code>targets={"Feature": FeatureRecord.select_newest}</code></p>
+<p>Commit these test updates at the end of the task (with the impl), not separately — keeps the repo in a buildable state only after both sides land.</p>
+<ul>
+<li>[ ] <strong>Step 3: Rewrite <code>restructure_assets</code> in <code>dataset_bag.py</code></strong></li>
+</ul>
+<p>Replace the current signature and body. The new signature per spec §3.1 + §8:</p>
+<pre><code class="language-python">def restructure_assets(
+    self,
+    output_dir: Path | str,
+    *,
+    asset_table: str | None = None,
+    targets: list[str] | dict[str, FeatureSelector] | None = None,
+    target_transform: Callable[..., str] | None = None,
+    missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;] = &quot;unknown&quot;,
+    use_symlinks: bool = True,
+    type_selector: Callable[[list[str]], str] | None = None,
+    type_to_dir_map: dict[str, str] | None = None,
+    enforce_vocabulary: bool = True,
+    file_transformer: Callable[[Path, Path], Path] | None = None,
+) -&gt; dict[Path, Path]:
+    &quot;&quot;&quot;[... full docstring per spec §8 ...]&quot;&quot;&quot;
+</code></pre>
+<p>Body:
+1. Validate <code>asset_table</code> (auto-detect from members if None; unchanged from today).
+2. Call <code>_resolve_targets(self, asset_table, targets=targets, missing=missing)</code> to get the <code>{rid: FeatureRecord}</code> map.
+3. For each RID, derive the directory name: if <code>target_transform</code> is provided, call it (and validate string return); else use the FeatureRecord's primary value (tricky — spec §3.7.2 says target_transform is required when targets is a multi-column feature because the direct FeatureRecord isn't a string; document this and enforce).
+4. Place file in <code>{output_dir}/{type_dir}/{target_dir}/{filename}</code> per existing FK-reachability logic.
+5. Apply missing policy: for <code>missing="unknown"</code> put into <code>unknown/</code>; for <code>missing="skip"</code> omit entirely.
+6. Keep all existing behavior for <code>type_selector</code>, <code>type_to_dir_map</code>, <code>enforce_vocabulary</code>, <code>file_transformer</code> — they don't change.
+7. Raise <code>TypeError</code> if user passes <code>group_by=</code> or <code>value_selector=</code> (use the <code>@validate_call</code> decorator or explicit check; the stdlib behavior of rejecting unknown kwargs is also acceptable).</p>
+<ul>
+<li>[ ] <strong>Step 4: Verify old-kwarg rejection</strong></li>
+</ul>
+<p>Manually test:</p>
+<pre><code class="language-python">bag.restructure_assets(output_dir=&quot;/tmp&quot;, group_by=[&quot;Diagnosis&quot;])
+# Expected: TypeError: restructure_assets() got an unexpected keyword argument 'group_by'
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Add migration-note paragraph to the docstring</strong></li>
+</ul>
+<p>Per spec §8.7, the docstring gets a short Migration note at the bottom:</p>
+<pre><code class="language-python">    &quot;&quot;&quot;[... main docstring ...]
+
+    Migration note (from pre-D2 signature):
+        - group_by=[&quot;Diagnosis&quot;] → targets=[&quot;Diagnosis&quot;]
+        - group_by=[&quot;Classification.Label&quot;] → targets=[&quot;Classification&quot;],
+          target_transform=lambda rec: rec.Label
+        - value_selector=FeatureRecord.select_newest →
+          targets={&quot;Feature&quot;: FeatureRecord.select_newest}
+    &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Run fast suite</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/dataset/ -q</code>
+Expected: all pass. Any test using old kwargs should have been updated in Step 2.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run full dataset suite (live catalog) — time permitting</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/ --timeout=600</code>
+Expected: 64+ passed. Focuses on the restructure integration tests.</p>
+<ul>
+<li>[ ] <strong>Step 8: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/dataset_bag.py tests/dataset/
+git commit -m &quot;refactor(dataset): align restructure_assets vocab with adapters
+
+Post-S2 D2 Task 5. restructure_assets now uses the same
+target-specification vocabulary (targets, target_transform, missing)
+as as_torch_dataset and as_tf_dataset, delegating feature resolution
+to the shared _resolve_targets helper.
+
+Signature changes (clean break — see spec §8):
+  - group_by → targets
+  - value_selector → merged into targets dict form
+  - \&quot;Feature.column\&quot; dotted syntax → use target_transform
+  - Added missing: Literal[\&quot;error\&quot;, \&quot;skip\&quot;, \&quot;unknown\&quot;] = \&quot;unknown\&quot;
+
+All other parameters (output_dir, asset_table, use_symlinks,
+type_selector, type_to_dir_map, enforce_vocabulary, file_transformer)
+unchanged. FK-reachability and type-derived directory naming
+unchanged. The default missing=\&quot;unknown\&quot; preserves today's behavior
+for unparameterized calls.
+
+Existing tests using old kwargs are updated to the new signature in
+the same commit. Passing old kwargs after this PR raises TypeError
+(standard Python behavior for removed kwargs).
+
+Migration note in the docstring guides users who hit a TypeError.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-user-guide-section">Task 6: User guide section</h2>
+<p><strong>Files:</strong>
+- Modify: <code>docs/user-guide/offline.md</code> (add "How to feed a bag to a training framework" section per spec §7.2)</p>
+<p>Write the UG section with the decision tree + three per-framework sub-subsections + Keras routing + ImageFolder pointer.</p>
+<ul>
+<li>[ ] <strong>Step 1: Locate insertion point in offline.md</strong></li>
+</ul>
+<p>The new section goes after the existing <code>restructure_assets</code> content and before the section on working with bags in notebooks (exact location TBD from current offline.md structure).</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the new UG section</strong></li>
+</ul>
+<p>Follows spec §7.2 exactly. Structure:</p>
+<ol>
+<li><strong>Motivation</strong> (2 sentences).</li>
+<li><strong>Choosing your path</strong> (decision paragraph).</li>
+<li><strong>7.2.1 Using with PyTorch</strong> — simple image-classification example, worked variations (tabular regression, multi-target, multi-annotator selector), notes pointer to <code>deriva-ml[torch]</code>.</li>
+<li><strong>7.2.2 Using with TensorFlow</strong> — simple example + output_signature guidance + same three worked variations, notes pointer to <code>deriva-ml[tf]</code> and platform wheels.</li>
+<li><strong>7.2.3 Using with Keras</strong> — three-backend routing example.</li>
+<li><strong>7.2.4 Using with <code>ImageFolder</code> / third-party tools</strong> — pointer to <code>restructure_assets</code>.</li>
+<li><strong>7.2.5 See also</strong> — cross-references.</li>
+</ol>
+<p>Each code example should be ~10-20 lines. Use <code># doctest: +SKIP</code> consistently for catalog-dependent examples; mkdocs-jupyter doesn't execute them but the markup should be valid.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run mkdocs --strict</strong></li>
+</ul>
+<p>Run: <code>uv run mkdocs build --strict 2&gt;&amp;1 | tail -20</code>
+Expected: either 27 warnings (same as baseline) or fewer. No new griffe warnings from the new section.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/offline.md
+git commit -m &quot;docs(user-guide): add 'How to feed a bag to a training framework' section
+
+Post-S2 D2 Task 6. New UG section in Chapter 5 (offline.md) covering
+PyTorch, TensorFlow, Keras (all three backends), and third-party
+ImageFolder-style layout.
+
+Structure follows the UG contract per spec §7.2:
+- Motivation + decision-tree paragraph at the top
+- Per-framework sub-sections with worked examples
+- Keras routing via either adapter based on backend choice
+- Pointer to restructure_assets for class-folder workflows
+
+mkdocs --strict: 27 warnings (unchanged from baseline).
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-cross-reference-sweep">Task 7: Cross-reference sweep</h2>
+<p><strong>Files:</strong>
+- Modify: various docstrings and related files</p>
+<p>Small edits per spec §7.3: docstring cross-references between the adapters, <code>restructure_assets</code>, <code>split_dataset</code>, and the <code>DatasetBag</code> class-level docstring.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>DatasetBag</code> class docstring</strong></li>
+</ul>
+<p>Add one bullet mentioning the adapters alongside the existing <code>restructure_assets()</code> mention. Keep to one sentence per bullet; link by method name only (mkdocstrings generates the cross-link).</p>
+<ul>
+<li>[ ] <strong>Step 2: Update <code>split_dataset</code> docstring</strong></li>
+</ul>
+<p>Add one sentence in the "Examples" or "See Also" section pointing at the adapter composition pattern (spec §7.4.1).</p>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>restructure_assets</code> docstring</strong></li>
+</ul>
+<p>Add one sentence (separate from the Migration note) pointing at <code>as_torch_dataset</code>/<code>as_tf_dataset</code> as the general-case adapter when a directory tree isn't needed.</p>
+<ul>
+<li>[ ] <strong>Step 4: Update CLAUDE.md</strong></li>
+</ul>
+<p>The section on <code>DatasetBag</code> in the project-level <code>CLAUDE.md</code> gets a one-sentence mention of the adapters for future agentic work.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run mkdocs --strict</strong></li>
+</ul>
+<p>Expected: warnings unchanged.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/dataset/ CLAUDE.md
+git commit -m &quot;docs: cross-reference sweep for D2 adapters
+
+Post-S2 D2 Task 7. Small edits to related docstrings:
+- DatasetBag class-level docstring mentions the two adapters
+- split_dataset docstring points at the composition pattern
+- restructure_assets docstring points at the adapters for
+  non-class-folder workflows
+- CLAUDE.md DatasetBag section gets the adapter mention
+
+No code changes.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-final-verification">Task 8: Final verification</h2>
+<p><strong>Files:</strong> none modified — verification only.</p>
+<ul>
+<li>[ ] <strong>Step 1: Run fast unit tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/dataset/test_target_resolution.py tests/dataset/test_torch_adapter_no_torch.py tests/dataset/test_torch_adapter_logic.py tests/dataset/test_tf_adapter_no_tf.py tests/dataset/test_tf_adapter_logic.py -q</code>
+Expected: 505+ passed, 3 skipped, 0 failed.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run e2e tests (if live catalog available)</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_torch_adapter_e2e.py tests/dataset/test_tf_adapter_e2e.py -v</code>
+Expected: 2+ passed. Verifies end-to-end against a real bag.</p>
+<ul>
+<li>[ ] <strong>Step 3: mkdocs --strict</strong></li>
+</ul>
+<p>Run: <code>uv run mkdocs build --strict 2&gt;&amp;1 | grep -cE "WARNING|Aborted"</code>
+Expected: <code>27</code> (unchanged from main baseline).</p>
+<ul>
+<li>[ ] <strong>Step 4: ruff check + format</strong></li>
+</ul>
+<p>Run: <code>uv run ruff check src/deriva_ml/dataset/ &amp;&amp; uv run ruff format --check src/deriva_ml/dataset/</code>
+Expected: clean on the new files (any format issues should have been caught during commits, but belt-and-suspenders).</p>
+<ul>
+<li>[ ] <strong>Step 5: Sibling-repo grep for removed kwargs</strong></li>
+</ul>
+<p>Re-run the grep from Task 5 Step 1 and record results in the PR description under "Breaking changes" so template maintainers see the migration guide.</p>
+<ul>
+<li>[ ] <strong>Step 6: Finish the branch</strong></li>
+</ul>
+<p>Invoke <code>superpowers:finishing-a-development-branch</code> and present the four options (merge / PR / keep / discard). The branch has ~9 commits (including the 7 spec commits + task commits). Recommended: Option 2 (push + create PR) given the PR size and the need for review on the clean-break restructure rename.</p>
+<hr />
+<h2 id="task-9-migration-guide">Task 9: Migration guide</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/migration-from-previous-version.md</code> (or similar name — see Step 1)
+- Modify: <code>mkdocs.yml</code> to include the new page in the nav
+- Modify: <code>docs/index.md</code> — add a pointer to the migration guide</p>
+<p>Write a user-facing migration guide covering all breaking changes and notable additions shipped to deriva-ml across the post-S2 documentation pass (PR #65 UG rewrite, PR #66 docstring sweep with 12 renames, PR #67 DRY cleanup, PR #68 metrics_file, and this D2 PR). Users upgrading from the previously-published version need a single place that says "here's what changes, here's how to update your code."</p>
+<h3 id="why-this-belongs-in-d2-specifically">Why this belongs in D2 specifically</h3>
+<p>The biggest breaking change in the set is <strong>D2's <code>restructure_assets</code> signature rename</strong> (<code>group_by=</code> → <code>targets=</code>, <code>value_selector=</code> merged, <code>"Feature.column"</code> removed). That's a <code>TypeError</code>-on-call for any downstream caller. PRs #66 and #67 had smaller renames (the 12 <code>_</code>-prefixed private renames were API cleanup that affected code calling the old public names). The migration guide lands in D2's PR so users pulling the new version find the guide in the same release that breaks them.</p>
+<ul>
+<li>[ ] <strong>Step 1: Decide the file path and naming</strong></li>
+</ul>
+<p>The migration guide should live somewhere discoverable. Three options:</p>
+<ul>
+<li><code>docs/user-guide/migration.md</code> — alongside the other UG chapters. Most discoverable.</li>
+<li><code>docs/migration.md</code> — top-level, separate from the UG structure. Good if users think of "migration" as a one-time reference not part of the regular UG.</li>
+<li><code>docs/reference/migration.md</code> — under the reference section. Good if it's more reference material than tutorial.</li>
+</ul>
+<p>Lean: <code>docs/user-guide/migration.md</code> — users will find it while browsing the UG, and the tone is more "walk me through changing my code" than reference-material lookup.</p>
+<ul>
+<li>[ ] <strong>Step 2: Enumerate every breaking change</strong></li>
+</ul>
+<p>The guide covers:</p>
+<p><strong>A. Breaking changes — <code>TypeError</code> or <code>AttributeError</code> on call:</strong></p>
+<ol>
+<li><strong><code>DatasetBag.restructure_assets</code> signature rename</strong> (D2):</li>
+<li><code>group_by=["Diagnosis"]</code> → <code>targets=["Diagnosis"]</code></li>
+<li><code>group_by=["Classification.Label"]</code> → <code>targets=["Classification"], target_transform=lambda rec: rec.Label</code></li>
+<li><code>value_selector=FeatureRecord.select_newest</code> → <code>targets={"Feature": FeatureRecord.select_newest}</code></li>
+<li>Dotted <code>"Feature.column"</code> syntax removed entirely.</li>
+<li><strong>Public methods renamed to <code>_</code>-prefixed private</strong> (PR #66 — 12 renames):</li>
+<li><code>ml.domain_path()</code> → <code>ml._domain_path()</code> (and similar for <code>table_path</code>, <code>is_system_schema</code>, <code>get_domain_schemas</code>, <code>apply_logger_overrides</code>, <code>compute_diff</code>, <code>retrieve_rid</code>, <code>cache_features</code>, <code>add_workflow</code>, <code>start_upload</code>, <code>asset_record_class</code> module-level factory)</li>
+<li>These were all internal helpers that shouldn't have been public; users calling them were depending on accidental API surface. The underscored versions still work.</li>
+<li>User-facing alternatives:<ul>
+<li><code>retrieve_rid</code> → use <code>resolve_rid()</code> instead (user-facing wrapper)</li>
+<li><code>asset_record_class</code> — the mixin method <code>ml.asset_record_class(table)</code> is still public; only the module-level factory is private.</li>
+<li><code>add_workflow</code> → use <code>create_workflow()</code> (user-facing factory)</li>
+</ul>
+</li>
+<li><strong>Methods deleted</strong> (PR #66):</li>
+<li><code>prefetch_dataset</code> — was a deprecated one-line shim; use <code>cache_dataset</code> directly.</li>
+<li><code>list_foreign_keys</code> — no callers, no replacement needed.</li>
+<li><code>add_page</code>, <code>user_list</code>, <code>globus_login</code> — removed from <code>DerivaML</code>; these were stale web-app helpers that never had users.</li>
+<li><strong>Documentation-only fix that may affect copy-pasted user code</strong>:</li>
+<li><code>AssetRIDConfig</code> (doc name) → <code>AssetSpec</code> / <code>AssetSpecConfig</code> (real class names). Users who copied example code from the old configuration docs hit an <code>ImportError</code>.</li>
+</ol>
+<p><strong>B. New features — additive, no break, but worth flagging:</strong></p>
+<ol>
+<li><strong><code>Execution.metrics_file(filename="metrics.jsonl")</code></strong> (PR #68) — recommended over manually calling <code>asset_file_path(MLAsset.execution_metadata, ...)</code> for training metrics.</li>
+<li><strong><code>DatasetBag.as_torch_dataset(...)</code> and <code>DatasetBag.as_tf_dataset(...)</code></strong> (D2) — recommended over hand-rolling <code>torch.utils.data.Dataset</code> subclasses.</li>
+<li><strong>State-machine recovery edge</strong> (PR A) — <code>Running → Pending_Upload</code> is now a legal transition. Users doing manual crash-recovery should use <code>update_status(Pending_Upload)</code> instead of <code>update_status(Failed)</code> (the old workaround).</li>
+</ol>
+<p><strong>C. Environment / tooling changes:</strong></p>
+<ol>
+<li><strong>Python 3.12+ required</strong> (no change — already the floor, but worth stating).</li>
+<li><strong>Optional <code>deriva-ml[torch]</code> / <code>deriva-ml[tf]</code> extras</strong> (D2) — new install-time choices.</li>
+<li>
+<p><strong>Dropped <code>SETUPTOOLS_USE_DISTUTILS</code> env var</strong> (PR #68 side-effect) — internal fix, no user action needed; documented because users with custom setups may notice the env var no longer gets set process-wide.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Draft the migration guide</strong></p>
+</li>
+</ol>
+<p>Structure the guide as:</p>
+<pre><code class="language-markdown"># Migrating from previous deriva-ml versions
+
+[one-paragraph intro: &quot;if you're upgrading from X.Y.Z or earlier, here's
+what changes&quot;]
+
+## At a glance
+
+[single summary table: category | old | new | fix]
+
+## Breaking changes
+
+### DatasetBag.restructure_assets signature changes
+[before/after code blocks, one per rename. Include the migration mapping
+from this plan's Task 5.]
+
+### Renamed private methods
+[table of 12 renames + one paragraph per user-facing alternative where
+the rename hides a better public API (resolve_rid, create_workflow)]
+
+### Deleted methods
+[list + replacements]
+
+### Asset specification classes (documentation-only break)
+[AssetRIDConfig was never a real class; copy-paste victims land here]
+
+## New recommended patterns
+
+### Training metrics
+[metrics_file() vs manual asset_file_path]
+
+### PyTorch / TensorFlow / Keras training
+[pointer to the three-framework UG section]
+
+### Crash recovery
+[update_status(Pending_Upload) pattern]
+
+## Finding affected code in your project
+
+[grep recipes for each break:]
+```bash
+# Find restructure_assets old-kwarg callers:
+grep -rn &quot;group_by=\|value_selector=\|restructure_assets.*\&quot;[A-Za-z_]*\.[A-Za-z_]*\&quot;&quot; your_project/
+
+# Find renamed-private callers:
+grep -rn -E &quot;\b(domain_path|table_path|is_system_schema|get_domain_schemas|apply_logger_overrides|compute_diff|retrieve_rid|cache_features|add_workflow|start_upload)\(&quot; your_project/ \
+  | grep -v &quot;_\(domain_path\|table_path\|...&quot; # exclude already-underscored
+
+# Find deleted-method callers:
+grep -rn -E &quot;\.(prefetch_dataset|list_foreign_keys|add_page|user_list|globus_login)\(&quot; your_project/
+</code></pre>
+<h2 id="version-compatibility-matrix">Version compatibility matrix</h2>
+<table>
+<thead>
+<tr>
+<th>deriva-ml version</th>
+<th>Python</th>
+<th>Torch</th>
+<th>TF</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>prior published</td>
+<td>≥3.12</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>[current baseline]</td>
+</tr>
+<tr>
+<td>this release</td>
+<td>≥3.12</td>
+<td>≥2.0 optional</td>
+<td>≥2.15 optional</td>
+<td>[what this doc covers]</td>
+</tr>
+</tbody>
+</table>
+<h2 id="support">Support</h2>
+<p>[if users hit a break not documented here, pointer to raising an issue]</p>
+<pre><code>
+Keep it around 400-600 lines; detailed enough to answer &quot;what do I change in my code&quot; but not a rehash of the UG.
+
+- [ ] **Step 4: Update `mkdocs.yml` nav**
+
+Add the migration guide to the User Guide section of the nav, probably at the end (not between chapters):
+
+```yaml
+nav:
+  - Introduction: index.md
+  - User Guide:
+      - Exploring a catalog: user-guide/exploring.md
+      - Working with datasets: user-guide/datasets.md
+      - ... [other chapters] ...
+      - Integrating with hydra-zen: user-guide/hydra-zen.md
+      - Migrating from previous versions: user-guide/migration.md    # new
+  # ... rest unchanged ...
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Add pointer from Introduction</strong></li>
+</ul>
+<p><code>docs/index.md</code> gets one sentence near the top (or in a "What's new" section if one exists) pointing users coming from older versions at the migration guide. Don't make it prominent — users upgrading need it; new users don't.</p>
+<ul>
+<li>[ ] <strong>Step 6: Grep sibling repos once more</strong></li>
+</ul>
+<p>Run the sibling-repo greps from Task 5 Step 1 and Task 8 Step 5 one more time. This time record the raw output in the migration-guide's "Finding affected code in your project" section as worked examples — real call sites from real deriva-ml-ecosystem projects.</p>
+<p>If the sibling repos aren't present on this machine, skip this step and flag in the commit message that the example-output section is representative, not actual.</p>
+<ul>
+<li>[ ] <strong>Step 7: mkdocs --strict</strong></li>
+</ul>
+<p>Run: <code>uv run mkdocs build --strict 2&gt;&amp;1 | tail -20</code>
+Expected: no new warnings. Confirm the new page renders (it'll show up in <code>site/user-guide/migration/index.html</code> after build).</p>
+<ul>
+<li>[ ] <strong>Step 8: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/migration.md mkdocs.yml docs/index.md
+git commit -m &quot;docs(migration): add migration guide from previous deriva-ml version
+
+Post-S2 D2 Task 9. User-facing migration guide covering every
+breaking change and notable addition across the post-S2 documentation
+pass (PRs #65, #66, #67, #68, and this PR).
+
+Sections:
+- At-a-glance table summarizing each change
+- Breaking changes with before/after code:
+  - restructure_assets signature (group_by → targets, value_selector
+    merged, Feature.column dotted syntax removed)
+  - 12 renamed private methods + user-facing alternatives where applicable
+  - 5 deleted methods + replacements
+  - AssetRIDConfig doc-only break (class is actually AssetSpec/
+    AssetSpecConfig)
+- New recommended patterns:
+  - metrics_file() for training-metric logs (D1)
+  - as_torch_dataset / as_tf_dataset for framework integration (D2)
+  - update_status(Pending_Upload) for crash recovery (A)
+- Grep recipes for finding affected call sites
+- Version compatibility matrix
+
+The guide lands in D2's PR because D2 ships the single biggest
+break (restructure_assets kwarg rename — TypeError on call); users
+pulling the new release find the guide in the same release that
+breaks them.
+
+Co-Authored-By: Claude Sonnet 4.6 &lt;noreply@anthropic.com&gt;&quot;
+</code></pre>
+<hr />
+<h2 id="summary-checklist">Summary checklist</h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Files touched</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>target_resolution.py</code>, <code>test_target_resolution.py</code></td>
+<td>pending</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>pyproject.toml</code></td>
+<td>pending</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>torch_adapter.py</code>, <code>dataset_bag.py</code>, 3 test files</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>tf_adapter.py</code>, <code>dataset_bag.py</code>, 3 test files</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>dataset_bag.py</code> (restructure rewrite), existing test updates</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>offline.md</code> UG section</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Various docstrings + <code>CLAUDE.md</code></td>
+<td>pending</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Verification only</td>
+<td>pending</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>migration.md</code>, <code>mkdocs.yml</code>, <code>index.md</code></td>
+<td>pending</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

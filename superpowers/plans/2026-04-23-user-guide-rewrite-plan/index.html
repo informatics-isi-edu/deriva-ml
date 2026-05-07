@@ -1,0 +1,3176 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-23-user-guide-rewrite-plan/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>User-Guide Rewrite Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#user-guide-rewrite-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              User-Guide Rewrite Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files-to-create" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New files to create
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-to-rewrite-in-place" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to rewrite in place
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-to-rename-content-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to rename (content unchanged)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-to-delete-replaced-by-stub-redirects-in-one-release-deprecation-cycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to delete (replaced by stub redirects in one-release deprecation cycle)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-modified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File modified
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-build-the-content-inventory-migration-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Build the content inventory (migration map)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-chapter-1-exploring-a-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Chapter 1 — Exploring a catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-chapter-2-working-with-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Chapter 2 — Working with datasets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-chapter-3-defining-and-using-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Chapter 3 — Defining and using features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-chapter-4-running-an-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Chapter 4 — Running an experiment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-chapter-5-working-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Chapter 5 — Working offline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-chapter-6-sharing-and-collaboration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Chapter 6 — Sharing and collaboration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-chapter-7-reproducibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Chapter 7 — Reproducibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-chapter-8-integrating-with-hydra-zen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Chapter 8 — Integrating with hydra-zen
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-10-rewrite-introduction-docsindexmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Rewrite Introduction (docs/index.md)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-11-rename-code-docs-to-api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Rename code-docs to api-reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-12-nav-rewrite-cut-list-deletions-stub-redirects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: Nav rewrite + cut-list deletions + stub redirects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-13-full-build-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 13: Full build verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-14-code-example-verification-selective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 14: Code-example verification (selective)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-15-cover-to-cover-read-through" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 15: Cover-to-cover read-through
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review-checklist-run-after-writing-this-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-review checklist (run after writing this plan)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Self-review checklist (run after writing this plan)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-spec-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Spec coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-placeholder-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Placeholder scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-type-name-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Type / name consistency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-scope-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Scope check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-execution-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Execution readiness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="user-guide-rewrite-implementation-plan">User-Guide Rewrite Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Replace deriva-ml's fragmented Getting Started + Concepts + Running Workflows sections with a coherent 8-chapter User Guide, following the technical-documentation pattern of a narrative middle layer between Introduction and API Reference.</p>
+<p><strong>Architecture:</strong> Content-preserving rewrite. Walk every cut-list page, extract unique content into an inventory keyed by destination chapter, draft each chapter from the inventory, then perform a coordinated nav rewrite + deletions + link audit. Stub-redirect pages preserve bookmarked URLs for one release cycle.</p>
+<p><strong>Tech Stack:</strong> Markdown (mkdocs-material), mkdocs-jupyter for notebooks, <code>mkdocs build --strict</code> for link validation, git for version control. No code changes to src/.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-04-23-user-guide-rewrite-design.md</code></p>
+<p><strong>Non-goals (out of scope for this plan):</strong>
+- Docstring content improvements (sub-project 2, separate spec + plan).
+- Any change to <code>src/deriva_ml/</code>.
+- Any change to <code>docs/configuration/</code>, <code>docs/Notebooks/</code>, <code>docs/release-notes.md</code>, <code>docs/architecture.md</code>.
+- New library features.
+- Template-repo changes.</p>
+<p><strong>Verification contract:</strong>
+- Every task that modifies <code>docs/</code> must end with <code>uv run mkdocs build --strict</code> passing.
+- Every chapter's commit message cites the migration-map entries (source pages) it absorbs, so the content-preservation invariant is auditable.
+- Final read-through (Task 15) is the acceptance gate.</p>
+<p><strong>Progress style:</strong> Each chapter is a single commit. 8 chapters + 5 supporting tasks = 13 commits minimum. Final read-through may add fix-up commits.</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<h3 id="new-files-to-create">New files to create</h3>
+<pre><code>docs/user-guide/exploring.md
+docs/user-guide/datasets.md
+docs/user-guide/features.md
+docs/user-guide/executions.md
+docs/user-guide/offline.md
+docs/user-guide/sharing.md
+docs/user-guide/reproducibility.md
+docs/user-guide/hydra-zen.md
+docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md   # migration map
+</code></pre>
+<h3 id="files-to-rewrite-in-place">Files to rewrite in place</h3>
+<ul>
+<li><code>docs/index.md</code> — Introduction: positioning + four-object model + template-repo pointer.</li>
+</ul>
+<h3 id="files-to-rename-content-unchanged">Files to rename (content unchanged)</h3>
+<pre><code>docs/code-docs/dataset.md                    → docs/api-reference/dataset.md
+docs/code-docs/dataset_aux_classes.md        → docs/api-reference/dataset_aux_classes.md
+docs/code-docs/dataset_bag.md                → docs/api-reference/dataset_bag.md
+docs/code-docs/dataset_split.md              → docs/api-reference/dataset_split.md
+docs/code-docs/deriva_definitions.md         → docs/api-reference/deriva_definitions.md
+docs/code-docs/deriva_ml_base.md             → docs/api-reference/deriva_ml_base.md
+docs/code-docs/deriva_model.md               → docs/api-reference/deriva_model.md
+docs/code-docs/exceptions.md                 → docs/api-reference/exceptions.md
+docs/code-docs/execution.md                  → docs/api-reference/execution.md
+docs/code-docs/execution_configuration.md    → docs/api-reference/execution_configuration.md
+docs/code-docs/feature.md                    → docs/api-reference/feature.md
+docs/code-docs/upload.md                     → docs/api-reference/upload.md
+docs/code-docs/workflow.md                   → docs/api-reference/workflow.md
+</code></pre>
+<h3 id="files-to-delete-replaced-by-stub-redirects-in-one-release-deprecation-cycle">Files to delete (replaced by stub redirects in one-release deprecation cycle)</h3>
+<pre><code>docs/getting-started/quick-start.md
+docs/getting-started/install.md
+docs/getting-started/project-setup.md
+docs/concepts/overview.md
+docs/concepts/identifiers.md
+docs/concepts/datasets.md
+docs/concepts/features.md
+docs/concepts/file-assets.md
+docs/concepts/annotations.md
+docs/concepts/denormalization.md
+docs/workflows/execution-lifecycle.md
+docs/workflows/running-models.md
+docs/workflows/git-and-versioning.md
+docs/cli-reference.md
+</code></pre>
+<h3 id="file-modified">File modified</h3>
+<ul>
+<li><code>mkdocs.yml</code> — nav section rewritten (one edit in Task 11).</li>
+</ul>
+<hr />
+<h2 id="task-1-build-the-content-inventory-migration-map">Task 1: Build the content inventory (migration map)</h2>
+<p><strong>Why:</strong> Before drafting a single chapter we need to walk every cut-list page and catalogue what's there. This prevents content loss and makes each chapter's source material explicit.</p>
+<p><strong>Files:</strong>
+- Create: <code>docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read every cut-list page end to end</strong></li>
+</ul>
+<p>Fourteen files. Open each in sequence and read start to finish (don't skim headings):</p>
+<pre><code>docs/getting-started/quick-start.md
+docs/getting-started/install.md
+docs/getting-started/project-setup.md
+docs/concepts/overview.md
+docs/concepts/identifiers.md
+docs/concepts/datasets.md
+docs/concepts/features.md
+docs/concepts/file-assets.md
+docs/concepts/annotations.md
+docs/concepts/denormalization.md
+docs/workflows/execution-lifecycle.md
+docs/workflows/running-models.md
+docs/workflows/git-and-versioning.md
+docs/cli-reference.md
+</code></pre>
+<p>For each, note: all code examples, all diagrams (reference the asset path), all "Note/Warning/Tip" callouts, all edge-case paragraphs, all cross-references to other pages.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the inventory doc</strong></li>
+</ul>
+<p>Create <code>docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md</code> with this structure:</p>
+<pre><code class="language-markdown"># User-Guide Content Inventory
+
+**Purpose:** migration map from cut-list pages to User Guide chapters.
+Every source sentence has a destination (or a retirement rationale).
+Used as the source-of-truth during chapter drafting.
+
+## Destination: Introduction (docs/index.md rewrite)
+
+### From docs/concepts/overview.md
+- Four-object mental model (Catalog / Dataset / Execution / Feature)
+- ERD image reference (docs/assets/ERD.png)
+- Paragraph on domain schema vs ML schema
+
+### From docs/getting-started/* (all three pages)
+- RETIRED: replaced by single pointer to template repo. No content re-homed.
+
+## Destination: Chapter 1 — Exploring a catalog (docs/user-guide/exploring.md)
+
+### From docs/concepts/overview.md
+- &lt;bullet per piece of content&gt;
+
+### From docs/concepts/identifiers.md
+- &lt;bullet per piece of content&gt;
+
+### From docs/cli-reference.md
+- &lt;only the read/browse CLI commands, if any&gt;
+
+## Destination: Chapter 2 — Working with datasets (docs/user-guide/datasets.md)
+
+&lt;same shape&gt;
+
+[... through Chapter 8 ...]
+
+## Retirements (content deliberately dropped with rationale)
+
+### From docs/concepts/annotations.md
+- &lt;list the content and justify why it doesn't belong in any User Guide chapter&gt;
+
+### From docs/getting-started/install.md
+- All content: covered by template repo.
+</code></pre>
+<p>Each destination section is a bulleted list of content items. Each item is short (one line per item). Retirements MUST include a rationale — "template repo owns it" or "obsolete in S2" or "belongs in API Reference."</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify every source sentence has a destination</strong></li>
+</ul>
+<p>Spot-check: pick 3 source pages at random. For each, confirm every paragraph is represented somewhere in the inventory (destination OR retirement). Add missing entries.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md
+git commit -m &quot;docs(plan): user-guide content inventory — migration map for rewrite&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-chapter-1-exploring-a-catalog">Task 2: Chapter 1 — Exploring a catalog</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/exploring.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 1</strong></li>
+</ul>
+<p>Open <code>docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md</code> and read the Chapter 1 destination section. These are your raw materials.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter using the fixed shape</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/exploring.md</code>. Follow the spec's §Writing approach structure exactly:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph</strong> — one sentence stating what the chapter covers, one sentence listing what the reader will know at the end.</p>
+</li>
+<li>
+<p><strong>Concept setup</strong> (1-2 paragraphs) — a DerivaML instance is a Python handle on a remote Deriva catalog. Everything in the catalog has a Resource Identifier (RID). The rest of the chapter shows how to list and browse catalog contents.</p>
+</li>
+<li>
+<p><strong>Task sections</strong> in this order:</p>
+</li>
+<li><code>## Connecting to a catalog</code> — one sentence on how, one code block, pointer to template repo for project setup.</li>
+<li><code>## Understanding RIDs</code> — opaque-ID story. Why they're random-looking strings, that they're stable, that they show up everywhere.</li>
+<li><code>## Listing tables and browsing the schema</code> — <code>ml.model</code> and related introspection.</li>
+<li><code>## Finding datasets, features, workflows, executions</code> — the four <code>find_*</code> methods with one example each.</li>
+<li><code>## Querying with pathBuilder</code> — when to reach for <code>ml.pathBuilder()</code> directly.</li>
+<li><code>## When to reach for pathBuilder vs. the high-level APIs</code> — comparison subsection.</li>
+<li>
+<p><code>## Jumping to Chaise</code> — <code>get_chaise_url()</code> for GUI browsing.</p>
+</li>
+<li>
+<p><strong>Common pitfalls</strong> (if warranted — RID opaqueness is a likely candidate).</p>
+</li>
+<li>
+<p><strong>See also</strong> — one-line cross-references to Chapter 2 (datasets deep dive), Chapter 4 (executions), API Reference entries.</p>
+</li>
+</ol>
+<p>Use <code>python</code> language tag on all code blocks. All examples short (5-15 lines). Reuse the exact imports at the top of the first example (<code>from deriva_ml import DerivaML</code>, etc.).</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify the build</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: SUCCESS with zero warnings. If broken links or bad syntax, fix.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/exploring.md
+git commit -m &quot;docs(user-guide): Chapter 1 — Exploring a catalog
+
+Re-homes content from:
+- docs/concepts/overview.md (four-object context, RIDs)
+- docs/concepts/identifiers.md (all)
+- docs/cli-reference.md (browse-related commands)
+
+See docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md.&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-chapter-2-working-with-datasets">Task 3: Chapter 2 — Working with datasets</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/datasets.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 2</strong></li>
+</ul>
+<p>Open the content inventory. The Chapter 2 destination will be the largest section — <code>docs/concepts/datasets.md</code> is 770 lines and is the primary source. Also note content from <code>docs/workflows/execution-lifecycle.md</code> about dataset versioning.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/datasets.md</code> following the fixed shape:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph</strong> — one sentence, one sentence.</p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — a Dataset is a versioned, named collection of RIDs. It doesn't copy data; it points at existing rows. Versions back onto catalog snapshots, so a named version always resolves the same rows.</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## Creating a dataset</code> — <code>ml.create_dataset(...)</code>. Dataset types. Adding element types.</li>
+<li><code>## Adding members to a dataset</code> — list-of-RIDs form AND dict form; when to use each.</li>
+<li><code>## Designing dataset types</code> — orthogonal tagging; when a new type is warranted.</li>
+<li><code>## Parent and child datasets</code> — hierarchy for train/val/test splits.</li>
+<li><code>## Versioning</code> — <code>current_version</code>, <code>increment_dataset_version</code>, semantic versioning, catalog snapshots. This is the reproducibility primitive.</li>
+<li><code>## Splitting a dataset</code> — <code>split_dataset()</code> with stratification, seed, dry-run.</li>
+<li>
+<p><code>## Downloading as a bag</code> — <code>DatasetSpec</code>, <code>DatasetBag</code>, <code>materialize=True/False</code> flag. When to use each.</p>
+</li>
+<li>
+<p><strong>Common pitfalls:</strong></p>
+</li>
+<li>Dataset types aren't mutually exclusive (orthogonal tagging).</li>
+<li><code>stratify_by_column</code> expects <code>TableName_ColumnName</code> format (opaque; document the format explicitly).</li>
+<li>
+<p>Version numbers don't auto-bump on member changes; you must call <code>increment_dataset_version</code>.</p>
+</li>
+<li>
+<p><strong>See also</strong> — Chapter 3 (features on dataset members), Chapter 5 (offline work with bags), Chapter 7 (reproducibility via version pinning).</p>
+</li>
+</ol>
+<p>Preserve every code example from <code>concepts/datasets.md</code> — adapt wording to the task-oriented structure but keep the code itself intact unless there's a clear reason to rewrite.</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify the build</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: SUCCESS.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/datasets.md
+git commit -m &quot;docs(user-guide): Chapter 2 — Working with datasets
+
+Re-homes content from:
+- docs/concepts/datasets.md (primary — 770 lines)
+- docs/workflows/execution-lifecycle.md (dataset versioning interplay)&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-chapter-3-defining-and-using-features">Task 4: Chapter 3 — Defining and using features</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/features.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 3</strong></li>
+</ul>
+<p>Primary source: <code>docs/concepts/features.md</code> (460 lines). Also the new S2 spec (<code>docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md</code>) is reference material for API shape. Also <code>docs/concepts/denormalization.md</code> for the "when to use <code>Denormalizer</code> vs <code>feature_values</code>" section.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/features.md</code> following the shape:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph.</strong></p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — a Feature is an association table linking a target table + execution + values. It's how you attach structured, provenance-linked annotations to existing data. Features differ from regular columns in that multiple executions can record different values for the same target row (multi-annotator scenarios).</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## When to use a feature vs. a column</code> — decision framework.</li>
+<li><code>## Creating a vocabulary</code> — prerequisite for term features.</li>
+<li><code>## Creating a feature</code> — <code>create_feature</code> with terms, assets, metadata columns.</li>
+<li><code>## Recording feature values</code> — <code>exe.add_features(records)</code> within an execution context.</li>
+<li><code>## Reading feature values</code> — three-method surface: <code>find_features</code>, <code>feature_values</code>, <code>lookup_feature</code>.</li>
+<li><code>## Using selectors to reduce multi-annotator data</code> — <code>select_newest</code>, <code>select_first</code>, <code>select_by_execution</code>, <code>select_majority_vote</code>, <code>select_by_workflow</code>. One code block per selector.</li>
+<li><code>## Asset features</code> — crop boxes, embeddings, segmentation masks. What makes them special.</li>
+<li><code>## Reading features from a downloaded bag</code> — API parity on <code>DatasetBag</code>.</li>
+<li>
+<p><code>## When to reach for feature_values vs. Denormalizer</code> — comparison subsection (the spec calls this out explicitly).</p>
+</li>
+<li>
+<p><strong>Common pitfalls:</strong></p>
+</li>
+<li>Workflow deduplication by checksum: re-running from the same script gives you the same workflow RID (document this since it's surprising).</li>
+<li>Features that have asset columns need the asset upload to land before the feature flush — the library handles this; document the invariant for users debugging failures.</li>
+<li>
+<p><code>feature_values</code> materializes all rows into memory before yielding (not true streaming — we documented this in the S2 docstring too, repeat it here).</p>
+</li>
+<li>
+<p><strong>See also</strong> — Chapter 4 (executions as the write context), Chapter 5 (offline feature reads).</p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Verify the build</strong></p>
+</li>
+</ol>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/features.md
+git commit -m &quot;docs(user-guide): Chapter 3 — Defining and using features
+
+Re-homes content from:
+- docs/concepts/features.md (primary)
+- docs/concepts/denormalization.md (Denormalizer vs feature_values comparison)
+
+Incorporates S2 API surface (feature_values iterator, select_by_workflow
+factory, lookup_feature).&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-chapter-4-running-an-experiment">Task 5: Chapter 4 — Running an experiment</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/executions.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 4</strong></li>
+</ul>
+<p>Primary sources: <code>docs/workflows/execution-lifecycle.md</code>, <code>docs/workflows/running-models.md</code>, <code>docs/cli-reference.md</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/executions.md</code>:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph.</strong></p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — an Execution is a tracked run of a Workflow at a point in time. It captures inputs, outputs, status, and the environment the code ran in. Everything you produce during the run — asset files, feature values, metadata — is linked to the execution for provenance.</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## Describing an execution with ExecutionConfiguration</code> — datasets, assets, description. Show creating from scratch AND from a hydra-zen-produced config.</li>
+<li><code>## Running an execution</code> — the <code>with ml.create_execution(cfg) as exe:</code> context manager pattern. Status transitions (Created → Running → Stopped).</li>
+<li><code>## Writing asset files</code> — <code>exe.asset_file_path(asset_table, filename, asset_types=...)</code> and why you must NOT manually write to <code>working_dir / "Execution_Metadata"</code>.</li>
+<li><code>## Writing feature values</code> — <code>exe.add_features(records)</code>. Staged to SQLite, flushed on upload.</li>
+<li><code>## Uploading outputs</code> — <code>execution.upload_execution_outputs()</code>. Ordering: assets first, features second. <code>__exit__</code> does NOT auto-upload; you must call explicitly.</li>
+<li><code>## Execution status lifecycle</code> — diagram of the state machine (Running → Stopped → Pending_Upload → Uploaded, plus Failed branches).</li>
+<li><code>## Crash-resume</code> — what happens if the process dies mid-run. Staged rows persist.</li>
+<li>
+<p><code>## CLI reference</code> — sub-section covering <code>deriva-ml-run</code>, <code>deriva-ml-run-notebook</code>, their flags. Short; the template repo has the full onramp.</p>
+</li>
+<li>
+<p><strong>Common pitfalls:</strong></p>
+</li>
+<li><code>__exit__</code> does NOT auto-upload.</li>
+<li>Workflow dedup by checksum (again — this surfaces for users creating executions too).</li>
+<li>
+<p>Dirty-tree check (<code>DERIVA_ML_ALLOW_DIRTY</code> is an override, not the default).</p>
+</li>
+<li>
+<p><strong>See also</strong> — Chapter 3 (features as execution outputs), Chapter 7 (reproducibility).</p>
+</li>
+</ol>
+<p>Add a state-machine diagram. Use Mermaid syntax inside a ```mermaid fenced block — mkdocs-material renders these.</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify the build</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/executions.md
+git commit -m &quot;docs(user-guide): Chapter 4 — Running an experiment
+
+Re-homes content from:
+- docs/workflows/execution-lifecycle.md (primary)
+- docs/workflows/running-models.md (CLI subsection)
+- docs/cli-reference.md (CLI subsection)
+
+Incorporates S2 changes: __exit__ does not auto-upload (verified during
+Task 7 review), feature flush order (assets then features), crash-resume
+via execution_state__feature_records.&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-chapter-5-working-offline">Task 6: Chapter 5 — Working offline</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/offline.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 5</strong></li>
+</ul>
+<p>Primary sources: <code>docs/concepts/datasets.md</code> bag sections, S2 design doc's offline-to-online section.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/offline.md</code>:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph.</strong></p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — a bag is a downloaded, self-contained, immutable snapshot of a dataset including all referenced asset files. Everything you do online via <code>Dataset</code> works on a bag via <code>DatasetBag</code>, with a small exception list. Bags let you develop on a laptop and sync results back when reconnected.</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## Downloading a dataset as a bag</code> — <code>DatasetSpec</code>, <code>download_dataset_bag</code>, <code>materialize=True/False</code>.</li>
+<li><code>## Reading from a bag</code> — <code>bag.find_features</code>, <code>bag.feature_values</code>, <code>bag.lookup_feature</code>, <code>bag.list_dataset_members</code>. API parity with live <code>Dataset</code>/<code>DerivaML</code>.</li>
+<li><code>## What bags can't do</code> — can't write; workflow-based queries that need the live catalog are limited (some cases work from bag SQLite).</li>
+<li><code>## Constructing feature records offline</code> — <code>bag.lookup_feature(...)</code> returns a <code>Feature</code> whose <code>feature_record_class()</code> works without a catalog connection. Build records from model predictions, keep them in memory.</li>
+<li><code>## Committing offline-built records when back online</code> — hand the records to <code>exe.add_features(records)</code> via a fresh execution. The execution provides provenance.</li>
+<li>
+<p><code>## Restructuring assets for ML frameworks</code> — <code>bag.restructure_assets()</code> produces the <code>class/image.jpg</code> directory layout that <code>torchvision.datasets.ImageFolder</code> and <code>tf.keras.utils.image_dataset_from_directory</code> expect.</p>
+</li>
+<li>
+<p><strong>Common pitfalls:</strong></p>
+</li>
+<li><code>restructure_assets()</code> returns a <code>dict[Path, Path]</code>, not a <code>Path</code> (CLAUDE.md flag).</li>
+<li>
+<p>Bags are immutable: if the source dataset changes, re-download the bag.</p>
+</li>
+<li>
+<p><strong>See also</strong> — Chapter 2 (creating datasets), Chapter 3 (features API).</p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Verify the build</strong></p>
+</li>
+</ol>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/offline.md
+git commit -m &quot;docs(user-guide): Chapter 5 — Working offline
+
+Re-homes content from:
+- docs/concepts/datasets.md (bag sections)
+
+Incorporates S2 offline-to-online write cycle (tested in
+tests/feature/test_feature_values.py::test_offline_construct_records_online_stage).&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-chapter-6-sharing-and-collaboration">Task 7: Chapter 6 — Sharing and collaboration</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/sharing.md</code></p>
+<p><strong>Note:</strong> This chapter is mostly new content. Reviewer #5 flagged <code>create_ml_workspace</code> as undocumented; sources will include reading <code>src/deriva_ml/catalog/clone.py</code> and <code>src/deriva_ml/catalog/localize.py</code> directly to understand behavior.</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 6</strong></li>
+</ul>
+<p>Primary sources: <code>docs/concepts/file-assets.md</code> partial coverage (bag-related bits), plus the CLAUDE.md section on catalog cloning, plus direct source read of:</p>
+<ul>
+<li><code>src/deriva_ml/catalog/clone.py</code> — <code>create_ml_workspace</code> function and orphan-handling strategies.</li>
+<li>
+<p><code>src/deriva_ml/catalog/localize.py</code> — <code>localize_assets</code> function.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 2: Write the chapter</strong></p>
+</li>
+</ul>
+<p>Create <code>docs/user-guide/sharing.md</code>:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph.</strong></p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — three ways to share data: citable bag URLs (MINIDs), downloadable bag archives (BDBag format), and partial catalog clones (for multi-site collaboration). Each has different portability vs. authority tradeoffs.</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## Sharing a dataset with a MINID</code> — <code>use_minid=True</code> when downloading. What a MINID guarantees (persistent global identifier). How collaborators resolve it.</li>
+<li><code>## Sharing a bag archive</code> — the <code>.bag.zip</code> format, what's in it, and how to inspect without deriva-ml installed.</li>
+<li><code>## Cloning a subset of a catalog</code> — <code>create_ml_workspace</code>. Three-stage approach: schema without FKs, async data copy, FK application with orphan handling.</li>
+<li><code>## Orphan-handling strategies</code> — <code>FAIL</code>, <code>DELETE</code>, <code>NULLIFY</code>. When each is right.</li>
+<li><code>## Copying assets after a clone</code> — <code>localize_assets</code> for <code>asset_mode=REFERENCES</code> clones.</li>
+<li>
+<p><code>## Access control</code> — brief, link to Deriva/Globus docs. We don't re-document that.</p>
+</li>
+<li>
+<p><strong>Common pitfalls:</strong></p>
+</li>
+<li><code>create_ml_schema</code> drops the existing schema with CASCADE (CLAUDE.md flag); never call on a populated catalog.</li>
+<li>
+<p>BDBag archives have their own spec; collaborators who want to inspect without deriva-ml need the <code>bdbag</code> CLI tool.</p>
+</li>
+<li>
+<p><strong>See also</strong> — Chapter 2 (datasets), Chapter 5 (bag-based workflows).</p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Verify the build</strong></p>
+</li>
+</ol>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/sharing.md
+git commit -m &quot;docs(user-guide): Chapter 6 — Sharing and collaboration
+
+Re-homes content from:
+- docs/concepts/file-assets.md (partial, bag-related)
+- CLAUDE.md (catalog cloning section)
+- source reading of src/deriva_ml/catalog/clone.py + localize.py
+
+Documents create_ml_workspace and localize_assets, which were flagged as
+undocumented by reviewer #5 in the S2 post-audit.&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-chapter-7-reproducibility">Task 8: Chapter 7 — Reproducibility</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/reproducibility.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 7</strong></li>
+</ul>
+<p>Primary sources: <code>docs/workflows/git-and-versioning.md</code>, dataset-versioning sections from <code>docs/concepts/datasets.md</code>, Execution snapshot work (from <code>src/deriva_ml/execution/execution_snapshot.py</code> if it exists).</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/reproducibility.md</code>:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph.</strong></p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — reproducibility in deriva-ml means: given an execution RID, you can reconstruct exactly what code ran, on what data, in what environment. The library captures these automatically, but you need to cooperate (commit before running, pin versions, use a clean tree).</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## What is captured automatically</code> — workflow checksum (git commit), environment snapshot (<code>uv.lock</code>), Hydra config, Docker image digest.</li>
+<li><code>## Pinning a dataset version</code> — <code>DatasetSpec(rid, version="1.0.0")</code>; catalog snapshot semantics.</li>
+<li><code>## Workflow checksums and git commits</code> — what gets hashed; why workflow dedup works.</li>
+<li><code>## Docker image digest capture</code> — for containerized runs; the <code>DERIVA_MCP_IMAGE_DIGEST</code> env var.</li>
+<li><code>## Dirty-tree handling</code> — the warning, <code>DERIVA_ML_ALLOW_DIRTY</code> override, when to use each.</li>
+<li>
+<p><code>## Re-running a past execution</code> — finding it via <code>find_executions</code>, reading its config back, constructing a new <code>ExecutionConfiguration</code> with the same inputs.</p>
+</li>
+<li>
+<p><strong>Common pitfalls:</strong></p>
+</li>
+<li><code>DERIVA_ML_ALLOW_DIRTY=true</code> silently pollutes provenance. Only use in tests.</li>
+<li>
+<p>Workflow dedup by checksum means repeat runs from the same script share one workflow RID; use that property intentionally.</p>
+</li>
+<li>
+<p><strong>See also</strong> — Chapter 2 (dataset versioning), Chapter 4 (execution lifecycle).</p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Verify the build</strong></p>
+</li>
+</ol>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/reproducibility.md
+git commit -m &quot;docs(user-guide): Chapter 7 — Reproducibility
+
+Re-homes content from:
+- docs/workflows/git-and-versioning.md (primary)
+- docs/concepts/datasets.md (version pinning sections)&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-chapter-8-integrating-with-hydra-zen">Task 9: Chapter 8 — Integrating with hydra-zen</h2>
+<p><strong>Files:</strong>
+- Create: <code>docs/user-guide/hydra-zen.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Chapter 8</strong></li>
+</ul>
+<p>Primary sources: <code>docs/configuration/overview.md</code> (NOT rewritten — this section stays; Chapter 8 is the shallow intro to it). Also CLAUDE.md §Hydra-zen Configuration for the four config classes.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the chapter</strong></li>
+</ul>
+<p>Create <code>docs/user-guide/hydra-zen.md</code>:</p>
+<ol>
+<li>
+<p><strong>Opening paragraph.</strong></p>
+</li>
+<li>
+<p><strong>Concept setup</strong> — hydra-zen is a layer on top of hydra that lets you define configs as Python classes instead of YAML. deriva-ml uses it so all ML-experiment configuration is type-checked Python, versionable with the code, with CLI overrides for free.</p>
+</li>
+<li>
+<p><strong>Task sections:</strong></p>
+</li>
+<li><code>## When to reach for hydra-zen vs. straight Python</code> — decision framework. Simple one-off notebook work: straight Python. Reproducible project-structured runs: hydra-zen.</li>
+<li><code>## The four config classes</code> — <code>DerivaMLConfig</code>, <code>DatasetSpecConfig</code>, <code>AssetRIDConfig</code>, <code>ExecutionConfiguration</code>. One-line summary each + link to Configuration section.</li>
+<li><code>## Composing configs through the CLI</code> — how the <code>deriva-ml-run</code> CLI consumes configs; config groups; multi-run.</li>
+<li>
+<p><code>## Project structure conventions</code> — pointer to template repo for the structure; don't re-document.</p>
+</li>
+<li>
+<p><strong>See also</strong> — Configuration section (deep dive), template repo (project setup), Chapter 4 (running an experiment).</p>
+</li>
+</ol>
+<p>Keep this chapter short (1500 words ceiling). It's deliberately shallow; the Configuration section is the authoritative deep dive.</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify the build</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/user-guide/hydra-zen.md
+git commit -m &quot;docs(user-guide): Chapter 8 — Integrating with hydra-zen
+
+Shallow orientation chapter; the Configuration section remains the
+deep-dive reference. Re-homes conceptual content from
+docs/workflows/running-models.md and CLAUDE.md §Hydra-zen.&quot;
+</code></pre>
+<hr />
+<h2 id="task-10-rewrite-introduction-docsindexmd">Task 10: Rewrite Introduction (docs/index.md)</h2>
+<p><strong>Files:</strong>
+- Modify: <code>docs/index.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the inventory entries for Introduction</strong></li>
+</ul>
+<p>Inventory destination: Introduction. Primary source: <code>docs/concepts/overview.md</code> (four-object model), positioning content from the S2 post-audit (Reviewer #5's "positioning vs competition" analysis — see <code>docs/superpowers/specs/2026-04-23-post-s2-findings.md</code>).</p>
+<ul>
+<li>[ ] <strong>Step 2: Rewrite index.md</strong></li>
+</ul>
+<p>Replace the current <code>docs/index.md</code> (22 lines) with:</p>
+<pre><code class="language-markdown"># DerivaML
+
+DerivaML is a Python library for reproducible machine learning workflows
+backed by a Deriva catalog. It captures code provenance, input data
+versions, configuration, and outputs so experiments can be reproduced,
+cited, and shared.
+
+## What deriva-ml does
+
+Four core concepts organize the library:
+
+- **Catalog** — the schema + data store. An ERMrest-backed Deriva catalog
+  with domain tables (Subject, Image, Observation, etc.) and an ML schema
+  (Dataset, Execution, Workflow, Feature_Name).
+- **Dataset** — a versioned, named collection of RIDs. Backs onto catalog
+  snapshots so a named version always resolves the same rows.
+- **Execution** — a tracked run of a Workflow. Captures inputs, outputs,
+  environment, and status with full provenance.
+- **Feature** — structured, provenance-linked annotations on existing rows.
+  The unit of record for labels, predictions, and derived metadata.
+
+![ERD](assets/ERD.png)
+
+## When to use deriva-ml
+
+Strong fit:
+
+- Research labs where data governance, audit trails, and multi-annotator
+  ground truth are first-class requirements.
+- Multi-site collaborations that need citable dataset identifiers and
+  reproducible execution records.
+- Biomedical imaging, clinical records, or similar domains with structured
+  schemas and vocabulary-controlled annotations.
+
+Weaker fit:
+
+- Quick single-dataset experiments where a folder of files and git is
+  enough. deriva-ml has a non-trivial setup cost; don't pay it without the
+  governance need.
+- Online feature-serving for low-latency inference. deriva-ml is
+  research-oriented; Feast / Tecton are better for that.
+
+See also: _Deriva-ML: A Continuous FAIRness Approach to Reproducible
+Machine Learning Models_ (Li et al., 2024, IEEE e-Science).
+
+## Starting a new project
+
+To start a new deriva-ml project, use the
+[deriva-ml-model-template repository](https://github.com/informatics-isi-edu/deriva-ml-model-template).
+It provides:
+
+- Hydra-zen configuration scaffolding
+- CLI entry points (`deriva-ml-run`, `deriva-ml-run-notebook`)
+- GitHub Actions for versioning and documentation deployment
+- An example model (CIFAR-10) with config variants
+
+These docs cover the deriva-ml library itself, for developers who already
+have a project and want to understand the library's concepts and APIs.
+Start with the [User Guide](user-guide/exploring.md) for a task-oriented
+walkthrough, or jump to the [API Reference](api-reference/deriva_ml_base.md)
+for per-method documentation.
+
+## Further reading
+
+The underlying FAIR-data principles are described in:
+
+&gt; Dempsey, William, Ian Foster, Scott Fraser, and Carl Kesselman.
+&gt; &quot;Sharing begins at home: how continuous and ubiquitous FAIRness can
+&gt; enhance research productivity and data reuse.&quot;
+&gt; _Harvard Data Science Review_ 4, no. 3 (2022).
+&gt; [PDF](assets/sharing-at-home.pdf)
+
+The deriva-ml architecture and design decisions are described in:
+
+&gt; Li, Zhiwei, Carl Kesselman, Mike D'Arcy, Michael Pazzani, and
+&gt; Benjamin Yizing Xu. &quot;Deriva-ML: A Continuous FAIRness Approach to
+&gt; Reproducible Machine Learning Models.&quot; In _2024 IEEE 20th International
+&gt; Conference on e-Science (e-Science)_, pp. 1-10. IEEE, 2024.
+&gt; [PDF](assets/deriva-ml.pdf)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Verify the build</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: WARNINGS about broken links to <code>user-guide/exploring.md</code> and <code>api-reference/deriva_ml_base.md</code> are expected at this point — those paths don't exist yet at the final location (user-guide files exist, but api-reference is still <code>code-docs/</code> until Task 11). If the build fails outright due to a missing reference, fix by using relative paths from <code>docs/index.md</code> in a way that resolves against the current state of the tree.</p>
+<p>Alternative: if <code>--strict</code> fails on this task, temporarily drop to <code>mkdocs build</code> (non-strict) for this one task; Task 12's link audit will catch any real broken links after the nav rewrite.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/index.md
+git commit -m &quot;docs(user-guide): rewrite Introduction with positioning and template-repo pointer
+
+Replaces 22-line index.md with positioning-forward intro that names the
+four-object mental model (Catalog/Dataset/Execution/Feature), states the
+fit-for-purpose decision, and points new-project readers to the template
+repo. Library-users see the User Guide and API Reference paths.&quot;
+</code></pre>
+<hr />
+<h2 id="task-11-rename-code-docs-to-api-reference">Task 11: Rename code-docs to api-reference</h2>
+<p><strong>Files:</strong>
+- Rename: <code>docs/code-docs/*.md</code> → <code>docs/api-reference/*.md</code> (13 files)
+- Modify: <code>mkdocs.yml</code> (nav section)</p>
+<ul>
+<li>[ ] <strong>Step 1: Move the directory</strong></li>
+</ul>
+<pre><code class="language-bash">git mv docs/code-docs docs/api-reference
+</code></pre>
+<p>Expected: 13 files renamed. Verify:</p>
+<pre><code class="language-bash">ls docs/api-reference/
+</code></pre>
+<p>Expected: 13 <code>.md</code> files (dataset.md, dataset_aux_classes.md, dataset_bag.md, dataset_split.md, deriva_definitions.md, deriva_ml_base.md, deriva_model.md, exceptions.md, execution.md, execution_configuration.md, feature.md, upload.md, workflow.md).</p>
+<ul>
+<li>[ ] <strong>Step 2: Update mkdocs.yml nav entry</strong></li>
+</ul>
+<p>In <code>mkdocs.yml</code>, find the <code>Library Documentation:</code> section and rename to <code>API Reference:</code>, updating all child paths from <code>code-docs/</code> to <code>api-reference/</code>. Do NOT rewrite the rest of the nav yet — that's Task 12.</p>
+<p>Example of the exact edit (before → after):</p>
+<pre><code class="language-yaml"># BEFORE:
+- Library Documentation:
+    - Core Classes:
+        - DerivaML: code-docs/deriva_ml_base.md
+        - DerivaModel: code-docs/deriva_model.md
+    - Datasets:
+        - Dataset: code-docs/dataset.md
+        ...
+
+# AFTER:
+- API Reference:
+    - Core Classes:
+        - DerivaML: api-reference/deriva_ml_base.md
+        - DerivaModel: api-reference/deriva_model.md
+    - Datasets:
+        - Dataset: api-reference/dataset.md
+        ...
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Verify the build</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: SUCCESS. If there are warnings about broken internal links to <code>code-docs/</code> paths, they'll come from the cut-list pages that still exist — those get deleted in Task 12. For now, if <code>--strict</code> fails on this task due to those references, the build is caught up with reality after Task 12.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/api-reference/ docs/code-docs/ mkdocs.yml
+git commit -m &quot;docs(user-guide): rename code-docs/ to api-reference/
+
+Matches the conventional docs terminology used elsewhere in the industry.
+No content changes; only directory rename and nav update. Cut-list page
+deletions (Task 12) will clean up any remaining code-docs/ references.&quot;
+</code></pre>
+<hr />
+<h2 id="task-12-nav-rewrite-cut-list-deletions-stub-redirects">Task 12: Nav rewrite + cut-list deletions + stub redirects</h2>
+<p><strong>Files:</strong>
+- Modify: <code>mkdocs.yml</code> (full nav rewrite)
+- Delete: 14 cut-list pages (replaced by redirect stubs)
+- Create: 14 stub redirect files at same paths</p>
+<ul>
+<li>[ ] <strong>Step 1: Rewrite the mkdocs.yml nav</strong></li>
+</ul>
+<p>In <code>mkdocs.yml</code>, replace the entire <code>nav:</code> section with:</p>
+<pre><code class="language-yaml">nav:
+  - Introduction: index.md
+  - User Guide:
+      - Exploring a catalog: user-guide/exploring.md
+      - Working with datasets: user-guide/datasets.md
+      - Defining and using features: user-guide/features.md
+      - Running an experiment: user-guide/executions.md
+      - Working offline: user-guide/offline.md
+      - Sharing and collaboration: user-guide/sharing.md
+      - Reproducibility: user-guide/reproducibility.md
+      - Integrating with hydra-zen: user-guide/hydra-zen.md
+  - Configuration:
+      - Overview: configuration/overview.md
+      - Configuration Groups: configuration/groups.md
+      - Experiments and Multiruns: configuration/experiments.md
+      - Notebook Configuration: configuration/notebooks.md
+  - Sample Notebooks:
+      - Datasets: 'Notebooks/DerivaML Dataset.ipynb'
+      - Execution: 'Notebooks/DerivaML Execution.ipynb'
+      - Features: 'Notebooks/DerivaML Features.ipynb'
+      - Vocabulary: 'Notebooks/DerivaML Vocabulary.ipynb'
+  - API Reference:
+      - Core Classes:
+          - DerivaML: api-reference/deriva_ml_base.md
+          - DerivaModel: api-reference/deriva_model.md
+      - Datasets:
+          - Dataset: api-reference/dataset.md
+          - DatasetBag: api-reference/dataset_bag.md
+          - Dataset Splitting: api-reference/dataset_split.md
+          - Dataset Auxiliary Classes: api-reference/dataset_aux_classes.md
+      - Execution:
+          - Execution: api-reference/execution.md
+          - ExecutionConfiguration: api-reference/execution_configuration.md
+          - Workflow: api-reference/workflow.md
+      - Features:
+          - Feature: api-reference/feature.md
+      - Utilities:
+          - Definitions &amp; Types: api-reference/deriva_definitions.md
+          - Exceptions: api-reference/exceptions.md
+          - Upload: api-reference/upload.md
+  - Release Notes: release-notes.md
+</code></pre>
+<p>Note: <code>Getting Started</code>, <code>Concepts</code>, <code>Running Workflows</code>, and <code>CLI Reference</code> entries are all removed from the nav.</p>
+<ul>
+<li>[ ] <strong>Step 2: Delete cut-list pages and replace with redirect stubs</strong></li>
+</ul>
+<p>For each of the 14 cut-list pages, replace its content with a <code>meta refresh</code> HTML stub. This preserves bookmarked URLs for one release cycle.</p>
+<p>The stub template (with <code>&lt;new-url&gt;</code> substituted per file):</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta http-equiv=&quot;refresh&quot; content=&quot;0; url=&lt;new-url&gt;&quot;&gt;
+&lt;link rel=&quot;canonical&quot; href=&quot;&lt;new-url&gt;&quot;&gt;
+&lt;title&gt;Page moved&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;p&gt;This page has moved. If you are not redirected automatically, follow
+&lt;a href=&quot;&lt;new-url&gt;&quot;&gt;this link to the new location&lt;/a&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p>The new-URL mapping per cut-list page:</p>
+<pre><code>docs/getting-started/quick-start.md           → https://github.com/informatics-isi-edu/deriva-ml-model-template
+docs/getting-started/install.md               → https://github.com/informatics-isi-edu/deriva-ml-model-template
+docs/getting-started/project-setup.md         → https://github.com/informatics-isi-edu/deriva-ml-model-template
+docs/concepts/overview.md                     → ../index.md
+docs/concepts/identifiers.md                  → ../user-guide/exploring.md
+docs/concepts/datasets.md                     → ../user-guide/datasets.md
+docs/concepts/features.md                     → ../user-guide/features.md
+docs/concepts/file-assets.md                  → ../user-guide/executions.md
+docs/concepts/annotations.md                  → ../user-guide/features.md
+docs/concepts/denormalization.md              → ../user-guide/features.md
+docs/workflows/execution-lifecycle.md         → ../user-guide/executions.md
+docs/workflows/running-models.md              → ../user-guide/hydra-zen.md
+docs/workflows/git-and-versioning.md          → ../user-guide/reproducibility.md
+docs/cli-reference.md                         → user-guide/executions.md
+</code></pre>
+<p>Do this for all 14 files. Example for <code>docs/concepts/datasets.md</code>:</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta http-equiv=&quot;refresh&quot; content=&quot;0; url=../user-guide/datasets.md&quot;&gt;
+&lt;link rel=&quot;canonical&quot; href=&quot;../user-guide/datasets.md&quot;&gt;
+&lt;title&gt;Page moved&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;p&gt;This page has moved. If you are not redirected automatically, follow
+&lt;a href=&quot;../user-guide/datasets.md&quot;&gt;this link to the new location&lt;/a&gt;.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p><strong>Important:</strong> These stubs are <code>.md</code> files but contain HTML content. mkdocs-material renders raw HTML inside markdown files.</p>
+<ul>
+<li>[ ] <strong>Step 3: Link audit</strong></li>
+</ul>
+<p>Grep the repo for every internal link to a deleted-or-moved page and fix it:</p>
+<pre><code class="language-bash">grep -rn &quot;getting-started/\|concepts/\|workflows/\|cli-reference\|code-docs/&quot; docs/ 2&gt;&amp;1 | grep -v stub | grep -v &quot;superpowers/&quot; | head -50
+</code></pre>
+<p>Fix every hit. Three categories:</p>
+<ol>
+<li><strong>Links in User Guide chapters</strong> — should use <code>user-guide/*.md</code> paths directly, not the old paths. Fix by rewriting.</li>
+<li><strong>Links in API Reference</strong> — already corrected by Task 11's rename.</li>
+<li><strong>Links in Sample Notebooks</strong> — may exist in notebook markdown cells; check each notebook.</li>
+<li><strong>Links in Release Notes</strong> — historical references are OK; a Release Notes entry saying "Added <code>concepts/features.md</code>" in v1.5.0 should stay historical.</li>
+</ol>
+<p>Skip <code>docs/superpowers/</code> (design/plan docs have their own histories and aren't user-facing).</p>
+<ul>
+<li>[ ] <strong>Step 4: Verify the build</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -30
+</code></pre>
+<p>Expected: SUCCESS with zero warnings. If broken links remain, fix them and re-run.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add mkdocs.yml docs/
+git commit -m &quot;docs(user-guide): rewrite nav, delete cut-list pages, add redirect stubs
+
+Nav restructured to the three-layer architecture: Introduction / User
+Guide / Configuration / Sample Notebooks / API Reference / Release Notes.
+Getting Started, Concepts, Running Workflows, CLI Reference sections
+removed; their content is re-homed into the 8 User Guide chapters
+(migration audit in docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md).
+
+14 cut-list pages replaced with meta-refresh redirect stubs to preserve
+bookmarked URLs for one release cycle. Stubs can be removed in the
+next minor release.&quot;
+</code></pre>
+<hr />
+<h2 id="task-13-full-build-verification">Task 13: Full build verification</h2>
+<p><strong>Files:</strong> none modified; verification only.</p>
+<ul>
+<li>[ ] <strong>Step 1: Strict build succeeds with zero warnings</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -30
+</code></pre>
+<p>Expected: <code>INFO    -  Documentation built in X.XX seconds</code> with no <code>WARNING</code> lines. If warnings remain, fix them.</p>
+<ul>
+<li>[ ] <strong>Step 2: Verify all 8 chapter files exist and are non-empty</strong></li>
+</ul>
+<pre><code class="language-bash">for f in exploring datasets features executions offline sharing reproducibility hydra-zen; do
+    path=&quot;docs/user-guide/$f.md&quot;
+    if [ -s &quot;$path&quot; ]; then echo &quot;OK: $path&quot;; else echo &quot;MISSING: $path&quot;; fi
+done
+</code></pre>
+<p>Expected: 8 "OK" lines.</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify all 14 stubs exist and redirect</strong></li>
+</ul>
+<pre><code class="language-bash">for f in \
+    docs/getting-started/quick-start.md \
+    docs/getting-started/install.md \
+    docs/getting-started/project-setup.md \
+    docs/concepts/overview.md \
+    docs/concepts/identifiers.md \
+    docs/concepts/datasets.md \
+    docs/concepts/features.md \
+    docs/concepts/file-assets.md \
+    docs/concepts/annotations.md \
+    docs/concepts/denormalization.md \
+    docs/workflows/execution-lifecycle.md \
+    docs/workflows/running-models.md \
+    docs/workflows/git-and-versioning.md \
+    docs/cli-reference.md; do
+    if grep -q &quot;meta http-equiv=\&quot;refresh\&quot;&quot; &quot;$f&quot; 2&gt;/dev/null; then
+        echo &quot;STUB OK: $f&quot;
+    else
+        echo &quot;STUB MISSING: $f&quot;
+    fi
+done
+</code></pre>
+<p>Expected: 14 "STUB OK" lines.</p>
+<ul>
+<li>[ ] <strong>Step 4: Verify api-reference exists, code-docs doesn't</strong></li>
+</ul>
+<pre><code class="language-bash">ls docs/api-reference/ | wc -l
+ls docs/code-docs/ 2&gt;&amp;1 | head -3
+</code></pre>
+<p>Expected: <code>api-reference/</code> has 13 files; <code>code-docs/</code> doesn't exist.</p>
+<ul>
+<li>[ ] <strong>Step 5: Serve the site locally and spot-check</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs serve 2&gt;&amp;1 | tail -10 &amp;
+sleep 5
+curl -s http://localhost:8000/ | grep -qi &quot;DerivaML&quot; &amp;&amp; echo &quot;HOME OK&quot;
+curl -s http://localhost:8000/user-guide/exploring/ | grep -qi &quot;Exploring&quot; &amp;&amp; echo &quot;CH1 OK&quot;
+curl -s http://localhost:8000/api-reference/deriva_ml_base/ | grep -qi &quot;DerivaML&quot; &amp;&amp; echo &quot;API OK&quot;
+kill %1 2&gt;/dev/null
+</code></pre>
+<p>Expected: 3 OK lines.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit (if fixes applied during verification)</strong></li>
+</ul>
+<p>If any steps 1-5 surfaced issues that required changes, commit them:</p>
+<pre><code class="language-bash">git add docs/ mkdocs.yml
+git commit -m &quot;docs(user-guide): build verification fixes&quot;
+</code></pre>
+<p>If no fixes needed, skip this step.</p>
+<hr />
+<h2 id="task-14-code-example-verification-selective">Task 14: Code-example verification (selective)</h2>
+<p><strong>Files:</strong> none modified; verification only. This task ensures the code examples in chapters 2, 3, 4, and 5 actually work against a live catalog.</p>
+<ul>
+<li>[ ] <strong>Step 1: Identify verified-tier examples</strong></li>
+</ul>
+<p>For chapters 2 (datasets), 3 (features), 4 (executions), 5 (offline), pick the 3 most important examples per chapter. These are the ones that will actually execute against a live catalog. Other examples remain illustrative.</p>
+<p>A "most important" example is one that demonstrates the primary use case (e.g., "create a feature + add values + read them back" for Chapter 3). Mark these in each chapter with an HTML comment at the top of the code block:</p>
+<pre><code class="language-markdown">&lt;!-- verified: tests/docs/test_chapter3_example1.py --&gt;
+```python
+# ... example code ...
+</code></pre>
+<pre><code>
+- [ ] **Step 2: Create executable test files for verified examples**
+
+For each verified example, create a file in `tests/docs/` that runs it against a `test_ml` fixture:
+
+</code></pre>
+<p>tests/docs/
+├── <strong>init</strong>.py
+├── conftest.py              # reuse test_ml fixture from tests/conftest.py
+├── test_chapter2_dataset_example.py
+├── test_chapter3_feature_example.py
+├── test_chapter4_execution_example.py
+└── test_chapter5_offline_example.py</p>
+<pre><code>
+Each test file extracts the example code from the chapter and runs it with minimal scaffolding:
+
+```python
+&quot;&quot;&quot;Verifies Chapter 3 example 1 from docs/user-guide/features.md.&quot;&quot;&quot;
+from deriva_ml.feature import FeatureRecord
+
+
+def test_chapter3_example_reads_feature_values(test_ml_with_feature):
+    &quot;&quot;&quot;The example shows reading feature values with select_newest selector.&quot;&quot;&quot;
+    records = list(test_ml_with_feature.ml.feature_values(
+        &quot;Image&quot;, test_ml_with_feature.feature_name,
+        selector=FeatureRecord.select_newest,
+    ))
+    assert records, &quot;Example should yield at least one record&quot;
+</code></pre>
+<p>Use existing fixtures where possible (e.g., <code>test_ml_with_feature</code> from <code>tests/feature/conftest.py</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3: Run the doc tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/docs/ -v 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: all tests pass. If a test fails, the chapter's example is broken — fix the example in the chapter (not the test) and re-run.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/docs/ docs/user-guide/
+git commit -m &quot;docs(user-guide): add live-catalog verification for primary examples
+
+Each verified example is marked in the chapter with an HTML comment
+pointing to its test file. Illustrative examples remain unverified.&quot;
+</code></pre>
+<hr />
+<h2 id="task-15-cover-to-cover-read-through">Task 15: Cover-to-cover read-through</h2>
+<p><strong>Files:</strong> may modify any chapter; verification + polish task.</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the full user guide in one sitting</strong></li>
+</ul>
+<p>Starting with <code>docs/index.md</code>, then chapters 1 through 8 in order, then a spot-check of the Configuration section and the redirect stubs. Budget 45-60 minutes; this is the most valuable verification step. Read fully, not skimming.</p>
+<p>Look for:</p>
+<ol>
+<li><strong>Internal inconsistencies</strong> — one chapter defines a term (e.g., "bag"), another redefines it differently.</li>
+<li><strong>Repeated material</strong> — each concept should have one primary home. Repetition across chapters suggests a chapter owns something it shouldn't, or a See-also link is missing.</li>
+<li><strong>Missing transitions</strong> — end of Chapter N doesn't set up Chapter N+1; reader has no sense of forward momentum.</li>
+<li><strong>Forward references</strong> — Chapter N refers to a concept introduced in Chapter N+2. Fix by either rewording the reference, or introducing the concept earlier.</li>
+<li><strong>Tone drift</strong> — one chapter is terse, another is chatty. The spec's §Writing approach sets the tone; realign.</li>
+<li>
+<p><strong>Broken links</strong> — all internal links work. <code>mkdocs build --strict</code> caught these at build time, but links may still point at the wrong anchor (same file, wrong heading).</p>
+</li>
+<li>
+<p>[ ] <strong>Step 2: Fix issues inline</strong></p>
+</li>
+</ol>
+<p>For each issue found, edit the chapter directly. Don't batch all edits into one commit; commit per issue category (e.g., "fix forward references", "align tone in Chapters 2-3").</p>
+<ul>
+<li>[ ] <strong>Step 3: Re-verify build after each fix</strong></li>
+</ul>
+<pre><code class="language-bash">uv run mkdocs build --strict 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: SUCCESS after each commit.</p>
+<ul>
+<li>[ ] <strong>Step 4: Final commit</strong></li>
+</ul>
+<p>After all read-through fixes are in:</p>
+<pre><code class="language-bash">git add -A
+git commit -m &quot;docs(user-guide): read-through polish
+
+Cross-chapter consistency, tone alignment, and transition cleanup
+after a full cover-to-cover read. No new content; readability fixes only.&quot;
+</code></pre>
+<hr />
+<h2 id="self-review-checklist-run-after-writing-this-plan">Self-review checklist (run after writing this plan)</h2>
+<h3 id="1-spec-coverage">1. Spec coverage</h3>
+<p>Walk the spec's §Chapter outlines. Every chapter in the spec has a task:</p>
+<ul>
+<li>✓ Chapter 1 → Task 2</li>
+<li>✓ Chapter 2 → Task 3</li>
+<li>✓ Chapter 3 → Task 4</li>
+<li>✓ Chapter 4 → Task 5</li>
+<li>✓ Chapter 5 → Task 6</li>
+<li>✓ Chapter 6 → Task 7</li>
+<li>✓ Chapter 7 → Task 8</li>
+<li>✓ Chapter 8 → Task 9</li>
+<li>✓ Introduction → Task 10</li>
+<li>✓ Nav rewrite → Task 12</li>
+<li>✓ Cut-list deletions → Task 12</li>
+<li>✓ API-reference rename → Task 11</li>
+<li>✓ Content inventory → Task 1</li>
+<li>✓ Migration plan phases (0-5) → Tasks 1, 2-9, 10, 11, 12, 13-15</li>
+</ul>
+<p>All phases from the spec are mapped to tasks.</p>
+<h3 id="2-placeholder-scan">2. Placeholder scan</h3>
+<p>No "TBD", "TODO", "fill in" remain. Each task has concrete content — source materials named, commit message templates provided, verification commands given.</p>
+<h3 id="3-type-name-consistency">3. Type / name consistency</h3>
+<ul>
+<li>Chapter filenames consistent throughout: <code>exploring.md</code>, <code>datasets.md</code>, <code>features.md</code>, <code>executions.md</code>, <code>offline.md</code>, <code>sharing.md</code>, <code>reproducibility.md</code>, <code>hydra-zen.md</code>.</li>
+<li>Directory names consistent: <code>docs/user-guide/</code>, <code>docs/api-reference/</code> (not <code>user_guide</code>, not <code>api_reference</code>).</li>
+<li>Commit-message prefix consistent: <code>docs(user-guide):</code> for User Guide work, <code>docs(plan):</code> for inventory.</li>
+<li>Stub-redirect format consistent across all 14 cut-list pages.</li>
+</ul>
+<h3 id="4-scope-check">4. Scope check</h3>
+<ul>
+<li>Plan covers one cohesive subsystem (user-guide rewrite).</li>
+<li>No scope creep into docstring work (sub-project 2) or code changes.</li>
+<li>Estimated effort (5-7 days) matches the spec's estimate.</li>
+</ul>
+<h3 id="5-execution-readiness">5. Execution readiness</h3>
+<ul>
+<li>All file paths are absolute and concrete.</li>
+<li>All commands are runnable as-written.</li>
+<li>Verification commands have expected output documented.</li>
+<li>TDD shape adapted to the docs-project context: <code>mkdocs build --strict</code> is the test; per-chapter builds are the incremental checkpoint; the full read-through is the acceptance test.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

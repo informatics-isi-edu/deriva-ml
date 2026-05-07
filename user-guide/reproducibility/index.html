@@ -1,0 +1,2324 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/user-guide/reproducibility/">
+      
+      
+        <link rel="prev" href="../sharing/">
+      
+      
+        <link rel="next" href="../hydra-zen/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Reproducibility - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reproducibility" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reproducibility
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-reproducibility-means-in-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What reproducibility means in deriva-ml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-captured-automatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is captured automatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-pin-a-dataset-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to pin a dataset version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-capture-workflow-checksums-and-git-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to capture workflow checksums and git commits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-capture-a-docker-image-digest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to capture a Docker image digest
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-configurationjson-and-execution-metadata-are-captured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How configuration.json and execution metadata are captured
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-handle-a-dirty-working-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to handle a dirty working tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-re-run-a-past-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to re-run a past execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-trace-what-an-artifact-was-produced-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to trace what an artifact was produced from
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-reproducibility-means-in-deriva-ml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What reproducibility means in deriva-ml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-captured-automatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is captured automatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-pin-a-dataset-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to pin a dataset version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-capture-workflow-checksums-and-git-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to capture workflow checksums and git commits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-capture-a-docker-image-digest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to capture a Docker image digest
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-configurationjson-and-execution-metadata-are-captured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How configuration.json and execution metadata are captured
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-handle-a-dirty-working-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to handle a dirty working tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-re-run-a-past-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to re-run a past execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-trace-what-an-artifact-was-produced-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to trace what an artifact was produced from
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="reproducibility">Reproducibility</h1>
+<p>This chapter covers what deriva-ml records automatically to support reproducing a past run, and what you must do to keep that record accurate. By the end you will know how to pin dataset versions, capture workflow provenance, handle a dirty working tree, and re-run a past execution from its stored configuration.</p>
+<h2 id="what-reproducibility-means-in-deriva-ml">What reproducibility means in deriva-ml</h2>
+<p>Every execution record is a snapshot of three things: the code that ran (workflow checksum and git commit), the data that was consumed (versioned dataset RIDs with catalog snapshot timestamps), and the environment in which it ran (locked Python dependencies and a runtime snapshot). Together these let you answer two questions later: "what code and data produced this result?" and "can I reproduce it?"</p>
+<p>The guarantees have limits. Catalog snapshots pin data state at a point in time — they do not pin library versions or external services. If your catalog has a snapshot-retention policy that deletes snapshots older than some age, pinned dataset versions older than that age become unresolvable. Check your catalog's policy before relying on long-term version pinning.</p>
+<h2 id="what-is-captured-automatically">What is captured automatically</h2>
+<p>When you enter the execution context manager, deriva-ml uploads four files to the <code>Execution_Metadata</code> asset table before your model code runs:</p>
+<table>
+<thead>
+<tr>
+<th>Asset type</th>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Deriva_Config</code></td>
+<td><code>configuration.json</code></td>
+<td>Fully resolved <code>ExecutionConfiguration</code>: datasets, assets, workflow reference, description, and Hydra config group choices</td>
+</tr>
+<tr>
+<td><code>Execution_Config</code></td>
+<td><code>uv.lock</code></td>
+<td>Python dependency lockfile from the project root, recording exact package versions</td>
+</tr>
+<tr>
+<td><code>Hydra_Config</code></td>
+<td><code>hydra-&lt;timestamp&gt;-*.yaml</code></td>
+<td>Hydra YAML files (<code>config.yaml</code>, <code>overrides.yaml</code>, <code>hydra.yaml</code>) — only present when running via <code>deriva-ml-run</code></td>
+</tr>
+<tr>
+<td><code>Runtime_Env</code></td>
+<td><code>environment_snapshot_&lt;timestamp&gt;.txt</code></td>
+<td>Python version, installed packages, OS, GPU availability, and environment variables</td>
+</tr>
+</tbody>
+</table>
+<p>These files are uploaded at initialization, not at upload time. If the execution fails, the metadata is still in the catalog.</p>
+<p>The <code>config_choices</code> field in <code>configuration.json</code> records which named Hydra config was selected for each config group. For example:</p>
+<pre><code class="language-json">{
+  &quot;model_config&quot;: &quot;cifar10_quick&quot;,
+  &quot;datasets&quot;: &quot;cifar10_small_labeled_split&quot;,
+  &quot;workflow&quot;: &quot;cifar10_training&quot;
+}
+</code></pre>
+<p>This lets you reproduce a run by selecting the same named configs, rather than reconstructing parameter values from scratch.</p>
+<h2 id="how-to-pin-a-dataset-version">How to pin a dataset version</h2>
+<p>Passing a <code>version</code> to <code>DatasetSpec</code> tells deriva-ml to fetch the dataset as it existed when that version was created, not as it exists today.</p>
+<pre><code class="language-python">from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.execution import ExecutionConfiguration
+
+config = ExecutionConfiguration(
+    datasets=[
+        DatasetSpec(rid=&quot;1-ABC4&quot;, version=&quot;2.1.0&quot;),
+    ],
+    workflow=workflow,
+    description=&quot;Pinned training run&quot;,
+)
+
+with ml.create_execution(config) as exe:
+    bag = exe.datasets[0]
+    # bag contains exactly the rows present at version 2.1.0
+</code></pre>
+<p>Under the hood, each dataset version stores a catalog snapshot timestamp. When deriva-ml downloads a versioned dataset bag, it appends the snapshot timestamp to every query, so it reads the catalog as of that moment. The same RID at version <code>2.1.0</code> returns the same rows on every run, regardless of subsequent additions or deletions.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>The <code>version</code> argument accepts a string (<code>"2.1.0"</code>), a three-element list, or a <code>DatasetVersion</code> object.</li>
+<li>Omitting <code>version</code> uses the dataset's current version, which changes as members are added.</li>
+<li><code>materialize=False</code> downloads table metadata only, without fetching asset files. Use this for large datasets when you only need row counts or identifiers.</li>
+<li>Snapshot timestamps can age out if your catalog has a retention policy. Verify that the snapshot still exists before depending on a version in long-running production code.</li>
+</ul>
+<h2 id="how-to-capture-workflow-checksums-and-git-commits">How to capture workflow checksums and git commits</h2>
+<p>Workflow provenance happens in two distinct steps: local object construction and catalog-side deduplication.</p>
+<p><strong>Step 1 — Local object construction.</strong> When you call <code>ml.create_workflow(...)</code> (or instantiate <code>Workflow(...)</code> directly), a Pydantic validator inspects the calling source and populates three fields:</p>
+<ul>
+<li>The GitHub blob URL pointing to the script at the current git commit (<code>https://github.com/org/repo/blob/&lt;commit&gt;/src/models/train.py</code>)</li>
+<li>A checksum computed from the file content (git object hash)</li>
+<li>The git version tag (from <code>setuptools_scm</code> or <code>pyproject.toml</code>)</li>
+</ul>
+<p>No catalog contact happens at this stage. The <code>Workflow</code> object is a local value object.</p>
+<pre><code class="language-python"># Constructs a local Workflow object — no catalog write yet
+workflow = ml.create_workflow(
+    name=&quot;CNN Training v2&quot;,
+    workflow_type=&quot;Training&quot;,
+    description=&quot;ResNet-50 with dropout&quot;,
+)
+</code></pre>
+<p><strong>Step 2 — Catalog-side deduplication.</strong> When you pass the workflow to <code>ml.create_execution(config)</code>, derive-ml calls <code>ml.add_workflow(workflow)</code> internally. That function queries the catalog for an existing record with the same checksum. If one exists, it returns its RID; otherwise it inserts a new record. Either way the execution is linked to the canonical RID.</p>
+<pre><code class="language-python"># All three executions below share one workflow RID because
+# add_workflow (called inside create_execution) finds the same
+# checksum and reuses the existing record
+with ml.create_execution(config_a) as exe: ...
+with ml.create_execution(config_b) as exe: ...
+with ml.create_execution(config_c) as exe: ...
+</code></pre>
+<p>If you call <code>ml.add_workflow(workflow)</code> directly (without going through <code>create_execution</code>), deduplication still applies — but <code>create_execution</code> is the typical path that triggers it automatically.</p>
+<p>Use this property intentionally: when you want a new workflow record (for a meaningfully different version of the code), commit the changes first. The new commit hash produces a new checksum, which causes <code>add_workflow</code> to insert a new record.</p>
+<p>You can verify the current version tag at any time:</p>
+<pre><code class="language-bash">uv run python -m setuptools_scm
+# 1.2.0        — clean release tag
+# 1.2.1.dev4+gabcd1234 — 4 commits after v1.2.1
+</code></pre>
+<p>Tag before important runs:</p>
+<pre><code class="language-bash">git add . &amp;&amp; git commit -m &quot;Finalize architecture for production run&quot;
+uv run bump-version minor
+uv run deriva-ml-run +experiment=production_training
+</code></pre>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Jupyter notebooks use the same mechanism: for <code>.ipynb</code> files, deriva-ml pipes the notebook through <code>nbstripout -t</code> before computing the git object hash, so re-running a notebook without code changes produces the same checksum. Install <code>nbstripout</code> (<code>pip install nbstripout</code>) to enable this path.</li>
+<li>The <code>url</code> and <code>checksum</code> fields on <code>Workflow</code> can be set explicitly to override automatic detection.</li>
+<li><code>bump-version</code> fetches tags, bumps the version, creates a new tag, and pushes — all in one step. Do not use <code>bump-my-version</code> directly; it does not push.</li>
+</ul>
+<h2 id="how-to-capture-a-docker-image-digest">How to capture a Docker image digest</h2>
+<p>When running inside a Docker container there is no local git repository. Deriva-ml reads provenance from environment variables that your CI/CD pipeline sets at image build time.</p>
+<p><code>DERIVA_MCP_IN_DOCKER=true</code> is the <strong>gate</strong>: unless this variable is set to <code>true</code>, none of the other Docker provenance variables are read and deriva-ml falls back to the standard git-based path (which will fail if there is no repo). Always set this variable first.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DERIVA_MCP_IN_DOCKER</code></td>
+<td><strong>Gate.</strong> Set to <code>true</code> to activate Docker provenance path</td>
+</tr>
+<tr>
+<td><code>DERIVA_MCP_IMAGE_NAME</code></td>
+<td>Image name, e.g. <code>ghcr.io/org/repo</code></td>
+</tr>
+<tr>
+<td><code>DERIVA_MCP_IMAGE_DIGEST</code></td>
+<td>Image digest (<code>sha256:...</code>) used as the workflow checksum</td>
+</tr>
+<tr>
+<td><code>DERIVA_MCP_GIT_COMMIT</code></td>
+<td>Git commit hash at build time (fallback when digest is absent)</td>
+</tr>
+<tr>
+<td><code>DERIVA_MCP_VERSION</code></td>
+<td>Semantic version of the image</td>
+</tr>
+</tbody>
+</table>
+<p>A typical GitHub Actions build step looks like:</p>
+<pre><code class="language-yaml">- name: Build and push image
+  uses: docker/build-push-action@v5
+  with:
+    push: true
+    tags: ghcr.io/org/repo:${{ github.sha }}
+  env:
+    DERIVA_MCP_IN_DOCKER: &quot;true&quot;
+    DERIVA_MCP_IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+    DERIVA_MCP_GIT_COMMIT: ${{ github.sha }}
+    DERIVA_MCP_VERSION: ${{ github.ref_name }}
+    DERIVA_MCP_IMAGE_NAME: ghcr.io/org/repo
+</code></pre>
+<p>Bake these variables into the image so they are present when the container runs. Deriva-ml constructs the workflow URL as <code>&lt;image_name&gt;@&lt;image_digest&gt;</code>, which serves as the permanent, content-addressed identifier for that image.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>DERIVA_MCP_IMAGE_DIGEST</code> takes precedence over <code>DERIVA_MCP_GIT_COMMIT</code> as the checksum.</li>
+<li>If neither variable is set and no local git repository is found, the workflow record is created without a checksum, which disables deduplication.</li>
+<li>Deduplication still applies: two containers built from the same image have the same digest and therefore share one workflow RID.</li>
+</ul>
+<h2 id="how-configurationjson-and-execution-metadata-are-captured">How configuration.json and execution metadata are captured</h2>
+<p><code>configuration.json</code> is the serialized <code>ExecutionConfiguration</code> as it exists at the moment <code>ml.create_execution(config)</code> is called. It includes:</p>
+<ul>
+<li>The list of <code>DatasetSpec</code> objects, each with its <code>rid</code>, <code>version</code>, <code>materialize</code>, and <code>timeout</code></li>
+<li>The list of <code>AssetSpec</code> objects for input assets</li>
+<li>The <code>workflow</code> reference (RID and checksum)</li>
+<li>The <code>description</code> and <code>argv</code></li>
+<li>The <code>config_choices</code> dict populated by <code>deriva-ml-run</code> from the Hydra runtime</li>
+</ul>
+<p><code>uv.lock</code> is copied from the project root at the same moment. It is skipped whenever the script is not tracked by git — specifically when <code>git_root</code> cannot be resolved. The most common cases are Docker containers without a mounted checkout and scripts run from outside a git repository.</p>
+<p><code>environment_snapshot_&lt;timestamp&gt;.txt</code> is generated from the live Python environment: <code>sys.version</code>, the output of <code>pip list</code>, the OS name and CPU architecture, GPU availability via <code>nvidia-smi</code>, and a filtered subset of environment variables. It is generated and uploaded during initialization regardless of execution environment.</p>
+<p>All four files use asset types from the <code>ExecMetadataType</code> vocabulary (<code>Deriva_Config</code>, <code>Execution_Config</code>, <code>Hydra_Config</code>, <code>Runtime_Env</code>). You can query them via <code>ml.list_assets("Execution_Metadata")</code> or by inspecting a past execution in the Chaise web UI.</p>
+<h2 id="how-to-handle-a-dirty-working-tree">How to handle a dirty working tree</h2>
+<p>If you have uncommitted changes when a <code>Workflow</code> object is constructed, deriva-ml issues a warning: the recorded URL still points to the last committed version of the file, but the checksum reflects the uncommitted state. The execution record exists, but the workflow URL and the actual code that ran are inconsistent — your run is not reproducible from the catalog record alone.</p>
+<p>The correct fix is to commit before running:</p>
+<pre><code class="language-bash">git status                          # see what is modified
+git add .
+git commit -m &quot;Work in progress — squash before merge&quot;
+uv run deriva-ml-run +experiment=my_experiment
+</code></pre>
+<p>For automated tests and CI pipelines you can set <code>DERIVA_ML_ALLOW_DIRTY=true</code> or pass <code>--allow-dirty</code> on the CLI. This suppresses the warning and allows the run to proceed:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/
+</code></pre>
+<p>!!! warning
+    Do not set <code>DERIVA_ML_ALLOW_DIRTY=true</code> in production workflows or shared CI pipelines. It silently allows runs to proceed with a workflow record that does not accurately reflect the code that ran. The execution appears to have full provenance, but the captured workflow URL may not match the uncommitted code. Auditors and future you will not be able to distinguish these runs from clean ones.</p>
+<p>Use <code>dry_run=true</code> during development instead of <code>DERIVA_ML_ALLOW_DIRTY</code>. A dry run downloads datasets and exercises your model code but writes no catalog records:</p>
+<pre><code class="language-bash">uv run deriva-ml-run dry_run=true +experiment=my_experiment
+</code></pre>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Notebook runs follow the same rule: commit the notebook before running so that the recorded URL and checksum are consistent. Install <code>nbstripout</code> once per repository (<code>nbstripout --install</code>) to keep output cells out of git history.</li>
+</ul>
+<h2 id="how-to-re-run-a-past-execution">How to re-run a past execution</h2>
+<p>To reproduce a past execution, find it in the catalog, read its stored configuration, and construct a new <code>ExecutionConfiguration</code> from the same inputs.</p>
+<pre><code class="language-python">from deriva_ml import DerivaML
+from deriva_ml.execution import ExecutionConfiguration
+from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.execution.state_store import ExecutionStatus
+
+ml = DerivaML(hostname=&quot;catalog.example.org&quot;, catalog_id=&quot;1&quot;)
+
+# Step 1: find the execution you want to reproduce
+for record in ml.find_executions(status=ExecutionStatus.Uploaded):
+    print(record.execution_rid, record.status, record.description)
+
+# Step 2: load its stored configuration from the catalog
+past_exec = ml.lookup_execution(&quot;1-XYZ4&quot;)
+</code></pre>
+<p>The <code>configuration.json</code> file stored in <code>Execution_Metadata</code> contains the full <code>ExecutionConfiguration</code> that was used. You can retrieve it from the catalog, or reconstruct it manually using the same dataset RIDs and versions:</p>
+<pre><code class="language-python"># Re-run with identical inputs
+config = ExecutionConfiguration(
+    datasets=[
+        DatasetSpec(rid=&quot;1-ABC4&quot;, version=&quot;2.1.0&quot;),
+    ],
+    workflow=past_exec.workflow,
+    description=&quot;Reproduction of 1-XYZ4&quot;,
+)
+
+with ml.create_execution(config) as exe:
+    bag = exe.datasets[0]
+    # run your model with bag.path ...
+
+exe.upload_execution_outputs()
+</code></pre>
+<p>Using the same <code>DatasetSpec</code> version ensures the new execution reads the same rows as the original. Using the same <code>workflow</code> object links the new execution to the same workflow record, so both appear together when you query <code>ml.find_executions(workflow=past_exec.workflow)</code>.</p>
+<p>If the original run used Hydra, the <code>config_choices</code> in <code>configuration.json</code> record which named configs were selected. Pass those same group selections to <code>deriva-ml-run</code> to reconstruct the Hydra configuration exactly:</p>
+<pre><code class="language-bash">uv run deriva-ml-run \
+  +experiment=production_training \
+  model_config=cifar10_quick \
+  datasets=cifar10_small_labeled_split
+</code></pre>
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>find_executions()</code> queries the live catalog. Its <code>status</code> parameter accepts a single <code>ExecutionStatus</code> value (or <code>None</code> for all statuses) — not a list. For offline inspection, <code>list_executions()</code> reads the local SQLite registry without contacting the server and accepts a list of statuses.</li>
+<li><code>lookup_execution(rid)</code> returns a live <code>ExecutionRecord</code> whose <code>status</code> field writes through to the catalog on assignment.</li>
+<li>The reproduced execution gets a new RID — it is a new record linked to the same workflow and dataset versions, not an alias of the original.</li>
+<li>If the original execution used input assets (<code>AssetSpec</code>), include those in the new configuration using their RIDs.</li>
+</ul>
+<h2 id="how-to-trace-what-an-artifact-was-produced-from">How to trace what an artifact was produced from</h2>
+<p>Reproducing a run is one direction; tracing an artifact backwards through its
+provenance chain is the other. When you're staring at a model output and want to
+verify "did this prediction trace back to the dataset I expected?", use
+<code>lookup_lineage()</code>:</p>
+<pre><code class="language-python">ml = DerivaML(hostname=&quot;catalog.example.org&quot;, catalog_id=&quot;1&quot;)
+lineage = ml.lookup_lineage(&quot;2-PRED1&quot;)    # the prediction asset RID
+
+# What was the immediate producing execution?
+print(lineage.root.producing_execution.description)
+# &quot;Train ResNet-50 on chest X-ray dataset 1-ABC4 v1.2.0...&quot;
+
+# What dataset versions did that execution actually consume?
+for ds in lineage.lineage.consumed_datasets:
+    print(f&quot;  {ds.rid} {ds.version} — {ds.name}&quot;)
+
+# Walk further back: which executions produced those datasets?
+for parent in lineage.lineage.parents:
+    print(parent.execution.description)
+</code></pre>
+<p>The full chain is walked server-side in one call, replacing what would otherwise be
+5–15 manual <code>lookup_execution</code> / <code>find_executions</code> round-trips. Lineage is the
+<strong>verification</strong> half of reproducibility: re-running gives you a new artifact;
+tracing tells you which inputs and code produced an existing artifact, so you can
+confirm a reproduction matches the original.</p>
+<p>See <a href="../executions/#how-to-trace-an-artifacts-lineage">Running an experiment — How to trace an artifact's lineage</a>
+for the full reference, including depth control, cycle handling, and the
+data-flow-vs-orchestration distinction (recorded in ADR-0001).</p>
+<p>!!! note "Common pitfalls"
+    <strong><code>DERIVA_ML_ALLOW_DIRTY=true</code> in production.</strong> This is the most dangerous reproducibility mistake. The execution record looks complete, but the workflow URL does not match the code that ran. Future auditors (including you) cannot tell. Reserve it for tests.</p>
+<pre><code>**Omitting `version` in `DatasetSpec`.** Without a pinned version, re-running the same configuration weeks later may read a different dataset if members have been added or removed. Always pin versions for runs you intend to reproduce.
+
+**Catalog snapshot expiry.** Catalog snapshots can age out under a retention policy. A dataset version whose snapshot no longer exists raises an error at download time. Archive critical bag zips locally if you need long-term reproducibility guarantees.
+</code></pre>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../executions/">Running an experiment</a> — execution context manager, <code>upload_execution_outputs()</code>, and <code>asset_file_path()</code></li>
+<li><a href="../datasets/">Working with datasets</a> — dataset versioning, <code>set_version()</code>, and <code>estimate_bag_size()</code></li>
+<li><a href="../hydra-zen/">Integrating with hydra-zen</a> — <code>config_choices</code>, <code>deriva-ml-run</code>, multirun sweeps, <code>bump-version</code>, and <code>--allow-dirty</code></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../sharing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Sharing and collaboration">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Sharing and collaboration
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../hydra-zen/" class="md-footer__link md-footer__link--next" aria-label="Next: Integrating with hydra-zen">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Integrating with hydra-zen
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

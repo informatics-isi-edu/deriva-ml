@@ -1,0 +1,2330 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-21-s4-hygiene-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>S4 — Cache-Backed Offline Mode Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#s4-cache-backed-offline-mode-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              S4 — Cache-Backed Offline Mode Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-scope-history-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Scope history note
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-status-migration-hygiene-scoped-out-see-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Status-migration hygiene (scoped out; see §1.1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-h1-implementation-details-cache-backed-offline-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. H1 implementation details — cache-backed offline mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. H1 implementation details — cache-backed offline mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-schemacache-srcderiva_mlcoreschema_cachepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 SchemaCache (src/deriva_ml/core/schema_cache.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-catalogstub-srcderiva_mlcorecatalog_stubpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 CatalogStub (src/deriva_ml/core/catalog_stub.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-derivamlrefresh_schemaforcefalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 DerivaML.refresh_schema(force=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-new-exception-derivamlschemarefreshblocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 New exception DerivaMLSchemaRefreshBlocked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-derivaml__init__-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 DerivaML.__init__ changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-derivamodelfrom_cached-classmethod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 DerivaModel.from_cached classmethod
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-snapshot-id-fetch-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Snapshot-id fetch API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-count_pending_rows-on-executionstatestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 count_pending_rows() on ExecutionStateStore
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-error-handling-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Error handling summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-testing-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Testing plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Testing plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-unit-tests-no-catalog-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Unit tests (no catalog needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-integration-tests-require-catalog-gated-on-deriva_host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Integration tests (require catalog, gated on DERIVA_HOST)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Rollout
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="s4-cache-backed-offline-mode-design">S4 — Cache-Backed Offline Mode Design</h1>
+<p><strong>Status:</strong> Draft · <strong>Date:</strong> 2026-04-21 · <strong>Subsystem:</strong> Phase 2 S4</p>
+<h2 id="1-goal">1. Goal</h2>
+<p>Make <code>ConnectionMode.offline</code> actually work without network access. <code>DerivaML.__init__</code> currently does <code>get_authn_session()</code>, <code>connect_ermrest()</code>, and <code>getCatalogModel()</code> unconditionally, so offline mode silently requires a reachable catalog. This subsystem introduces a workspace-backed schema cache, a <code>CatalogStub</code> that raises <code>DerivaMLReadOnlyError</code> on any offline catalog access, and an explicit <code>refresh_schema()</code> method with a drift-detection policy.</p>
+<h2 id="11-scope-history-note">1.1 Scope history note</h2>
+<p>The initial brainstorming pass also scoped a second hygiene item — finishing the S1a <code>Status</code>-enum migration (formerly called "H2"). On starting execution we verified that H2 had already been completed on <code>main</code> in commit <code>8313953</code> (<code>refactor(core): migrate base.py + mixins to ExecutionStatus.Aborted</code>) and that the grep-gate test <code>tests/test_migration_complete.py</code> was landed separately. The stale context that suggested otherwise came from a sibling worktree stuck at a pre-migration commit. H2 is therefore dropped from the spec; S4 is scoped to H1 only.</p>
+<h2 id="2-scope">2. Scope</h2>
+<p><strong>In scope:</strong>
+- Cache-backed offline mode: <code>SchemaCache</code>, <code>CatalogStub</code>, <code>refresh_schema()</code>, mode-branched <code>__init__</code>.</p>
+<p><strong>Out of scope (tracked in the project todo list):</strong>
+- H3 — Legacy Pydantic <code>ExecutionRecord</code> class in <code>execution/execution_record.py</code> and its 7 importers. Scheduled for a later subsystem.
+- Schema-cache data-migration operations (<code>pin_schema</code>, <code>migrate_schema</code> with table/column maps). Built on top of this subsystem's <code>SchemaCache</code> foundation.
+- Bug C — asset metadata None-stringification.
+- Bug E.2 — deriva-py upserts by MD5+Filename, ignoring pre-leased RIDs.
+- H4 — <code>@pytest.mark.skip</code> tests in <code>tests/dataset/test_denormalize.py</code> and <code>tests/catalog/test_clone_subset_catalog.py</code>.</p>
+<h2 id="3-architecture">3. Architecture</h2>
+<p>Three new units:</p>
+<ol>
+<li><code>SchemaCache</code> (<code>src/deriva_ml/core/schema_cache.py</code>) — owns one file at <code>&lt;workspace&gt;/schema-cache.json</code>. Methods: <code>exists()</code>, <code>load()</code>, <code>write(...)</code>, <code>snapshot_id()</code>. Atomic writes (tmp + fsync + rename).</li>
+<li><code>CatalogStub</code> (<code>src/deriva_ml/core/catalog_stub.py</code>) — drop-in replacement for <code>ErmrestCatalog</code> in offline mode. <code>__getattr__</code> raises <code>DerivaMLReadOnlyError("catalog access requires online mode")</code> on any attribute access.</li>
+<li><code>DerivaML.refresh_schema(force=False)</code> — new method on <code>DerivaML</code> (defined in <code>core/base.py</code>). Refuses if the workspace has pending rows unless <code>force=True</code>.</li>
+</ol>
+<p><code>DerivaML.__init__</code> branches on <code>self._mode</code> into <code>_init_online</code> or <code>_init_offline</code> helpers.</p>
+<h2 id="4-status-migration-hygiene-scoped-out-see-11">4. Status-migration hygiene (scoped out; see §1.1)</h2>
+<p>Originally this section specified the H2 <code>Status</code>-enum migration cleanup. On starting execution we discovered the migration was already completed on <code>main</code> in commit <code>8313953</code>, and the grep-gate test <code>tests/test_migration_complete.py</code> was already landed. Nothing to do. Scope section §2 has been updated; the implementation plan will also be trimmed.</p>
+<h2 id="5-h1-implementation-details-cache-backed-offline-mode">5. H1 implementation details — cache-backed offline mode</h2>
+<h3 id="51-schemacache-srcderiva_mlcoreschema_cachepy">5.1 <code>SchemaCache</code> (<code>src/deriva_ml/core/schema_cache.py</code>)</h3>
+<p>Owns one file at <code>&lt;workspace&gt;/schema-cache.json</code>. Layout:</p>
+<pre><code class="language-json">{
+  &quot;snapshot_id&quot;: &quot;&lt;ERMrest snapshot id&gt;&quot;,
+  &quot;hostname&quot;: &quot;example.org&quot;,
+  &quot;catalog_id&quot;: &quot;42&quot;,
+  &quot;ml_schema&quot;: &quot;deriva-ml&quot;,
+  &quot;schema&quot;: { ... full ermrest /schema payload ... }
+}
+</code></pre>
+<p>API:</p>
+<pre><code class="language-python">class SchemaCache:
+    def __init__(self, workspace_root: Path):
+        self._path = workspace_root / &quot;schema-cache.json&quot;
+
+    def exists(self) -&gt; bool
+    def load(self) -&gt; dict                 # raises FileNotFoundError
+    def write(
+        self, *, snapshot_id: str, hostname: str,
+        catalog_id: str, ml_schema: str, schema: dict,
+    ) -&gt; None                              # atomic: tmp + fsync + rename
+    def snapshot_id(self) -&gt; str | None    # None if cache missing
+</code></pre>
+<h3 id="52-catalogstub-srcderiva_mlcorecatalog_stubpy">5.2 <code>CatalogStub</code> (<code>src/deriva_ml/core/catalog_stub.py</code>)</h3>
+<pre><code class="language-python">class CatalogStub:
+    &quot;&quot;&quot;Placeholder for ErmrestCatalog in offline mode.
+
+    Any attribute access raises DerivaMLReadOnlyError. This makes
+    &quot;I hit the catalog while offline&quot; a loud error rather than an
+    AttributeError, without requiring every mixin to guard with
+    `if self._mode is offline`.
+    &quot;&quot;&quot;
+
+    def __getattr__(self, name: str):
+        raise DerivaMLReadOnlyError(
+            f&quot;catalog.{name} requires online mode; &quot;
+            f&quot;this DerivaML instance was constructed with mode=offline&quot;
+        )
+
+    def __repr__(self) -&gt; str:
+        return &quot;CatalogStub(offline)&quot;
+</code></pre>
+<h3 id="53-derivamlrefresh_schemaforcefalse">5.3 <code>DerivaML.refresh_schema(force=False)</code></h3>
+<p>Defined in <code>core/base.py</code>. Signature:</p>
+<pre><code class="language-python">def refresh_schema(self, *, force: bool = False) -&gt; None:
+    &quot;&quot;&quot;Fetch the current catalog schema and overwrite the workspace cache.
+
+    Args:
+        force: If True, refresh even when the workspace has pending
+            rows. Those rows may become inconsistent with the new
+            schema; caller is responsible for the consequences.
+            Default False refuses in that case.
+
+    Raises:
+        DerivaMLReadOnlyError: In offline mode.
+        DerivaMLSchemaRefreshBlocked: force=False and the workspace
+            has pending rows.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Body:</p>
+<ol>
+<li>If <code>self._mode is ConnectionMode.offline</code>: raise <code>DerivaMLReadOnlyError("refresh_schema requires online mode")</code>.</li>
+<li>Count pending rows via <code>self.workspace.execution_state_store().count_pending_rows()</code>.</li>
+<li>If count &gt; 0 and not force: raise <code>DerivaMLSchemaRefreshBlocked</code>.</li>
+<li>Fetch live <code>snapshot_id</code> and the schema dict from the catalog.</li>
+<li><code>SchemaCache(self.working_dir).write(...)</code>.</li>
+<li>Reload <code>self.model = DerivaModel.from_cached(new_schema, ml_schema, domain_schemas, default_schema)</code> so the ongoing session sees the new schema.</li>
+<li>Log: <code>logger.info("schema cache refreshed from %s to %s", old_id, new_id)</code>.</li>
+</ol>
+<h3 id="54-new-exception-derivamlschemarefreshblocked">5.4 New exception <code>DerivaMLSchemaRefreshBlocked</code></h3>
+<p>In <code>core/exceptions.py</code>, a subclass of <code>DerivaMLConfigurationError</code>:</p>
+<pre><code class="language-python">class DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError):
+    &quot;&quot;&quot;refresh_schema was called while the workspace had staged work.
+
+    Drain the workspace first (`ml.upload_pending()`) or call
+    `refresh_schema(force=True)` to discard local state.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="55-derivaml__init__-changes">5.5 <code>DerivaML.__init__</code> changes</h3>
+<p>Replace the current lines 277–304 block with a mode branch. The <code>working_dir</code> setup must move earlier so it's available before the branch.</p>
+<p>Mode-dispatched init:</p>
+<pre><code class="language-python">self.credential = credential or get_credential(hostname)  # local file only
+cache = SchemaCache(self.working_dir)
+
+if self._mode is ConnectionMode.online:
+    self._init_online(
+        hostname=hostname, catalog_id=catalog_id, check_auth=check_auth,
+        cache=cache, ml_schema=ml_schema,
+        domain_schemas=domain_schemas, default_schema=default_schema,
+    )
+else:
+    self._init_offline(
+        hostname=hostname, catalog_id=catalog_id,
+        cache=cache, ml_schema=ml_schema,
+        domain_schemas=domain_schemas, default_schema=default_schema,
+    )
+</code></pre>
+<p><code>_init_online</code>:</p>
+<pre><code class="language-python">def _init_online(self, *, hostname, catalog_id, check_auth, cache,
+                 ml_schema, domain_schemas, default_schema):
+    server = DerivaServer(&quot;https&quot;, hostname, credentials=self.credential,
+                          session_config=self._get_session_config())
+    if check_auth:
+        try:
+            server.get_authn_session()
+        except Exception:
+            raise DerivaMLException(&quot;...&quot;)
+    self.catalog = server.connect_ermrest(catalog_id)
+    live_snapshot_id = self._fetch_live_snapshot_id()
+
+    if cache.exists():
+        cached = cache.load()
+        if cached[&quot;snapshot_id&quot;] != live_snapshot_id:
+            logger.warning(
+                &quot;schema cache is at snapshot %s; live catalog is at %s. &quot;
+                &quot;Using cached schema. Call ml.refresh_schema() to update.&quot;,
+                cached[&quot;snapshot_id&quot;], live_snapshot_id,
+            )
+        self.model = DerivaModel.from_cached(
+            cached[&quot;schema&quot;], ml_schema=ml_schema,
+            domain_schemas=domain_schemas, default_schema=default_schema,
+        )
+    else:
+        # First-time online: fetch live, populate cache.
+        live_schema = self._fetch_live_schema()
+        cache.write(
+            snapshot_id=live_snapshot_id, hostname=hostname,
+            catalog_id=str(catalog_id), ml_schema=ml_schema,
+            schema=live_schema,
+        )
+        self.model = DerivaModel.from_cached(
+            live_schema, ml_schema=ml_schema,
+            domain_schemas=domain_schemas, default_schema=default_schema,
+        )
+</code></pre>
+<p><strong>Design choice flagged for user review (§5.5):</strong> When drift is detected in online mode, the implementation <strong>honors the cache</strong> (uses cached schema, discards the live-fetched one). This is consistent with the "drift is a warning, never automatic" rule and leaves room for future pin-to-snapshot workflows. The alternative — use live schema for this session but don't persist to cache — is more useful for first-time users but muddies the offline-cache-is-authoritative model.</p>
+<p><code>_init_offline</code>:</p>
+<pre><code class="language-python">def _init_offline(self, *, hostname, catalog_id, cache,
+                  ml_schema, domain_schemas, default_schema):
+    if not cache.exists():
+        raise DerivaMLConfigurationError(
+            f&quot;offline mode requires a cached schema at {cache._path}; &quot;
+            f&quot;run online once first to populate the cache.&quot;
+        )
+    cached = cache.load()
+    if cached[&quot;hostname&quot;] != hostname or cached[&quot;catalog_id&quot;] != str(catalog_id):
+        raise DerivaMLConfigurationError(
+            f&quot;cached schema is for {cached['hostname']}/{cached['catalog_id']}, &quot;
+            f&quot;but __init__ was called with {hostname}/{catalog_id}. &quot;
+            f&quot;Use the matching workspace or run online to refresh.&quot;
+        )
+    self.catalog = CatalogStub()
+    self.model = DerivaModel.from_cached(
+        cached[&quot;schema&quot;], ml_schema=ml_schema,
+        domain_schemas=domain_schemas, default_schema=default_schema,
+    )
+</code></pre>
+<h3 id="56-derivamodelfrom_cached-classmethod">5.6 <code>DerivaModel.from_cached</code> classmethod</h3>
+<p>Add to <code>src/deriva_ml/model/catalog.py</code>:</p>
+<pre><code class="language-python">@classmethod
+def from_cached(
+    cls, schema_dict: dict, *,
+    ml_schema: str, domain_schemas: list[str] | None, default_schema: str | None,
+) -&gt; &quot;DerivaModel&quot;:
+    &quot;&quot;&quot;Construct a DerivaModel from a cached schema dict (no network).
+
+    Uses deriva-py's `Model.fromcatalog()` pattern in reverse —
+    the dict is a captured ermrest /schema response and we
+    rehydrate a `Model` object from it.
+    &quot;&quot;&quot;
+    from deriva.core.ermrest_model import Model
+    model = Model.fromfile_or_dict(schema_dict)  # verify exact API
+    return cls(model, ml_schema=ml_schema,
+               domain_schemas=domain_schemas, default_schema=default_schema)
+</code></pre>
+<p>The exact deriva-py API will be verified by the implementation plan (user confirmed it exists; the plan writer will grep for the precise method name).</p>
+<h3 id="57-snapshot-id-fetch-api">5.7 Snapshot-id fetch API</h3>
+<p><code>self.catalog.get_server_state()["snaptime"]</code> or equivalent. Exact call to be verified by the plan. The intent is "what ERMrest snapshot id is the catalog currently at" — a cheap GET that returns snapshot metadata.</p>
+<h3 id="58-count_pending_rows-on-executionstatestore">5.8 <code>count_pending_rows()</code> on ExecutionStateStore</h3>
+<p>If this method doesn't already exist on <code>ExecutionStateStore</code>, add it:</p>
+<pre><code class="language-python">def count_pending_rows(self) -&gt; int:
+    &quot;&quot;&quot;Count rows in non-terminal states (staged/leasing/leased/uploading/failed).&quot;&quot;&quot;
+    with self.engine.begin() as conn:
+        return conn.scalar(
+            select(func.count()).select_from(self.pending_rows).where(
+                self.pending_rows.c.status.in_([
+                    str(PendingRowStatus.staged),
+                    str(PendingRowStatus.leasing),
+                    str(PendingRowStatus.leased),
+                    str(PendingRowStatus.uploading),
+                    str(PendingRowStatus.failed),
+                ])
+            )
+        ) or 0
+</code></pre>
+<h2 id="6-data-flow">6. Data flow</h2>
+<p><strong>Online init — cache hit:</strong></p>
+<pre><code>__init__(mode=online)
+  → credentials loaded (local file)
+  → DerivaServer + connect_ermrest (network: catalog handle)
+  → fetch live snapshot_id (network: cheap call)
+  → cache.snapshot_id() == live_snapshot_id
+  → self.model = DerivaModel.from_cached(cache.load()[&quot;schema&quot;])
+  → self.catalog = real ErmrestCatalog
+</code></pre>
+<p><strong>Online init — drift detected:</strong></p>
+<pre><code>→ cache.snapshot_id() != live_snapshot_id
+→ logger.warning(...)
+→ self.model = DerivaModel.from_cached(cache.load()[&quot;schema&quot;])  # cache still authoritative
+→ live schema is discarded
+</code></pre>
+<p><strong>Online init — cache miss (first time):</strong></p>
+<pre><code>→ cache.exists() == False
+→ fetch live schema (network)
+→ cache.write(...)
+→ self.model = DerivaModel.from_cached(fresh_schema)
+</code></pre>
+<p><strong>Offline init — happy path:</strong></p>
+<pre><code>__init__(mode=offline)
+  → credentials loaded
+  → cache.exists() == True AND hostname/catalog_id match
+  → self.catalog = CatalogStub()
+  → self.model = DerivaModel.from_cached(cache.load()[&quot;schema&quot;])
+  → skip lease reconciliation (online-only block)
+</code></pre>
+<p><strong>Offline init — error paths:</strong></p>
+<pre><code>cache missing            → DerivaMLConfigurationError
+cache host/catalog mismatch → DerivaMLConfigurationError
+</code></pre>
+<p><strong>refresh_schema():</strong></p>
+<pre><code>ml.refresh_schema()
+  → if offline: DerivaMLReadOnlyError
+  → count_pending_rows() &gt; 0 and not force: DerivaMLSchemaRefreshBlocked
+  → fetch live snapshot_id + schema (network)
+  → cache.write(...)
+  → self.model = DerivaModel.from_cached(new_schema)
+  → logger.info(...)
+</code></pre>
+<h2 id="7-error-handling-summary">7. Error handling summary</h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Exception / behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Offline init, no cache</td>
+<td><code>DerivaMLConfigurationError</code></td>
+</tr>
+<tr>
+<td>Offline init, (host,catalog) mismatch</td>
+<td><code>DerivaMLConfigurationError</code></td>
+</tr>
+<tr>
+<td>Any <code>self.catalog.X</code> in offline mode</td>
+<td><code>DerivaMLReadOnlyError</code> (via CatalogStub)</td>
+</tr>
+<tr>
+<td><code>refresh_schema()</code> in offline mode</td>
+<td><code>DerivaMLReadOnlyError</code></td>
+</tr>
+<tr>
+<td><code>refresh_schema(force=False)</code> with pending rows</td>
+<td><code>DerivaMLSchemaRefreshBlocked</code></td>
+</tr>
+<tr>
+<td><code>refresh_schema(force=True)</code> with pending rows</td>
+<td>Succeeds; warning logged</td>
+</tr>
+<tr>
+<td>Corrupt cache file (unparseable JSON)</td>
+<td><code>DerivaMLConfigurationError("cache at &lt;path&gt; is corrupt; delete and re-run online")</code></td>
+</tr>
+<tr>
+<td>Online cache hit + drift</td>
+<td>Warning; no exception</td>
+</tr>
+<tr>
+<td>Legacy <code>Status</code> reference in non-exempt src file</td>
+<td><code>tests/test_migration_complete.py</code> fails</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-testing-plan">8. Testing plan</h2>
+<h3 id="81-unit-tests-no-catalog-needed">8.1 Unit tests (no catalog needed)</h3>
+<ul>
+<li>~~<code>tests/test_migration_complete.py</code>~~ — already exists on main from a prior migration; see §4.</li>
+<li><code>tests/core/test_schema_cache.py</code> — <code>SchemaCache</code> unit tests: write+load round-trip, atomic-write recovery (tmp exists, original intact on crash), missing file returns <code>None</code> from <code>snapshot_id()</code>, corrupt JSON raises.</li>
+<li><code>tests/core/test_catalog_stub.py</code> — <code>CatalogStub</code>: any attribute access raises <code>DerivaMLReadOnlyError</code> with the attribute name in the message.</li>
+</ul>
+<h3 id="82-integration-tests-require-catalog-gated-on-deriva_host">8.2 Integration tests (require catalog, gated on <code>DERIVA_HOST</code>)</h3>
+<p><code>tests/core/test_offline_init.py</code>:</p>
+<ul>
+<li><code>test_offline_without_cache_raises</code> — construct in offline mode without pre-populating → <code>DerivaMLConfigurationError</code>.</li>
+<li><code>test_online_first_populates_cache</code> — online init; verify <code>schema-cache.json</code> exists in workspace.</li>
+<li><code>test_offline_after_online_succeeds</code> — online once, then offline against same workspace → works; <code>ml.catalog</code> is <code>CatalogStub</code>.</li>
+<li><code>test_offline_hostname_mismatch_raises</code> — cache for host A; offline init with host B → <code>DerivaMLConfigurationError</code>.</li>
+<li><code>test_refresh_schema_refuses_with_pending_rows</code> — stage a pending row; <code>refresh_schema()</code> → <code>DerivaMLSchemaRefreshBlocked</code>.</li>
+<li><code>test_refresh_schema_force_discards</code> — same setup; <code>refresh_schema(force=True)</code> → succeeds; warning in caplog.</li>
+<li><code>test_online_drift_warning</code> — write cache with fake snapshot id; reinit online → warning logged; cache unchanged; <code>self.model</code> loaded from cache.</li>
+</ul>
+<h3 id="83-regression">8.3 Regression</h3>
+<p>The existing test suite must pass end-to-end. The <code>self.catalog = CatalogStub()</code> change could break tests that currently rely on <code>self.catalog is None</code> to detect offline mode. Plan will include an audit task.</p>
+<h2 id="9-risks">9. Risks</h2>
+<ol>
+<li><strong><code>DerivaModel.from_cached</code> / model-from-dict deriva-py API.</strong> User confirmed deriva-py supports this. The plan's first task verifies the exact method name (<code>Model.fromfile</code>, <code>.from_json</code>, <code>.fromjson</code>, etc.) before anything else.</li>
+<li><strong>Snapshot-id fetch API.</strong> <code>catalog.get_server_state()["snaptime"]</code> or equivalent — verify exact call in the plan.</li>
+<li><strong>Existing <code>self.catalog is None</code> assumptions.</strong> Plan audit task: <code>git grep 'catalog is None'</code> in <code>src/</code> and <code>tests/</code>; fix any offenders.</li>
+<li><strong>Corrupt or partially-written cache files</strong> from earlier crashes. Atomic write + explicit <code>DerivaMLConfigurationError</code> on unparseable JSON. User can always delete the file and re-run online.</li>
+</ol>
+<h2 id="10-rollout">10. Rollout</h2>
+<p>Single PR against <code>main</code>. CHANGELOG entry documents the offline-mode work under one "Unreleased — Phase 2 Subsystem 4" heading. No feature flag. No breaking change to existing API:</p>
+<ul>
+<li><code>DerivaML()</code> default mode is still <code>online</code>; behavior unchanged for existing callers.</li>
+<li><code>ConnectionMode.offline</code> now actually works (previously silently network-dependent).</li>
+<li><code>refresh_schema()</code> is net-new, not a replacement for any existing method.</li>
+</ul>
+<p>Breaking change only for code that relied on <code>ml.catalog is None</code> to detect offline mode. Those callers get <code>DerivaMLReadOnlyError</code> instead, which is arguably better than silent <code>None</code>-check behavior but requires a code update. Noted in CHANGELOG.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3512 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-27-sort-and-feature-batch/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Sort + materialize_limit + batch feature_values — Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sort-materialize_limit-batch-feature_values-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Sort + materialize_limit + batch feature_values — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Design summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#f1-sort-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F1 — sort= parameter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f2-materialize_limit-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F2 — materialize_limit= parameter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f3-execution_rids-parameter-on-feature_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F3 — execution_rids= parameter on feature_values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tasks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tasks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-create-branch-new-exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Create branch + new exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-sort-helper-module-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Sort helper module + unit tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-add-sort-parameter-to-interfacespy-protocol-declarations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Add sort= parameter to interfaces.py Protocol declarations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-implement-sort-in-find_executions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Implement sort= in find_executions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-implement-sort-in-find_datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Implement sort= in find_datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-implement-sort-in-find_workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Implement sort= in find_workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-implement-materialize_limit-and-execution_rids-in-catalog-feature_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Implement materialize_limit= and execution_rids= in catalog feature_values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-thread-materialize_limit-execution_rids-through-dataset-scoped-feature_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Thread materialize_limit= / execution_rids= through dataset-scoped feature_values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-9-implement-materialize_limit-and-execution_rids-in-offline-datasetbagfeature_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Implement materialize_limit= and execution_rids= in offline DatasetBag.feature_values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-10-full-suite-integration-test-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Full-suite integration test pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-11-update-changelog-and-verify-ready-for-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Update CHANGELOG and verify ready for release
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-12-pr-merge-and-minor-version-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: PR, merge, and minor-version release
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-Review
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="sort-materialize_limit-batch-feature_values-implementation-plan">Sort + materialize_limit + batch feature_values — Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Add three capabilities to <code>deriva-ml</code> that unblock the v3.1.0 release of <code>deriva-ml-mcp</code>: (1) optional sort ordering on <code>find_*</code> and <code>list_dataset_*</code> methods, (2) a <code>materialize_limit</code> safety cap on <code>feature_values()</code>, and (3) a batch-by-execution shortcut on <code>feature_values()</code> for compare-runs workflows.</p>
+<p><strong>Architecture:</strong> Three separate, additive changes — none of them break the current API. All three changes follow the established three-place pattern: <code>interfaces.py</code> Protocol → online implementation (mixin or <code>Dataset</code> class) → offline <code>DatasetBag</code> implementation. The <code>sort=</code> parameter is a three-state union (<code>None</code> = server order, <code>True</code> = method's documented default, <code>Callable</code> = user override). The <code>materialize_limit=</code> parameter raises a clear exception when exceeded. The <code>execution_rids=</code> parameter pushes filtering into the catalog query so callers don't have to materialize-then-filter.</p>
+<p><strong>Tech Stack:</strong> Python 3.13+, deriva-py path builder (online), SQLAlchemy + SQLite (offline DatasetBag), pytest, ruff.</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<p><strong>Modify:</strong>
+- <code>src/deriva_ml/interfaces.py</code> — extend Protocol signatures for <code>find_executions</code>, <code>find_datasets</code>, <code>find_workflows</code>, <code>list_dataset_members</code>, <code>list_dataset_parents</code>, <code>list_dataset_children</code>, and <code>feature_values</code>.
+- <code>src/deriva_ml/core/mixins/execution.py</code> — implement <code>sort=</code> in <code>find_executions</code>.
+- <code>src/deriva_ml/core/mixins/dataset.py</code> — implement <code>sort=</code> in <code>find_datasets</code>.
+- <code>src/deriva_ml/core/mixins/workflow.py</code> — implement <code>sort=</code> in <code>find_workflows</code>.
+- <code>src/deriva_ml/core/mixins/feature.py</code> — implement <code>materialize_limit=</code> and <code>execution_rids=</code> in <code>feature_values</code>.
+- <code>src/deriva_ml/dataset/dataset.py</code> — implement <code>sort=</code> in <code>list_dataset_members</code> / <code>list_dataset_parents</code> / <code>list_dataset_children</code>; thread <code>materialize_limit=</code> and <code>execution_rids=</code> through the dataset-scoped <code>feature_values</code>.
+- <code>src/deriva_ml/dataset/dataset_bag.py</code> — implement same three changes on the offline backend.
+- <code>src/deriva_ml/core/exceptions.py</code> — add <code>DerivaMLMaterializeLimitExceeded</code> exception.</p>
+<p><strong>Create:</strong>
+- <code>src/deriva_ml/core/sort.py</code> — small new helper module: <code>SortSpec</code> type alias + <code>_resolve_sort(default_callable, sort_param, path)</code> helper used by all online <code>find_*</code> implementations.
+- <code>tests/core/test_sort.py</code> — pure-Python unit tests for <code>_resolve_sort</code> (no catalog needed).
+- <code>tests/feature/test_feature_values_limits.py</code> — integration tests for <code>materialize_limit</code> and <code>execution_rids</code> (catalog needed).
+- <code>tests/execution/test_find_executions_sort.py</code> — integration test for <code>find_executions(sort=True)</code>.
+- <code>tests/dataset/test_find_datasets_sort.py</code> — integration test for <code>find_datasets(sort=True)</code>.</p>
+<p><strong>Don't modify:</strong>
+- <code>find_features</code> (catalog mixin or Dataset class). It returns schema descriptors, not catalog rows; sorting by RCT is meaningless for schema objects.
+- <code>list_dataset_element_types</code> (returns Tables; same reason).
+- Any test fixture that already passes — the new parameters are all default-None / default-<code>False</code> so existing call sites are unaffected.</p>
+<hr />
+<h2 id="design-summary">Design summary</h2>
+<h3 id="f1-sort-parameter">F1 — <code>sort=</code> parameter</h3>
+<pre><code class="language-python">SortSpec = Union[bool, Callable[[Any], Any], None]
+
+def find_executions(
+    self,
+    workflow=None,
+    workflow_type=None,
+    status=None,
+    sort: SortSpec = None,   # NEW
+) -&gt; Iterable[&quot;ExecutionRecord&quot;]:
+</code></pre>
+<p>Three meanings:
+- <code>sort=None</code> (default) — no sort applied, server returns rows in its own order. <strong>Existing behavior preserved.</strong>
+- <code>sort=True</code> — method's documented default applies. For activity-log methods (<code>find_executions</code>, <code>find_datasets</code>, <code>find_workflows</code>): <code>RCT desc</code> (newest-first).
+- <code>sort=callable</code> — user override. Callable receives the path-builder context (the entity-table path object) and returns either a single sort key (column wrapper or <code>column.desc</code>) or a list of them. Whatever the callable returns is unpacked into <code>path.entities().sort(*keys)</code>.</p>
+<p><strong>Pagination interaction:</strong> <code>after_rid</code> in deriva-ml-mcp's <code>_paginate</code> helper continues to mean "find this RID in the result set as the upstream returned it, slice forward from there." Under <code>sort=True</code> that result set is RCT-sorted, so <code>after_rid</code> is your position in the sorted list. Documented in the MCP-side plan, not in deriva-ml.</p>
+<h3 id="f2-materialize_limit-parameter">F2 — <code>materialize_limit=</code> parameter</h3>
+<pre><code class="language-python">def feature_values(
+    self,
+    table,
+    feature_name,
+    selector=None,
+    materialize_limit: int | None = None,   # NEW
+    execution_rids: list[str] | None = None,  # NEW (F3, see below)
+) -&gt; Iterable[FeatureRecord]:
+</code></pre>
+<p>Default <code>None</code> preserves existing unbounded materialization. When set and the row count of the catalog query exceeds <code>materialize_limit</code>, raises a new <code>DerivaMLMaterializeLimitExceeded</code> exception.</p>
+<p>Three impls (Catalog / Dataset / DatasetBag) all check after the row fetch and before record construction.</p>
+<h3 id="f3-execution_rids-parameter-on-feature_values">F3 — <code>execution_rids=</code> parameter on <code>feature_values</code></h3>
+<p>Same method, additional kwarg. When set, the catalog query is filtered with <code>path.Execution.in_(execution_rids)</code> (online) or <code>WHERE Execution IN (...)</code> (offline). Caller can then group by execution RID in Python — one pass, one round-trip, regardless of how many executions.</p>
+<hr />
+<h2 id="tasks">Tasks</h2>
+<h3 id="task-1-create-branch-new-exception">Task 1: Create branch + new exception</h3>
+<p><strong>Files:</strong>
+- Branch: <code>feature/sort-and-feature-batch</code>
+- Modify: <code>src/deriva_ml/core/exceptions.py</code>
+- Modify: <code>src/deriva_ml/__init__.py</code> (re-export)</p>
+<ul>
+<li>[ ] <strong>Step 1: Create branch off main</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git checkout main &amp;&amp; git pull &amp;&amp; git checkout -b feature/sort-and-feature-batch
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Read the existing exception hierarchy</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n &quot;^class \|DerivaMLException&quot; src/deriva_ml/core/exceptions.py | head -40
+</code></pre>
+<p>You should see the hierarchy from CLAUDE.md: <code>DerivaMLException</code> (base) with subclasses <code>DerivaMLConfigurationError</code>, <code>DerivaMLDataError</code> (with subclasses <code>DerivaMLNotFoundError</code>, <code>DerivaMLValidationError</code>, etc.), <code>DerivaMLExecutionError</code>, <code>DerivaMLReadOnlyError</code>. Confirm before proceeding.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add the new exception class</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/exceptions.py</code>, add <code>DerivaMLMaterializeLimitExceeded</code> as a subclass of <code>DerivaMLValidationError</code> (it's a caller-controlled limit, validation-shaped). Place it adjacent to the other <code>DerivaMLValidationError</code> subclasses if any exist; otherwise place it directly under <code>DerivaMLValidationError</code>'s definition. The class:</p>
+<pre><code class="language-python">class DerivaMLMaterializeLimitExceeded(DerivaMLValidationError):
+    &quot;&quot;&quot;Raised when a result set exceeds the caller-supplied ``materialize_limit``.
+
+    Surfaced by helpers (e.g. ``feature_values``) that materialize the
+    full result set into memory before reduction. Callers can either
+    raise the limit, narrow their query (e.g. add an ``execution_rids``
+    filter), or switch to a streaming consumer.
+
+    Attributes:
+        actual_count: The actual size of the result set that triggered
+            the limit.
+        limit: The ``materialize_limit`` the caller passed.
+
+    Example:
+        &gt;&gt;&gt; from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+        &gt;&gt;&gt; exc = DerivaMLMaterializeLimitExceeded(actual_count=1500, limit=1000)
+        &gt;&gt;&gt; exc.actual_count
+        1500
+        &gt;&gt;&gt; &quot;exceeds materialize_limit&quot; in str(exc)
+        True
+    &quot;&quot;&quot;
+
+    def __init__(self, actual_count: int, limit: int):
+        self.actual_count = actual_count
+        self.limit = limit
+        super().__init__(
+            f&quot;feature_values result set ({actual_count} rows) exceeds materialize_limit ({limit}); &quot;
+            f&quot;narrow the query (e.g. pass execution_rids=...) or raise the limit.&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Re-export the exception from the package root</strong></li>
+</ul>
+<p>Find the <code>__init__.py</code> re-export of <code>DerivaMLValidationError</code>:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -n &quot;DerivaMLValidationError\|DerivaMLDataError&quot; src/deriva_ml/__init__.py
+</code></pre>
+<p>Add <code>DerivaMLMaterializeLimitExceeded</code> to the same import block and to <code>__all__</code> if there is one.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run unit tests + lint to confirm no regression</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q 2&gt;&amp;1 | tail -10 &amp;&amp; uv run ruff check src/ &amp;&amp; uv run ruff format --check src/
+</code></pre>
+<p>Expected: all unit tests pass, ruff clean.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/exceptions.py src/deriva_ml/__init__.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(exceptions): add DerivaMLMaterializeLimitExceeded
+
+Raised when a result set exceeds the caller-supplied materialize_limit.
+Will be used by feature_values() to give callers a clear signal when
+their query would materialize too many rows; the caller can then narrow
+the filter (e.g. pass execution_rids=...) or raise the limit.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-sort-helper-module-unit-tests">Task 2: Sort helper module + unit tests</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/core/sort.py</code>
+- Create: <code>tests/core/test_sort.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Create the sort module</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/core/sort.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Sort-spec resolution helper for ``find_*`` methods.
+
+A small, pure-Python helper that lets every ``find_*`` method on
+``DerivaML`` (and its dataset / bag counterparts) accept a uniform
+three-state ``sort=`` parameter:
+
+- ``None`` (default): no sort is applied. The caller gets rows in
+  whatever order the backend returns, which is cheapest. This
+  preserves the pre-sort behavior of every existing caller.
+- ``True``: the method's documented default sort applies. For
+  activity-log methods (``find_executions``, ``find_datasets``,
+  ``find_workflows``) this is &quot;newest-first by record creation time&quot;
+  (``RCT desc``). The exact default is the method's responsibility;
+  this module only routes the request.
+- A callable ``(path) -&gt; sort_keys``: caller-supplied override. The
+  callable receives the path-builder context (an ERMrest entity-table
+  path) and returns either a single sort key (a column wrapper, or
+  ``column.desc``) or a list of them. The result is unpacked into
+  ``path.entities().sort(*keys)`` by the calling implementation.
+
+The ``Callable`` form is intentionally library-private — it requires
+knowledge of the deriva-py path-builder column-wrapper API. The MCP
+plugin only forwards ``True`` / ``None`` over the wire.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Union
+
+SortSpec = Union[bool, Callable[[Any], Any], None]
+&quot;&quot;&quot;Type alias for the ``sort=`` parameter on ``find_*`` methods.
+
+See the module docstring for the three-state semantics.
+&quot;&quot;&quot;
+
+
+def resolve_sort(
+    sort: SortSpec,
+    default_callable: Callable[[Any], Any],
+    path: Any,
+) -&gt; list[Any] | None:
+    &quot;&quot;&quot;Resolve a ``SortSpec`` against a method's default-sort callable.
+
+    Used inside ``find_*`` implementations to translate the caller's
+    ``sort=`` argument into the list of sort keys (or ``None``, meaning
+    &quot;do not call ``.sort()`` at all&quot;). Each implementation supplies
+    its own ``default_callable`` -- for activity-log methods that's
+    ``lambda p: p.RCT.desc``; for other methods it can be anything.
+
+    Args:
+        sort: The caller's ``sort=`` parameter (None, True, or callable).
+        default_callable: Method-supplied callable returning the
+            method's documented default sort keys, used when
+            ``sort=True``. Receives the same ``path`` object.
+        path: The path-builder context to pass to the callable. Opaque
+            to this helper -- whatever the implementation's entity-table
+            path object is.
+
+    Returns:
+        ``None`` when ``sort=None`` -- caller should NOT call
+        ``.sort()`` on the path. Otherwise a list of sort keys (one
+        or more) suitable for unpacking into ``path.entities().sort(*keys)``.
+
+    Raises:
+        TypeError: If ``sort`` is neither ``None``, ``True``, nor a
+            callable.
+
+    Example:
+        &gt;&gt;&gt; from deriva_ml.core.sort import resolve_sort
+        &gt;&gt;&gt; # sort=None -&gt; no sort applied
+        &gt;&gt;&gt; resolve_sort(None, lambda p: p, object()) is None
+        True
+        &gt;&gt;&gt; # sort=True -&gt; default callable runs, result wrapped in list
+        &gt;&gt;&gt; resolve_sort(True, lambda p: &quot;RCT-desc&quot;, object())
+        ['RCT-desc']
+        &gt;&gt;&gt; # sort=callable -&gt; user callable runs
+        &gt;&gt;&gt; resolve_sort(lambda p: [&quot;A&quot;, &quot;B&quot;], lambda p: [&quot;default&quot;], object())
+        ['A', 'B']
+        &gt;&gt;&gt; # Single value gets wrapped in a list
+        &gt;&gt;&gt; resolve_sort(lambda p: &quot;single&quot;, lambda p: &quot;default&quot;, object())
+        ['single']
+    &quot;&quot;&quot;
+    if sort is None:
+        return None
+    if sort is True:
+        keys = default_callable(path)
+    elif callable(sort):
+        keys = sort(path)
+    else:
+        raise TypeError(
+            f&quot;sort must be None, True, or a callable; got {type(sort).__name__}&quot;
+        )
+    if isinstance(keys, (list, tuple)):
+        return list(keys)
+    return [keys]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Write the unit tests</strong></li>
+</ul>
+<p>Write <code>tests/core/test_sort.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for ``deriva_ml.core.sort.resolve_sort``.
+
+Pure-Python — no catalog, no fixtures.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.core.sort import SortSpec, resolve_sort
+
+
+def test_resolve_sort_none_returns_none():
+    &quot;&quot;&quot;sort=None means no sort applied; helper returns None.&quot;&quot;&quot;
+    result = resolve_sort(None, lambda p: &quot;should-not-be-called&quot;, object())
+    assert result is None
+
+
+def test_resolve_sort_true_calls_default():
+    &quot;&quot;&quot;sort=True invokes the method-supplied default callable.&quot;&quot;&quot;
+    sentinel = object()
+    captured_path = []
+
+    def default_callable(path):
+        captured_path.append(path)
+        return &quot;default-keys&quot;
+
+    path = object()
+    result = resolve_sort(True, default_callable, path)
+    assert captured_path == [path]
+    assert result == [&quot;default-keys&quot;]
+
+
+def test_resolve_sort_callable_runs_user_callable():
+    &quot;&quot;&quot;sort=callable invokes the user callable, ignores the default.&quot;&quot;&quot;
+    user_calls = []
+    default_calls = []
+
+    def user_callable(path):
+        user_calls.append(path)
+        return &quot;user-keys&quot;
+
+    def default_callable(path):
+        default_calls.append(path)
+        return &quot;default-keys&quot;
+
+    path = object()
+    result = resolve_sort(user_callable, default_callable, path)
+    assert user_calls == [path]
+    assert default_calls == []
+    assert result == [&quot;user-keys&quot;]
+
+
+def test_resolve_sort_wraps_single_value_in_list():
+    &quot;&quot;&quot;A single column key is wrapped so the result is always list-shaped.&quot;&quot;&quot;
+    result = resolve_sort(lambda p: &quot;RCT-desc&quot;, lambda p: &quot;ignored&quot;, object())
+    assert result == [&quot;RCT-desc&quot;]
+
+
+def test_resolve_sort_passes_through_list():
+    &quot;&quot;&quot;A list/tuple is returned as a list (tuple is normalized).&quot;&quot;&quot;
+    result_list = resolve_sort(lambda p: [&quot;A&quot;, &quot;B&quot;], lambda p: &quot;ignored&quot;, object())
+    result_tuple = resolve_sort(lambda p: (&quot;A&quot;, &quot;B&quot;), lambda p: &quot;ignored&quot;, object())
+    assert result_list == [&quot;A&quot;, &quot;B&quot;]
+    assert result_tuple == [&quot;A&quot;, &quot;B&quot;]
+
+
+def test_resolve_sort_rejects_invalid_type():
+    &quot;&quot;&quot;sort must be None, True, or callable; other values raise TypeError.&quot;&quot;&quot;
+    with pytest.raises(TypeError, match=&quot;sort must be None, True, or a callable&quot;):
+        resolve_sort(42, lambda p: &quot;ignored&quot;, object())  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match=&quot;sort must be None, True, or a callable&quot;):
+        resolve_sort(&quot;RCT&quot;, lambda p: &quot;ignored&quot;, object())  # type: ignore[arg-type]
+
+
+def test_resolve_sort_rejects_false():
+    &quot;&quot;&quot;sort=False is NOT accepted -- only True is the sentinel.
+
+    Rationale: ``False`` is ambiguous (&quot;don't sort&quot; overlaps with
+    ``None``); we keep the sentinel narrow to the documented value.
+    &quot;&quot;&quot;
+    with pytest.raises(TypeError, match=&quot;sort must be None, True, or a callable&quot;):
+        resolve_sort(False, lambda p: &quot;ignored&quot;, object())
+
+
+def test_sort_spec_type_alias_exists():
+    &quot;&quot;&quot;SortSpec is exported for callers that want to type-annotate.&quot;&quot;&quot;
+    # Just import-time check; nothing to assert at runtime
+    assert SortSpec is not None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the unit tests</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/test_sort.py -v 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: 8 passed.</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + format</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src/deriva_ml/core/sort.py tests/core/test_sort.py &amp;&amp; uv run ruff format src/deriva_ml/core/sort.py tests/core/test_sort.py
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/sort.py tests/core/test_sort.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(sort): add resolve_sort helper for find_* methods
+
+Centralises the three-state sort= parameter semantics (None | True |
+callable) so each find_* implementation just supplies its own
+default-sort callable and unpacks the result into
+path.entities().sort(*keys). Pure-Python helper, fully unit-tested
+without a catalog.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-add-sort-parameter-to-interfacespy-protocol-declarations">Task 3: Add <code>sort=</code> parameter to <code>interfaces.py</code> Protocol declarations</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/interfaces.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the current interfaces.py imports + DatasetLike Protocol header</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; head -100 src/deriva_ml/interfaces.py
+</code></pre>
+<p>Confirm the file uses <code>from typing import ...</code> for type annotations (it does). You'll add a <code>SortSpec</code> import.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add the SortSpec import near the top of interfaces.py</strong></li>
+</ul>
+<p>Find the existing <code>from typing import ...</code> block (or <code>from collections.abc import ...</code>). Add:</p>
+<pre><code class="language-python">from deriva_ml.core.sort import SortSpec
+</code></pre>
+<p>Place it with the other intra-package imports.</p>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>list_dataset_children</code> Protocol (line ~132)</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">    def list_dataset_children(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
+    ) -&gt; list[Self]:
+        &quot;&quot;&quot;Get nested child datasets.
+
+        Args:
+            recurse: Whether to recursively include children of children.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list children from (Dataset only, ignored by DatasetBag).
+            **kwargs: Additional implementation-specific arguments.
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">    def list_dataset_children(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        sort: SortSpec = None,
+        **kwargs: Any,
+    ) -&gt; list[Self]:
+        &quot;&quot;&quot;Get nested child datasets.
+
+        Args:
+            recurse: Whether to recursively include children of children.
+            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
+            version: Dataset version to list children from (Dataset only, ignored by DatasetBag).
+            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                the method's default (newest-first by ``RCT``). A callable
+                receives the path-builder context and returns sort keys.
+            **kwargs: Additional implementation-specific arguments.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Update <code>list_dataset_parents</code> Protocol (line ~156)</strong></li>
+</ul>
+<p>Apply the same insertion (<code>sort: SortSpec = None,</code> after <code>version</code>) and the same <code>Args:</code> block addition for <code>sort:</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Update <code>list_dataset_members</code> Protocol (line ~180)</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">    def list_dataset_members(
+        self,
+        recurse: bool = False,
+        limit: int | None = None,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        **kwargs: Any,
+    ) -&gt; dict[str, list[dict[str, Any]]]:
+</code></pre>
+<p>Replace:</p>
+<pre><code class="language-python">    def list_dataset_members(
+        self,
+        recurse: bool = False,
+        limit: int | None = None,
+        _visited: set[RID] | None = None,
+        version: Any = None,
+        sort: SortSpec = None,
+        **kwargs: Any,
+    ) -&gt; dict[str, list[dict[str, Any]]]:
+</code></pre>
+<p>And add the <code>sort:</code> documentation in the <code>Args:</code> block (same wording as Step 3).</p>
+<ul>
+<li>[ ] <strong>Step 6: Update <code>feature_values</code> Protocol (line ~240)</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">    def feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Any = None,
+    ) -&gt; Iterable[FeatureRecord]:
+        &quot;&quot;&quot;Yield feature values for a single feature, one record per target RID.
+
+        Args:
+            table: Target table the feature is defined on (name or Table).
+            feature_name: Name of the feature to read.
+            selector: Optional callable ``(list[FeatureRecord]) -&gt; FeatureRecord | None``
+                used to reduce multi-value groups.
+
+        Returns:
+            Iterator of ``FeatureRecord`` instances.
+
+        Raises:
+            DerivaMLException: If ``feature_name`` is not a feature on ``table``.
+        &quot;&quot;&quot;
+        ...
+</code></pre>
+<p>Replace:</p>
+<pre><code class="language-python">    def feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Any = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
+    ) -&gt; Iterable[FeatureRecord]:
+        &quot;&quot;&quot;Yield feature values for a single feature, one record per target RID.
+
+        Args:
+            table: Target table the feature is defined on (name or Table).
+            feature_name: Name of the feature to read.
+            selector: Optional callable ``(list[FeatureRecord]) -&gt; FeatureRecord | None``
+                used to reduce multi-value groups.
+            materialize_limit: Optional cap on the number of rows that
+                may be materialized into memory. When the catalog query
+                returns more than this many rows, raises
+                ``DerivaMLMaterializeLimitExceeded``. Default ``None``
+                preserves the existing unbounded behavior; callers
+                driving Python directly opt into responsibility for
+                memory management. The ``deriva-ml-mcp`` plugin sets a
+                default to keep MCP responses bounded.
+            execution_rids: Optional filter — when set, only feature
+                rows whose ``Execution`` value is in this list are
+                materialized. Lets callers compare metric values
+                across a known set of executions in a single
+                catalog round-trip rather than N sequential queries.
+
+        Returns:
+            Iterator of ``FeatureRecord`` instances.
+
+        Raises:
+            DerivaMLException: If ``feature_name`` is not a feature on ``table``.
+            DerivaMLMaterializeLimitExceeded: If the result set exceeds
+                ``materialize_limit``.
+        &quot;&quot;&quot;
+        ...
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Update <code>find_datasets</code> Protocol declarations (lines ~680, ~958)</strong></li>
+</ul>
+<p>There are two declarations of <code>find_datasets</code> in this file (one in <code>DerivaMLCatalogReader</code>, one in <code>DerivaMLCatalog</code>). Update both:</p>
+<p>Find each:</p>
+<pre><code class="language-python">    def find_datasets(self, deleted: bool = False) -&gt; Iterable[DatasetLike]:
+</code></pre>
+<p>(or <code>Iterable["Dataset"]</code> for the second one). Replace each with:</p>
+<pre><code class="language-python">    def find_datasets(
+        self, deleted: bool = False, sort: SortSpec = None
+    ) -&gt; Iterable[DatasetLike]:
+</code></pre>
+<p>(adjust the return type to match the original line). For each, also add the <code>sort:</code> documentation in the <code>Args:</code> block (same wording as Step 3).</p>
+<ul>
+<li>[ ] <strong>Step 8: Update <code>find_workflows</code> Protocol (line ~766)</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">    def find_workflows(self) -&gt; Iterable[&quot;Workflow&quot;]:
+</code></pre>
+<p>Replace:</p>
+<pre><code class="language-python">    def find_workflows(self, sort: SortSpec = None) -&gt; Iterable[&quot;Workflow&quot;]:
+</code></pre>
+<p>Add the <code>sort:</code> documentation in the <code>Args:</code> block.</p>
+<ul>
+<li>[ ] <strong>Step 9: Update <code>find_executions</code> Protocol (line ~823)</strong></li>
+</ul>
+<p>Find the <code>find_executions</code> Protocol declaration (3 args today: <code>workflow</code>, <code>workflow_type</code>, <code>status</code>). Add <code>sort: SortSpec = None,</code> as the last positional/kwarg before any <code>**kwargs</code>. Add the <code>sort:</code> documentation in the <code>Args:</code> block.</p>
+<ul>
+<li>[ ] <strong>Step 10: Run unit tests + lint to confirm Protocol changes don't break import</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -10 &amp;&amp; uv run ruff check src/deriva_ml/interfaces.py
+</code></pre>
+<p>Expected: all unit tests pass, ruff clean.</p>
+<ul>
+<li>[ ] <strong>Step 11: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/interfaces.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(interfaces): add sort=, materialize_limit=, execution_rids= to Protocol decls
+
+Updates the DatasetLike, DerivaMLCatalogReader, and DerivaMLCatalog
+protocols to include the new optional parameters that find_* and
+feature_values implementations will gain in subsequent commits. All
+parameters default to None / current behavior so concrete classes
+that haven't been updated yet still satisfy the protocol.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-implement-sort-in-find_executions">Task 4: Implement <code>sort=</code> in <code>find_executions</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code> (lines ~567-628)
+- Test: <code>tests/execution/test_find_executions_sort.py</code> (new)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the existing <code>find_executions</code> impl</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '565,635p' src/deriva_ml/core/mixins/execution.py
+</code></pre>
+<p>Confirm the structure: <code>pb = self.pathBuilder()</code>, <code>execution_path = pb.schemas[self.ml_schema].Execution</code>, applies filters via <code>filtered_path.filter(...)</code>, then <code>for exec_record in filtered_path.entities().fetch():</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add the <code>sort</code> import + parameter</strong></li>
+</ul>
+<p>Edit <code>src/deriva_ml/core/mixins/execution.py</code>. Find the existing imports near the top of the file. Add (in the appropriate import group):</p>
+<pre><code class="language-python">from deriva_ml.core.sort import SortSpec, resolve_sort
+</code></pre>
+<p>Then find the <code>find_executions</code> signature and replace it:</p>
+<pre><code class="language-python">    def find_executions(
+        self,
+        workflow: &quot;Workflow | RID | None&quot; = None,
+        workflow_type: str | None = None,
+        status: ExecutionStatus | None = None,
+        sort: SortSpec = None,
+    ) -&gt; Iterable[&quot;ExecutionRecord&quot;]:
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Update the docstring <code>Args:</code> and <code>Example:</code> blocks</strong></li>
+</ul>
+<p>In the <code>find_executions</code> docstring, add a new <code>sort:</code> entry in the <code>Args:</code> block right after the <code>status:</code> entry:</p>
+<pre><code>            sort: Optional sort spec.
+                - ``None`` (default): backend-determined order (no sort
+                  clause applied; cheapest path).
+                - ``True``: newest-first by record creation time
+                  (``RCT desc``). Recommended for &quot;show me the most
+                  recent executions&quot; queries.
+                - Callable ``(path) -&gt; sort_keys``: receives the
+                  Execution table path and returns one or more
+                  path-builder sort keys (e.g. ``path.RCT.desc``,
+                  or ``[path.Status, path.RCT.desc]``).
+</code></pre>
+<p>In the <code>Example:</code> block, add a new example after the existing one:</p>
+<pre><code>        Example:
+            &gt;&gt;&gt; for record in ml.find_executions(status=ExecutionStatus.Uploaded):  # doctest: +SKIP
+            ...     print(record.execution_rid, record.status)
+
+            Newest-first (most common):
+            &gt;&gt;&gt; for record in ml.find_executions(sort=True):  # doctest: +SKIP
+            ...     ...
+
+            Custom sort — group by status, then newest within group:
+            &gt;&gt;&gt; for record in ml.find_executions(  # doctest: +SKIP
+            ...     sort=lambda path: [path.Status, path.RCT.desc],
+            ... ):
+            ...     ...
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Apply the sort in the implementation body</strong></li>
+</ul>
+<p>Find this block in the impl (around lines 622-628):</p>
+<pre><code class="language-python">        if status:
+            filtered_path = filtered_path.filter(execution_path.Status == status.value)
+
+        # Create ExecutionRecord objects
+        for exec_record in filtered_path.entities().fetch():
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        if status:
+            filtered_path = filtered_path.filter(execution_path.Status == status.value)
+
+        # Resolve sort spec against this method's default (newest-first
+        # by record creation time). resolve_sort returns None when the
+        # caller explicitly opted out of sorting (sort=None), in which
+        # case we don't call .sort() at all -- backend default order.
+        entity_set = filtered_path.entities()
+        sort_keys = resolve_sort(sort, lambda p: p.RCT.desc, execution_path)
+        if sort_keys is not None:
+            entity_set = entity_set.sort(*sort_keys)
+
+        # Create ExecutionRecord objects
+        for exec_record in entity_set.fetch():
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Write the integration test</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_find_executions_sort.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Integration tests for ``find_executions(sort=...)``.
+
+Catalog-required. Validates the three sort modes (None / True / callable)
+and asserts the row order returned in each mode.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.execution import ExecutionStatus
+
+
+# These tests need a live catalog with at least 3 executions of the same
+# workflow_type. Fixture from conftest.py provides this.
+@pytest.mark.integration
+def test_find_executions_sort_none_uses_backend_order(catalog_with_executions):
+    &quot;&quot;&quot;sort=None preserves the existing unsorted-by-design behavior.
+
+    We don't assert a specific order here -- the contract is &quot;whatever
+    the backend returns.&quot; We just confirm the method runs and yields
+    records.
+    &quot;&quot;&quot;
+    ml = catalog_with_executions
+    records = list(ml.find_executions())
+    assert len(records) &gt;= 3, &quot;fixture should provide at least 3 executions&quot;
+
+
+@pytest.mark.integration
+def test_find_executions_sort_true_returns_newest_first(catalog_with_executions):
+    &quot;&quot;&quot;sort=True yields records ordered by RCT descending.
+
+    Each ExecutionRecord exposes a ``rct`` (record creation time)
+    attribute. We assert the list is non-strictly decreasing by rct.
+    &quot;&quot;&quot;
+    ml = catalog_with_executions
+    records = list(ml.find_executions(sort=True))
+    rcts = [r.rct for r in records]  # rct is set on every record by lookup_execution
+    assert rcts == sorted(rcts, reverse=True), (
+        f&quot;records should be newest-first; got rcts={rcts}&quot;
+    )
+
+
+@pytest.mark.integration
+def test_find_executions_sort_callable_applies_user_keys(catalog_with_executions):
+    &quot;&quot;&quot;A user-supplied sort callable receives the path and returns sort keys.&quot;&quot;&quot;
+    ml = catalog_with_executions
+
+    def by_rid_asc(path):
+        return path.RID  # ascending RID
+
+    records = list(ml.find_executions(sort=by_rid_asc))
+    rids = [r.execution_rid for r in records]
+    assert rids == sorted(rids), f&quot;records should be RID-ascending; got {rids}&quot;
+
+
+@pytest.mark.integration
+def test_find_executions_sort_invalid_type_raises(catalog_with_executions):
+    &quot;&quot;&quot;Passing a bare string (not None/True/callable) raises TypeError.&quot;&quot;&quot;
+    ml = catalog_with_executions
+    with pytest.raises(TypeError, match=&quot;sort must be None, True, or a callable&quot;):
+        list(ml.find_executions(sort=&quot;newest&quot;))  # type: ignore[arg-type]
+</code></pre>
+<p>Note: this assumes a <code>catalog_with_executions</code> fixture exists. If it doesn't, you'll need to either skip these tests with <code>pytest.mark.skipif</code> and document the fixture as a follow-up, OR construct a small fixture in this file by combining <code>test_ml</code> with a few <code>create_execution</code> calls. Check <code>tests/execution/conftest.py</code> first:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn &quot;catalog_with_executions\|def test_ml&quot; tests/execution/ tests/conftest.py 2&gt;/dev/null | head -5
+</code></pre>
+<p>If <code>catalog_with_executions</code> doesn't exist, add a local fixture at the top of <code>tests/execution/test_find_executions_sort.py</code>:</p>
+<pre><code class="language-python">@pytest.fixture
+def catalog_with_executions(test_ml):
+    &quot;&quot;&quot;Create at least 3 executions on a fresh test catalog.
+
+    Each is a no-op execution against a dedup'd workflow; the
+    important property is that they have distinct RIDs and RCTs
+    spaced far enough apart for sort tests to be meaningful (the
+    create_execution call alone produces distinct RCTs).
+    &quot;&quot;&quot;
+    from deriva_ml.execution import ExecutionConfiguration
+
+    workflow = test_ml.create_workflow(
+        name=&quot;sort_test&quot;,
+        url=&quot;https://example.com/test&quot;,
+        workflow_type=&quot;Generic&quot;,  # adjust to whatever the test catalog has
+        version=&quot;1.0.0&quot;,
+        checksum=&quot;dummy&quot;,
+    )
+    for i in range(3):
+        cfg = ExecutionConfiguration(
+            workflow=workflow.rid,
+            description=f&quot;sort-test-execution-{i}&quot;,
+        )
+        test_ml.create_execution(cfg, dry_run=False)
+    return test_ml
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Run the unit tests + the new integration test (skip-only mode if no catalog)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: unit tests still pass.</p>
+<p>If a <code>DERIVA_HOST</code> is set:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=&quot;$DERIVA_HOST&quot; uv run pytest tests/execution/test_find_executions_sort.py -v --timeout=300 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: 4 passed.</p>
+<ul>
+<li>[ ] <strong>Step 7: Lint + format</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src/deriva_ml/core/mixins/execution.py tests/execution/test_find_executions_sort.py &amp;&amp; uv run ruff format src/deriva_ml/core/mixins/execution.py tests/execution/test_find_executions_sort.py
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 8: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/execution.py tests/execution/test_find_executions_sort.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(find_executions): add sort= parameter
+
+Three-state sort spec (None | True | callable):
+- None preserves backend order (default; existing callers unaffected)
+- True applies the method's default — newest-first by RCT desc
+- callable receives the path and returns one or more path-builder sort keys
+
+Integration tests cover all three modes plus the TypeError on invalid input.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-implement-sort-in-find_datasets">Task 5: Implement <code>sort=</code> in <code>find_datasets</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/dataset.py</code> (lines ~65-100)
+- Test: <code>tests/dataset/test_find_datasets_sort.py</code> (new)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the existing <code>find_datasets</code> impl</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '63,110p' src/deriva_ml/core/mixins/dataset.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Add the import + extend the signature</strong></li>
+</ul>
+<p>Edit <code>src/deriva_ml/core/mixins/dataset.py</code>. Add to the imports at the top:</p>
+<pre><code class="language-python">from deriva_ml.core.sort import SortSpec, resolve_sort
+</code></pre>
+<p>Replace the <code>find_datasets</code> signature:</p>
+<pre><code class="language-python">    def find_datasets(
+        self, deleted: bool = False, sort: SortSpec = None
+    ) -&gt; Iterable[&quot;Dataset&quot;]:
+</code></pre>
+<p>Add a <code>sort:</code> entry to the <code>Args:</code> block:</p>
+<pre><code>            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
+                ``None`` (default) preserves backend order. ``True`` applies
+                newest-first by record creation time (``RCT desc``). A callable
+                receives the path and returns one or more sort keys.
+</code></pre>
+<p>Add a sort example to the <code>Example:</code> block:</p>
+<pre><code>            &gt;&gt;&gt; # Newest-first:
+            &gt;&gt;&gt; recent = list(ml.find_datasets(sort=True))  # doctest: +SKIP
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Apply the sort in the impl body</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">        # Create Dataset objects - dataset_types is now a property that fetches from catalog
+        datasets = []
+        for dataset in filtered_path.entities().fetch():
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        # Resolve sort spec; default is newest-first by RCT.
+        entity_set = filtered_path.entities()
+        sort_keys = resolve_sort(sort, lambda p: p.RCT.desc, dataset_path)
+        if sort_keys is not None:
+            entity_set = entity_set.sort(*sort_keys)
+
+        # Create Dataset objects - dataset_types is now a property that fetches from catalog
+        datasets = []
+        for dataset in entity_set.fetch():
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Write the integration test</strong></li>
+</ul>
+<p>Create <code>tests/dataset/test_find_datasets_sort.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Integration tests for ``find_datasets(sort=...)``.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import pytest
+
+
+@pytest.mark.integration
+def test_find_datasets_sort_none_returns_records(catalog_with_datasets):
+    &quot;&quot;&quot;sort=None preserves backend order; just verify it returns rows.&quot;&quot;&quot;
+    ml = catalog_with_datasets
+    datasets = list(ml.find_datasets())
+    assert len(datasets) &gt;= 2, &quot;fixture should provide at least 2 datasets&quot;
+
+
+@pytest.mark.integration
+def test_find_datasets_sort_true_returns_newest_first(catalog_with_datasets):
+    &quot;&quot;&quot;sort=True yields records ordered by RCT descending.&quot;&quot;&quot;
+    ml = catalog_with_datasets
+    datasets = list(ml.find_datasets(sort=True))
+    # Each Dataset object exposes RCT via the underlying record;
+    # adjust the attribute name if it differs in your codebase.
+    rcts = [getattr(d, &quot;rct&quot;, None) for d in datasets]
+    assert all(r is not None for r in rcts), (
+        f&quot;every Dataset should expose its rct; got {rcts}&quot;
+    )
+    assert rcts == sorted(rcts, reverse=True), (
+        f&quot;datasets should be newest-first; got rcts={rcts}&quot;
+    )
+
+
+@pytest.mark.integration
+def test_find_datasets_sort_callable_applies_user_keys(catalog_with_datasets):
+    &quot;&quot;&quot;User-supplied sort callable applies.&quot;&quot;&quot;
+    ml = catalog_with_datasets
+
+    def by_rid_asc(path):
+        return path.RID
+
+    datasets = list(ml.find_datasets(sort=by_rid_asc))
+    rids = [d.dataset_rid for d in datasets]
+    assert rids == sorted(rids)
+
+
+@pytest.mark.integration
+def test_find_datasets_sort_invalid_raises(catalog_with_datasets):
+    ml = catalog_with_datasets
+    with pytest.raises(TypeError, match=&quot;sort must be None, True, or a callable&quot;):
+        list(ml.find_datasets(sort=&quot;newest&quot;))  # type: ignore[arg-type]
+</code></pre>
+<p>Note: <code>catalog_with_datasets</code> already exists per CLAUDE.md.</p>
+<p>If the <code>Dataset</code> object doesn't expose <code>rct</code> directly, the test needs to look up via <code>ml.lookup_dataset(rid).rct</code> or via the path builder. Check the actual <code>Dataset</code> class shape before running; adjust the attribute name if needed.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run tests + lint</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -5 &amp;&amp; uv run ruff check src/deriva_ml/core/mixins/dataset.py tests/dataset/test_find_datasets_sort.py &amp;&amp; uv run ruff format src/deriva_ml/core/mixins/dataset.py tests/dataset/test_find_datasets_sort.py
+</code></pre>
+<p>Expected: unit tests pass, ruff clean.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/dataset.py tests/dataset/test_find_datasets_sort.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(find_datasets): add sort= parameter
+
+Same three-state semantics as find_executions; default is newest-first
+when sort=True. Backend order preserved when sort=None.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-implement-sort-in-find_workflows">Task 6: Implement <code>sort=</code> in <code>find_workflows</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/workflow.py</code> (lines ~77-130)
+- Test: extend or add <code>tests/workflow/test_find_workflows_sort.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the existing <code>find_workflows</code> impl</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '75,130p' src/deriva_ml/core/mixins/workflow.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Apply the same pattern as Tasks 4 and 5</strong></li>
+</ul>
+<p>Add the import:</p>
+<pre><code class="language-python">from deriva_ml.core.sort import SortSpec, resolve_sort
+</code></pre>
+<p>Update the signature:</p>
+<pre><code class="language-python">    def find_workflows(self, sort: SortSpec = None) -&gt; list[Workflow]:
+</code></pre>
+<p>Add <code>sort:</code> to the <code>Args:</code> block. Add a sort example.</p>
+<p>In the impl body, find:</p>
+<pre><code class="language-python">        workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
+        types_index = self._get_workflow_types_index()
+        workflows = []
+        for w in workflow_path.entities().fetch():
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
+        entity_set = workflow_path.entities()
+        sort_keys = resolve_sort(sort, lambda p: p.RCT.desc, workflow_path)
+        if sort_keys is not None:
+            entity_set = entity_set.sort(*sort_keys)
+        types_index = self._get_workflow_types_index()
+        workflows = []
+        for w in entity_set.fetch():
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Write the integration test</strong></li>
+</ul>
+<p>Create <code>tests/workflow/test_find_workflows_sort.py</code> (or extend an existing workflow test file). Same shape as Task 5's tests but for <code>find_workflows</code>. Use the existing test_ml fixture; create 2-3 workflows with distinct names/URLs to avoid dedup, then assert sort.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests + lint</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -5 &amp;&amp; uv run ruff check src/deriva_ml/core/mixins/workflow.py &amp;&amp; uv run ruff format src/deriva_ml/core/mixins/workflow.py
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/workflow.py tests/workflow/test_find_workflows_sort.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(find_workflows): add sort= parameter
+
+Same three-state semantics as find_executions and find_datasets.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-implement-materialize_limit-and-execution_rids-in-catalog-feature_values">Task 7: Implement <code>materialize_limit=</code> and <code>execution_rids=</code> in catalog <code>feature_values</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/feature.py</code> (lines ~366-475)
+- Test: <code>tests/feature/test_feature_values_limits.py</code> (new)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the existing <code>feature_values</code> impl in feature.py</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '365,475p' src/deriva_ml/core/mixins/feature.py
+</code></pre>
+<p>Confirm the structure: builds <code>pb.schemas[feat.feature_table.schema.name].tables[feat.feature_table.name].entities().fetch()</code>, then materializes to FeatureRecord list, then optional selector reduction.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add the imports + extend the signature</strong></li>
+</ul>
+<p>Add to the imports at the top of <code>src/deriva_ml/core/mixins/feature.py</code>:</p>
+<pre><code class="language-python">from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+</code></pre>
+<p>Replace the <code>feature_values</code> signature:</p>
+<pre><code class="language-python">    def feature_values(
+        self,
+        table: Table | str,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
+    ) -&gt; Iterable[FeatureRecord]:
+</code></pre>
+<p>Update the docstring:
+- In <code>Args:</code>, add the two new entries (use the wording from Task 3 Step 6).
+- In <code>Raises:</code>, add <code>DerivaMLMaterializeLimitExceeded</code> to the list with one-line description.
+- Update the long-form docstring sentence "All rows for the feature are fetched from the catalog before the first record is yielded" to also mention: "When <code>execution_rids</code> is set, the catalog query is filtered server-side to those execution RIDs only -- this is the recommended way to keep the materialization cost bounded for cross-execution comparisons."</p>
+<ul>
+<li>[ ] <strong>Step 3: Apply <code>execution_rids</code> filter to the catalog query</strong></li>
+</ul>
+<p>Find the existing fetch (around line 446-450):</p>
+<pre><code class="language-python">        # Fetch raw rows via datapath
+        pb = self.pathBuilder()
+        raw_values = (
+            pb.schemas[feat.feature_table.schema.name]
+            .tables[feat.feature_table.name]
+            .entities()
+            .fetch()
+        )
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        # Fetch raw rows via datapath. Apply execution_rids filter
+        # server-side to avoid materializing rows we'll discard.
+        pb = self.pathBuilder()
+        feature_path = pb.schemas[feat.feature_table.schema.name].tables[feat.feature_table.name]
+        if execution_rids is not None:
+            if not execution_rids:
+                # Empty list means &quot;no executions&quot; -- short-circuit
+                # to an empty result, no catalog round-trip needed.
+                return
+            feature_path = feature_path.filter(feature_path.Execution.in_(execution_rids))
+        raw_values = list(feature_path.entities().fetch())
+
+        # Enforce the materialize_limit cap before record construction.
+        if materialize_limit is not None and len(raw_values) &gt; materialize_limit:
+            raise DerivaMLMaterializeLimitExceeded(
+                actual_count=len(raw_values),
+                limit=materialize_limit,
+            )
+</code></pre>
+<p>(Note: <code>raw_values = list(...)</code> instead of just <code>raw_values = ...</code> because we need <code>len()</code> for the limit check. Without the explicit list, the result is a generator with no <code>len()</code>.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Write the integration test</strong></li>
+</ul>
+<p>Create <code>tests/feature/test_feature_values_limits.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Integration tests for the materialize_limit= and execution_rids= parameters
+on ``feature_values``.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import pytest
+
+from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+
+
+@pytest.mark.integration
+def test_feature_values_materialize_limit_not_exceeded(catalog_with_feature_values):
+    &quot;&quot;&quot;When the row count is below the limit, no exception is raised.&quot;&quot;&quot;
+    ml = catalog_with_feature_values
+    # Limit set high; should not raise.
+    records = list(
+        ml.feature_values(&quot;Image&quot;, &quot;Quality&quot;, materialize_limit=10_000)
+    )
+    assert isinstance(records, list)
+
+
+@pytest.mark.integration
+def test_feature_values_materialize_limit_exceeded_raises(catalog_with_feature_values):
+    &quot;&quot;&quot;When the row count exceeds the limit, raises DerivaMLMaterializeLimitExceeded.&quot;&quot;&quot;
+    ml = catalog_with_feature_values
+    # Limit set to 0 -- guaranteed to exceed unless the table is empty.
+    with pytest.raises(DerivaMLMaterializeLimitExceeded) as exc_info:
+        list(ml.feature_values(&quot;Image&quot;, &quot;Quality&quot;, materialize_limit=0))
+    assert exc_info.value.limit == 0
+    assert exc_info.value.actual_count &gt; 0
+
+
+@pytest.mark.integration
+def test_feature_values_execution_rids_filters_results(catalog_with_feature_values):
+    &quot;&quot;&quot;execution_rids= restricts results to the named executions only.&quot;&quot;&quot;
+    ml = catalog_with_feature_values
+    # Fetch all to learn what executions exist.
+    all_records = list(ml.feature_values(&quot;Image&quot;, &quot;Quality&quot;))
+    all_exec_rids = sorted({r.Execution for r in all_records if r.Execution})
+    assert len(all_exec_rids) &gt;= 2, (
+        &quot;fixture should produce records from at least 2 executions&quot;
+    )
+    # Filter to a single execution RID; should get a subset.
+    target_rid = all_exec_rids[0]
+    filtered = list(
+        ml.feature_values(&quot;Image&quot;, &quot;Quality&quot;, execution_rids=[target_rid])
+    )
+    assert len(filtered) &gt; 0, &quot;filter should not eliminate everything&quot;
+    assert all(r.Execution == target_rid for r in filtered)
+    assert len(filtered) &lt; len(all_records), &quot;filter should restrict the set&quot;
+
+
+@pytest.mark.integration
+def test_feature_values_execution_rids_empty_list_returns_nothing(catalog_with_feature_values):
+    &quot;&quot;&quot;execution_rids=[] short-circuits to an empty result.&quot;&quot;&quot;
+    ml = catalog_with_feature_values
+    records = list(ml.feature_values(&quot;Image&quot;, &quot;Quality&quot;, execution_rids=[]))
+    assert records == []
+
+
+@pytest.mark.integration
+def test_feature_values_execution_rids_with_materialize_limit_combine(
+    catalog_with_feature_values,
+):
+    &quot;&quot;&quot;The two parameters compose -- filter is applied first, limit checked after.&quot;&quot;&quot;
+    ml = catalog_with_feature_values
+    all_records = list(ml.feature_values(&quot;Image&quot;, &quot;Quality&quot;))
+    all_exec_rids = sorted({r.Execution for r in all_records if r.Execution})
+    target_rid = all_exec_rids[0]
+    target_count = sum(1 for r in all_records if r.Execution == target_rid)
+
+    # Limit higher than the filtered count -- should succeed.
+    records = list(
+        ml.feature_values(
+            &quot;Image&quot;,
+            &quot;Quality&quot;,
+            execution_rids=[target_rid],
+            materialize_limit=target_count + 10,
+        )
+    )
+    assert len(records) == target_count
+
+    # Limit below the filtered count -- should raise.
+    with pytest.raises(DerivaMLMaterializeLimitExceeded):
+        list(
+            ml.feature_values(
+                &quot;Image&quot;,
+                &quot;Quality&quot;,
+                execution_rids=[target_rid],
+                materialize_limit=0,
+            )
+        )
+</code></pre>
+<p>You'll need a <code>catalog_with_feature_values</code> fixture. Check the existing fixtures:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; grep -rn &quot;def catalog_with_feature_values\|fixture.*feature.*values&quot; tests/ 2&gt;/dev/null | head -5
+</code></pre>
+<p>If it doesn't exist, add a fixture at the top of <code>tests/feature/test_feature_values_limits.py</code>:</p>
+<pre><code class="language-python">@pytest.fixture
+def catalog_with_feature_values(catalog_with_datasets):
+    &quot;&quot;&quot;Add a Feature on Image and populate it with values from 2 executions.
+
+    Returns the DerivaML instance with the feature populated.
+    &quot;&quot;&quot;
+    ml = catalog_with_datasets
+
+    # Adjust feature_name and value column to whatever the test catalog supports
+    if not any(f.feature_name == &quot;Quality&quot; for f in ml.find_features(&quot;Image&quot;)):
+        ml.create_feature(
+            target_table=&quot;Image&quot;,
+            feature_name=&quot;Quality&quot;,
+            metadata=[&quot;score&quot;],  # scalar float column
+        )
+
+    # Create 2 executions and populate feature values from each
+    workflow = ml.create_workflow(
+        name=&quot;feature_values_limit_test&quot;,
+        url=&quot;https://example.com/test&quot;,
+        workflow_type=&quot;Generic&quot;,
+        version=&quot;1.0.0&quot;,
+        checksum=&quot;dummy-fvl&quot;,
+    )
+    image_rids = list(ml.find_assets(&quot;Image&quot;))[:5]  # take a few targets
+    feature = ml.lookup_feature(&quot;Image&quot;, &quot;Quality&quot;)
+    record_class = feature.feature_record_class()
+
+    for i in range(2):
+        from deriva_ml.execution import ExecutionConfiguration
+        cfg = ExecutionConfiguration(
+            workflow=workflow.rid,
+            description=f&quot;fvl-execution-{i}&quot;,
+        )
+        with ml.create_execution(cfg, dry_run=False).execute() as exe:
+            for img_rid in image_rids:
+                exe.add_features([
+                    record_class(Image=img_rid, score=0.5 + i * 0.1),
+                ])
+
+    return ml
+</code></pre>
+<p>If the test catalog's existing fixture already populates feature values, you may be able to reuse it. Adjust accordingly.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run tests + lint</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -5 &amp;&amp; uv run ruff check src/deriva_ml/core/mixins/feature.py tests/feature/test_feature_values_limits.py &amp;&amp; uv run ruff format src/deriva_ml/core/mixins/feature.py tests/feature/test_feature_values_limits.py
+</code></pre>
+<p>Expected: clean.</p>
+<p>If <code>DERIVA_HOST</code> is set and the fixture works:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=&quot;$DERIVA_HOST&quot; uv run pytest tests/feature/test_feature_values_limits.py -v --timeout=600 2&gt;&amp;1 | tail -30
+</code></pre>
+<p>Expected: 5 passed.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/core/mixins/feature.py tests/feature/test_feature_values_limits.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(feature_values): add materialize_limit= and execution_rids= parameters
+
+materialize_limit: caller-controlled cap on row materialization, raises
+DerivaMLMaterializeLimitExceeded when exceeded. Default None preserves
+unbounded behavior.
+
+execution_rids: server-side filter to a known set of execution RIDs.
+Lets compare-runs workflows fetch values across N executions in one
+catalog round-trip rather than N. Empty list short-circuits to an empty
+result.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-thread-materialize_limit-execution_rids-through-dataset-scoped-feature_values">Task 8: Thread <code>materialize_limit=</code> / <code>execution_rids=</code> through dataset-scoped <code>feature_values</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code> (lines ~530-590)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the dataset-scoped impl</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '530,595p' src/deriva_ml/dataset/dataset.py
+</code></pre>
+<p>This impl filters its parent's <code>feature_values</code> output to dataset members. It needs to forward both new parameters.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update the signature</strong></li>
+</ul>
+<p>Replace the <code>Dataset.feature_values</code> signature:</p>
+<pre><code class="language-python">    def feature_values(
+        self,
+        table: str | Table,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
+    ) -&gt; Iterable[FeatureRecord]:
+</code></pre>
+<p>Update the docstring <code>Args:</code> to include the two new parameters (cross-reference the catalog mixin's docstring for the canonical wording).</p>
+<ul>
+<li>[ ] <strong>Step 3: Forward the new parameters</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">        # Filter upstream raw records to dataset members
+        raw_in_scope = [
+            rec
+            for rec in self._ml_instance.feature_values(table, feature_name, selector=None)
+            if getattr(rec, target_col, None) in members
+        ]
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        # Filter upstream raw records to dataset members. Forward
+        # materialize_limit and execution_rids to the catalog query so
+        # the upstream materialization is bounded too. The dataset-scope
+        # filter is applied AFTER the catalog query, so the limit check
+        # in the upstream guards us against memory blow-up before we
+        # filter further.
+        raw_in_scope = [
+            rec
+            for rec in self._ml_instance.feature_values(
+                table,
+                feature_name,
+                selector=None,
+                materialize_limit=materialize_limit,
+                execution_rids=execution_rids,
+            )
+            if getattr(rec, target_col, None) in members
+        ]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run unit tests + lint</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -5 &amp;&amp; uv run ruff check src/deriva_ml/dataset/dataset.py &amp;&amp; uv run ruff format src/deriva_ml/dataset/dataset.py
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/dataset/dataset.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(Dataset.feature_values): forward materialize_limit and execution_rids
+
+Dataset-scoped feature_values now forwards both new parameters to the
+catalog-level call so the materialization cap is enforced before the
+dataset-membership filter is applied.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-9-implement-materialize_limit-and-execution_rids-in-offline-datasetbagfeature_values">Task 9: Implement <code>materialize_limit=</code> and <code>execution_rids=</code> in offline <code>DatasetBag.feature_values</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code> (lines ~580-650)</p>
+<ul>
+<li>[ ] <strong>Step 1: Read the offline impl</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; sed -n '580,655p' src/deriva_ml/dataset/dataset_bag.py
+</code></pre>
+<p>It calls <code>BagFeatureCache.fetch_feature_records(target_col, feature_name)</code> to get a flat list, then optionally selector-reduces.</p>
+<ul>
+<li>[ ] <strong>Step 2: Update the signature</strong></li>
+</ul>
+<p>Replace the signature:</p>
+<pre><code class="language-python">    def feature_values(
+        self,
+        table: str | Table,
+        feature_name: str,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        materialize_limit: int | None = None,
+        execution_rids: list[str] | None = None,
+    ) -&gt; Iterable[FeatureRecord]:
+</code></pre>
+<p>Update the docstring (same <code>Args:</code> and <code>Raises:</code> additions as Task 7 Step 2). Note in the docstring that the offline backend reads from the per-feature SQLite cache, so the <code>materialize_limit</code> check happens after the cache fetch (which is bounded by the bag's snapshot anyway).</p>
+<ul>
+<li>[ ] <strong>Step 3: Apply the parameters in the impl</strong></li>
+</ul>
+<p>Find:</p>
+<pre><code class="language-python">        target_col = table if isinstance(table, str) else table.name
+        records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
+
+        if selector is None:
+            yield from records
+            return
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        target_col = table if isinstance(table, str) else table.name
+        records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
+
+        # Apply execution_rids filter (Python-side; the bag cache doesn't
+        # have a server-side query layer to push this into).
+        if execution_rids is not None:
+            if not execution_rids:
+                return
+            execution_rid_set = set(execution_rids)
+            records = [r for r in records if getattr(r, &quot;Execution&quot;, None) in execution_rid_set]
+
+        # Enforce materialize_limit cap. Bag-side limit is post-cache-fetch
+        # since the cache is already populated; primary purpose of the
+        # cap here is API parity with the online backend.
+        if materialize_limit is not None and len(records) &gt; materialize_limit:
+            from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+            raise DerivaMLMaterializeLimitExceeded(
+                actual_count=len(records),
+                limit=materialize_limit,
+            )
+
+        if selector is None:
+            yield from records
+            return
+</code></pre>
+<p>(Lazy import of the exception class to avoid touching the existing module-level import block.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Run unit tests + lint</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/test_sort.py -q 2&gt;&amp;1 | tail -5 &amp;&amp; uv run ruff check src/deriva_ml/dataset/dataset_bag.py &amp;&amp; uv run ruff format src/deriva_ml/dataset/dataset_bag.py
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add src/deriva_ml/dataset/dataset_bag.py &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(DatasetBag.feature_values): support materialize_limit + execution_rids
+
+Offline backend gets the same two new parameters as the online
+catalog-mixin impl. execution_rids is applied Python-side (the bag
+cache has no server-side query layer); materialize_limit is checked
+after cache fetch for API parity.
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-10-full-suite-integration-test-pass">Task 10: Full-suite integration test pass</h3>
+<p><strong>Files:</strong>
+- Touch: nothing (verification only)</p>
+<p>This task verifies that the cumulative changes from Tasks 1-9 don't regress the integration suite. It runs the slow tests in the appropriate buckets per the CLAUDE.md guidance.</p>
+<ul>
+<li>[ ] <strong>Step 1: Run unit tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ tests/core/ -q --timeout=120 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run feature tests (catalog required)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=&quot;${DERIVA_HOST:-localhost}&quot; uv run pytest tests/feature/ -q --timeout=600 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: all pass including the new <code>test_feature_values_limits.py</code> (5 new tests).</p>
+<ul>
+<li>[ ] <strong>Step 3: Run execution tests (catalog required)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=&quot;${DERIVA_HOST:-localhost}&quot; uv run pytest tests/execution/ -q --timeout=600 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: all pass including the new <code>test_find_executions_sort.py</code> (4 new tests).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run dataset tests (catalog required)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=&quot;${DERIVA_HOST:-localhost}&quot; uv run pytest tests/dataset/ -q --timeout=600 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: all pass including the new <code>test_find_datasets_sort.py</code> (4 new tests).</p>
+<ul>
+<li>[ ] <strong>Step 5: Run remaining catalog/schema/workflow tests</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=&quot;${DERIVA_HOST:-localhost}&quot; uv run pytest tests/catalog/ tests/schema/ tests/workflow/ -q --timeout=600 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Expected: all pass including the new <code>test_find_workflows_sort.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 6: Final lint + format check across the whole src tree</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; uv run ruff check src/ tests/ &amp;&amp; uv run ruff format --check src/ tests/
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 7: No commit needed</strong></li>
+</ul>
+<p>This task is verification-only. If everything passes, no commit. If anything fails, fix it in a new commit on this branch and re-run the affected suite.</p>
+<hr />
+<h3 id="task-11-update-changelog-and-verify-ready-for-release">Task 11: Update CHANGELOG and verify ready for release</h3>
+<p><strong>Files:</strong>
+- Modify: <code>CHANGELOG.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the current CHANGELOG.md head</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; head -40 CHANGELOG.md
+</code></pre>
+<p>Confirm the existing format (date headers, bullet style) before editing.</p>
+<ul>
+<li>[ ] <strong>Step 2: Add a new "Unreleased" section at the top</strong></li>
+</ul>
+<p>Insert at the top of <code>CHANGELOG.md</code> (after any title/header but before the most recent dated section):</p>
+<pre><code class="language-markdown">## [Unreleased]
+
+### Added
+
+- `find_executions`, `find_datasets`, `find_workflows` accept an optional
+  `sort=` parameter (`None` | `True` | callable). `sort=None` (default)
+  preserves the existing backend-determined order. `sort=True` returns
+  records newest-first by record creation time (`RCT desc`). A callable
+  receives the path-builder context and returns one or more sort keys.
+- `feature_values` on `DerivaML`, `Dataset`, and `DatasetBag` accepts:
+  - `materialize_limit: int | None = None` — caller-controlled cap on
+    rows materialized into memory; raises
+    `DerivaMLMaterializeLimitExceeded` when exceeded.
+  - `execution_rids: list[str] | None = None` — server-side filter to
+    a known set of execution RIDs. Empty list short-circuits to an
+    empty result. Lets compare-runs workflows fetch values across N
+    executions in one round-trip.
+- `DerivaMLMaterializeLimitExceeded` exception class
+  (subclass of `DerivaMLValidationError`).
+- `deriva_ml.core.sort` module — `SortSpec` type alias and
+  `resolve_sort` helper used by all `find_*` impls to centralize
+  the three-state sort semantics.
+
+### Changed
+
+- `interfaces.py` Protocol declarations for `find_executions`,
+  `find_datasets`, `find_workflows`, `list_dataset_members`,
+  `list_dataset_parents`, `list_dataset_children`, and
+  `feature_values` extended with the new optional parameters. All
+  parameters default to None / current behavior so concrete classes
+  that haven't been updated yet still satisfy the protocol.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Verify the file is well-formed</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; head -50 CHANGELOG.md
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git add CHANGELOG.md &amp;&amp; git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(changelog): document sort=, materialize_limit=, execution_rids= additions
+
+Co-Authored-By: Claude Opus 4.7 &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-12-pr-merge-and-minor-version-release">Task 12: PR, merge, and minor-version release</h3>
+<p><strong>Files:</strong>
+- Touch: nothing in the repo (release ops only)</p>
+<ul>
+<li>[ ] <strong>Step 1: Push branch</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git push -u origin feature/sort-and-feature-batch
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Open PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; gh pr create --title &quot;Add sort=, materialize_limit=, execution_rids= to find_* and feature_values&quot; --body &quot;$(cat &lt;&lt;'EOF'
+## Summary
+
+Three additive capability changes to unblock the deriva-ml-mcp v3.1.0
+release. None of these change existing behavior (all new parameters
+default to None / current behavior).
+
+## Changes
+
+### 1. `sort=` on `find_*` methods (F1 from the deriva-ml-mcp audit)
+
+`find_executions`, `find_datasets`, `find_workflows` accept a
+three-state `sort=` parameter:
+- `None` (default): backend order, no sort applied
+- `True`: newest-first by `RCT desc`
+- callable: user-supplied sort keys via the path-builder
+
+### 2. `materialize_limit=` on `feature_values` (F2 stopgap)
+
+Caller-controlled cap on rows materialized into memory. Raises
+`DerivaMLMaterializeLimitExceeded` when exceeded. The MCP plugin will
+set a default to keep wire responses bounded; direct Python callers
+keep unbounded behavior.
+
+### 3. `execution_rids=` on `feature_values` (F3 backend)
+
+Server-side filter to a known set of execution RIDs. Lets the MCP's
+forthcoming `compare_metrics` tool fetch values across N executions
+in one catalog round-trip rather than N sequential queries.
+
+## Test plan
+
+- [x] Unit tests for `resolve_sort` (8 tests, no catalog needed)
+- [x] Integration tests for `find_executions(sort=...)` (4 tests)
+- [x] Integration tests for `find_datasets(sort=...)` (4 tests)
+- [x] Integration tests for `find_workflows(sort=...)`
+- [x] Integration tests for `feature_values(materialize_limit=, execution_rids=)` (5 tests)
+- [x] Full integration suite passes
+- [x] Lint + format clean
+
+## Wire-shape impact
+
+None. All new parameters default to None / current behavior. Existing
+callers see no change.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Merge PR</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; gh pr merge --merge --delete-branch
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Bump minor version + tag + push</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git checkout main &amp;&amp; git pull &amp;&amp; uv run bump-version minor 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected output (final lines):</p>
+<pre><code>New version tag: v?.?.0
+Release process complete!
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Verify the tag landed</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/DerivaML/deriva-ml &amp;&amp; git log --oneline -3 &amp;&amp; git tag --sort=-version:refname | head -3
+</code></pre>
+<p>Expected: top tag is the new minor version; top commit is the version bump.</p>
+<hr />
+<h2 id="self-review">Self-Review</h2>
+<p><strong>1. Spec coverage:</strong>
+- F1 (sort): Tasks 2-6 cover the helper, Protocol updates, and the three online <code>find_*</code> impls.
+- F2 (materialize_limit): Task 1 (exception), Task 7 (catalog impl), Task 8 (Dataset wrapper), Task 9 (DatasetBag impl).
+- F3 (execution_rids batch filter): Task 7 (catalog), Task 8 (Dataset), Task 9 (DatasetBag) — same set of tasks as F2 because they share a parameter location.</p>
+<p><strong>2. Placeholder scan:</strong> No "TBD", "implement later", "etc." Test code blocks are complete; no "write tests for the above" without showing them. Each step that changes code shows the actual code.</p>
+<p><strong>3. Type consistency:</strong>
+- <code>SortSpec = Union[bool, Callable, None]</code> is defined in Task 2 (<code>src/deriva_ml/core/sort.py</code>) and used in Tasks 3-6.
+- <code>DerivaMLMaterializeLimitExceeded</code> is defined in Task 1 (<code>exceptions.py</code>) and consumed in Tasks 7 + 9.
+- <code>resolve_sort(sort, default_callable, path)</code> signature is defined in Task 2 and used identically in Tasks 4, 5, 6.
+- All parameter names match across Protocol (Task 3) and impl (Tasks 4-9): <code>sort</code>, <code>materialize_limit</code>, <code>execution_rids</code>.</p>
+<p><strong>Known scope choice:</strong> I dropped sorting from <code>list_dataset_members</code> / <code>list_dataset_parents</code> / <code>list_dataset_children</code> (originally in the design summary). The audit's friction was on <code>find_*</code> methods for "show me the last N." The dataset-relationship list methods don't have the same use case, and YAGNI applies — we can add them later if anyone asks. The Protocol declarations in Task 3 still get the <code>sort=</code> parameter for forward-compat; only the concrete implementations are deferred. Consequence: the Protocol allows <code>sort=</code> on <code>list_dataset_*</code> but the current impls ignore it (it sits in <code>**kwargs</code>). When/if anyone implements it, the Protocol is already in place. Documented in the Protocol's <code>Args:</code> block as "currently ignored by Dataset and DatasetBag; reserved for future use."</p>
+<p>If a Protocol-conformance test catches the Protocol-vs-impl mismatch, fix by either (a) accepting <code>sort</code> and discarding it (current <code>**kwargs: Any</code> already allows this), or (b) implementing the sort on those methods (out of scope for this PR, file a follow-up issue).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

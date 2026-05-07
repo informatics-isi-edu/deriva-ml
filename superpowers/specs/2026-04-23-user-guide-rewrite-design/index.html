@@ -1,0 +1,2713 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-23-user-guide-rewrite-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>User-Guide Rewrite — Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#user-guide-rewrite-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              User-Guide Rewrite — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#three-layer-information-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three-layer information model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-top-level-nav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New top-level nav
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-preservation-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Content-preservation invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files-to-create" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New files to create
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-to-rewrite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to rewrite
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-to-rename-content-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to rename (content unchanged)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-to-delete-content-re-homed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to delete (content re-homed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files unchanged
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chapter-outlines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter outlines
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Chapter outlines">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chapter-1-exploring-a-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 1: Exploring a catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-2-working-with-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 2: Working with datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-3-defining-and-using-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 3: Defining and using features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-4-running-an-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 4: Running an experiment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-5-working-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 5: Working offline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-6-sharing-and-collaboration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 6: Sharing and collaboration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-7-reproducibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 7: Reproducibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-8-integrating-with-hydra-zen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter 8: Integrating with hydra-zen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing approach
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing approach">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#voice-and-audience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Voice and audience
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chapter-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chapter structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runnable-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runnable examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatting-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting conventions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-references
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#building-the-migration-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the migration map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drafting-a-chapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafting a chapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nav-rewrite-and-deletions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nav rewrite and deletions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tier-1-per-chapter-mechanical-blocking-per-commit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1 — per-chapter mechanical (blocking per commit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-2-cross-chapter-integration-blocking-before-nav-rewrite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2 — cross-chapter integration (blocking before nav rewrite)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-3-code-verification-selective-blocking-per-chapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 3 — code verification (selective, blocking per chapter)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-4-cover-to-cover-read-through-blocking-before-pr-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 4 — cover-to-cover read-through (blocking before PR merge)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-5-external-reader-non-blocking-but-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 5 — external reader (non-blocking but recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cut-list-migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cut list (migration plan)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Migration plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-0-inventory-and-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0 — inventory and map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-chapter-drafts-one-commit-per-chapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — chapter drafts (one commit per chapter)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-introduction-rewrite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Introduction rewrite
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-api-reference-rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — API reference rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-nav-rewrite-and-deletions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4 — nav rewrite and deletions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-read-through-external-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5 — read-through + external reader
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scale-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scale estimate
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="user-guide-rewrite-design">User-Guide Rewrite — Design</h1>
+<p><strong>Status:</strong> Draft
+<strong>Date:</strong> 2026-04-23
+<strong>Scope:</strong> Sub-project 1 of the two-part documentation pass. Rewrites the deriva-ml user-facing documentation as a conventional technical user guide. Sub-project 2 (docstring sweep) is a separate brainstorm → spec → plan cycle.</p>
+<h2 id="problem">Problem</h2>
+<p>The current <code>deriva-ml</code> documentation has three user-facing sections (<code>Getting Started</code>, <code>Concepts</code>, <code>Running Workflows</code>) that overlap, collectively mis-orient readers, and duplicate content that the <code>deriva-ml-model-template</code> repo already owns. Reviewer #5 (the ML-developer lifecycle reviewer in the S2 post-audit) flagged the onramp story specifically: the current quick-start leads with <code>deriva-ml-run</code> and hydra-zen configuration before the reader knows what a Dataset or Execution is, which doubles time-to-first-success.</p>
+<p>With the template repo now responsible for zero-to-first-success (install, project scaffolding, CLI usage, hydra-zen), <code>deriva-ml</code>'s own docs are free to stop trying to be an onramp and become what they should be: a <strong>user guide</strong> — the narrative layer between a conceptual white-paper and the API reference, task-oriented and readable cover-to-cover.</p>
+<h2 id="goals">Goals</h2>
+<ul>
+<li><strong>One authoritative narrative</strong> for what the library does and how to use it. Resolve the overlap between today's <code>Concepts</code> and <code>Running Workflows</code> sections.</li>
+<li><strong>Task-oriented chapters</strong> — organized by what the user wants to do (explore, build a dataset, record features, run an experiment), not by API surface.</li>
+<li><strong>No duplication with the template repo.</strong> Onramp / install / project scaffolding / CLI is the template's concern; link to it instead of repeating it.</li>
+<li><strong>Complete content preservation.</strong> Every piece of information in the existing deriva-ml docs either gets re-homed into the user guide or is explicitly retired with rationale.</li>
+<li><strong>Backward-compatible URLs for one release cycle</strong> via HTML <code>meta refresh</code> stubs on deleted pages.</li>
+</ul>
+<h2 id="non-goals">Non-goals</h2>
+<ul>
+<li><strong>Docstring sweep.</strong> Sub-project 2, separate spec/plan. Different audience (future Claude + MCP), different shape (per-method), different review loop.</li>
+<li><strong>New library features.</strong> If a chapter example would be cleaner with a code change, file a follow-on issue; don't write around it, don't change the library here.</li>
+<li><strong>API-reference content improvement.</strong> Renaming <code>docs/code-docs/ → docs/api-reference/</code> is mechanical; substantive improvement comes from the docstring sweep.</li>
+<li><strong>Hydra-zen Configuration section rewrite.</strong> Stays as the deep-dive reference; the user-guide chapter 8 is only a shallow introduction that points to it.</li>
+<li><strong>Template-repo docs.</strong> The template's README and docs are the template's concern.</li>
+<li><strong>Positioning / branding changes to the project as a whole</strong> beyond what the Introduction page requires.</li>
+</ul>
+<h2 id="architecture">Architecture</h2>
+<h3 id="three-layer-information-model">Three-layer information model</h3>
+<ul>
+<li><strong>Conceptual layer (Introduction):</strong> one page. Positions deriva-ml in the ML tooling landscape, explains the problem it solves, names the four core objects (Catalog, Dataset, Execution, Feature), and points new readers to the template repo for onramp.</li>
+<li><strong>Narrative layer (User Guide):</strong> eight chapters. Task-oriented. The spine of the docs — meant to be read cover-to-cover or sampled by task.</li>
+<li><strong>Reference layer (API Reference):</strong> auto-generated from docstrings, renamed from today's "Library Documentation." Content improvement is deferred to sub-project 2.</li>
+</ul>
+<h3 id="new-top-level-nav">New top-level nav</h3>
+<pre><code>1. Introduction                 (was: index.md + Getting Started section)
+2. User Guide                   (NEW — 8 chapters replacing Concepts + Workflows)
+3. Configuration                (unchanged — hydra-zen deep dive)
+4. Sample Notebooks             (unchanged)
+5. API Reference                (renamed from Library Documentation)
+6. Release Notes                (unchanged)
+</code></pre>
+<h3 id="content-preservation-invariant">Content-preservation invariant</h3>
+<p>Every sentence currently in <code>docs/</code> outside the untouched sections either:
+(a) is re-homed into a User Guide chapter with the same or improved clarity,
+(b) is folded into the Introduction,
+(c) is explicitly marked obsolete in this spec's §Cut list with a rationale.</p>
+<p>No information loss. A migration map (see §Migration plan) is built before any rewriting starts.</p>
+<h2 id="components">Components</h2>
+<h3 id="new-files-to-create">New files to create</h3>
+<pre><code>docs/
+├── user-guide/
+│   ├── exploring.md            # Chapter 1: Exploring a catalog
+│   ├── datasets.md             # Chapter 2: Working with datasets
+│   ├── features.md             # Chapter 3: Defining and using features
+│   ├── executions.md           # Chapter 4: Running an experiment
+│   ├── offline.md              # Chapter 5: Working offline
+│   ├── sharing.md              # Chapter 6: Sharing and collaboration
+│   ├── reproducibility.md      # Chapter 7: Reproducibility
+│   └── hydra-zen.md            # Chapter 8: Integrating with hydra-zen
+</code></pre>
+<h3 id="files-to-rewrite">Files to rewrite</h3>
+<ul>
+<li><code>docs/index.md</code> — Introduction, rewritten with positioning and a pointer to the template repo.</li>
+</ul>
+<h3 id="files-to-rename-content-unchanged">Files to rename (content unchanged)</h3>
+<ul>
+<li><code>docs/code-docs/*.md</code> → <code>docs/api-reference/*.md</code> — eleven files; no content changes; <code>mkdocs.yml</code> nav updated to match.</li>
+</ul>
+<h3 id="files-to-delete-content-re-homed">Files to delete (content re-homed)</h3>
+<p>Twelve pages. See §Cut list for the full table.</p>
+<h3 id="files-unchanged">Files unchanged</h3>
+<ul>
+<li><code>docs/configuration/*.md</code> (4 pages)</li>
+<li><code>docs/Notebooks/*.ipynb</code> (4 notebooks)</li>
+<li><code>docs/release-notes.md</code></li>
+<li><code>docs/architecture.md</code> (developer-facing, not user-facing)</li>
+<li><code>docs/assets/*</code> (images, PDFs)</li>
+</ul>
+<h3 id="configuration-change">Configuration change</h3>
+<ul>
+<li><code>mkdocs.yml</code> — nav section rewritten to match the new three-layer structure.</li>
+</ul>
+<h2 id="chapter-outlines">Chapter outlines</h2>
+<p>Each chapter: 1500-3000 words, task-oriented. Every chapter follows the same internal shape (see §Writing approach).</p>
+<h3 id="chapter-1-exploring-a-catalog">Chapter 1: Exploring a catalog</h3>
+<p><strong>Goal:</strong> the reader knows how to discover what's in a DerivaML instance they've just connected to.</p>
+<p><strong>Sections:</strong>
+- Connecting (<code>DerivaML(hostname, catalog_id)</code>) with a pointer to the template repo for project setup
+- Understanding RIDs (the opaque-ID story + how they show up everywhere)
+- Listing tables and browsing the schema
+- <code>find_datasets</code>, <code>find_features</code>, <code>find_workflows</code>, <code>find_executions</code>
+- <code>ml.pathBuilder()</code> for ad-hoc queries — when to reach for it vs. the high-level APIs (the "when to reach for X vs Y" pattern)
+- Jumping to Chaise (<code>get_chaise_url</code>) for GUI browsing</p>
+<p><strong>Source material:</strong> current <code>concepts/overview.md</code>, <code>concepts/identifiers.md</code>, parts of <code>cli-reference.md</code>.</p>
+<h3 id="chapter-2-working-with-datasets">Chapter 2: Working with datasets</h3>
+<p><strong>Goal:</strong> the reader can create, populate, version, and split datasets.</p>
+<p><strong>Sections:</strong>
+- What a Dataset is: a versioned, named collection of RIDs; it doesn't copy data, it points at existing rows
+- Creating a dataset; adding members (list-of-RIDs form and dict form)
+- Dataset types — choosing and designing them (orthogonal tagging)
+- Parent/child relationships, nested datasets
+- Version management: <code>current_version</code>, <code>increment_dataset_version</code>, catalog snapshot semantics
+- Splitting: <code>split_dataset</code> with stratification, dry-run, seed control
+- Downloading as a bag; <code>DatasetSpec</code> vs <code>DatasetBag</code></p>
+<p><strong>Source material:</strong> current <code>concepts/datasets.md</code> (770 lines — major rewrite, preserve all examples), chunks of <code>workflows/execution-lifecycle.md</code> on versioning.</p>
+<h3 id="chapter-3-defining-and-using-features">Chapter 3: Defining and using features</h3>
+<p><strong>Goal:</strong> the reader can add structured, provenance-linked annotations to their data.</p>
+<p><strong>Sections:</strong>
+- What a Feature is (association table with target + execution + values)
+- When to use a feature vs. a regular column
+- Creating a vocabulary (prerequisite for term features)
+- <code>create_feature</code> — terms, assets, metadata columns
+- Three-method read surface: <code>find_features</code>, <code>feature_values</code>, <code>lookup_feature</code>
+- Selectors: <code>select_newest</code>, <code>select_by_workflow</code>, <code>select_majority_vote</code>, custom selectors
+- Multi-annotator scenarios (the canonical use case)
+- Asset features (crop boxes, embeddings)
+- Reading features from a downloaded bag (same API, offline)</p>
+<p><strong>Source material:</strong> current <code>concepts/features.md</code> (460 lines — rewrite, preserve worked examples), S2 spec, the new docstrings we wrote during S2.</p>
+<h3 id="chapter-4-running-an-experiment">Chapter 4: Running an experiment</h3>
+<p><strong>Goal:</strong> the reader can execute a training or analysis run with full provenance.</p>
+<p><strong>Sections:</strong>
+- The Execution mental model (a workflow run instance)
+- <code>ExecutionConfiguration</code>: datasets, assets, description
+- The <code>with ml.create_execution(cfg)</code> context manager pattern
+- Status lifecycle: Created → Running → Stopped → Pending_Upload → Uploaded (+ failure paths)
+- Writing outputs: <code>exe.asset_file_path()</code> for files, <code>exe.add_features()</code> for records
+- <code>upload_execution_outputs()</code> — what it does and the ordering guarantees (assets first, features second, asset-column RID rewriting between)
+- Crash-resume and what the SQLite execution state does for you
+- CLI reference as a subsection (<code>deriva-ml-run</code>, <code>deriva-ml-run-notebook</code>)</p>
+<p><strong>Source material:</strong> <code>workflows/execution-lifecycle.md</code>, <code>workflows/running-models.md</code>, <code>cli-reference.md</code>, S2 execution changes.</p>
+<h3 id="chapter-5-working-offline">Chapter 5: Working offline</h3>
+<p><strong>Goal:</strong> the reader can do work on a laptop with a downloaded bag and sync back when online.</p>
+<p><strong>Sections:</strong>
+- Bag vs live catalog — the mental model
+- Downloading a bag; materializing assets
+- <code>DatasetBag</code> API parity with <code>Dataset</code> — what works, what doesn't, and why
+- The offline-to-online write cycle: construct <code>FeatureRecord</code> from bag metadata, hand to <code>exe.add_features()</code> when reconnected
+- <code>restructure_assets()</code> for framework-friendly directory layouts (ImageFolder pattern)</p>
+<p><strong>Source material:</strong> <code>concepts/datasets.md</code> bag sections, S2 offline-cycle tests, new S2 docstrings.</p>
+<h3 id="chapter-6-sharing-and-collaboration">Chapter 6: Sharing and collaboration</h3>
+<p><strong>Goal:</strong> the reader can share data with collaborators — whether they have catalog access or not.</p>
+<p><strong>Sections:</strong>
+- MINIDs as citable identifiers — what they guarantee
+- BDBag format — enough to understand what you're sharing
+- <code>create_ml_workspace</code> — partial catalog clones for multi-site collaboration (currently undocumented; reviewer #5 flagged this as a major gap)
+- <code>localize_assets</code> — copying Hatrac assets after a clone
+- Orphan-handling strategies during cloning (FAIL / DELETE / NULLIFY)
+- Access control — brief (delegated to Deriva/Globus; link to their docs)</p>
+<p><strong>Source material:</strong> <code>concepts/file-assets.md</code> (partial), <code>CLAUDE.md</code> section on catalog cloning, net new from source-code reading where needed.</p>
+<h3 id="chapter-7-reproducibility">Chapter 7: Reproducibility</h3>
+<p><strong>Goal:</strong> the reader understands what reproducibility deriva-ml guarantees, what it costs, and how to exercise it.</p>
+<p><strong>Sections:</strong>
+- What reproducibility costs and buys
+- Dataset version pinning via catalog snapshots
+- Workflow checksums and git commit capture
+- Docker image digest capture for containerized runs
+- <code>configuration.json</code> and execution metadata — what's captured automatically
+- Dirty-tree handling — warnings vs. hard errors, <code>DERIVA_ML_ALLOW_DIRTY</code>
+- Patterns for re-running past executions (discovering a past execution, reading its config back, launching a new execution with the same inputs)</p>
+<p><strong>Source material:</strong> <code>workflows/git-and-versioning.md</code>, dataset-versioning sections of <code>concepts/datasets.md</code>, execution-snapshot work.</p>
+<h3 id="chapter-8-integrating-with-hydra-zen">Chapter 8: Integrating with hydra-zen</h3>
+<p><strong>Goal:</strong> the reader understands how hydra-zen fits with deriva-ml and can choose when to use it.</p>
+<p><strong>Sections:</strong>
+- What hydra-zen is and why deriva-ml uses it
+- The four config classes (<code>DerivaMLConfig</code>, <code>DatasetSpecConfig</code>, <code>AssetRIDConfig</code>, <code>ExecutionConfiguration</code>)
+- How configs thread through the <code>deriva-ml-run</code> CLI
+- When to reach for hydra-zen vs. straight Python (the comparison pattern)
+- Link to the Configuration section for the deep dive
+- Link to the template repo for project-setup patterns</p>
+<p><strong>Source material:</strong> current <code>configuration/overview.md</code> (the Configuration section is preserved; chapter 8 is a shallow intro), CLAUDE.md hydra-zen sections, summarize-and-link approach.</p>
+<h2 id="writing-approach">Writing approach</h2>
+<h3 id="voice-and-audience">Voice and audience</h3>
+<p>Written for a working ML developer who has a project scaffolded from the template and wants to understand the library they're using. Assume Python fluency, ML vocabulary (train/val/test, labels, features, assets), and basic familiarity with relational schemas. Do not assume prior Deriva knowledge — introduce Deriva-specific concepts (RIDs, catalogs, ERMrest, Hatrac, Chaise) on first use with a sentence of explanation each.</p>
+<p>Tone: direct, technical, second person ("you"). No hype, no "easy and powerful," no emoji. Short paragraphs, short sentences. Diagrams only when they clarify something text can't.</p>
+<h3 id="chapter-structure">Chapter structure</h3>
+<p>Every chapter has the same shape:</p>
+<ol>
+<li><strong>Opening paragraph</strong> — what the chapter is for, what the reader will know at the end. No preamble about the topic's importance.</li>
+<li><strong>Concept setup</strong> (1-2 paragraphs) — the mental model the rest of the chapter builds on.</li>
+<li><strong>Task sections</strong> — each is a <code>## How to &lt;verb&gt; &lt;noun&gt;</code> heading with: one-paragraph motivation, runnable code example, explanation of what the code did, bulleted "Notes" list of gotchas.</li>
+<li><strong>"When to reach for X vs Y" subsections</strong> — comparison subsections where two APIs are legitimately both valid (e.g., <code>Denormalizer</code> vs <code>feature_values</code>, <code>ml.pathBuilder()</code> vs high-level APIs).</li>
+<li><strong>Common pitfalls</strong> (optional) — things that will actually trip people up. One per chapter at most.</li>
+<li><strong>See also</strong> — one-line cross-references to related chapters and API reference anchors.</li>
+</ol>
+<h3 id="runnable-examples">Runnable examples</h3>
+<p>Every code block either (a) runs against any DerivaML instance with no setup, or (b) has a prominent <code># assumes: dataset_rid is a valid dataset in your catalog</code> comment at the top. Examples are short (5-15 lines) and self-contained. Long worked examples go into <code>docs/Notebooks/</code>.</p>
+<p>Code style matches what users would actually write: imports at the top of each chapter's first example, then assumed available in subsequent examples within the same chapter.</p>
+<h3 id="formatting-conventions">Formatting conventions</h3>
+<ul>
+<li>Markdown with mkdocs-material Admonition syntax: <code>!!! note</code>, <code>!!! warning</code>, <code>!!! tip</code>. Used for pitfalls and important caveats only, not decoration.</li>
+<li>Code blocks use language-tagged fences: <code>python</code> by default, <code>bash</code> for shell, <code>json</code> for catalog payloads.</li>
+<li>Diagrams: PNG or Mermaid. Keep the existing ERD on the Introduction page. Add execution-state-machine diagram in Chapter 4. Add dataset-version → catalog-snapshot flow in Chapter 2 if prose is unclear. No more than 4-5 diagrams total across the guide.</li>
+</ul>
+<h3 id="cross-references">Cross-references</h3>
+<p>Inside the user guide: relative paths (<code>../user-guide/features.md#selectors</code>).
+To API reference: <code>../api-reference/deriva_ml_base.md#DerivaML.feature_values</code>.
+External links: full URLs.</p>
+<h2 id="data-flow">Data flow</h2>
+<h3 id="building-the-migration-map">Building the migration map</h3>
+<p>Before writing any chapter:</p>
+<ol>
+<li>Walk the 12 pages in the cut list and extract every code example, diagram, edge-case note, and "gotcha" box. Store keyed by destination chapter.</li>
+<li>For each chapter, assemble the source material into an outline following the §Chapter outlines structure.</li>
+<li>Flag any content that doesn't fit the new structure. Three outcomes: (a) belongs in a different chapter, (b) redundant with other content, (c) obsolete.</li>
+<li>Produce a content inventory document and commit it alongside the chapter drafts. Reviewers can verify nothing was lost.</li>
+</ol>
+<h3 id="drafting-a-chapter">Drafting a chapter</h3>
+<ol>
+<li>Open the migration map entry for the chapter.</li>
+<li>Draft the opening paragraph + concept setup.</li>
+<li>For each task section: write the motivation → write or adapt the code example → verify it runs (if verification-tier; see §Testing) → write the explanation → list gotchas.</li>
+<li>Add "When to reach for X vs Y" subsections where the current code has two valid paths.</li>
+<li>Add common-pitfalls admonition if warranted.</li>
+<li>Add See-also cross-references.</li>
+<li>Run <code>mkdocs build --strict</code> locally; fix broken links.</li>
+<li>Commit the chapter as a single commit.</li>
+</ol>
+<h3 id="nav-rewrite-and-deletions">Nav rewrite and deletions</h3>
+<p>After all 8 chapters are drafted and committed:</p>
+<ol>
+<li>Rewrite <code>mkdocs.yml</code> nav.</li>
+<li>Rename <code>docs/code-docs/</code> to <code>docs/api-reference/</code> in one commit; update nav.</li>
+<li>Delete the 12 cut-list pages; replace each with a stub <code>meta refresh</code> redirect to its new home. Stub stays for one release cycle.</li>
+<li>Run a full link audit (<code>grep -rn "concepts/\|workflows/\|getting-started/" docs/</code>) and fix every intra-doc reference.</li>
+<li>Commit the nav change and deletions together.</li>
+</ol>
+<h2 id="error-handling">Error handling</h2>
+<p>This is a documentation project, not a code project, so "errors" are shape-of-the-content problems:</p>
+<ul>
+<li><strong>Content loss</strong> — a sentence from a cut page isn't captured in the migration map. Mitigation: the migration map is a required pre-chapter artifact and is reviewable independently.</li>
+<li><strong>Link rot</strong> — internal links pointing at deleted pages. Mitigation: <code>mkdocs build --strict</code> rejects broken intra-doc links; external link-checker catches external ones; stub-redirect pages cover user-facing bookmark URLs for one release.</li>
+<li><strong>Example drift</strong> — code examples that stop working as the library evolves. Mitigation: each chapter declares which examples were executed against a live catalog. Out-of-date examples surface the next time someone reads the chapter.</li>
+<li><strong>Stale cross-references to API names</strong> — API Reference anchors that break when docstrings get restructured in sub-project 2. Mitigation: sub-project 2's spec includes a link-audit step that updates user-guide cross-references.</li>
+<li><strong>Inconsistent voice / pattern across chapters</strong> — one chapter has worked examples, another has only API sketches. Mitigation: the §Writing approach structure is mandatory per chapter; the final read-through (§Testing) catches drift.</li>
+</ul>
+<h2 id="testing">Testing</h2>
+<p>Five verification stages, ordered by cost:</p>
+<h3 id="tier-1-per-chapter-mechanical-blocking-per-commit">Tier 1 — per-chapter mechanical (blocking per commit)</h3>
+<ul>
+<li><code>uv run mkdocs build --strict</code> succeeds with zero warnings.</li>
+<li>All <code>!!! admonition</code> blocks use valid types.</li>
+<li>All code blocks have language tags.</li>
+</ul>
+<h3 id="tier-2-cross-chapter-integration-blocking-before-nav-rewrite">Tier 2 — cross-chapter integration (blocking before nav rewrite)</h3>
+<ul>
+<li>Link audit: <code>grep -rn "(concepts|workflows|getting-started)/" docs/</code> after deletions returns nothing.</li>
+<li><code>mkdocs-linkcheck</code> (or equivalent) passes — no broken external links.</li>
+<li>All 8 chapter files exist; all 12 cut-list files are either deleted or stub-redirects.</li>
+</ul>
+<h3 id="tier-3-code-verification-selective-blocking-per-chapter">Tier 3 — code verification (selective, blocking per chapter)</h3>
+<p>For the most important examples per chapter (3-5 per chapter), actually execute the code against a live catalog (<code>test_ml</code> fixture or equivalent) and confirm it works. Document which examples were verified in each chapter's migration-map entry. Pure illustrative examples (e.g., "assuming you had this data…") are marked as illustrative.</p>
+<h3 id="tier-4-cover-to-cover-read-through-blocking-before-pr-merge">Tier 4 — cover-to-cover read-through (blocking before PR merge)</h3>
+<p>Read the full user guide in one sitting. Catch:</p>
+<ul>
+<li>Internal inconsistencies (e.g., one chapter defines a term, another redefines it differently)</li>
+<li>Repeated material across chapters (each concept should have one primary home)</li>
+<li>Missing transitions between chapters</li>
+<li>"Forward references" — chapter N referring to a concept introduced in chapter N+2</li>
+</ul>
+<h3 id="tier-5-external-reader-non-blocking-but-recommended">Tier 5 — external reader (non-blocking but recommended)</h3>
+<p>Ask a developer not on the project to read chapters 1-4 and report confusion points. Single-session, no pre-briefing. Their confusion reveals what the intended audience would stumble on.</p>
+<h2 id="cut-list-migration-plan">Cut list (migration plan)</h2>
+<table>
+<thead>
+<tr>
+<th>Source page</th>
+<th>Disposition</th>
+<th>Destination</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docs/getting-started/quick-start.md</code></td>
+<td>Delete</td>
+<td>Pointer in Introduction to the template repo</td>
+</tr>
+<tr>
+<td><code>docs/getting-started/install.md</code></td>
+<td>Delete</td>
+<td>Pointer in Introduction to the template repo</td>
+</tr>
+<tr>
+<td><code>docs/getting-started/project-setup.md</code></td>
+<td>Delete</td>
+<td>Pointer in Introduction to the template repo</td>
+</tr>
+<tr>
+<td><code>docs/concepts/overview.md</code></td>
+<td>Delete</td>
+<td>Content merged into Introduction (positioning + four-object model) and Chapter 1 (catalog exploration)</td>
+</tr>
+<tr>
+<td><code>docs/concepts/identifiers.md</code></td>
+<td>Delete</td>
+<td>Merged into Chapter 1 (the "Understanding RIDs" section)</td>
+</tr>
+<tr>
+<td><code>docs/concepts/datasets.md</code></td>
+<td>Rewrite</td>
+<td>Becomes Chapter 2; preserve all code examples</td>
+</tr>
+<tr>
+<td><code>docs/concepts/features.md</code></td>
+<td>Rewrite</td>
+<td>Becomes Chapter 3; preserve worked examples</td>
+</tr>
+<tr>
+<td><code>docs/concepts/file-assets.md</code></td>
+<td>Delete</td>
+<td>Split across Chapter 4 (assets as execution outputs) and Chapter 6 (assets in shared bags)</td>
+</tr>
+<tr>
+<td><code>docs/concepts/annotations.md</code></td>
+<td>Delete</td>
+<td>Merged into Chapter 3 (feature-column annotations) if the content is user-facing; retire to developer docs if not</td>
+</tr>
+<tr>
+<td><code>docs/concepts/denormalization.md</code></td>
+<td>Delete</td>
+<td>Content about <code>Denormalizer</code> merged into Chapter 3 ("When to reach for X vs Y" subsection)</td>
+</tr>
+<tr>
+<td><code>docs/workflows/execution-lifecycle.md</code></td>
+<td>Rewrite</td>
+<td>Becomes Chapter 4 core</td>
+</tr>
+<tr>
+<td><code>docs/workflows/running-models.md</code></td>
+<td>Delete</td>
+<td>Split across Chapter 8 (hydra-zen integration) and Chapter 4 (CLI reference subsection)</td>
+</tr>
+<tr>
+<td><code>docs/workflows/git-and-versioning.md</code></td>
+<td>Rewrite</td>
+<td>Becomes Chapter 7 core</td>
+</tr>
+<tr>
+<td><code>docs/cli-reference.md</code></td>
+<td>Delete</td>
+<td>Folded into Chapter 4 as a "CLI reference" subsection</td>
+</tr>
+</tbody>
+</table>
+<p>Stubs (<code>meta refresh</code> redirects) stay for one release cycle for all deleted pages. Rewrite-destination files replace their source files in place (same filename where applicable, like <code>concepts/datasets.md → user-guide/datasets.md</code>).</p>
+<h2 id="migration-plan">Migration plan</h2>
+<p>Work is ordered so each phase is independently reviewable:</p>
+<h3 id="phase-0-inventory-and-map">Phase 0 — inventory and map</h3>
+<ol>
+<li>Walk every cut-list page; extract code examples, diagrams, and edge-case notes into a structured inventory (keyed by destination chapter).</li>
+<li>Draft the inventory doc as <code>docs/superpowers/specs/2026-04-23-user-guide-content-inventory.md</code>.</li>
+<li>Commit the inventory and this spec together.</li>
+</ol>
+<h3 id="phase-1-chapter-drafts-one-commit-per-chapter">Phase 1 — chapter drafts (one commit per chapter)</h3>
+<ol>
+<li><strong>Chapter 1: Exploring a catalog</strong> — simplest, establishes voice and pattern. First to draft.</li>
+<li><strong>Chapter 2: Working with datasets</strong> — largest source material; big rewrite.</li>
+<li><strong>Chapter 3: Defining and using features</strong> — S2 surface is well-understood.</li>
+<li><strong>Chapter 4: Running an experiment</strong> — depends on chapters 2 and 3 (references datasets and features).</li>
+<li><strong>Chapter 5: Working offline</strong> — depends on chapters 2, 3, 4.</li>
+<li><strong>Chapter 6: Sharing and collaboration</strong> — mostly new content (reviewer #5 flagged as undocumented).</li>
+<li><strong>Chapter 7: Reproducibility</strong> — cross-cuts; written after 2-4 so it can reference their content.</li>
+<li><strong>Chapter 8: Integrating with hydra-zen</strong> — last; just orients to the existing Configuration section.</li>
+</ol>
+<p>Each chapter commit: chapter content + updated <code>mkdocs.yml</code> nav entry for that chapter.</p>
+<h3 id="phase-2-introduction-rewrite">Phase 2 — Introduction rewrite</h3>
+<p>Rewrite <code>docs/index.md</code> with positioning, four-object mental model, template-repo pointer. One commit.</p>
+<h3 id="phase-3-api-reference-rename">Phase 3 — API reference rename</h3>
+<p>Rename <code>docs/code-docs/ → docs/api-reference/</code>. Update <code>mkdocs.yml</code>. No content changes. One commit.</p>
+<h3 id="phase-4-nav-rewrite-and-deletions">Phase 4 — nav rewrite and deletions</h3>
+<ol>
+<li>Rewrite <code>mkdocs.yml</code> top-level nav to match the §New top-level nav.</li>
+<li>Delete the 12 cut-list pages; replace with <code>meta refresh</code> stubs.</li>
+<li>Run the full link audit and fix every internal reference.</li>
+<li>One commit.</li>
+</ol>
+<h3 id="phase-5-read-through-external-reader">Phase 5 — read-through + external reader</h3>
+<ol>
+<li>Cover-to-cover read of all 8 chapters + Introduction.</li>
+<li>Fix drift, missing transitions, forward references.</li>
+<li>(Optional) external reader; fix their confusion points.</li>
+<li>Final commit, then PR.</li>
+</ol>
+<h2 id="open-dependencies">Open dependencies</h2>
+<ul>
+<li>Sub-project 2 (docstring sweep) is the companion. User-guide cross-references to API Reference anchors depend on docstring stability. Solution: write the user guide first with coarse anchor references (<code>api-reference/feature.md#FeatureRecord</code>), then update anchors as part of the docstring-sweep work.</li>
+<li>Template repo must clearly own the onramp story for the Introduction's pointer to be honest. Current state (verified: <code>/Users/carl/GitHub/deriva-ml-model-template</code>) is sufficient.</li>
+</ul>
+<h2 id="scale-estimate">Scale estimate</h2>
+<ul>
+<li><strong>Content volume:</strong> 15,000–25,000 words of new and rewritten content across 8 chapters + Introduction.</li>
+<li><strong>Effort:</strong> roughly half a day per chapter to draft well. Full sub-project: 5–7 working days if done straight through, longer with review cycles.</li>
+<li><strong>Review load:</strong> each chapter commit is a natural review unit; the final read-through is the biggest review checkpoint.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

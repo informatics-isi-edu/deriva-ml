@@ -1,0 +1,3606 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-23-docstring-sweep-plan/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Docstring Sweep Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#docstring-sweep-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Docstring Sweep Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-0-preparatory-verification-start_upload-visibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 0: Preparatory Verification — start_upload() Visibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-doctest-infrastructure-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Doctest Infrastructure Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-coremixinsdatasetpy-priority-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: core/mixins/dataset.py — Priority 1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-coremixinsannotationpy-priority-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: core/mixins/annotation.py — Priority 1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-featurepy-priority-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: feature.py — Priority 1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-datasetdataset_bagpy-priority-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: dataset/dataset_bag.py — Priority 1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-executionexecutionpy-priority-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: execution/execution.py — Priority 2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-datasetdatasetpy-priority-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: dataset/dataset.py — Priority 2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-coremixinsassetpy-priority-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: core/mixins/asset.py — Priority 2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-rename-group-a-coremixinspath_builderpy-coreconstantspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Rename Group A — core/mixins/path_builder.py + core/constants.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-10-rename-group-b-corelogging_configpy-coreschema_diffpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: Rename Group B — core/logging_config.py + core/schema_diff.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-11-rename-group-c-rid_resolutionpy-asset_recordpy-workflowpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: Rename Group C — rid_resolution.py + asset_record.py + workflow.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-12-corebasepy-renames-dead-code-working_data-docstring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: core/base.py — Renames + Dead Code + working_data Docstring
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-13-toolsvalidate_schema_docpy-rename-internal-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 13: tools/validate_schema_doc.py — Rename Internal Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-14-coremixinsexecutionpy-start_upload-decision-docstring-sweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 14: core/mixins/execution.py — start_upload Decision + Docstring Sweep
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-15-tier-4-module-level-docstring-sweep-remaining-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 15: Tier 4 — Module-Level Docstring Sweep (Remaining Modules)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-16-test-file-renames-update-all-renamed-symbol-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 16: Test File Renames — Update All Renamed Symbol References
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-17-final-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 17: Final Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="docstring-sweep-implementation-plan">Docstring Sweep Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Bring every public method in <code>src/deriva_ml/</code> to the full docstring contract (one-line summary + extended description + Args/Returns/Raises/Example), eliminate 12 leaked public names via <code>_prefix</code> renames, and delete 7 dead symbols — all in per-module commits on the <code>feature/docstring-sweep</code> branch.</p>
+<p><strong>Architecture:</strong> Each task covers one module (or a tightly-coupled pair). The task flow is always: (1) apply docstring edits, (2) apply renames/deletions, (3) add inline comments, (4) run fast unit tests, (5) commit. Priority 1 (worst areas) and Priority 2 (named gaps) go first; reviewer sign-off is expected before Priority 3 and 4 begin. A single follow-on task updates test files that reference renamed symbols, and a final task wires up <code>--doctest-modules</code> and confirms docs build.</p>
+<p><strong>Tech Stack:</strong> Python ≥ 3.12, Pydantic v2, <code>uv run pytest</code>, <code>pytest --doctest-modules</code> with <code># doctest: +SKIP</code> for catalog-dependent examples, <code>uv run ruff check / ruff format</code>, <code>uv run mkdocs build --strict</code>.</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Files modified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Task 0 — prep</td>
+<td><code>src/deriva_ml/core/mixins/execution.py</code> (grep only, no edits yet)</td>
+</tr>
+<tr>
+<td>Task 1 — doctest infra</td>
+<td><code>pyproject.toml</code>, <code>CLAUDE.md</code></td>
+</tr>
+<tr>
+<td>Task 2 — <code>core/mixins/dataset.py</code></td>
+<td><code>src/deriva_ml/core/mixins/dataset.py</code></td>
+</tr>
+<tr>
+<td>Task 3 — <code>core/mixins/annotation.py</code></td>
+<td><code>src/deriva_ml/core/mixins/annotation.py</code></td>
+</tr>
+<tr>
+<td>Task 4 — <code>feature.py</code></td>
+<td><code>src/deriva_ml/feature.py</code></td>
+</tr>
+<tr>
+<td>Task 5 — <code>dataset/dataset_bag.py</code></td>
+<td><code>src/deriva_ml/dataset/dataset_bag.py</code></td>
+</tr>
+<tr>
+<td>Task 6 — <code>execution/execution.py</code></td>
+<td><code>src/deriva_ml/execution/execution.py</code></td>
+</tr>
+<tr>
+<td>Task 7 — <code>dataset/dataset.py</code></td>
+<td><code>src/deriva_ml/dataset/dataset.py</code></td>
+</tr>
+<tr>
+<td>Task 8 — <code>core/mixins/asset.py</code></td>
+<td><code>src/deriva_ml/core/mixins/asset.py</code></td>
+</tr>
+<tr>
+<td>Task 9 — rename group A</td>
+<td><code>src/deriva_ml/core/mixins/path_builder.py</code>, <code>src/deriva_ml/core/constants.py</code></td>
+</tr>
+<tr>
+<td>Task 10 — rename group B</td>
+<td><code>src/deriva_ml/core/logging_config.py</code>, <code>src/deriva_ml/core/schema_diff.py</code></td>
+</tr>
+<tr>
+<td>Task 11 — rename group C</td>
+<td><code>src/deriva_ml/core/mixins/rid_resolution.py</code>, <code>src/deriva_ml/asset/asset_record.py</code>, <code>src/deriva_ml/core/mixins/workflow.py</code></td>
+</tr>
+<tr>
+<td>Task 12 — <code>core/base.py</code></td>
+<td><code>src/deriva_ml/core/base.py</code></td>
+</tr>
+<tr>
+<td>Task 13 — <code>tools/validate_schema_doc.py</code></td>
+<td><code>src/deriva_ml/tools/validate_schema_doc.py</code>, <code>tests/tools/</code></td>
+</tr>
+<tr>
+<td>Task 14 — <code>core/mixins/execution.py</code></td>
+<td><code>src/deriva_ml/core/mixins/execution.py</code></td>
+</tr>
+<tr>
+<td>Task 15 — Tier 4 module sweep</td>
+<td>~20 remaining modules (catalog, dataset, execution, model, schema, local_db sub-modules)</td>
+</tr>
+<tr>
+<td>Task 16 — test file renames</td>
+<td><code>tests/**/*.py</code> (update references to renamed symbols)</td>
+</tr>
+<tr>
+<td>Task 17 — final verification</td>
+<td>run test suites + mkdocs build</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-0-preparatory-verification-start_upload-visibility">Task 0: Preparatory Verification — <code>start_upload()</code> Visibility</h2>
+<p><strong>Files:</strong>
+- Read-only: <code>/Users/carl/GitHub/deriva-ml-model-template</code> (grep only)
+- No edits in this task</p>
+<ul>
+<li>[ ] <strong>Step 1: Grep the template repo for <code>start_upload</code> callers</strong></li>
+</ul>
+<pre><code class="language-bash">grep -r &quot;start_upload&quot; /Users/carl/GitHub/deriva-ml-model-template 2&gt;/dev/null &amp;&amp; echo &quot;FOUND&quot; || echo &quot;NOT FOUND&quot;
+</code></pre>
+<p>Expected: if <code>NOT FOUND</code> → <code>start_upload</code> will be renamed to <code>_start_upload</code> in Task 14.
+If <code>FOUND</code> → keep it public, add a complete docstring, and document the external caller in Task 14's commit message.</p>
+<ul>
+<li>[ ] <strong>Step 2: Record the decision</strong></li>
+</ul>
+<p>Write the decision as a comment at the top of Task 14 (or note it in the commit message). No code changes yet.</p>
+<hr />
+<h2 id="task-1-doctest-infrastructure-setup">Task 1: Doctest Infrastructure Setup</h2>
+<p><strong>Files:</strong>
+- Modify: <code>pyproject.toml</code>
+- Modify: <code>CLAUDE.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>--doctest-modules</code> to pytest configuration</strong></li>
+</ul>
+<p>In <code>pyproject.toml</code>, find the <code>[tool.pytest.ini_options]</code> section and add <code>--doctest-modules</code> to <code>addopts</code>, plus the <code>doctest_optionflags</code> needed to handle whitespace variation:</p>
+<pre><code class="language-toml">[tool.pytest.ini_options]
+addopts = &quot;--doctest-modules&quot;
+doctest_optionflags = [&quot;NORMALIZE_WHITESPACE&quot;, &quot;ELLIPSIS&quot;]
+</code></pre>
+<p>If there is no existing <code>addopts</code>, add it. If there is, append <code>--doctest-modules</code> to the existing value.</p>
+<p>Note: <code>--doctest-modules</code> collects doctests from all <code>src/deriva_ml/</code> Python files. Examples that require a live catalog must be annotated <code># doctest: +SKIP</code> or they will fail in CI.</p>
+<ul>
+<li>[ ] <strong>Step 2: Verify fast unit tests still pass with doctest collection enabled</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS (any existing docstring examples that lack <code># doctest: +SKIP</code> will surface here as failures; fix them before committing)</p>
+<ul>
+<li>[ ] <strong>Step 3: Update CLAUDE.md with doctest guidance</strong></li>
+</ul>
+<p>Find the <code>## Best Practices &amp; Patterns</code> section in <code>CLAUDE.md</code> and add a new subsection after the last pattern:</p>
+<pre><code class="language-markdown">### Doctest Policy
+
+New public methods must include an `Example:` block with a passing doctest or a `+SKIP` annotation before merge. The pattern for catalog-dependent examples:
+
+```python
+Example:
+    &gt;&gt;&gt; ml = DerivaML(hostname=&quot;example.org&quot;, catalog_id=&quot;42&quot;)  # doctest: +SKIP
+    &gt;&gt;&gt; result = ml.list_datasets()  # doctest: +SKIP
+</code></pre>
+<p>Examples that run without a catalog (no <code>+SKIP</code> needed):
+- <code>ExecutionConfiguration</code> and <code>DatasetSpecConfig</code> construction
+- Enum values and <code>DerivaMLConfig</code> field validation
+- <code>FeatureRecord</code> creation with a stub container
+- Selector factory classmethods that operate on a pre-built record</p>
+<pre><code>
+- [ ] **Step 4: Commit**
+
+```bash
+cd /Users/carl/GitHub/deriva-ml
+git add pyproject.toml CLAUDE.md
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): configure --doctest-modules + CLAUDE.md doctest policy
+
+Adds pytest --doctest-modules so Example: blocks are verified on every
+test run. Catalog-dependent examples use # doctest: +SKIP. Pure-Python
+examples (Pydantic construction, enum values, selector factories) run
+for real. CLAUDE.md policy section documents the requirement for new
+public methods.
+
+Reviewer #2 gaps addressed: doctest infrastructure for all Example: blocks
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-coremixinsdatasetpy-priority-1">Task 2: <code>core/mixins/dataset.py</code> — Priority 1</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/dataset.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>The current <code>delete_dataset</code> docstring is missing an <code>Example:</code>. <code>list_dataset_element_types</code> and <code>add_dataset_element_type</code> lack <code>Raises:</code> and <code>Example:</code>. The ORM-rebuild block at lines 217–236 needs a "why" comment. <code>prefetch_dataset</code> (line ~485) is dead and must be deleted.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>Example:</code> to <code>delete_dataset</code></strong></li>
+</ul>
+<p>Find <code>def delete_dataset</code> and add after the existing <code>Raises:</code> block:</p>
+<pre><code class="language-python">    Example:
+        &gt;&gt;&gt; ds = ml.lookup_dataset(&quot;1-ABC&quot;)  # doctest: +SKIP
+        &gt;&gt;&gt; ml.delete_dataset(ds, recurse=False)  # doctest: +SKIP
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Expand <code>list_dataset_element_types</code> docstring</strong></li>
+</ul>
+<p>Replace the current stub with:</p>
+<pre><code class="language-python">    def list_dataset_element_types(self) -&gt; Iterable[Table]:
+        &quot;&quot;&quot;List the table types that can be added as dataset members.
+
+        Returns every table that has an association with the Dataset table,
+        restricted to domain-schema tables and the Dataset table itself.
+        These are the types accepted by ``add_dataset_members()``.
+
+        Returns:
+            Iterable of ``Table`` objects representing valid member types.
+
+        Raises:
+            DerivaMLException: If the catalog schema cannot be read.
+
+        Example:
+            &gt;&gt;&gt; types = ml.list_dataset_element_types()  # doctest: +SKIP
+            &gt;&gt;&gt; print([t.name for t in types])  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Expand <code>add_dataset_element_type</code> docstring and add inline comment</strong></li>
+</ul>
+<p>Replace the existing docstring to add <code>Raises:</code> and <code>Example:</code>, and insert the inline comment explaining the ORM rebuild:</p>
+<pre><code class="language-python">    def add_dataset_element_type(self, element: str | Table) -&gt; Table:
+        &quot;&quot;&quot;Make it possible to add objects from ``element`` table to a dataset.
+
+        Creates a new association table linking Dataset to the given table,
+        then updates catalog annotations so the new type is included in
+        bag-export specs. If the workspace ORM was already built, it is
+        rebuilt to pick up the new association table — the ORM is eagerly
+        constructed at init time and does not see DDL changes applied after
+        that point.
+
+        Args:
+            element: Name of the table (str) or Table object to register as
+                a valid dataset element type.
+
+        Returns:
+            The Table object that was registered.
+
+        Raises:
+            DerivaMLException: If ``element`` is not a valid table name.
+            DerivaMLTableTypeError: If the table is a system or ML table
+                and cannot be a dataset element type.
+
+        Example:
+            &gt;&gt;&gt; ml.add_dataset_element_type(&quot;Image&quot;)  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<p>Then, immediately before the <code>if getattr(self, "_workspace", None) is not None:</code> block (currently around line 218), add:</p>
+<pre><code class="language-python">        # Rebuild the workspace ORM so it can resolve the new association table.
+        # The workspace ORM is built eagerly at init time from the schema snapshot;
+        # DDL applied after that point (like this new association table) is not
+        # visible until the ORM is rebuilt from a fresh model fetch.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Delete <code>prefetch_dataset</code></strong></li>
+</ul>
+<p>Find the method <code>def prefetch_dataset(self, ...)</code> (around line 485). Delete the entire method definition including its docstring. It is a one-line <code>return self.cache_dataset(...)</code> wrapper with a "Deprecated" docstring and zero callers.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/mixins/dataset.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep core/mixins/dataset.py — 3 docstrings, 1 inline comment, 1 dead-code deletion
+
+Reviewer #2 gaps addressed: delete_dataset Example:, list_dataset_element_types
+(Args/Raises/Example), add_dataset_element_type (Raises/Example)
+Reviewer #2 inline comment: add_dataset_element_type ORM-rebuild block explains
+why workspace.rebuild_schema() is called after new DDL (ORM built eagerly at init)
+Reviewer #4 dead code: deleted prefetch_dataset (deprecated shim, zero callers)
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-coremixinsannotationpy-priority-1">Task 3: <code>core/mixins/annotation.py</code> — Priority 1</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/annotation.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>Every <code>AnnotationMixin</code> method has stub examples but no <code>Raises:</code> and no annotation-dict format guidance. <code>list_foreign_keys</code> is dead and must be deleted (it was also going to be renamed, but deletion takes precedence).</p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>Raises:</code> and improve <code>Example:</code> for <code>get_table_annotations</code></strong></li>
+</ul>
+<pre><code class="language-python">    def get_table_annotations(self, table: str | Table) -&gt; dict[str, Any]:
+        &quot;&quot;&quot;Get all Chaise display-related annotations for a table.
+
+        Returns the current values of display, visible-columns,
+        visible-foreign-keys, and table-display annotations. Missing
+        annotations are represented as ``None`` in the returned dict.
+
+        Args:
+            table: Table name (str) or ``Table`` object.
+
+        Returns:
+            Dict with keys ``table`` (str), ``schema`` (str),
+            ``display`` (dict | None), ``visible_columns`` (dict | None),
+            ``visible_foreign_keys`` (dict | None), ``table_display``
+            (dict | None).
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+
+        Example:
+            &gt;&gt;&gt; anns = ml.get_table_annotations(&quot;Image&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; anns[&quot;visible_columns&quot;]  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Add <code>Raises:</code> and annotation-dict format guidance to <code>get_column_annotations</code></strong></li>
+</ul>
+<pre><code class="language-python">    def get_column_annotations(self, table: str | Table, column_name: str) -&gt; dict[str, Any]:
+        &quot;&quot;&quot;Get all Chaise display-related annotations for a column.
+
+        Returns display and column-display annotations. Missing annotations
+        are ``None``.
+
+        Args:
+            table: Table name (str) or ``Table`` object.
+            column_name: Name of the column.
+
+        Returns:
+            Dict with keys ``table`` (str), ``schema`` (str),
+            ``column`` (str), ``display`` (dict | None),
+            ``column_display`` (dict | None).
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+            DerivaMLException: If ``column_name`` is not a column of ``table``.
+
+        Example:
+            &gt;&gt;&gt; anns = ml.get_column_annotations(&quot;Image&quot;, &quot;Filename&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; anns[&quot;display&quot;]  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add <code>Raises:</code> + format guidance to <code>set_display_annotation</code>, <code>set_visible_columns</code>, <code>set_visible_foreign_keys</code>, <code>set_table_display</code>, <code>set_column_display</code></strong></li>
+</ul>
+<p>For each setter, add or replace the docstring to include:
+- <code>Raises: DerivaMLTableTypeError: If the table is not found.</code>
+- <code>Example:</code> block with <code># doctest: +SKIP</code></p>
+<p>Template (adapt per method):</p>
+<pre><code class="language-python">    def set_display_annotation(self, table: str | Table, display: dict[str, Any]) -&gt; None:
+        &quot;&quot;&quot;Set the Chaise display annotation on a table.
+
+        The display annotation controls how the table is labeled in the
+        Chaise web UI. The dict shape follows the Chaise display tag
+        specification: ``{&quot;name&quot;: &quot;Human Readable Name&quot;}``.
+
+        Args:
+            table: Table name (str) or ``Table`` object.
+            display: Annotation dict. Must be a valid Chaise display
+                annotation, e.g. ``{&quot;name&quot;: &quot;My Table&quot;}``.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not found in the catalog model.
+
+        Example:
+            &gt;&gt;&gt; ml.set_display_annotation(&quot;Image&quot;, {&quot;name&quot;: &quot;Scan Image&quot;})  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<p>Apply the same pattern (with appropriate Args/Example content) to:
+- <code>set_visible_columns(table, columns)</code> — note that <code>columns</code> is a list of column name strings or column filter dicts per the Chaise visible-columns spec
+- <code>set_visible_foreign_keys(table, foreign_keys)</code> — <code>foreign_keys</code> is a list of FK specs per the Chaise visible-foreign-keys spec
+- <code>set_table_display(table, table_display)</code> — <code>table_display</code> is a dict per the Chaise table-display tag
+- <code>set_column_display(table, column_name, column_display)</code> — <code>column_display</code> is a dict per the Chaise column-display tag</p>
+<ul>
+<li>[ ] <strong>Step 4: Add <code>Raises:</code> and <code>Example:</code> to <code>add_visible_column</code>, <code>remove_visible_column</code>, <code>reorder_visible_columns</code></strong></li>
+</ul>
+<p>Same pattern — each needs <code>Raises: DerivaMLTableTypeError</code> and a <code># doctest: +SKIP</code> example.</p>
+<ul>
+<li>[ ] <strong>Step 5: Add <code>Raises:</code> and <code>Example:</code> to <code>add_visible_foreign_key</code>, <code>remove_visible_foreign_key</code>, <code>reorder_visible_foreign_keys</code></strong></li>
+</ul>
+<p>Same pattern.</p>
+<ul>
+<li>[ ] <strong>Step 6: Add <code>Raises:</code> and <code>Example:</code> to <code>apply_annotations</code></strong></li>
+</ul>
+<pre><code class="language-python">    def apply_annotations(self) -&gt; None:
+        &quot;&quot;&quot;Apply all staged annotation changes to the catalog.
+
+        Pushes any in-memory annotation changes to the live catalog. Must
+        be called after any sequence of ``set_*`` or ``add_*/remove_*``
+        annotation calls to make changes visible in Chaise.
+
+        Raises:
+            DerivaMLException: If the catalog is read-only or the apply
+                call fails.
+
+        Example:
+            &gt;&gt;&gt; ml.set_display_annotation(&quot;Image&quot;, {&quot;name&quot;: &quot;Scan&quot;})  # doctest: +SKIP
+            &gt;&gt;&gt; ml.apply_annotations()  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Delete <code>list_foreign_keys</code></strong></li>
+</ul>
+<p>Find <code>def list_foreign_keys(self, ...)</code> (around line 405). Delete the entire method. Zero callers in <code>src/</code>, <code>tests/</code>, or <code>docs/</code>.</p>
+<ul>
+<li>[ ] <strong>Step 8: Remove <code>list_foreign_keys</code> from the class-level <code>Methods:</code> docstring in <code>AnnotationMixin</code></strong></li>
+</ul>
+<p>Find the line <code>list_foreign_keys: List all foreign keys related to a table</code> in the class docstring and delete it.</p>
+<ul>
+<li>[ ] <strong>Step 9: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 10: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/mixins/annotation.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep core/mixins/annotation.py — 12 docstrings, 1 dead-code deletion
+
+Reviewer #2 gaps addressed: all AnnotationMixin methods now have Raises:,
+annotation-dict format guidance, and Example: blocks
+Reviewer #4 dead code: deleted list_foreign_keys (zero callers)
+Reviewer #4 renames: list_foreign_keys deletion supersedes rename
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-featurepy-priority-1">Task 4: <code>feature.py</code> — Priority 1</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/feature.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p><code>Feature.__init__</code> has no docstring at all. <code>feature_record_class</code> lacks <code>Args:</code>, <code>Raises:</code>, and <code>Example:</code>. The <code>assoc_fkeys</code> subtraction block (lines 448–463) needs an inline "why" comment. The module-level docstring should document the selector classmethod suite.</p>
+<ul>
+<li>[ ] <strong>Step 1: Expand the module-level docstring</strong></li>
+</ul>
+<p>Replace the current module docstring with:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Feature implementation for deriva-ml.
+
+This module provides classes for defining and managing features in deriva-ml.
+Features represent measurable properties or characteristics associated with
+records in a target table (e.g., a diagnostic label on an Image row).
+
+Exported classes:
+    Feature: Encapsulates a feature's schema — target table, vocabulary columns,
+        asset columns, and value columns. Obtained via ``DerivaML.create_feature``
+        or ``DerivaML.lookup_feature``. Not constructed directly.
+    FeatureRecord: Pydantic base class for dynamically generated feature record
+        models. Subclasses are created by ``Feature.feature_record_class()``.
+
+Selector classmethod suite (``FeatureRecord`` class methods):
+    ``FeatureRecord.select_newest(records)`` — Returns the record with the most
+        recent ``RCT`` (Row Creation Time). Useful when multiple annotators have
+        labelled the same object.
+    ``FeatureRecord.select_by_execution(records, execution_rid)`` — Returns the
+        record produced by a specific execution run.
+
+Typical usage:
+    &gt;&gt;&gt; feature = ml.lookup_feature(&quot;Image&quot;, &quot;Diagnosis&quot;)  # doctest: +SKIP
+    &gt;&gt;&gt; DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
+    &gt;&gt;&gt; record = DiagnosisRecord(Diagnosis=&quot;benign&quot;, Confidence=0.97)  # doctest: +SKIP
+&quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Add docstring to <code>Feature.__init__</code></strong></li>
+</ul>
+<p>Insert a docstring immediately after <code>def __init__(self, atable: FindAssociationResult, model: "DerivaModel") -&gt; None:</code>:</p>
+<pre><code class="language-python">        &quot;&quot;&quot;Initialize a Feature from an association table result.
+
+        Classifies the feature table's FK columns into three disjoint sets:
+        ``asset_columns`` (FK to an asset table), ``term_columns`` (FK to a
+        vocabulary table), and ``value_columns`` (everything else). The
+        association FKs linking back to the target table and to the feature
+        name vocabulary are excluded before classification.
+
+        Args:
+            atable: Result from ``deriva.core.ermrest_model.FindAssociationResult``
+                describing the feature association table. Provides the feature
+                table, the self-FK back to the target, and the set of other FKs.
+            model: ``DerivaModel`` instance used to classify FK targets as
+                asset or vocabulary tables.
+
+        Note:
+            This constructor is not part of the public API. Obtain ``Feature``
+            instances via ``DerivaML.create_feature`` or
+            ``DerivaML.lookup_feature``.
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add inline comment to the <code>assoc_fkeys</code> block</strong></li>
+</ul>
+<p>Find the line <code>assoc_fkeys = {atable.self_fkey} | atable.other_fkeys</code> (around line 448) and add a comment immediately before it:</p>
+<pre><code class="language-python">        # Exclude the two FKs that are structural parts of the association table
+        # itself — the self-FK pointing back to the target table (e.g., Image)
+        # and the other-FKs pointing to Feature_Name and Execution — before
+        # classifying the remaining FKs as asset, term, or value columns. Without
+        # this subtraction, those structural FKs would be misclassified as feature
+        # columns and create spurious fields in the generated FeatureRecord class.
+        assoc_fkeys = {atable.self_fkey} | atable.other_fkeys
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Expand <code>feature_record_class</code> docstring</strong></li>
+</ul>
+<p>Replace the current docstring:</p>
+<pre><code class="language-python">    def feature_record_class(self) -&gt; type[FeatureRecord]:
+        &quot;&quot;&quot;Create a dynamically generated Pydantic model class for this feature.
+
+        Builds a ``FeatureRecord`` subclass with fields derived from the feature
+        table's columns. Column types are mapped as follows:
+
+        - Term columns (FK to vocabulary): ``str`` (vocabulary term name)
+        - Asset columns (FK to asset table): ``str | Path`` (file path)
+        - Value columns (direct data): typed per the database column type
+          (``int``, ``float``, or ``str``)
+
+        All fields are Optional with a default of ``None`` to allow partial
+        construction when building records for insertion.
+
+        Returns:
+            A subclass of ``FeatureRecord`` whose fields match this feature's
+            schema. The class's ``feature`` ClassVar is set to ``self``.
+
+        Raises:
+            DerivaMLException: If the feature table schema cannot be read.
+
+        Example:
+            &gt;&gt;&gt; feature = ml.lookup_feature(&quot;Image&quot;, &quot;Diagnosis&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
+            &gt;&gt;&gt; rec = DiagnosisRecord(Diagnosis=&quot;benign&quot;)  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/feature.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep feature.py — 3 docstrings, 1 inline comment, module docstring expanded
+
+Reviewer #2 gaps addressed: Feature.__init__ (no docstring at all),
+feature_record_class (Args/Raises/Example), module docstring (selector suite)
+Reviewer #2 inline comment: assoc_fkeys subtraction explains why structural
+association FKs are excluded before role classification
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-datasetdataset_bagpy-priority-1">Task 5: <code>dataset/dataset_bag.py</code> — Priority 1</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p><code>list_dataset_members</code> has a thin docstring with the <code>version</code> kwarg unexplained. The <code>_dataset_table_view</code> union block (lines 276–315) needs a "why" comment about SQLAlchemy UNION semantics.</p>
+<ul>
+<li>[ ] <strong>Step 1: Expand <code>list_dataset_members</code> docstring</strong></li>
+</ul>
+<p>Find <code>def list_dataset_members</code> and replace its docstring:</p>
+<pre><code class="language-python">    def list_dataset_members(
+        self,
+        recurse: bool = False,
+        version: str | None = None,
+    ) -&gt; dict[str, list[dict[str, Any]]]:
+        &quot;&quot;&quot;Return all members of this dataset bag grouped by table name.
+
+        Queries the local SQLite replica of the downloaded bag. Each key
+        in the returned dict is a table name (e.g. ``&quot;Image&quot;``); each value
+        is a list of row dicts with the full set of columns for that table.
+
+        Args:
+            recurse: If ``True``, recursively include members from nested
+                child datasets. Default is ``False``.
+            version: Dataset version string (e.g. ``&quot;1.2.0&quot;``) to query.
+                When ``None`` (default), uses the latest materialized version
+                in the bag. This parameter exists for API symmetry with the
+                live-catalog ``Dataset.list_dataset_members``; bag contents
+                are immutable so changing ``version`` only filters which
+                version's membership snapshot is read.
+
+        Returns:
+            Dict mapping table name to list of row dicts. Empty dict if
+            no members are present.
+
+        Raises:
+            DerivaMLException: If the bag SQLite database cannot be read
+                or the requested version is not present in the bag.
+
+        Example:
+            &gt;&gt;&gt; bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            &gt;&gt;&gt; members = bag.list_dataset_members(recurse=True)  # doctest: +SKIP
+            &gt;&gt;&gt; images = members.get(&quot;Image&quot;, [])  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Add inline comment to <code>_dataset_table_view</code> union block</strong></li>
+</ul>
+<p>Find the <code>union(*)</code> call inside <code>_dataset_table_view</code> (around lines 276–315) and add a comment immediately before the union call:</p>
+<pre><code class="language-python">        # Use UNION (not UNION ALL) to deduplicate rows that are reachable via
+        # multiple FK paths. SQLAlchemy's union() is DISTINCT by default, which
+        # is exactly what we want here: a dataset member table (e.g., Image) may
+        # appear in the bag via two separate FK paths (e.g., directly in the
+        # dataset AND via a nested child dataset), and without DISTINCT we would
+        # count or return the same row twice. See §6 inline comment gap #4.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Spot-check all other public methods in the file for missing sections</strong></li>
+</ul>
+<p>Walk through <code>DatasetBag</code>'s public methods and confirm each has a one-line summary, <code>Args:</code>, <code>Returns:</code> (where applicable), <code>Raises:</code>, and <code>Example: # doctest: +SKIP</code>. Patch any gaps with the same contract template.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/dataset/dataset_bag.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep dataset/dataset_bag.py — 2+ docstrings, 1 inline comment
+
+Reviewer #2 gaps addressed: list_dataset_members (version kwarg explained,
+Raises/Example added)
+Reviewer #2 inline comment: _dataset_table_view union(*) block explains why
+DISTINCT union is load-bearing (SQLAlchemy UNION is DISTINCT; de-duplicates
+rows reachable via multiple FK paths)
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-executionexecutionpy-priority-2">Task 6: <code>execution/execution.py</code> — Priority 2</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/execution.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p><code>Execution.create_dataset</code> (line ~2006) lacks <code>Raises:</code> and <code>Example:</code>. <code>Execution.upload_execution_outputs</code> (line ~1397) has an unexplained <code>Returns:</code> dict shape and no <code>Raises:</code>. <code>Execution.__init__</code> (lines 322–361) needs a "why" comment on the dry-run guard.</p>
+<ul>
+<li>[ ] <strong>Step 1: Expand <code>create_dataset</code> docstring</strong></li>
+</ul>
+<p>Find <code>def create_dataset</code> in <code>Execution</code> and replace its docstring:</p>
+<pre><code class="language-python">    def create_dataset(
+        self,
+        dataset_types: list[str] | None = None,
+        description: str = &quot;&quot;,
+        members: list[RID] | None = None,
+    ) -&gt; &quot;Dataset&quot;:
+        &quot;&quot;&quot;Create a new dataset tracked to this execution.
+
+        Creates a ``Dataset`` catalog record linked to this execution as its
+        provenance. The dataset is immediately usable for adding members and
+        incrementing versions.
+
+        Args:
+            dataset_types: List of dataset type vocabulary term names to apply.
+                Must be pre-registered via ``add_dataset_type``. Pass ``None``
+                or an empty list to create an untyped dataset.
+            description: Human-readable description of the dataset. Stored in
+                the catalog ``Dataset.Description`` column.
+            members: Optional list of RIDs to immediately add as dataset members
+                after creation. Equivalent to calling ``dataset.add_dataset_members``
+                after this call.
+
+        Returns:
+            A ``Dataset`` instance bound to the newly created catalog record.
+
+        Raises:
+            DerivaMLInvalidTerm: If any name in ``dataset_types`` is not a
+                registered ``Dataset_Type`` vocabulary term.
+            DerivaMLExecutionError: If the execution context is no longer active.
+
+        Example:
+            &gt;&gt;&gt; with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     ds = exe.create_dataset(  # doctest: +SKIP
+            ...         dataset_types=[&quot;training&quot;],  # doctest: +SKIP
+            ...         description=&quot;Training images v1&quot;,  # doctest: +SKIP
+            ...     )  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Expand <code>upload_execution_outputs</code> docstring</strong></li>
+</ul>
+<p>Find <code>def upload_execution_outputs</code> and replace its docstring:</p>
+<pre><code class="language-python">    def upload_execution_outputs(
+        self,
+        timeout: int = 30,
+        chunk_size: int = 10 * 1024 * 1024,
+    ) -&gt; dict[str, list[str]]:
+        &quot;&quot;&quot;Upload all registered output assets to Hatrac and record provenance.
+
+        Reads the asset manifest, uploads each file to the catalog's Hatrac
+        object store, and inserts ``{Asset}_Execution`` association records
+        linking each uploaded asset to this execution with the ``Output`` role.
+
+        Call this method **after** exiting the execution context manager, not
+        inside it. The context manager sets execution status to ``Completed``
+        on exit; uploading after that preserves the correct status ordering.
+
+        Args:
+            timeout: HTTP session timeout in seconds for each upload request.
+                Default is 30.
+            chunk_size: Hatrac chunk upload size in bytes. Default is 10 MiB.
+                Increase for large files on high-bandwidth connections.
+
+        Returns:
+            Dict mapping asset table name to list of uploaded RIDs, e.g.
+            ``{&quot;Image&quot;: [&quot;1-ABC&quot;, &quot;1-DEF&quot;], &quot;Model&quot;: [&quot;2-GHI&quot;]}``.
+
+        Raises:
+            DerivaMLUploadError: If any file upload fails. Partial uploads are
+                recorded in the manifest so the upload can be resumed.
+            DerivaMLReadOnlyError: If the catalog connection is read-only.
+
+        Example:
+            &gt;&gt;&gt; with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     path = exe.asset_file_path(&quot;Model&quot;, &quot;model.pt&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; uploaded = exe.upload_execution_outputs()  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add inline comment to the dry-run guard in <code>__init__</code></strong></li>
+</ul>
+<p>Find the block around lines 322–361 in <code>Execution.__init__</code> containing <code>not self._dry_run and reload is None</code>. Add a comment immediately before that condition:</p>
+<pre><code class="language-python">        # Guard SQLite registry insertion: skip when (a) this is a dry-run
+        # (we never want to persist dry-run state) or (b) we are resuming an
+        # existing execution (reload is not None), in which case the registry
+        # entry was written by the original run and should not be overwritten.
+        # Writing twice would corrupt the start-time and initial-status fields.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Spot-check all other public methods in <code>Execution</code> for missing sections</strong></li>
+</ul>
+<p>Walk through <code>Execution</code>'s public methods and confirm each has the required docstring sections. Patch any gaps.</p>
+<ul>
+<li>[ ] <strong>Step 5: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/execution/execution.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep execution/execution.py — 3 docstrings, 1 inline comment
+
+Reviewer #2 gaps addressed: Execution.create_dataset (Raises/Example),
+upload_execution_outputs (Returns dict shape, Raises)
+Reviewer #2 inline comment: __init__ dry-run guard explains why
+`not self._dry_run and reload is None` gates SQLite registry insertion
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-datasetdatasetpy-priority-2">Task 7: <code>dataset/dataset.py</code> — Priority 2</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>Four methods lack <code>Raises:</code> and/or <code>Example:</code>. The <code>_insert_dataset_versions</code> two-step INSERT+GET pattern (lines 1580–1610) needs an inline "why" comment.</p>
+<ul>
+<li>[ ] <strong>Step 1: Expand <code>list_dataset_parents</code> docstring</strong></li>
+</ul>
+<p>Find <code>def list_dataset_parents</code> (around line 1404) and replace its docstring:</p>
+<pre><code class="language-python">    def list_dataset_parents(self) -&gt; list[&quot;Dataset&quot;]:
+        &quot;&quot;&quot;Return all datasets that directly contain this dataset as a member.
+
+        Queries the catalog for ``Dataset_Dataset`` association records where
+        this dataset appears as the child. Returns an empty list if this dataset
+        is not nested inside any other dataset.
+
+        Returns:
+            List of ``Dataset`` instances that are direct parents. May be empty.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            &gt;&gt;&gt; ds = ml.lookup_dataset(&quot;1-ABC&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; parents = ds.list_dataset_parents()  # doctest: +SKIP
+            &gt;&gt;&gt; print([p.dataset_rid for p in parents])  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Expand <code>list_dataset_children</code> docstring</strong></li>
+</ul>
+<p>Find <code>def list_dataset_children</code> (around line 1453) and replace its docstring:</p>
+<pre><code class="language-python">    def list_dataset_children(self) -&gt; list[&quot;Dataset&quot;]:
+        &quot;&quot;&quot;Return all datasets directly nested inside this dataset.
+
+        Queries the catalog for ``Dataset_Dataset`` association records where
+        this dataset appears as the parent. Returns an empty list if this
+        dataset has no nested children.
+
+        Returns:
+            List of ``Dataset`` instances that are direct children. May be empty.
+
+        Raises:
+            DerivaMLException: If the catalog query fails.
+
+        Example:
+            &gt;&gt;&gt; ds = ml.lookup_dataset(&quot;1-ABC&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; children = ds.list_dataset_children()  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Add <code>Raises:</code> to <code>add_dataset_members</code></strong></li>
+</ul>
+<p>Find <code>def add_dataset_members</code> (around line 1194). Add after the existing <code>Args:</code> block:</p>
+<pre><code class="language-python">        Raises:
+            DerivaMLNotFoundError: If any RID in ``members`` does not resolve
+                to a catalog entity of the expected table type.
+            DerivaMLTableTypeError: If a member RID belongs to a table type
+                that is not registered as a dataset element type.
+            DerivaMLValidationError: If ``members`` contains duplicates that
+                are already present in the dataset.
+</code></pre>
+<p>Also add if missing:</p>
+<pre><code class="language-python">        Example:
+            &gt;&gt;&gt; ds.add_dataset_members([&quot;1-ABC&quot;, &quot;1-DEF&quot;])  # doctest: +SKIP
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Expand <code>download_dataset_bag</code> docstring</strong></li>
+</ul>
+<p>Find <code>def download_dataset_bag</code> (around line 1612) and replace its docstring to document the <code>DatasetBag</code> return shape and add <code>Raises:</code>:</p>
+<pre><code class="language-python">    def download_dataset_bag(self, ...) -&gt; &quot;DatasetBag&quot;:
+        &quot;&quot;&quot;Download this dataset to the local filesystem as a BDBag.
+
+        Exports the dataset's tables and asset references into a BDBag
+        directory structure. If the catalog has ``s3_bucket`` configured
+        and ``use_minid=True``, the bag is also uploaded to S3 and
+        registered with the MINID service.
+
+        Returns:
+            A ``DatasetBag`` instance wrapping the downloaded bag. Key attributes:
+            ``bag.path`` (``Path``) — local directory containing the bag;
+            ``bag.dataset_rid`` (str) — RID of the dataset;
+            ``bag.version`` (str) — version string at time of download.
+
+        Raises:
+            DerivaMLDatasetNotFound: If this dataset's RID no longer exists
+                in the catalog (e.g., was deleted after this object was created).
+            DerivaMLException: If the bag export or materialization fails.
+
+        Example:
+            &gt;&gt;&gt; spec = DatasetSpecConfig(rid=&quot;1-ABC&quot;, version=&quot;1.0.0&quot;)  # doctest: +SKIP
+            &gt;&gt;&gt; bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            &gt;&gt;&gt; members = bag.list_dataset_members()  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Add inline comment to <code>_insert_dataset_versions</code> two-step pattern</strong></li>
+</ul>
+<p>Find the two-step INSERT + GET block around lines 1580–1610. Add a comment immediately before the GET:</p>
+<pre><code class="language-python">        # ERMrest does not return system-generated columns (including snaptime)
+        # in the INSERT response — it only echoes back the columns you sent.
+        # We need the snaptime to record the version's catalog snapshot for
+        # point-in-time reads. Perform a separate GET immediately after the
+        # INSERT to retrieve the server-assigned snaptime for this row.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/dataset/dataset.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep dataset/dataset.py — 4 docstrings, 1 inline comment
+
+Reviewer #2 gaps addressed: list_dataset_parents (Raises/Example),
+list_dataset_children (Raises/Example), add_dataset_members (Raises),
+download_dataset_bag (Returns DatasetBag shape, Raises)
+Reviewer #2 inline comment: _insert_dataset_versions explains two-step
+INSERT + GET snaptime pattern (ERMrest does not return snaptime on INSERT)
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-coremixinsassetpy-priority-2">Task 8: <code>core/mixins/asset.py</code> — Priority 2</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/asset.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p><code>create_asset</code> is missing <code>Raises:</code> and <code>Example:</code>. Module-level docstring is minimal — expand it.</p>
+<ul>
+<li>[ ] <strong>Step 1: Expand the module-level docstring</strong></li>
+</ul>
+<p>Replace the current module docstring:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Asset management mixin for DerivaML.
+
+This module provides the ``AssetMixin`` class, which manages asset tables
+in a Deriva catalog. An &quot;asset&quot; is a file-backed table whose rows track
+uploaded files (images, documents, model weights, etc.) together with
+provenance metadata.
+
+The mixin provides:
+    - ``create_asset``: Define a new asset table schema in the catalog.
+    - ``list_assets``: Query the contents of an existing asset table.
+
+Asset tables follow a fixed schema convention (Filename, URL, Length, MD5,
+Description plus system columns) augmented with user-defined metadata columns.
+Access controlled by ``AssetMixin`` is layered; the ``AssetMixin`` handles schema
+management while upload/download is handled by ``ExecutionMixin`` and the
+upload engine.
+&quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Expand <code>create_asset</code> docstring</strong></li>
+</ul>
+<p>Replace the existing docstring:</p>
+<pre><code class="language-python">    def create_asset(
+        self,
+        asset_name: str,
+        column_defs: Iterable[ColumnDefinition] | None = None,
+        fkey_defs: Iterable[ColumnDefinition] | None = None,
+        referenced_tables: Iterable[Table] | None = None,
+        comment: str = &quot;&quot;,
+        schema: str | None = None,
+        update_navbar: bool = True,
+    ) -&gt; Table:
+        &quot;&quot;&quot;Create a new asset table in the catalog.
+
+        Defines a Chaise-compatible asset table (Filename, URL, Length, MD5,
+        Description, plus system columns) with optional additional metadata
+        columns and foreign-key references. Registers the asset type in the
+        ``Asset_Type`` vocabulary and optionally updates the Chaise navigation
+        bar.
+
+        Args:
+            asset_name: Name for the new asset table, e.g. ``&quot;Image&quot;`` or
+                ``&quot;ModelWeights&quot;``.
+            column_defs: Extra metadata columns beyond the standard asset
+                columns. Each is a ``ColumnDefinition`` specifying name, type,
+                nullability, and comment.
+            fkey_defs: Foreign-key definitions from the asset table to other
+                tables (e.g., linking images to a subject table).
+            referenced_tables: Tables that the new asset table should reference
+                via FKs. Convenience alternative to ``fkey_defs`` when only
+                a reference to an existing table is needed.
+            comment: Human-readable description of the asset table stored
+                as the table comment in the catalog.
+            schema: Schema in which to create the table. Defaults to
+                ``self.default_schema``.
+            update_navbar: If ``True`` (default), call
+                ``apply_catalog_annotations()`` immediately to add the new
+                table to the Chaise navigation bar. Set ``False`` when
+                creating multiple asset tables in a batch; call
+                ``apply_catalog_annotations()`` once at the end.
+
+        Returns:
+            The newly created ``Table`` object.
+
+        Raises:
+            DerivaMLException: If a table named ``asset_name`` already exists
+                in the target schema.
+            DerivaMLSchemaError: If ``schema`` is not a valid schema in this
+                catalog.
+
+        Example:
+            &gt;&gt;&gt; from deriva.core.typed import Column, builtin_types  # doctest: +SKIP
+            &gt;&gt;&gt; ml.create_asset(  # doctest: +SKIP
+            ...     &quot;ScanImage&quot;,  # doctest: +SKIP
+            ...     comment=&quot;MRI scan images&quot;,  # doctest: +SKIP
+            ... )  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Spot-check <code>list_assets</code> for missing sections</strong></li>
+</ul>
+<p>Confirm <code>list_assets</code> has <code>Args:</code>, <code>Returns:</code>, <code>Raises:</code>, <code>Example:</code>. Add any missing sections.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/mixins/asset.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep core/mixins/asset.py — 2 docstrings, module docstring expanded
+
+Reviewer #2 gaps addressed: create_asset (Raises/Example),
+list_assets (spot-checked and patched if needed)
+Module docstring: expanded to document asset table convention and mixin layering
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-rename-group-a-coremixinspath_builderpy-coreconstantspy">Task 9: Rename Group A — <code>core/mixins/path_builder.py</code> + <code>core/constants.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/path_builder.py</code>
+- Modify: <code>src/deriva_ml/core/constants.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>Four renames: <code>domain_path</code> → <code>_domain_path</code>, <code>table_path</code> → <code>_table_path</code>, <code>is_system_schema</code> → <code>_is_system_schema</code>, <code>get_domain_schemas</code> → <code>_get_domain_schemas</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Rename <code>domain_path</code> → <code>_domain_path</code> in <code>path_builder.py</code></strong></li>
+</ul>
+<p>Find <code>def domain_path(</code> and rename to <code>def _domain_path(</code>. Update the class-level <code>Methods:</code> docstring entry. Search the entire <code>src/</code> tree for any other callers and update them:</p>
+<pre><code class="language-bash">grep -rn &quot;\.domain_path(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site found. Also update the class-level <code>Methods:</code> docstring to reference <code>_domain_path</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Rename <code>table_path</code> → <code>_table_path</code> in <code>path_builder.py</code></strong></li>
+</ul>
+<p>Find <code>def table_path(</code> and rename to <code>def _table_path(</code>. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;\.table_path(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add spot-check docstrings if missing in <code>path_builder.py</code></strong></li>
+</ul>
+<p>Verify <code>pathBuilder</code>, <code>get_table_as_dataframe</code>, <code>get_table_as_dict</code> have full docstrings. Add <code>Raises:</code> and <code>Example: # doctest: +SKIP</code> where missing.</p>
+<ul>
+<li>[ ] <strong>Step 4: Rename <code>is_system_schema</code> → <code>_is_system_schema</code> in <code>core/constants.py</code></strong></li>
+</ul>
+<p>Find <code>def is_system_schema(</code> and rename. Search for all callers:</p>
+<pre><code class="language-bash">grep -rn &quot;is_system_schema(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site. Also update the module-level docstring list that names <code>is_system_schema</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Rename <code>get_domain_schemas</code> → <code>_get_domain_schemas</code> in <code>core/constants.py</code></strong></li>
+</ul>
+<p>Find <code>def get_domain_schemas(</code> and rename. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;get_domain_schemas(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site. Update the module docstring.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/mixins/path_builder.py src/deriva_ml/core/constants.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep path_builder.py + constants.py — spot-check docstrings, 4 renames
+
+Reviewer #4 renames: domain_path→_domain_path, table_path→_table_path
+  (low-level ERMrest/filesystem helpers; not user-facing)
+Reviewer #4 renames: is_system_schema→_is_system_schema,
+  get_domain_schemas→_get_domain_schemas (schema introspection predicates;
+  users won't call these directly)
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-10-rename-group-b-corelogging_configpy-coreschema_diffpy">Task 10: Rename Group B — <code>core/logging_config.py</code> + <code>core/schema_diff.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/logging_config.py</code>
+- Modify: <code>src/deriva_ml/core/schema_diff.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>Two renames: <code>apply_logger_overrides</code> → <code>_apply_logger_overrides</code>, <code>compute_diff</code> → <code>_compute_diff</code>. Module docstrings need expansion per spec §5.</p>
+<ul>
+<li>[ ] <strong>Step 1: Expand <code>core/logging_config.py</code> module docstring</strong></li>
+</ul>
+<p>The current module docstring is already detailed (mentions <code>get_logger</code>, <code>configure_logging</code>, <code>LoggerMixin</code>, <code>is_hydra_initialized</code>). Verify it also documents <code>apply_logger_overrides</code> (now <code>_apply_logger_overrides</code>) as an internal helper. If the current docstring lists it as part of the public API, remove it from the public surface description.</p>
+<ul>
+<li>[ ] <strong>Step 2: Rename <code>apply_logger_overrides</code> → <code>_apply_logger_overrides</code></strong></li>
+</ul>
+<p>Find <code>def apply_logger_overrides(</code> and rename. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;apply_logger_overrides(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site (expected: one call in <code>DerivaML.__init__</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3: Spot-check remaining public methods in <code>logging_config.py</code></strong></li>
+</ul>
+<p>Verify <code>get_logger</code>, <code>configure_logging</code>, <code>LoggerMixin</code> class, and <code>is_hydra_initialized</code> have full docstrings. Add missing <code>Raises:</code> / <code>Example:</code> as needed.</p>
+<ul>
+<li>[ ] <strong>Step 4: Rename <code>compute_diff</code> → <code>_compute_diff</code> in <code>core/schema_diff.py</code></strong></li>
+</ul>
+<p>Find <code>def compute_diff(</code> and rename. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;compute_diff(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site (expected: in <code>core/base.py</code> pin/diff logic).</p>
+<ul>
+<li>[ ] <strong>Step 5: Spot-check <code>SchemaDiff</code> and helper dataclasses in <code>schema_diff.py</code></strong></li>
+</ul>
+<p>Verify <code>SchemaDiff</code>, <code>AddedTable</code>, <code>RemovedTable</code>, <code>AddedColumn</code>, <code>RemovedColumn</code>, <code>AddedFK</code>, <code>RemovedFK</code> all have at least a one-line class docstring. Add any missing docstrings.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/logging_config.py src/deriva_ml/core/schema_diff.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep logging_config.py + schema_diff.py — spot-check, 2 renames
+
+Reviewer #4 renames: apply_logger_overrides→_apply_logger_overrides
+  (called once in DerivaML.__init__; not user-facing)
+Reviewer #4 renames: compute_diff→_compute_diff (only used inside base.py
+  pin/diff logic; not user-facing)
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-11-rename-group-c-rid_resolutionpy-asset_recordpy-workflowpy">Task 11: Rename Group C — <code>rid_resolution.py</code> + <code>asset_record.py</code> + <code>workflow.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/rid_resolution.py</code>
+- Modify: <code>src/deriva_ml/asset/asset_record.py</code>
+- Modify: <code>src/deriva_ml/core/mixins/workflow.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>Three renames: <code>retrieve_rid</code> → <code>_retrieve_rid</code>, <code>asset_record_class</code> → <code>_asset_record_class</code> (module-level function), <code>add_workflow</code> → <code>_add_workflow</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Rename <code>retrieve_rid</code> → <code>_retrieve_rid</code> in <code>rid_resolution.py</code></strong></li>
+</ul>
+<p>Find <code>def retrieve_rid(</code> and rename. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;retrieve_rid(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site. Note: the user-facing API is <code>resolve_rid()</code> — that stays public. Add a spot-check docstring to <code>resolve_rid()</code> if it is missing <code>Raises:</code> or <code>Example:</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Rename module-level <code>asset_record_class</code> → <code>_asset_record_class</code> in <code>asset_record.py</code></strong></li>
+</ul>
+<p>Find <code>def asset_record_class(</code> (the module-level function, not a method). Rename it. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;asset_record_class(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site. The mixin's method that wraps it will now call <code>_asset_record_class(...)</code> internally.</p>
+<ul>
+<li>[ ] <strong>Step 3: Spot-check <code>AssetRecord</code> and <code>_asset_record_class</code> docstrings</strong></li>
+</ul>
+<p><code>AssetRecord</code> has a docstring. Verify it includes <code>Example:</code>. <code>_asset_record_class</code> is now private — add or keep a one-line summary docstring (it's fine for private helpers to have a minimal docstring).</p>
+<ul>
+<li>[ ] <strong>Step 4: Rename <code>add_workflow</code> → <code>_add_workflow</code> in <code>workflow.py</code></strong></li>
+</ul>
+<p>Find <code>def add_workflow(</code> and rename. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;add_workflow(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+grep -rn &quot;add_workflow(&quot; /Users/carl/GitHub/deriva-ml/tests/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site. Note: <code>create_workflow()</code> remains public — no changes to it.</p>
+<ul>
+<li>[ ] <strong>Step 5: Spot-check <code>WorkflowMixin</code> public methods</strong></li>
+</ul>
+<p>Verify <code>find_workflows</code>, <code>lookup_workflow</code>, <code>find_workflow_by_url</code>, <code>create_workflow</code>, <code>list_workflow_executions</code> all have complete docstrings. Add missing <code>Raises:</code> / <code>Example:</code> as needed.</p>
+<ul>
+<li>[ ] <strong>Step 6: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/mixins/rid_resolution.py \
+        src/deriva_ml/asset/asset_record.py \
+        src/deriva_ml/core/mixins/workflow.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep rid_resolution.py + asset_record.py + workflow.py — spot-check, 3 renames
+
+Reviewer #4 renames: retrieve_rid→_retrieve_rid (user-facing is resolve_rid())
+Reviewer #4 renames: asset_record_class→_asset_record_class (internal factory;
+  users access via mixin method)
+Reviewer #4 renames: add_workflow→_add_workflow (create_workflow() is the
+  user-facing factory)
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-12-corebasepy-renames-dead-code-working_data-docstring">Task 12: <code>core/base.py</code> — Renames + Dead Code + <code>working_data</code> Docstring</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/base.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>One rename: <code>cache_features</code> → <code>_cache_features</code>. Three dead-code deletions: <code>add_page</code>, <code>user_list</code>, <code>globus_login</code>. One docstring addition: <code>working_data</code> property needs a proper deprecation-documenting docstring. Spot-check remaining public methods.</p>
+<ul>
+<li>[ ] <strong>Step 1: Rename <code>cache_features</code> → <code>_cache_features</code></strong></li>
+</ul>
+<p>Find <code>def cache_features(</code> and rename. Search for callers:</p>
+<pre><code class="language-bash">grep -rn &quot;cache_features(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+grep -rn &quot;cache_features(&quot; /Users/carl/GitHub/deriva-ml/tests/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update every call site.</p>
+<ul>
+<li>[ ] <strong>Step 2: Delete <code>add_page</code></strong></li>
+</ul>
+<p>Find <code>def add_page(</code> (around line 1364) and delete the entire method definition including its docstring. Zero callers.</p>
+<ul>
+<li>[ ] <strong>Step 3: Delete <code>user_list</code></strong></li>
+</ul>
+<p>Find <code>def user_list(</code> (around line 1097) and delete the entire method. Zero callers.</p>
+<ul>
+<li>[ ] <strong>Step 4: Delete <code>globus_login</code></strong></li>
+</ul>
+<p>Find <code>def globus_login(</code> (around line 955) and delete the entire method. Zero callers.</p>
+<ul>
+<li>[ ] <strong>Step 5: Add proper docstring to <code>working_data</code> property</strong></li>
+</ul>
+<p>Find <code>def working_data(</code> (around line 856). Replace its docstring:</p>
+<pre><code class="language-python">    @property
+    def working_data(self) -&gt; Path:
+        &quot;&quot;&quot;Return the working data directory path.
+
+        .. deprecated::
+            ``working_data`` is deprecated and will be removed in the next
+            major version. Use ``working_dir`` instead.
+
+            ``working_dir`` is the canonical attribute; it is set during
+            execution initialization and contains all output assets, metadata,
+            and intermediate files for the current execution.
+
+        Returns:
+            Path to the working data directory (same as ``working_dir``).
+
+        Raises:
+            DeprecationWarning: Always emitted at access time.
+
+        Example:
+            &gt;&gt;&gt; exe.working_dir  # use this instead  # doctest: +SKIP
+        &quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Spot-check remaining public methods in <code>core/base.py</code></strong></li>
+</ul>
+<p>Walk the public surface of <code>DerivaML</code> (excluding mixin methods). Confirm each has a complete docstring. Focus on any methods not touched by other tasks. Patch gaps.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 8: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/base.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep core/base.py — 1 rename, 3 dead-code deletions, working_data docstring
+
+Reviewer #4 renames: cache_features→_cache_features (legacy workspace-cache
+  shortcut; no callers in tests)
+Reviewer #4 dead code: deleted add_page (zero callers), user_list (zero callers),
+  globus_login (zero callers)
+Reviewer #4 dead code: working_data KEPT — deprecation stub still serves its
+  purpose as a deprecation signal; given a proper docstring documenting
+  DeprecationWarning and replacement (working_dir). Removal deferred to
+  next major-version bump per spec decision #7.
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-13-toolsvalidate_schema_docpy-rename-internal-helpers">Task 13: <code>tools/validate_schema_doc.py</code> — Rename Internal Helpers</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/</code> (update imports to underscored names)
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/ -q --timeout=60</code></p>
+<p>Three functions used only from <code>main()</code> and from <code>tests/tools/</code> get <code>_prefix</code> renames: <code>load_from_doc</code> → <code>_load_from_doc</code>, <code>load_from_code</code> → <code>_load_from_code</code>, <code>diff_schemas</code> → <code>_diff_schemas</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Rename <code>load_from_doc</code> → <code>_load_from_doc</code></strong></li>
+</ul>
+<p>Find <code>def load_from_doc(</code> and rename. Then find all call sites:</p>
+<pre><code class="language-bash">grep -rn &quot;load_from_doc(&quot; /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot;
+grep -rn &quot;load_from_doc(&quot; /Users/carl/GitHub/deriva-ml/tests/ --include=&quot;*.py&quot;
+</code></pre>
+<p>Update all call sites in both <code>validate_schema_doc.py</code>'s <code>main()</code> and <code>tests/tools/</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Rename <code>load_from_code</code> → <code>_load_from_code</code></strong></li>
+</ul>
+<p>Find <code>def load_from_code(</code> and rename. Update all call sites (same grep pattern as Step 1).</p>
+<ul>
+<li>[ ] <strong>Step 3: Rename <code>diff_schemas</code> → <code>_diff_schemas</code></strong></li>
+</ul>
+<p>Find <code>def diff_schemas(</code> and rename. Update all call sites.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tools tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/tools/validate_schema_doc.py
+git add tests/tools/
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep tools/validate_schema_doc.py — 3 renames
+
+Reviewer #4 dead code (item 7): load_from_doc→_load_from_doc,
+  load_from_code→_load_from_code, diff_schemas→_diff_schemas
+  (CLI-tool internals; only called from main() and tests/tools/)
+  Tests in tests/tools/ updated to use underscored names.
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-14-coremixinsexecutionpy-start_upload-decision-docstring-sweep">Task 14: <code>core/mixins/execution.py</code> — <code>start_upload</code> Decision + Docstring Sweep</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/mixins/execution.py</code>
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>Apply the <code>start_upload</code> decision from Task 0. Spot-check all public methods in <code>ExecutionMixin</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Apply <code>start_upload</code> decision</strong></li>
+</ul>
+<p>Based on Task 0:
+- If <code>start_upload</code> had <strong>no external callers</strong>: rename to <code>_start_upload</code>. Search for internal callers and update them:
+  <code>bash
+  grep -rn "start_upload(" /Users/carl/GitHub/deriva-ml/src/ --include="*.py"</code>
+- If <code>start_upload</code> had <strong>external callers</strong> (found in template repo): keep it public, add a complete docstring following the contract shape.</p>
+<p>Document the decision in the commit message.</p>
+<ul>
+<li>[ ] <strong>Step 2: Spot-check all public methods in <code>ExecutionMixin</code></strong></li>
+</ul>
+<p>Walk all public methods: <code>create_execution</code>, <code>resume_execution</code>, <code>get_execution</code>, <code>update_execution_status</code>, <code>list_executions</code>. Confirm each has complete docstrings. Add any missing <code>Raises:</code> / <code>Example: # doctest: +SKIP</code> blocks.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run fast tests</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add src/deriva_ml/core/mixins/execution.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(docstrings): sweep core/mixins/execution.py — spot-check, start_upload decision
+
+Reviewer #4 renames: start_upload → [_start_upload | kept public] — see decision
+  from Task 0 grep of deriva-ml-model-template.
+  [OUTCOME: &lt;replace with actual grep result&gt;]
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-15-tier-4-module-level-docstring-sweep-remaining-modules">Task 15: Tier 4 — Module-Level Docstring Sweep (Remaining Modules)</h2>
+<p><strong>Files:</strong> All <code>src/deriva_ml/</code> modules not already swept in Tasks 2–14. Key targets below.
+<strong>Test:</strong> <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>These modules have no Reviewer #2 or #4 findings. Each gets: (1) add/expand module docstring if missing or minimal, (2) verify all public methods have at minimum a one-line summary, (3) add <code>Example: # doctest: +SKIP</code> where missing.</p>
+<p>Group them into three sub-commits for reviewability:</p>
+<p><strong>Sub-commit A — catalog + dataset support modules:</strong></p>
+<ul>
+<li><code>src/deriva_ml/catalog/localize.py</code> — expand module docstring to explain three-stage clone flow and asset-copy semantics (§5 of spec)</li>
+<li><code>src/deriva_ml/catalog/clone.py</code> — spot-check module docstring and public functions</li>
+<li><code>src/deriva_ml/dataset/catalog_graph.py</code> — <code>CatalogGraph</code> stays public; add/expand class and method docstrings</li>
+<li><code>src/deriva_ml/dataset/split.py</code> — spot-check</li>
+<li>
+<p><code>src/deriva_ml/dataset/bag_cache.py</code>, <code>dataset/bag_feature_cache.py</code> — spot-check</p>
+</li>
+<li>
+<p>[ ] <strong>Step 1: Expand <code>catalog/localize.py</code> module docstring</strong></p>
+</li>
+</ul>
+<p>Replace the one-liner:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Localize remote Hatrac assets to a local catalog server.
+
+Copies assets referenced in a cloned catalog's asset tables from the source
+Hatrac store to the local Hatrac instance. Intended for use after
+``create_ml_workspace`` is called with ``asset_mode=REFERENCES``.
+
+Three-stage flow:
+1. Enumerate all rows in asset tables (tables with URL, Filename, MD5 columns).
+2. For each row, download the file from the source Hatrac URL to a temp file,
+   then upload it to the local Hatrac namespace.
+3. Update the catalog row's URL to point to the new local Hatrac path.
+
+The ``LocalizeResult`` dataclass summarizes counts of processed/skipped/failed
+assets and provides the old-to-new URL mapping for auditing.
+&quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Spot-check <code>catalog/clone.py</code> + <code>dataset/catalog_graph.py</code></strong></li>
+</ul>
+<p>For each, confirm:
+- Module docstring present and meaningful.
+- <code>CatalogGraph</code>: class docstring covers FK-traversal purpose, <code>generate_dataset_download_spec</code>, <code>estimate_bag_size</code>, and the RID-union semantics.
+- All public methods/functions have at minimum a one-line summary.</p>
+<p>Patch as needed.</p>
+<ul>
+<li>[ ] <strong>Step 3: Sub-commit A</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/catalog/ src/deriva_ml/dataset/catalog_graph.py \
+        src/deriva_ml/dataset/split.py src/deriva_ml/dataset/bag_cache.py \
+        src/deriva_ml/dataset/bag_feature_cache.py
+git commit -m &quot;docs(docstrings): Tier 4 sweep — catalog + dataset support modules&quot;
+</code></pre>
+<p><strong>Sub-commit B — execution support + model + schema:</strong></p>
+<ul>
+<li><code>src/deriva_ml/execution/execution_configuration.py</code></li>
+<li><code>src/deriva_ml/execution/workflow.py</code></li>
+<li><code>src/deriva_ml/execution/runner.py</code>, <code>execution/state_machine.py</code>, <code>execution/state_store.py</code></li>
+<li><code>src/deriva_ml/model/catalog.py</code>, <code>model/annotations.py</code>, <code>model/schema_builder.py</code></li>
+<li>
+<p><code>src/deriva_ml/schema/create_schema.py</code>, <code>schema/check_schema.py</code>, <code>schema/annotations.py</code></p>
+</li>
+<li>
+<p>[ ] <strong>Step 4: Spot-check the execution support modules</strong></p>
+</li>
+</ul>
+<p>For each listed module: add module docstring if missing, verify public class/method docstrings. Patch gaps.</p>
+<ul>
+<li>[ ] <strong>Step 5: Sub-commit B</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/execution/execution_configuration.py \
+        src/deriva_ml/execution/workflow.py \
+        src/deriva_ml/execution/runner.py \
+        src/deriva_ml/execution/state_machine.py \
+        src/deriva_ml/execution/state_store.py \
+        src/deriva_ml/model/ \
+        src/deriva_ml/schema/
+git commit -m &quot;docs(docstrings): Tier 4 sweep — execution support + model + schema modules&quot;
+</code></pre>
+<p><strong>Sub-commit C — local_db + interfaces + exceptions + remaining:</strong></p>
+<ul>
+<li><code>src/deriva_ml/local_db/workspace.py</code>, <code>local_db/denormalize.py</code>, <code>local_db/manifest_store.py</code></li>
+<li><code>src/deriva_ml/interfaces.py</code> — protocol docstrings</li>
+<li><code>src/deriva_ml/core/exceptions.py</code> — exception class docstrings</li>
+<li><code>src/deriva_ml/core/mixins/vocabulary.py</code>, <code>core/mixins/feature.py</code>, <code>core/mixins/file.py</code></li>
+<li><code>src/deriva_ml/core/ermrest.py</code>, <code>core/config.py</code>, <code>core/definitions.py</code>, <code>core/enums.py</code></li>
+<li><code>src/deriva_ml/core/validation.py</code>, <code>core/schema_cache.py</code>, <code>core/filespec.py</code></li>
+<li><code>src/deriva_ml/experiment/experiment.py</code></li>
+<li>
+<p><code>src/deriva_ml/asset/asset.py</code>, <code>asset/manifest.py</code>, <code>asset/aux_classes.py</code></p>
+</li>
+<li>
+<p>[ ] <strong>Step 6: Spot-check the local_db + interfaces + remaining modules</strong></p>
+</li>
+</ul>
+<p>For each: add/expand module docstring if missing, verify all public symbols have at minimum a one-line summary. Patch gaps.</p>
+<ul>
+<li>[ ] <strong>Step 7: Sub-commit C</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/local_db/ \
+        src/deriva_ml/interfaces.py \
+        src/deriva_ml/core/exceptions.py \
+        src/deriva_ml/core/mixins/vocabulary.py \
+        src/deriva_ml/core/mixins/feature.py \
+        src/deriva_ml/core/mixins/file.py \
+        src/deriva_ml/core/ermrest.py \
+        src/deriva_ml/core/config.py \
+        src/deriva_ml/core/definitions.py \
+        src/deriva_ml/core/enums.py \
+        src/deriva_ml/core/validation.py \
+        src/deriva_ml/core/schema_cache.py \
+        src/deriva_ml/core/filespec.py \
+        src/deriva_ml/experiment/ \
+        src/deriva_ml/asset/
+git commit -m &quot;docs(docstrings): Tier 4 sweep — local_db, interfaces, exceptions, remaining modules&quot;
+</code></pre>
+<hr />
+<h2 id="task-16-test-file-renames-update-all-renamed-symbol-references">Task 16: Test File Renames — Update All Renamed Symbol References</h2>
+<p><strong>Files:</strong>
+- Modify: any file under <code>tests/</code> that references the 12 renamed symbols
+- Test: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q</code></p>
+<p>This task runs after all module-level renames are committed (Tasks 9–14). Find and update every test that uses the old public names.</p>
+<ul>
+<li>[ ] <strong>Step 1: Find all test references to renamed symbols</strong></li>
+</ul>
+<pre><code class="language-bash">grep -rn &quot;domain_path\|table_path\|is_system_schema\|get_domain_schemas\
+\|apply_logger_overrides\|compute_diff\|retrieve_rid\|asset_record_class\
+\|cache_features\|add_workflow\|start_upload\|prefetch_dataset\
+\|list_foreign_keys&quot; \
+  /Users/carl/GitHub/deriva-ml/tests/ --include=&quot;*.py&quot;
+</code></pre>
+<p>For each hit: update to the underscored name. Note: <code>prefetch_dataset</code> and <code>list_foreign_keys</code> were deleted (not renamed) — any test asserting those methods exist should be deleted.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run the full fast test suite</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml
+git add tests/
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+test: update test references for renamed private symbols
+
+All 12 renames from the docstring sweep (Tasks 9-14) reflected in tests.
+Deleted test assertions for prefetch_dataset and list_foreign_keys (those
+methods were deleted, not renamed).
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-17-final-verification">Task 17: Final Verification</h2>
+<p><strong>Files:</strong> none modified — verification only.</p>
+<ul>
+<li>[ ] <strong>Step 1: Run fast unit tests with doctest collection</strong></li>
+</ul>
+<p>Run: <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/ tests/model/ -q --timeout=60</code>
+Expected: PASS (including all collected doctests that don't have <code>+SKIP</code>)</p>
+<ul>
+<li>[ ] <strong>Step 2: Verify mkdocs build</strong></li>
+</ul>
+<p>Run: <code>uv run mkdocs build --strict 2&gt;&amp;1 | tail -20</code>
+Expected: no warnings or errors. If any docstring renders with broken markup (e.g., unbalanced backticks, malformed admonitions), fix inline and re-run.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run ruff on the swept modules</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff check src/deriva_ml/ &amp;&amp; uv run ruff format --check src/deriva_ml/
+</code></pre>
+<p>Expected: no errors. Fix any issues and amend the relevant module's last commit or add a fixup commit.</p>
+<ul>
+<li>[ ] <strong>Step 4: Spot-check that no old public names leak into <code>__all__</code> or the public API surface</strong></li>
+</ul>
+<pre><code class="language-bash">grep -rn &quot;domain_path\|table_path\|is_system_schema\|get_domain_schemas\
+\|apply_logger_overrides\|compute_diff\|retrieve_rid\|asset_record_class\
+\|cache_features\|add_workflow\|prefetch_dataset\|list_foreign_keys&quot; \
+  /Users/carl/GitHub/deriva-ml/src/ --include=&quot;*.py&quot; \
+  | grep -v &quot;^.*:.*#&quot; \
+  | grep -v &quot;_domain_path\|_table_path\|_is_system_schema\|_get_domain_schemas\
+\|_apply_logger_overrides\|_compute_diff\|_retrieve_rid\|_asset_record_class\
+\|_cache_features\|_add_workflow&quot;
+</code></pre>
+<p>Expected: empty (or only comments / docstring text referencing the old names).</p>
+<ul>
+<li>[ ] <strong>Step 5: Final commit if any fixups were needed</strong></li>
+</ul>
+<pre><code class="language-bash">git add &lt;any fixup files&gt;
+git commit -m &quot;docs(docstrings): fixups from final verification (ruff + mkdocs)&quot;
+</code></pre>
+<hr />
+<h2 id="summary-checklist">Summary Checklist</h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Module(s)</th>
+<th>Priority</th>
+<th>Docstrings</th>
+<th>Renames</th>
+<th>Dead code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>(grep only)</td>
+<td>prep</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>pyproject.toml</code>, <code>CLAUDE.md</code></td>
+<td>infra</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>core/mixins/dataset.py</code></td>
+<td>P1</td>
+<td>3</td>
+<td>1 (delete)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>core/mixins/annotation.py</code></td>
+<td>P1</td>
+<td>12</td>
+<td>—</td>
+<td>1</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>feature.py</code></td>
+<td>P1</td>
+<td>3</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>dataset/dataset_bag.py</code></td>
+<td>P1</td>
+<td>2+</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>execution/execution.py</code></td>
+<td>P2</td>
+<td>3</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>dataset/dataset.py</code></td>
+<td>P2</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>core/mixins/asset.py</code></td>
+<td>P2</td>
+<td>2</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>path_builder.py</code> + <code>constants.py</code></td>
+<td>P3</td>
+<td>spot</td>
+<td>4</td>
+<td>—</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>logging_config.py</code> + <code>schema_diff.py</code></td>
+<td>P3</td>
+<td>spot</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>rid_resolution.py</code> + <code>asset_record.py</code> + <code>workflow.py</code></td>
+<td>P3</td>
+<td>spot</td>
+<td>3</td>
+<td>—</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>core/base.py</code></td>
+<td>P3</td>
+<td>spot + <code>working_data</code></td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>tools/validate_schema_doc.py</code></td>
+<td>P3</td>
+<td>—</td>
+<td>3</td>
+<td>—</td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>core/mixins/execution.py</code></td>
+<td>P3/4</td>
+<td>spot</td>
+<td>0–1 (pending §7a)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>15</td>
+<td>~20 remaining modules</td>
+<td>P4</td>
+<td>module + spot</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>tests/</code></td>
+<td>follow-on</td>
+<td>—</td>
+<td>(reflected)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>17</td>
+<td>(verification)</td>
+<td>final</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2267 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-03-19-manifest-first-asset-management-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Manifest-First Asset Management for DerivaML - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#manifest-first-asset-management-for-derivaml" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Manifest-First Asset Management for DerivaML
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#directory-structure-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Directory Structure (New)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifest-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asset_file_path-three-modes-preserved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        asset_file_path() Three Modes (Preserved)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetrecord-class-dynamically-generated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssetRecord Class (Dynamically Generated)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assetfilepath-api-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssetFilePath API Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation Timeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upload-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upload Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash Recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-to-modify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files to Modify
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Files to Modify">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-existing-utilities-to-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key existing utilities to reuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unchanged-reused-as-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unchanged (reused as-is)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="manifest-first-asset-management-for-derivaml">Manifest-First Asset Management for DerivaML</h1>
+<h2 id="context">Context</h2>
+<p>DerivaML's current asset management encodes metadata as directory names in a shadow tree that mirrors the GenericUploader's regex patterns. This creates four problems:</p>
+<ol>
+<li><strong>Crash fragility</strong> — If a model crashes between <code>asset_file_path()</code> and upload, the shadow directory state may be inconsistent</li>
+<li><strong>Metadata inflexibility</strong> — Column values encoded as directory names are brittle (special chars, ordering, renaming)</li>
+<li><strong>Upload coupling</strong> — The staging format is tightly bound to GenericUploader's regex conventions</li>
+<li><strong>Code complexity</strong> — The shadow tree creation, regex generation, and FK fixup are entangled</li>
+</ol>
+<p>This design replaces the eager shadow-tree approach with a persistent JSON manifest as single source of truth, flat per-table file storage, and ephemeral symlink staging at upload time.</p>
+<h2 id="design-decisions">Design Decisions</h2>
+<ul>
+<li><strong>Manifest persistence</strong>: Write-through + fsync on every mutation for crash safety</li>
+<li><strong>API compatibility</strong>: <code>asset_file_path()</code> still returns <code>AssetFilePath</code> (a <code>Path</code> subclass), same signature</li>
+<li><strong>Metadata addition</strong>: <code>AssetFilePath</code> gains <code>.set_metadata(col, val)</code> and <code>.set_asset_types([...])</code> methods</li>
+<li><strong>Validation</strong>: Column names validated immediately; FK values warn at set time, error at upload</li>
+<li><strong>Duplicate handling</strong>: Last-write-wins with warning log</li>
+<li><strong>Upload resume</strong>: Per-asset status tracking in manifest (pending → uploaded with RID)</li>
+<li><strong>Upload staging</strong>: Ephemeral symlinks from flat storage into regex-expected tree at upload time</li>
+<li><strong>Backward compatibility</strong>: Clean break — same API surface, new internals</li>
+</ul>
+<h2 id="architecture">Architecture</h2>
+<h3 id="directory-structure-new">Directory Structure (New)</h3>
+<pre><code>{working_dir}/deriva-ml/execution/{exec_rid}/
+├── asset-manifest.json              # Single source of truth (write-through + fsync)
+├── assets/                          # Flat per-table storage
+│   ├── Image/
+│   │   ├── scan001.jpg
+│   │   └── scan002.jpg
+│   ├── Model/
+│   │   └── weights.pt
+│   └── Execution_Metadata/
+│       └── config.yaml
+├── upload-staging/                   # Ephemeral, created at upload time only
+│   └── asset/{schema}/{table}/{metadata_dirs}/...  # Symlinks into assets/
+├── features/                        # Unchanged from current
+│   └── {schema}/{target_table}/{feature_name}/...
+└── table/                           # Unchanged from current
+    └── {schema}/{table}/{table}.csv
+</code></pre>
+<h3 id="manifest-schema">Manifest Schema</h3>
+<pre><code class="language-json">{
+  &quot;version&quot;: 1,
+  &quot;execution_rid&quot;: &quot;4SP&quot;,
+  &quot;created_at&quot;: &quot;2026-03-19T...&quot;,
+  &quot;assets&quot;: {
+    &quot;Image/scan001.jpg&quot;: {
+      &quot;asset_table&quot;: &quot;Image&quot;,
+      &quot;schema&quot;: &quot;test-schema&quot;,
+      &quot;asset_types&quot;: [&quot;Training_Data&quot;],
+      &quot;metadata&quot;: {
+        &quot;Subject&quot;: &quot;2-DEF&quot;,
+        &quot;Acquisition_Date&quot;: &quot;2026-01-15&quot;
+      },
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;rid&quot;: null,
+      &quot;uploaded_at&quot;: null,
+      &quot;error&quot;: null
+    }
+  },
+  &quot;features&quot;: {
+    &quot;Diagnosis&quot;: {
+      &quot;feature_name&quot;: &quot;Diagnosis&quot;,
+      &quot;target_table&quot;: &quot;Image&quot;,
+      &quot;schema&quot;: &quot;test-schema&quot;,
+      &quot;values_path&quot;: &quot;features/test-schema/Image/Diagnosis/Diagnosis.jsonl&quot;,
+      &quot;asset_columns&quot;: {},
+      &quot;status&quot;: &quot;pending&quot;
+    }
+  }
+}
+</code></pre>
+<ul>
+<li>Asset keys are <code>{AssetTable}/{filename}</code> (unique per table)</li>
+<li><code>status</code> transitions: <code>pending</code> → <code>uploaded</code> (with RID) | <code>failed</code> (with error)</li>
+<li><code>metadata</code> dict maps column names to values — no directory encoding</li>
+<li>Features tracked separately for different upload flow</li>
+</ul>
+<h3 id="asset_file_path-three-modes-preserved">asset_file_path() Three Modes (Preserved)</h3>
+<p>The current method has three modes based on whether <code>file_name</code> exists. All three are preserved:</p>
+<ol>
+<li><strong>New file</strong> — <code>file_name</code> doesn't exist: returns <code>assets/{Table}/filename.ext</code>. Caller writes to it.</li>
+<li><strong>Symlink</strong> — <code>file_name</code> exists, <code>copy_file=False</code> (default): creates symlink <code>assets/{Table}/filename.ext</code> → original</li>
+<li><strong>Copy</strong> — <code>file_name</code> exists, <code>copy_file=True</code>: copies file to <code>assets/{Table}/filename.ext</code></li>
+</ol>
+<p>In all cases, a manifest entry is created immediately. The <code>rename_file</code> parameter works unchanged.</p>
+<p><strong>Key difference from current</strong>: Files land in <code>assets/{Table}/</code> (flat) instead of <code>asset/{schema}/{Table}/{meta1}/{meta2}/.../</code> (deep tree). Metadata is in the manifest, not the path.</p>
+<h3 id="assetrecord-class-dynamically-generated">AssetRecord Class (Dynamically Generated)</h3>
+<p>Following the <code>FeatureRecord</code> / <code>feature_record_class()</code> pattern, each asset table gets a dynamically generated Pydantic model:</p>
+<pre><code class="language-python"># Generate typed record class from catalog schema (cached per table)
+ImageAsset = ml.asset_record_class(&quot;Image&quot;)
+# → class ImageAsset(AssetRecord):
+#       Subject: str           # FK to Subject table (required if non-nullable)
+#       Acquisition_Date: str  # metadata column
+#       Acquisition_Time: str | None = None  # nullable metadata
+
+# Use at registration time
+record = ImageAsset(Subject=&quot;2-DEF&quot;, Acquisition_Date=&quot;2026-01-15&quot;)
+path = exe.asset_file_path(&quot;Image&quot;, &quot;scan001.jpg&quot;, metadata=record)
+
+# Or set metadata after registration
+path = exe.asset_file_path(&quot;Image&quot;, &quot;scan001.jpg&quot;)
+path.metadata = ImageAsset(Subject=&quot;2-DEF&quot;, Acquisition_Date=&quot;2026-01-15&quot;)
+</code></pre>
+<p><strong>Implementation</strong>: Reuse the same pattern as <code>Feature.feature_record_class()</code> in <code>feature.py:391-468</code>:
+- <code>DerivaModel.asset_metadata(table)</code> already returns the set of metadata column names
+- Use <code>pydantic.create_model()</code> with column types mapped from ERMrest types
+- Required vs optional based on column nullability
+- FK columns validated against referenced table at upload time</p>
+<p><strong>Base class</strong>: <code>AssetRecord(BaseModel)</code> in <code>src/deriva_ml/asset/aux_classes.py</code>
+- Provides <code>model_dump()</code> for manifest serialization
+- Provides column name introspection for validation</p>
+<h3 id="assetfilepath-api-changes">AssetFilePath API Changes</h3>
+<pre><code class="language-python">class AssetFilePath(Path):
+    # Existing attributes preserved
+    asset_table: str
+    file_name: str
+    asset_metadata: AssetRecord | None  # Changed from dict to AssetRecord
+    asset_types: list[str]
+    asset_rid: str | None
+
+    # NEW: Typed metadata via AssetRecord
+    @property
+    def metadata(self) -&gt; AssetRecord | None: ...
+
+    @metadata.setter
+    def metadata(self, record: AssetRecord) -&gt; None:
+        &quot;&quot;&quot;Set metadata from an AssetRecord. Updates manifest (write-through + fsync).&quot;&quot;&quot;
+
+    def set_asset_types(self, types: list[str]) -&gt; None:
+        &quot;&quot;&quot;Set asset types. Validates terms exist in Asset_Type vocabulary.
+        Raises DerivaMLValidationError for invalid terms.
+        Updates manifest (write-through + fsync).&quot;&quot;&quot;
+</code></pre>
+<h3 id="validation-timeline">Validation Timeline</h3>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What</th>
+<th>On failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_metadata(col, val)</code></td>
+<td>Column exists on asset table</td>
+<td>Raise <code>DerivaMLValidationError</code></td>
+</tr>
+<tr>
+<td><code>set_metadata(col, val)</code></td>
+<td>FK target exists (if FK column)</td>
+<td>Warn (log)</td>
+</tr>
+<tr>
+<td><code>set_asset_types([...])</code></td>
+<td>Terms exist in Asset_Type vocab</td>
+<td>Raise <code>DerivaMLValidationError</code></td>
+</tr>
+<tr>
+<td><code>set_metadata(col, val)</code></td>
+<td>Same column set twice</td>
+<td>Warn (log), last-write-wins</td>
+</tr>
+<tr>
+<td><code>upload_execution_outputs()</code></td>
+<td>Non-nullable columns have values</td>
+<td>Raise with full report</td>
+</tr>
+<tr>
+<td><code>upload_execution_outputs()</code></td>
+<td>All FK references resolve</td>
+<td>Raise with full report</td>
+</tr>
+</tbody>
+</table>
+<h3 id="upload-flow">Upload Flow</h3>
+<ol>
+<li><strong>Read manifest</strong> — load <code>asset-manifest.json</code></li>
+<li><strong>Filter</strong> — skip entries with <code>status: "uploaded"</code> (resume support)</li>
+<li><strong>Validate</strong> — check all required metadata present, FK refs valid</li>
+<li><strong>Build symlink tree</strong> — for each pending asset:</li>
+<li>Read metadata from manifest</li>
+<li>Create symlink: <code>upload-staging/asset/{schema}/{table}/{meta1}/{meta2}/.../file</code> → <code>assets/{table}/file</code></li>
+<li><strong>Upload</strong> — feed <code>upload-staging/</code> to GenericUploader with existing bulk upload config</li>
+<li><strong>Update manifest</strong> — for each successful upload, write RID + "uploaded" + timestamp (fsync)</li>
+<li><strong>FK fixup</strong> — link assets to execution, asset types, features (same as current)</li>
+<li><strong>Cleanup</strong> — remove <code>upload-staging/</code> directory</li>
+</ol>
+<h3 id="crash-recovery">Crash Recovery</h3>
+<ul>
+<li>Model crashes during training: manifest has all registered assets with <code>status: pending</code></li>
+<li>Re-create execution, call <code>upload_execution_outputs()</code> — it reads manifest, skips uploaded, resumes</li>
+<li>Upload crashes mid-way: some assets marked <code>uploaded</code>, rest still <code>pending</code></li>
+<li>Re-call <code>upload_execution_outputs()</code> — picks up where it left off</li>
+</ul>
+<h2 id="files-to-modify">Files to Modify</h2>
+<h3 id="core-changes">Core changes</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/asset/aux_classes.py</code></td>
+<td>Add <code>set_metadata()</code>, <code>set_asset_types()</code> to <code>AssetFilePath</code></td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution.py</code></td>
+<td>Rewrite <code>asset_file_path()</code> to use flat storage + manifest</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution.py</code></td>
+<td>Rewrite <code>_upload_execution_dirs()</code> to build symlinks from manifest</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution.py</code></td>
+<td>Rewrite <code>upload_execution_outputs()</code> with resume logic</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/upload.py</code></td>
+<td>Keep <code>upload_directory()</code> and <code>bulk_upload_configuration()</code> unchanged</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/upload.py</code></td>
+<td>Rewrite path helpers: <code>asset_file_path()</code> → flat, remove deep tree creation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="new-files">New files</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/asset/manifest.py</code></td>
+<td><code>AssetManifest</code> class — load/save/query/update manifest with fsync</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/asset/asset_record.py</code></td>
+<td><code>AssetRecord</code> base class + <code>asset_record_class()</code> factory (like <code>feature_record_class()</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-existing-utilities-to-reuse">Key existing utilities to reuse</h3>
+<table>
+<thead>
+<tr>
+<th>File:Line</th>
+<th>Function</th>
+<th>How used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model/catalog.py:500</code></td>
+<td><code>DerivaModel.asset_metadata(table)</code></td>
+<td>Returns metadata column names for asset table</td>
+</tr>
+<tr>
+<td><code>model/catalog.py:405</code></td>
+<td><code>DerivaModel.is_asset(table)</code></td>
+<td>Validates table is an asset table</td>
+</tr>
+<tr>
+<td><code>feature.py:391-468</code></td>
+<td><code>Feature.feature_record_class()</code></td>
+<td>Pattern to follow for <code>asset_record_class()</code> — uses <code>pydantic.create_model()</code></td>
+</tr>
+<tr>
+<td><code>dataset/upload.py:321-508</code></td>
+<td><code>upload_directory()</code></td>
+<td>Reused unchanged for GenericUploader integration</td>
+</tr>
+<tr>
+<td><code>dataset/upload.py:245-307</code></td>
+<td><code>bulk_upload_configuration()</code></td>
+<td>Reused unchanged for upload config</td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-changes">Test changes</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tests/execution/test_execution.py</code></td>
+<td>Update asset staging assertions for flat structure</td>
+</tr>
+<tr>
+<td><code>tests/asset/test_asset.py</code></td>
+<td>Add tests for <code>set_metadata()</code>, <code>set_asset_types()</code>, validation</td>
+</tr>
+<tr>
+<td><code>tests/asset/test_manifest.py</code></td>
+<td>New: manifest persistence, crash recovery, resume tests</td>
+</tr>
+</tbody>
+</table>
+<h3 id="unchanged-reused-as-is">Unchanged (reused as-is)</h3>
+<ul>
+<li><code>src/deriva_ml/dataset/upload.py: upload_directory()</code> — GenericUploader integration</li>
+<li><code>src/deriva_ml/dataset/upload.py: bulk_upload_configuration()</code> — regex-based upload config</li>
+<li><code>src/deriva_ml/schema/annotations.py</code> — bulk upload annotation generation</li>
+<li><code>src/deriva_ml/execution/execution.py: _update_asset_execution_table()</code> — FK fixup</li>
+<li><code>src/deriva_ml/execution/execution.py: _update_feature_table()</code> — feature remapping</li>
+</ul>
+<h2 id="verification">Verification</h2>
+<ol>
+<li><strong>Unit tests</strong>: <code>AssetManifest</code> — create, append, update status, fsync, load after simulated crash</li>
+<li><strong>Unit tests</strong>: <code>AssetFilePath.set_metadata()</code> — valid columns, invalid columns, FK warnings, duplicates</li>
+<li><strong>Integration tests</strong>: Full execution cycle — register assets, set metadata, upload, verify catalog</li>
+<li><strong>Resume test</strong>: Register assets, upload half, simulate crash, resume, verify all uploaded</li>
+<li><strong>Existing test suite</strong>: Run full <code>uv run pytest</code> to verify no regressions</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

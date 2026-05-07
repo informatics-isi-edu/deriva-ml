@@ -1,0 +1,3125 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-22-bug-e2-preallocated-rid/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Bug E.2: Pre-Allocated RID Upload — Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bug-e2-pre-allocated-rid-upload-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bug E.2: Pre-Allocated RID Upload — Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#repo-coordination" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repo coordination
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva-py-phase-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-py (Phase 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-phase-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml (Phase 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bug-e2-pre-allocated-rid-upload-implementation-plan">Bug E.2: Pre-Allocated RID Upload — Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Fix the pre-S3 architectural gap where deriva-py's asset uploader ignores pre-allocated RIDs from the lease system. Catalog inserts for asset rows must honor the caller-supplied RID.</p>
+<p><strong>Architecture:</strong> Two-repo change. <strong>deriva-py</strong> gains an opt-in <code>use_pre_allocated_rid</code> config flag on asset mappings and a new <code>_createFileRecordWithRid</code> method (with idempotency pre-check) that bypasses the MD5+Filename lookup. <strong>deriva-ml</strong> emits the flag in <code>asset_table_upload_spec</code>, appends the pre-leased RID as the final directory segment in the staging tree, and adds a pre-flight validator that confirms every pre-leased RID is live in <code>ERMrest_RID_Lease</code> before any upload work starts.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, Pydantic v2 (deriva-ml validator output matches Bug C's aggregated-error shape), deriva-py's <code>GenericUploader</code> extension point, pytest. Built on the existing lease infrastructure (<code>rid_lease.py</code>, <code>lease_orchestrator.py</code>) and Bug C's validator pattern.</p>
+<p><strong>Reference spec:</strong> <code>docs/superpowers/specs/2026-04-22-bug-e2-preallocated-rid-design.md</code></p>
+<hr />
+<h2 id="repo-coordination">Repo coordination</h2>
+<ul>
+<li><strong>deriva-py</strong> branch <code>2.0-dev</code> already tracked from deriva-ml's <code>pyproject.toml</code> as a git dep — no version bump needed.</li>
+<li><strong>deriva-py</strong> tasks (Phase 1) land first; CI for the deriva-ml PR will fail until deriva-py merges, then automatically picks up the new commit.</li>
+<li><strong>deriva-ml</strong> tasks (Phase 2) run against current <code>main</code> (which includes Bug C fixes).</li>
+</ul>
+<p>Both repos are checked out side-by-side on the same machine:
+- deriva-py: <code>/Users/carl/GitHub/deriva-py</code> (branch <code>2.0-dev</code>)
+- deriva-ml worktree: <code>/Users/carl/GitHub/deriva-ml/.worktrees/bug-e</code> (branch <code>claude/bug-e</code>)</p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<h3 id="deriva-py-phase-1">deriva-py (Phase 1)</h3>
+<ul>
+<li>Modify: <code>deriva/transfer/upload/deriva_upload.py</code> — add fast-fail validation in <code>_initFileMetadata</code>, branch in <code>_uploadAsset</code> Step 7, new method <code>_createFileRecordWithRid</code>.</li>
+<li>Create: <code>tests/deriva/transfer/upload/__init__.py</code> — test package marker.</li>
+<li>Create: <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code> — unit tests for the new flag and method.</li>
+</ul>
+<h3 id="deriva-ml-phase-2">deriva-ml (Phase 2)</h3>
+<ul>
+<li>Modify: <code>src/deriva_ml/execution/rid_lease.py</code> — add <code>_validate_pending_asset_leases</code> at end of file.</li>
+<li>Modify: <code>src/deriva_ml/dataset/upload.py</code> — emit <code>use_pre_allocated_rid=True</code>, extend regex + column_map.</li>
+<li>Modify: <code>src/deriva_ml/execution/upload_engine.py</code> — append RID to staging path, call lease validator at <code>run_upload_engine</code>.</li>
+<li>Modify: <code>src/deriva_ml/execution/execution.py</code> — append RID to staging path in <code>_build_upload_staging</code>, call lease validator at <code>_upload_execution_dirs</code>.</li>
+<li>Modify: <code>src/deriva_ml/core/mixins/execution.py</code> — adapt caller of <code>asset_file_path</code> (line 229) to pass its known RID.</li>
+<li>Create: <code>tests/execution/test_pending_asset_lease_validator.py</code> — 5 unit tests for the lease validator.</li>
+<li>Modify: <code>tests/asset/test_null_sentinel_processor.py</code> — add 3 tests for the new upload-spec fields.</li>
+<li>Create: <code>tests/execution/test_bug_e2_live_smoke.py</code> — 3 live-catalog integration tests.</li>
+<li>Modify: <code>CHANGELOG.md</code> — Unreleased entry.</li>
+</ul>
+<hr />
+<h1 id="phase-1-deriva-py">Phase 1: deriva-py</h1>
+<h2 id="task-1-add-fast-fail-validation-in-_initfilemetadata">Task 1: Add fast-fail validation in <code>_initFileMetadata</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>deriva/transfer/upload/deriva_upload.py:829-831</code> (append after <code>self._updateFileMetadata(match_groupdict)</code>)
+- Create: <code>tests/deriva/transfer/upload/__init__.py</code> (empty, package marker)
+- Test: <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code> (new file)</p>
+<p>Guard: if asset mapping has <code>use_pre_allocated_rid=true</code> but the regex didn't capture <code>RID</code>, raise <code>DerivaUploadConfigurationError</code> before any hatrac I/O.</p>
+<ul>
+<li>[ ] <strong>Step 1: Create test package marker</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; mkdir -p tests/deriva/transfer/upload &amp;&amp; touch tests/deriva/transfer/upload/__init__.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for deriva-py's use_pre_allocated_rid asset-mapping flag.
+
+These tests exercise two narrowly-scoped changes on GenericUploader:
+
+1. A fast-fail validation in ``_initFileMetadata`` when the flag is
+   set but the regex didn't capture a RID group.
+2. A new ``_createFileRecordWithRid`` method that bypasses the
+   MD5+Filename lookup in ``_getFileRecord`` and creates (or
+   idempotently returns) a catalog row at the caller-supplied RID.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+
+@pytest.fixture
+def uploader():
+    &quot;&quot;&quot;Construct a GenericUploader with mocked catalog + identity.&quot;&quot;&quot;
+    from deriva.transfer.upload.deriva_upload import GenericUploader
+    inst = GenericUploader.__new__(GenericUploader)
+    # Fill the attributes _initFileMetadata and _createFileRecordWithRid read.
+    inst.metadata = {}
+    inst.catalog = MagicMock()
+    inst.identity = {&quot;id&quot;: &quot;anon&quot;, &quot;display_name&quot;: &quot;a&quot;, &quot;full_name&quot;: &quot;A&quot;, &quot;email&quot;: &quot;a@b&quot;}
+    inst.processor_output = {}
+    inst.cancelled = False
+    return inst
+
+
+def test_init_file_metadata_raises_when_flag_set_and_no_rid_captured(uploader):
+    from deriva.transfer.upload.deriva_upload import DerivaUploadConfigurationError
+    asset_mapping = {
+        &quot;use_pre_allocated_rid&quot;: True,
+        &quot;target_table&quot;: [&quot;S&quot;, &quot;T&quot;],
+    }
+    # match_groupdict has NO 'RID' key — regex didn't capture it.
+    match_groupdict = {&quot;schema&quot;: &quot;S&quot;, &quot;asset_table&quot;: &quot;T&quot;}
+    # Stub getCatalogTable to avoid needing a real catalog model.
+    uploader.getCatalogTable = MagicMock(return_value=&quot;S:T&quot;)
+    uploader.getFileDisplayName = MagicMock(return_value=&quot;f.bin&quot;)
+    uploader.getFileSize = MagicMock(return_value=123)
+
+    with pytest.raises(DerivaUploadConfigurationError) as ei:
+        uploader._initFileMetadata(&quot;/tmp/f.bin&quot;, asset_mapping, match_groupdict)
+    msg = str(ei.value)
+    assert &quot;use_pre_allocated_rid&quot; in msg
+    assert &quot;RID&quot; in msg
+
+
+def test_init_file_metadata_passes_when_flag_set_and_rid_captured(uploader):
+    asset_mapping = {
+        &quot;use_pre_allocated_rid&quot;: True,
+        &quot;target_table&quot;: [&quot;S&quot;, &quot;T&quot;],
+    }
+    match_groupdict = {&quot;schema&quot;: &quot;S&quot;, &quot;asset_table&quot;: &quot;T&quot;, &quot;RID&quot;: &quot;1-ABC&quot;}
+    uploader.getCatalogTable = MagicMock(return_value=&quot;S:T&quot;)
+    uploader.getFileDisplayName = MagicMock(return_value=&quot;f.bin&quot;)
+    uploader.getFileSize = MagicMock(return_value=123)
+
+    # Should not raise.
+    uploader._initFileMetadata(&quot;/tmp/f.bin&quot;, asset_mapping, match_groupdict)
+    assert uploader.metadata[&quot;RID&quot;] == &quot;1-ABC&quot;
+
+
+def test_init_file_metadata_passes_when_flag_absent(uploader):
+    &quot;&quot;&quot;Legacy callers (flag not set) see no behavior change — no RID check.&quot;&quot;&quot;
+    asset_mapping = {&quot;target_table&quot;: [&quot;S&quot;, &quot;T&quot;]}
+    match_groupdict = {&quot;schema&quot;: &quot;S&quot;, &quot;asset_table&quot;: &quot;T&quot;}
+    uploader.getCatalogTable = MagicMock(return_value=&quot;S:T&quot;)
+    uploader.getFileDisplayName = MagicMock(return_value=&quot;f.bin&quot;)
+    uploader.getFileSize = MagicMock(return_value=123)
+
+    # Should not raise — legacy path doesn't require RID.
+    uploader._initFileMetadata(&quot;/tmp/f.bin&quot;, asset_mapping, match_groupdict)
+    assert &quot;RID&quot; not in uploader.metadata
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; python -m pytest tests/deriva/transfer/upload/test_pre_allocated_rid.py -v</code></p>
+<p>Expected: <code>test_init_file_metadata_raises_when_flag_set_and_no_rid_captured</code> FAILS with "DID NOT RAISE" because the validation doesn't exist yet. The other two tests pass trivially (no validation runs, so no raise).</p>
+<ul>
+<li>[ ] <strong>Step 4: Add the fast-fail validation</strong></li>
+</ul>
+<p>In <code>deriva/transfer/upload/deriva_upload.py</code>, locate <code>_initFileMetadata</code> (around line 829). After the line <code>self._updateFileMetadata(match_groupdict)</code> and before <code>self.metadata['target_table'] = self.getCatalogTable(...)</code>, insert:</p>
+<pre><code class="language-python">        # Fast-fail check for pre-allocated-RID asset mappings: the caller
+        # opted in via ``use_pre_allocated_rid: true`` and must supply the
+        # RID via a ``(?P&lt;RID&gt;...)`` named group in the file_pattern regex.
+        if stob(asset_mapping.get(&quot;use_pre_allocated_rid&quot;, False)):
+            if not self.metadata.get(&quot;RID&quot;):
+                raise DerivaUploadConfigurationError(
+                    &quot;Asset mapping has use_pre_allocated_rid=true but no RID &quot;
+                    &quot;was captured by the file_pattern regex. Ensure the pattern &quot;
+                    &quot;includes a (?P&lt;RID&gt;[A-Z0-9-]+) named group.&quot;
+                )
+</code></pre>
+<p>Verify <code>stob</code> and <code>DerivaUploadConfigurationError</code> are already imported (they should be — <code>stob</code> appears in <code>_uploadAsset</code>; <code>DerivaUploadConfigurationError</code> in <code>_getFileRecord</code>).</p>
+<ul>
+<li>[ ] <strong>Step 5: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; python -m pytest tests/deriva/transfer/upload/test_pre_allocated_rid.py -v</code></p>
+<p>Expected: all 3 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 6: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; git add tests/deriva/transfer/upload/__init__.py tests/deriva/transfer/upload/test_pre_allocated_rid.py deriva/transfer/upload/deriva_upload.py
+git commit -m &quot;feat(upload): fast-fail when use_pre_allocated_rid flag has no RID&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-add-_createfilerecordwithrid-with-idempotency-pre-check">Task 2: Add <code>_createFileRecordWithRid</code> with idempotency pre-check</h2>
+<p><strong>Files:</strong>
+- Modify: <code>deriva/transfer/upload/deriva_upload.py</code> — add new method after <code>_getFileRecord</code> (around line 820).
+- Test: <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code> — append 2 tests.</p>
+<p>New private method that skips MD5+Filename lookup, does a RID-keyed existence check for idempotent retry, creates if absent.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code>:</p>
+<pre><code class="language-python">def test_create_file_record_with_rid_happy_path(uploader):
+    &quot;&quot;&quot;No existing row with RID → _catalogRecordCreate called with RID in payload.&quot;&quot;&quot;
+    asset_mapping = {
+        &quot;use_pre_allocated_rid&quot;: True,
+        &quot;column_map&quot;: {&quot;MD5&quot;: &quot;{md5}&quot;, &quot;Filename&quot;: &quot;{file_name}&quot;, &quot;RID&quot;: &quot;{RID}&quot;},
+    }
+    uploader.metadata = {
+        &quot;RID&quot;: &quot;1-NEW&quot;,
+        &quot;md5&quot;: &quot;abc123&quot;,
+        &quot;file_name&quot;: &quot;f.bin&quot;,
+        &quot;target_table&quot;: &quot;S:T&quot;,
+    }
+
+    # Pre-check GET returns empty — row doesn't exist yet.
+    get_response = MagicMock()
+    get_response.json.return_value = []
+    uploader.catalog.get.return_value = get_response
+
+    # Stub _catalogRecordCreate to return a created-record shape.
+    uploader._catalogRecordCreate = MagicMock(
+        return_value=[{&quot;RID&quot;: &quot;1-NEW&quot;, &quot;MD5&quot;: &quot;abc123&quot;, &quot;Filename&quot;: &quot;f.bin&quot;}]
+    )
+    uploader._updateFileMetadata = MagicMock()
+
+    record, result = uploader._createFileRecordWithRid(asset_mapping)
+
+    # Pre-check queried by RID.
+    uploader.catalog.get.assert_called_once_with(&quot;/entity/S:T/RID=1-NEW&quot;)
+    # Create called with RID in the row.
+    create_call = uploader._catalogRecordCreate.call_args
+    assert create_call[0][0] == &quot;S:T&quot;  # target_table
+    assert create_call[0][1][&quot;RID&quot;] == &quot;1-NEW&quot;
+    # Return shape mirrors _getFileRecord: (dict, record).
+    assert isinstance(record, dict)
+    assert result[&quot;RID&quot;] == &quot;1-NEW&quot;
+
+
+def test_create_file_record_with_rid_idempotent_on_existing(uploader):
+    &quot;&quot;&quot;RID already exists → skip create, return existing row.&quot;&quot;&quot;
+    asset_mapping = {
+        &quot;use_pre_allocated_rid&quot;: True,
+        &quot;column_map&quot;: {&quot;MD5&quot;: &quot;{md5}&quot;, &quot;Filename&quot;: &quot;{file_name}&quot;, &quot;RID&quot;: &quot;{RID}&quot;},
+    }
+    uploader.metadata = {
+        &quot;RID&quot;: &quot;1-OLD&quot;,
+        &quot;md5&quot;: &quot;abc123&quot;,
+        &quot;file_name&quot;: &quot;f.bin&quot;,
+        &quot;target_table&quot;: &quot;S:T&quot;,
+    }
+
+    existing_row = {&quot;RID&quot;: &quot;1-OLD&quot;, &quot;MD5&quot;: &quot;abc123&quot;, &quot;Filename&quot;: &quot;f.bin&quot;}
+    get_response = MagicMock()
+    get_response.json.return_value = [existing_row]
+    uploader.catalog.get.return_value = get_response
+
+    # _catalogRecordCreate MUST NOT be called.
+    uploader._catalogRecordCreate = MagicMock()
+    uploader._updateFileMetadata = MagicMock()
+
+    record, result = uploader._createFileRecordWithRid(asset_mapping)
+
+    uploader._catalogRecordCreate.assert_not_called()
+    # Return shape: (pruned dict, existing record).
+    assert isinstance(record, dict)
+    assert result == existing_row
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; python -m pytest tests/deriva/transfer/upload/test_pre_allocated_rid.py -v</code></p>
+<p>Expected: the 2 new tests FAIL with <code>AttributeError: 'GenericUploader' object has no attribute '_createFileRecordWithRid'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add the method</strong></li>
+</ul>
+<p>In <code>deriva/transfer/upload/deriva_upload.py</code>, locate <code>_getFileRecord</code> (around line 793). Immediately AFTER that method (before <code>_urlEncodeMetadata</code> or whatever method comes next), insert:</p>
+<pre><code class="language-python">    def _createFileRecordWithRid(self, asset_mapping):
+        &quot;&quot;&quot;Create a new record using a caller-supplied RID.
+
+        Used when asset_mapping has ``use_pre_allocated_rid: true``.
+        Skips the MD5+Filename lookup in ``_getFileRecord``; the caller
+        (via the scan-path regex) must have supplied an RID that was
+        pre-allocated from ``ERMrest_RID_Lease``.
+
+        Idempotency: if a row with the supplied RID already exists
+        (e.g., a prior upload landed the catalog row but the client
+        crashed before recording success), returns that row rather
+        than raising an RID-collision error. Callers can safely retry
+        after partial failures.
+
+        Returns:
+            Tuple of (row, record) mirroring ``_getFileRecord``'s
+            return shape.
+        &quot;&quot;&quot;
+        column_map = asset_mapping.get(&quot;column_map&quot;, {})
+        allow_none_col_list = asset_mapping.get(&quot;allow_empty_columns_on_update&quot;, [])
+        target_table = self.metadata['target_table']
+        rid = self.metadata[&quot;RID&quot;]
+
+        # Pre-check: does a row with this RID already exist?
+        existing = self.catalog.get(&quot;/entity/%s/RID=%s&quot; % (target_table, rid)).json()
+        if existing:
+            record = existing[0]
+            self._updateFileMetadata(record, no_overwrite=True)
+            return self.pruneDict(record, column_map, allow_none_col_list), record
+
+        # Fresh create — RID goes into the payload via column_map.
+        row = self.interpolateDict(self.metadata, column_map, allow_none_col_list)
+        result = self._catalogRecordCreate(target_table, row)
+        record = result[0] if result else row
+        if record:
+            self._updateFileMetadata(record)
+        return self.interpolateDict(
+            self.metadata, column_map, allow_none_column_list=allow_none_col_list
+        ), record
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; python -m pytest tests/deriva/transfer/upload/test_pre_allocated_rid.py -v</code></p>
+<p>Expected: all 5 tests pass (3 from Task 1 + 2 new).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; git add deriva/transfer/upload/deriva_upload.py tests/deriva/transfer/upload/test_pre_allocated_rid.py
+git commit -m &quot;feat(upload): _createFileRecordWithRid bypasses MD5+Filename lookup&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-wire-_createfilerecordwithrid-into-_uploadasset">Task 3: Wire <code>_createFileRecordWithRid</code> into <code>_uploadAsset</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>deriva/transfer/upload/deriva_upload.py:736-738</code> (Step 7 of <code>_uploadAsset</code>)
+- Test: <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code> — append 1 test.</p>
+<p>Route <code>_uploadAsset</code>'s Step 7 to <code>_createFileRecordWithRid</code> when the flag is set.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Append to <code>tests/deriva/transfer/upload/test_pre_allocated_rid.py</code>:</p>
+<pre><code class="language-python">def test_flag_off_uses_existing_md5_filename_path(uploader):
+    &quot;&quot;&quot;When flag is absent, _getFileRecord (MD5+Filename path) is used.&quot;&quot;&quot;
+    asset_mapping = {&quot;target_table&quot;: [&quot;S&quot;, &quot;T&quot;], &quot;column_map&quot;: {&quot;MD5&quot;: &quot;{md5}&quot;}}
+    uploader.metadata = {&quot;md5&quot;: &quot;abc&quot;, &quot;file_name&quot;: &quot;f.bin&quot;, &quot;target_table&quot;: &quot;S:T&quot;}
+
+    uploader._getFileRecord = MagicMock(return_value=({}, {&quot;RID&quot;: &quot;SERVER-RID&quot;}))
+    uploader._createFileRecordWithRid = MagicMock()
+
+    # Simulate what _uploadAsset Step 7 will do (see task step 2).
+    from deriva.transfer.upload.deriva_upload import stob
+    if stob(asset_mapping.get(&quot;use_pre_allocated_rid&quot;, False)):
+        record, result = uploader._createFileRecordWithRid(asset_mapping)
+    else:
+        record, result = uploader._getFileRecord(asset_mapping)
+
+    uploader._getFileRecord.assert_called_once()
+    uploader._createFileRecordWithRid.assert_not_called()
+    assert result[&quot;RID&quot;] == &quot;SERVER-RID&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Update <code>_uploadAsset</code> Step 7</strong></li>
+</ul>
+<p>In <code>deriva/transfer/upload/deriva_upload.py</code>, locate <code>_uploadAsset</code> (line 660). Find Step 7 (around line 736-738):</p>
+<pre><code class="language-python">        # 7. Check for an existing record and create a new one if necessary
+        if not record:
+            record, result = self._getFileRecord(asset_mapping)
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">        # 7. Check for an existing record and create a new one if necessary.
+        #    If use_pre_allocated_rid is set, skip the MD5+Filename lookup
+        #    and go straight to _createFileRecordWithRid (with idempotency
+        #    pre-check).
+        if not record:
+            if stob(asset_mapping.get(&quot;use_pre_allocated_rid&quot;, False)):
+                record, result = self._createFileRecordWithRid(asset_mapping)
+            else:
+                record, result = self._getFileRecord(asset_mapping)
+</code></pre>
+<p>Also check Step 5 (around line 690-693) — it has a similar <code>record = self._getFileRecord(asset_mapping)</code> call in the <code>create_record_before_upload</code> branch. For safety and symmetry, update it too:</p>
+<pre><code class="language-python">        # 5. If &quot;create_record_before_upload&quot; specified in asset_mapping, check for an existing record, creating a new
+        #    one if necessary. Otherwise, delay this logic until after the file upload.
+        result = record = None
+        if stob(asset_mapping.get(&quot;create_record_before_upload&quot;, False)):
+            if stob(asset_mapping.get(&quot;use_pre_allocated_rid&quot;, False)):
+                record = self._createFileRecordWithRid(asset_mapping)
+            else:
+                record = self._getFileRecord(asset_mapping)
+</code></pre>
+<p>Wait — the existing Step 5 returns only <code>record</code> (not a tuple). Let me leave Step 5 as is for now; <code>create_record_before_upload</code> isn't in deriva-ml's use case. Only update Step 7.</p>
+<p>Revert any Step 5 change; only Step 7 should be modified.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; python -m pytest tests/deriva/transfer/upload/test_pre_allocated_rid.py -v</code></p>
+<p>Expected: all 6 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; git add deriva/transfer/upload/deriva_upload.py tests/deriva/transfer/upload/test_pre_allocated_rid.py
+git commit -m &quot;feat(upload): route _uploadAsset Step 7 to _createFileRecordWithRid when flag set&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-push-deriva-py-branch-and-open-pr">Task 4: Push deriva-py branch and open PR</h2>
+<ul>
+<li>[ ] <strong>Step 1: Push the branch</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; git checkout -b claude/bug-e2-preallocated-rid &amp;&amp; git push -u origin claude/bug-e2-preallocated-rid
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Open a PR against <code>2.0-dev</code></strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-py &amp;&amp; gh pr create \
+  --base 2.0-dev \
+  --title &quot;feat(upload): add use_pre_allocated_rid flag for caller-supplied RIDs&quot; \
+  --body &quot;$(cat &lt;&lt;'EOF'
+## Summary
+
+Add opt-in support for asset mappings that use caller-supplied RIDs instead of deriva-py's default MD5+Filename lookup/upsert.
+
+When an asset mapping sets \`use_pre_allocated_rid: true\`:
+
+- \`_initFileMetadata\` fast-fails with \`DerivaUploadConfigurationError\` if the file_pattern regex didn't capture a \`RID\` named group.
+- \`_uploadAsset\` Step 7 routes to a new \`_createFileRecordWithRid\` method that does a RID-keyed existence check for idempotent retry, then creates with the caller-supplied RID in the payload.
+
+Default (flag absent): legacy MD5+Filename behavior — no change.
+
+## Motivation
+
+deriva-ml's lease system (\`ERMrest_RID_Lease\`) pre-allocates RIDs so client code can reference them in FK columns before the target row exists. The existing upload path silently substitutes server-generated RIDs for asset rows, breaking this invariant. This flag lets opt-in callers honor pre-allocated RIDs.
+
+## Test Plan
+
+- [x] 6 unit tests in \`tests/deriva/transfer/upload/test_pre_allocated_rid.py\`:
+  - Fast-fail validation when flag set without RID
+  - Passthrough when flag set with RID captured
+  - No change when flag absent
+  - Happy path (no existing row → create with RID)
+  - Idempotent retry (existing row → return without re-create)
+  - Step 7 routing correctness
+
+## Backward Compatibility
+
+Strictly opt-in. No existing asset mapping has the flag, so no existing caller sees any behavior change.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)&quot;
+</code></pre>
+<p>Record the PR URL — deriva-ml Phase 2 can't merge until this one does.</p>
+<hr />
+<h1 id="phase-2-deriva-ml">Phase 2: deriva-ml</h1>
+<h2 id="task-5-add-_validate_pending_asset_leases-validator">Task 5: Add <code>_validate_pending_asset_leases</code> validator</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/rid_lease.py</code> — append new function at end of file.
+- Test: <code>tests/execution/test_pending_asset_lease_validator.py</code> (new file).</p>
+<p>Pre-flight validator that batch-queries <code>ERMrest_RID_Lease</code> and aggregates missing RIDs into a single <code>DerivaMLValidationError</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_pending_asset_lease_validator.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for _validate_pending_asset_leases.&quot;&quot;&quot;
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+
+def _fake_catalog(found_rids: set[str]):
+    &quot;&quot;&quot;Build a fake ErmrestCatalog whose .get() returns rows with
+    RIDs from ``found_rids`` that match the query's filter.&quot;&quot;&quot;
+    catalog = MagicMock()
+
+    def fake_get(path: str):
+        # Parse &quot;/entity/public:ERMrest_RID_Lease/RID=r1;RID=r2;...&quot;
+        response = MagicMock()
+        assert path.startswith(&quot;/entity/public:ERMrest_RID_Lease/&quot;)
+        filter_part = path.split(&quot;/entity/public:ERMrest_RID_Lease/&quot;, 1)[1]
+        queried = []
+        for clause in filter_part.split(&quot;;&quot;):
+            key, _, value = clause.partition(&quot;=&quot;)
+            if key == &quot;RID&quot;:
+                queried.append(value)
+        response.json.return_value = [
+            {&quot;RID&quot;: rid, &quot;ID&quot;: f&quot;token-{rid}&quot;}
+            for rid in queried
+            if rid in found_rids
+        ]
+        return response
+
+    catalog.get.side_effect = fake_get
+    return catalog
+
+
+def test_empty_entries_returns_none():
+    from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+    catalog = MagicMock()
+    assert _validate_pending_asset_leases(catalog, []) is None
+    catalog.get.assert_not_called()
+
+
+def test_all_leases_valid_passes():
+    from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+    catalog = _fake_catalog({&quot;1-ABC&quot;, &quot;1-DEF&quot;})
+    entries = [(&quot;Image/a.png&quot;, &quot;1-ABC&quot;), (&quot;Image/b.png&quot;, &quot;1-DEF&quot;)]
+    assert _validate_pending_asset_leases(catalog, entries) is None
+
+
+def test_single_missing_lease_raises():
+    from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    catalog = _fake_catalog({&quot;1-ABC&quot;})  # 1-DEF NOT there
+    entries = [(&quot;Image/a.png&quot;, &quot;1-ABC&quot;), (&quot;Image/b.png&quot;, &quot;1-DEF&quot;)]
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_leases(catalog, entries)
+    msg = str(ei.value)
+    assert &quot;Image/b.png&quot; in msg
+    assert &quot;1-DEF&quot; in msg
+    assert &quot;Image/a.png&quot; not in msg  # the valid one isn't listed
+
+
+def test_multiple_missing_leases_aggregated():
+    from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    catalog = _fake_catalog(set())  # nothing found
+    entries = [
+        (&quot;Image/z.png&quot;, &quot;1-ZZZ&quot;),
+        (&quot;Image/a.png&quot;, &quot;1-AAA&quot;),
+    ]
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_leases(catalog, entries)
+    msg = str(ei.value)
+    assert &quot;1-ZZZ&quot; in msg
+    assert &quot;1-AAA&quot; in msg
+    # Sorted by (key, rid) — 'a.png' before 'z.png'.
+    assert msg.index(&quot;Image/a.png&quot;) &lt; msg.index(&quot;Image/z.png&quot;)
+
+
+def test_batched_queries_use_chunk_size(monkeypatch):
+    &quot;&quot;&quot;More entries than chunk size → multiple catalog.get calls.&quot;&quot;&quot;
+    from deriva_ml.execution import rid_lease
+    from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+
+    # Set chunk size to 2 so 3 entries require 2 batched calls.
+    monkeypatch.setattr(rid_lease, &quot;PENDING_ROWS_LEASE_CHUNK&quot;, 2)
+    catalog = _fake_catalog({&quot;1-A&quot;, &quot;1-B&quot;, &quot;1-C&quot;})
+    entries = [(&quot;k1&quot;, &quot;1-A&quot;), (&quot;k2&quot;, &quot;1-B&quot;), (&quot;k3&quot;, &quot;1-C&quot;)]
+    _validate_pending_asset_leases(catalog, entries)
+    # Expect 2 calls: first batch of 2, second batch of 1.
+    assert catalog.get.call_count == 2
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_asset_lease_validator.py -v</code></p>
+<p>Expected: all 5 tests FAIL with <code>ImportError: cannot import name '_validate_pending_asset_leases'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the validator</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/rid_lease.py</code>, append at the end of the file:</p>
+<pre><code class="language-python">def _validate_pending_asset_leases(
+    catalog: &quot;ErmrestCatalog&quot;,
+    entries: &quot;Iterable[tuple[str, str]]&quot;,
+) -&gt; None:
+    &quot;&quot;&quot;Confirm each (key, rid) pair's RID is still live in ERMrest_RID_Lease.
+
+    Queries the lease table in batches of ``PENDING_ROWS_LEASE_CHUNK``.
+    Aggregates missing RIDs and raises a single
+    :class:`DerivaMLValidationError` listing every failure in sorted
+    order. Returns ``None`` silently when every RID is present.
+
+    Args:
+        catalog: Live ErmrestCatalog for querying the lease table.
+        entries: Iterable of (key, rid) tuples. Key is a
+            human-readable identifier used in the error message.
+
+    Raises:
+        DerivaMLValidationError: If one or more RIDs are not found
+            in ``ERMrest_RID_Lease``.
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    entries_list = list(entries)
+    if not entries_list:
+        return
+
+    # Build a reverse map so we can attribute a missing RID back to
+    # its caller-supplied key. If the same RID appears under two keys
+    # (shouldn't happen in practice), the last one wins in the reverse
+    # map — missing-list below iterates the forward list.
+    rid_to_keys: dict[str, list[str]] = {}
+    for key, rid in entries_list:
+        rid_to_keys.setdefault(rid, []).append(key)
+
+    all_rids = list(rid_to_keys.keys())
+    found_rids: set[str] = set()
+
+    for i in range(0, len(all_rids), PENDING_ROWS_LEASE_CHUNK):
+        chunk = all_rids[i : i + PENDING_ROWS_LEASE_CHUNK]
+        filter_clause = &quot;;&quot;.join(f&quot;RID={rid}&quot; for rid in chunk)
+        path = f&quot;/entity/public:ERMrest_RID_Lease/{filter_clause}&quot;
+        response = catalog.get(path)
+        for row in response.json():
+            found_rids.add(row[&quot;RID&quot;])
+
+    missing: list[tuple[str, str]] = []
+    for key, rid in entries_list:
+        if rid not in found_rids:
+            missing.append((key, rid))
+    if not missing:
+        return
+
+    lines = [
+        f&quot;Missing or invalid pre-allocated RIDs for &quot;
+        f&quot;{len(missing)} pending asset(s):&quot;
+    ]
+    for key, rid in sorted(missing):
+        lines.append(f&quot;  - {key}: RID {rid} not found in ERMrest_RID_Lease&quot;)
+    lines.append(
+        &quot;A pre-leased RID has become invalid (e.g., cleared from the &quot;
+        &quot;lease table or never successfully POSTed). Restart the &quot;
+        &quot;execution to re-lease, or investigate lease-table state.&quot;
+    )
+    raise DerivaMLValidationError(&quot;\n&quot;.join(lines))
+</code></pre>
+<p>Also add <code>Iterable</code> to the <code>typing</code> imports at the top of <code>rid_lease.py</code> if not already present. Current imports block:</p>
+<pre><code class="language-python">from typing import TYPE_CHECKING
+</code></pre>
+<p>becomes:</p>
+<pre><code class="language-python">from typing import TYPE_CHECKING, Iterable
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_asset_lease_validator.py -v</code></p>
+<p>Expected: all 5 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add src/deriva_ml/execution/rid_lease.py tests/execution/test_pending_asset_lease_validator.py
+git commit -m &quot;feat(rid_lease): _validate_pending_asset_leases for pre-flight lease-table check&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-emit-use_pre_allocated_rid-in-upload-spec">Task 6: Emit <code>use_pre_allocated_rid</code> in upload spec</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/upload.py</code> — extend <code>asset_table_upload_spec()</code>.
+- Test: <code>tests/asset/test_null_sentinel_processor.py</code> — append 3 tests.</p>
+<p>Extend the regex with a RID capture group, add <code>RID</code> to <code>column_map</code>, emit the <code>use_pre_allocated_rid=True</code> flag.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/asset/test_null_sentinel_processor.py</code>:</p>
+<pre><code class="language-python">def test_asset_table_upload_spec_has_use_pre_allocated_rid_flag(test_ml):
+    from deriva.core.ermrest_model import builtin_types
+    from deriva_ml.core.definitions import ColumnDefinition
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    test_ml.create_asset(
+        &quot;UsePreAllocatedFlagTest&quot;,
+        column_defs=[ColumnDefinition(name=&quot;foo&quot;, type=builtin_types.int4)],
+    )
+    spec = asset_table_upload_spec(test_ml.model, &quot;UsePreAllocatedFlagTest&quot;)
+    assert spec.get(&quot;use_pre_allocated_rid&quot;) is True
+
+
+def test_asset_table_upload_spec_file_pattern_captures_rid(test_ml):
+    from deriva.core.ermrest_model import builtin_types
+    from deriva_ml.core.definitions import ColumnDefinition
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    test_ml.create_asset(
+        &quot;UsePreAllocatedRegexTest&quot;,
+        column_defs=[ColumnDefinition(name=&quot;foo&quot;, type=builtin_types.int4)],
+    )
+    spec = asset_table_upload_spec(test_ml.model, &quot;UsePreAllocatedRegexTest&quot;)
+    pattern = spec[&quot;file_pattern&quot;]
+    # Regex must contain a (?P&lt;RID&gt;...) named group.
+    assert &quot;(?P&lt;RID&gt;&quot; in pattern, f&quot;file_pattern missing RID capture: {pattern}&quot;
+
+
+def test_asset_table_upload_spec_column_map_includes_rid(test_ml):
+    from deriva.core.ermrest_model import builtin_types
+    from deriva_ml.core.definitions import ColumnDefinition
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    test_ml.create_asset(
+        &quot;UsePreAllocatedColumnMapTest&quot;,
+        column_defs=[ColumnDefinition(name=&quot;foo&quot;, type=builtin_types.int4)],
+    )
+    spec = asset_table_upload_spec(test_ml.model, &quot;UsePreAllocatedColumnMapTest&quot;)
+    assert spec[&quot;column_map&quot;].get(&quot;RID&quot;) == &quot;{RID}&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/test_null_sentinel_processor.py -v</code></p>
+<p>Expected: the 3 new tests FAIL (flag, regex group, and column_map entry all absent).</p>
+<ul>
+<li>[ ] <strong>Step 3: Extend <code>asset_table_upload_spec</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/upload.py</code>, locate <code>asset_table_upload_spec()</code> (around line 276). Find the block that builds <code>asset_path</code>:</p>
+<pre><code class="language-python">    metadata_path = &quot;/&quot;.join([rf&quot;(?P&lt;{c}&gt;[-:._ \w]+)&quot; for c in metadata_columns])
+    asset_path = f&quot;{exec_dir_regex}/asset/{schema}/{asset_table.name}/{metadata_path}/{asset_file_regex}&quot;
+</code></pre>
+<p>Replace with:</p>
+<pre><code class="language-python">    metadata_path = &quot;/&quot;.join([rf&quot;(?P&lt;{c}&gt;[-:._ \w]+)&quot; for c in metadata_columns])
+    # Bug E.2: capture pre-allocated RID as an additional path segment
+    # after metadata columns and before the filename.
+    rid_path = r&quot;(?P&lt;RID&gt;[-A-Z0-9]+)&quot;
+    parts = [metadata_path, rid_path] if metadata_path else [rid_path]
+    asset_path = (
+        f&quot;{exec_dir_regex}/asset/{schema}/{asset_table.name}/&quot;
+        f&quot;{'/'.join(parts)}/{asset_file_regex}&quot;
+    )
+</code></pre>
+<p>Then find the <code>spec = {...}</code> dict. Extend <code>column_map</code> to include <code>RID</code>:</p>
+<p>Current:</p>
+<pre><code class="language-python">        &quot;column_map&quot;: {
+            &quot;MD5&quot;: &quot;{md5}&quot;,
+            &quot;URL&quot;: &quot;{URI}&quot;,
+            &quot;Length&quot;: &quot;{file_size}&quot;,
+            &quot;Filename&quot;: &quot;{file_name}&quot;,
+        }
+        | {c: f&quot;{{{c}}}&quot; for c in metadata_columns},
+</code></pre>
+<p>Change to:</p>
+<pre><code class="language-python">        &quot;column_map&quot;: {
+            &quot;MD5&quot;: &quot;{md5}&quot;,
+            &quot;URL&quot;: &quot;{URI}&quot;,
+            &quot;Length&quot;: &quot;{file_size}&quot;,
+            &quot;Filename&quot;: &quot;{file_name}&quot;,
+            &quot;RID&quot;: &quot;{RID}&quot;,  # Bug E.2: pre-allocated RID
+        }
+        | {c: f&quot;{{{c}}}&quot; for c in metadata_columns},
+</code></pre>
+<p>Finally, add the <code>use_pre_allocated_rid</code> flag to the spec dict. Find the end of the spec dict (after <code>record_query_template</code>) and add:</p>
+<pre><code class="language-python">    spec = {
+        ...existing fields...
+        &quot;record_query_template&quot;: &quot;/entity/{target_table}/MD5={md5}&amp;Filename={file_name}&quot;,
+        &quot;use_pre_allocated_rid&quot;: True,  # Bug E.2: use caller-supplied RID
+    }
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/test_null_sentinel_processor.py -v</code></p>
+<p>Expected: all tests pass (original 6 from Bug C + 3 new = 9).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add src/deriva_ml/dataset/upload.py tests/asset/test_null_sentinel_processor.py
+git commit -m &quot;feat(dataset/upload): emit use_pre_allocated_rid + RID capture (Bug E.2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-append-rid-to-staging-path-in-_build_upload_staging">Task 7: Append RID to staging path in <code>_build_upload_staging</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/execution.py</code> — <code>_build_upload_staging</code> around line 1074.</p>
+<p>Change the staging directory layout to append the pre-leased RID (from <code>entry.rid</code>) as the final segment before the filename.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>_build_upload_staging</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, locate <code>_build_upload_staging</code> method (around line 1034). Find the block that builds <code>target_dir</code>:</p>
+<pre><code class="language-python">            all_metadata_cols = sorted(self._model.asset_metadata(asset_table_name))
+            metadata_parts = [
+                str(entry.metadata.get(k, NULL_SENTINEL)) for k in all_metadata_cols
+            ] if all_metadata_cols else []
+            target_dir = staging_root / entry.schema / asset_table_name
+            for part in metadata_parts:
+                target_dir = target_dir / part
+            target_dir.mkdir(parents=True, exist_ok=True)
+</code></pre>
+<p>Change to:</p>
+<pre><code class="language-python">            all_metadata_cols = sorted(self._model.asset_metadata(asset_table_name))
+            metadata_parts = [
+                str(entry.metadata.get(k, NULL_SENTINEL)) for k in all_metadata_cols
+            ] if all_metadata_cols else []
+            target_dir = staging_root / entry.schema / asset_table_name
+            for part in metadata_parts:
+                target_dir = target_dir / part
+            # Bug E.2: append pre-leased RID as the final path segment.
+            # asset_table_upload_spec's file_pattern expects to capture
+            # this as (?P&lt;RID&gt;[-A-Z0-9]+).
+            target_dir = target_dir / entry.rid
+            target_dir.mkdir(parents=True, exist_ok=True)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Sanity import check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.execution import Execution; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add src/deriva_ml/execution/execution.py
+git commit -m &quot;fix(execution): append pre-leased RID in _build_upload_staging (Bug E.2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-append-rid-to-staging-path-in-_invoke_deriva_py_uploader">Task 8: Append RID to staging path in <code>_invoke_deriva_py_uploader</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/upload_engine.py</code> — <code>_invoke_deriva_py_uploader._path_for</code> around line 680.</p>
+<p>Same one-line addition for the engine-driven path.</p>
+<ul>
+<li>[ ] <strong>Step 1: Update <code>_path_for</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/upload_engine.py</code>, locate <code>_invoke_deriva_py_uploader</code> (around line 562). Inside, find <code>_path_for</code>:</p>
+<pre><code class="language-python">        def _path_for(f: dict) -&gt; Path:
+            &quot;&quot;&quot;Compute the regex-expected path for one input file.&quot;&quot;&quot;
+            src = Path(f[&quot;path&quot;]).resolve()
+            metadata = f.get(&quot;metadata&quot;) or {}
+            target_dir = asset_root / schema_name / target_table
+            for col in metadata_cols:
+                target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
+            return target_dir / src.name
+</code></pre>
+<p>Change to:</p>
+<pre><code class="language-python">        def _path_for(f: dict) -&gt; Path:
+            &quot;&quot;&quot;Compute the regex-expected path for one input file.&quot;&quot;&quot;
+            src = Path(f[&quot;path&quot;]).resolve()
+            metadata = f.get(&quot;metadata&quot;) or {}
+            target_dir = asset_root / schema_name / target_table
+            for col in metadata_cols:
+                target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
+            # Bug E.2: pre-leased RID as the final segment before filename.
+            target_dir = target_dir / f[&quot;rid&quot;]
+            return target_dir / src.name
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Sanity import check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.upload_engine import run_upload_engine; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add src/deriva_ml/execution/upload_engine.py
+git commit -m &quot;fix(upload_engine): append pre-leased RID in _invoke_deriva_py_uploader (Bug E.2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-update-asset_file_path-helper-in-datasetuploadpy">Task 9: Update <code>asset_file_path</code> helper in <code>dataset/upload.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/upload.py</code> — <code>asset_file_path</code> function around line 657.
+- Modify: <code>src/deriva_ml/core/mixins/execution.py:229</code> — caller site.</p>
+<p>The module-level <code>asset_file_path</code> helper (not the Execution method) is used only by <code>core/mixins/execution.py:229</code> for <code>Execution_Metadata</code> configuration. It needs a new <code>rid</code> parameter since the staging regex now requires it.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>rid</code> parameter to <code>asset_file_path</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/upload.py</code>, locate the <code>asset_file_path</code> function (around line 657):</p>
+<pre><code class="language-python">def asset_file_path(
+    prefix: Path | str,
+    exec_rid: RID,
+    file_name: str | Path,
+    asset_table: Table,
+    metadata: dict | None = None,
+) -&gt; Path:
+</code></pre>
+<p>Add a <code>rid</code> parameter:</p>
+<pre><code class="language-python">def asset_file_path(
+    prefix: Path | str,
+    exec_rid: RID,
+    file_name: str | Path,
+    asset_table: Table,
+    rid: RID,
+    metadata: dict | None = None,
+) -&gt; Path:
+</code></pre>
+<p>And in the function body (around line 691), add the RID segment:</p>
+<pre><code class="language-python">    for m in asset_metadata:
+        path = path / str(metadata.get(m, NULL_SENTINEL))
+    # Bug E.2: append pre-allocated RID as final segment.
+    path = path / rid
+    path.mkdir(parents=True, exist_ok=True)
+    return path / file_name
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Update the caller in <code>core/mixins/execution.py</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/mixins/execution.py</code>, locate the call around line 229:</p>
+<pre><code class="language-python">        cfile = asset_file_path(
+            prefix=self.working_dir,
+            exec_rid=execution_rid,
+            file_name=&quot;configuration.json&quot;,
+            asset_table=self.model.name_to_table(&quot;Execution_Metadata&quot;),
+            metadata={},
+        )
+</code></pre>
+<p>This call is reading an EXISTING configuration.json for an already-uploaded execution. The file's staging path on disk includes whatever RID it has — but we don't have that RID at this call site. We're trying to read it, not write it.</p>
+<p>Read the function's purpose in context — it's looking up a config file that was created during a previous run. The current behavior was: path ends at <code>/configuration.json</code> after the metadata dirs. With the RID segment added, we need to either:</p>
+<p><strong>A.</strong> Glob under all RID dirs: <code>path / "*" / "configuration.json"</code> (ambiguous if multiple exist).
+<strong>B.</strong> Pass the known RID from the caller's context.
+<strong>C.</strong> Fall back to a wildcard-resolving helper specifically for this case.</p>
+<p>Let me check the broader context. What's this function called from?</p>
+<p>Reading lines around 229 in mixins/execution.py:</p>
+<p>The function is <code>bind_execution</code> or similar — it loads a configuration for a RESUMED execution. The caller has <code>execution_rid</code> but not the <code>configuration.json</code>'s RID (which would be the RID of the Execution_Metadata row recording that file).</p>
+<p><strong>The simplest compatible path:</strong> for <code>Execution_Metadata</code> rows loaded this way, there's no metadata column and no pre-leased RID applicable — this is reading an existing on-disk file, not staging a new upload. Use a glob:</p>
+<pre><code class="language-python">        # Execution_Metadata for a resumed execution: the file lives under
+        # a RID-segment directory that was written by a prior run. Glob
+        # for it rather than requiring the caller to know the RID.
+        em_table = self.model.name_to_table(&quot;Execution_Metadata&quot;)
+        staging_base = (
+            Path(self.working_dir) / &quot;deriva-ml&quot; / &quot;execution&quot; / execution_rid
+            / &quot;asset&quot; / em_table.schema.name / em_table.name
+        )
+        candidates = list(staging_base.glob(&quot;*/configuration.json&quot;))
+        cfile = candidates[0] if candidates else (staging_base / &quot;configuration.json&quot;)
+</code></pre>
+<p>Actually this is getting complex for a helper meant to just compute a path. Let me reconsider.</p>
+<p><strong>Alternative simpler approach: don't change <code>asset_file_path</code>'s signature.</strong> Instead, only callers that actually need the new RID segment (the two upload-side staging builders in Tasks 7 and 8) compute the path themselves. The <code>asset_file_path</code> helper stays as-is — it's no longer aligned with the upload regex, but it's not ON the upload path either.</p>
+<p>Confirm by checking: is <code>asset_file_path</code> called anywhere else in the upload pipeline?</p>
+<pre><code class="language-bash">grep -rn &quot;from deriva_ml.dataset.upload import asset_file_path\|dataset.upload\.asset_file_path\| asset_file_path(&quot; src/deriva_ml/ tests/
+</code></pre>
+<p>Expected: only <code>core/mixins/execution.py:229</code> calls it.</p>
+<p>If that's the only caller, and it's not part of the upload pipeline, we revert this task. The helper is then dead code with respect to the new regex, but still correctly finds the configuration.json it's looking for (since that file was saved BEFORE Bug E.2 with no RID segment).</p>
+<p><strong>Decision:</strong> skip this task. Leave <code>asset_file_path</code> unchanged. Verify in step 3 that no other callers exist.</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify <code>asset_file_path</code> has no other upload-path callers</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; grep -rn "asset_file_path" src/deriva_ml/ | grep -v "__pycache__" | grep -v "self\.asset_file_path\|exe\.asset_file_path\|execution\.asset_file_path"</code></p>
+<p>Expected output: only the definition at <code>src/deriva_ml/dataset/upload.py:657</code> and the one caller at <code>src/deriva_ml/core/mixins/execution.py:229</code>.</p>
+<p>The <code>Execution.asset_file_path</code> method (different function, defined at <code>src/deriva_ml/execution/execution.py:1291</code>) uses the manifest + <code>_build_upload_staging</code> (Task 7) — that path IS covered.</p>
+<ul>
+<li>[ ] <strong>Step 4: No code change needed — leave Task 9 as a verification-only task</strong></li>
+</ul>
+<p>If step 3 confirms, this task is a no-op beyond the check. Commit nothing; log the decision:</p>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git log --oneline -1
+</code></pre>
+<p>(If step 3 surfaces other callers, this task expands to include those updates. Default plan assumes no other callers.)</p>
+<hr />
+<h2 id="task-10-call-lease-validator-at-_upload_execution_dirs">Task 10: Call lease validator at <code>_upload_execution_dirs</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/execution.py</code> — <code>_upload_execution_dirs</code> around line 1100.</p>
+<p>Add the lease validator call alongside the existing Bug C metadata validator.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add the validator call</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, locate <code>_upload_execution_dirs</code> (around line 1100). Find the existing Bug C validator block:</p>
+<pre><code class="language-python">        # Bug C: refuse to upload if any pending asset is missing a
+        # required (NOT-NULL) metadata column. This raises a single
+        # DerivaMLValidationError that lists all failures at once.
+        from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+        _validate_pending_asset_metadata(self._model, self._get_manifest())
+</code></pre>
+<p>Immediately after it, add:</p>
+<pre><code class="language-python">        # Bug E.2: confirm each pre-leased asset RID is still live in
+        # ERMrest_RID_Lease. Catches stale SQLite state and out-of-band
+        # lease-table edits before any hatrac I/O.
+        from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+        manifest = self._get_manifest()
+        lease_entries = [
+            (key, entry.rid)
+            for key, entry in manifest.pending_assets().items()
+            if entry.rid
+        ]
+        if lease_entries:
+            _validate_pending_asset_leases(
+                self._ml_object.catalog, lease_entries,
+            )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Sanity import check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.execution import Execution; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add src/deriva_ml/execution/execution.py
+git commit -m &quot;feat(execution): validate pre-leased RIDs at _upload_execution_dirs (Bug E.2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-11-call-lease-validator-at-run_upload_engine">Task 11: Call lease validator at <code>run_upload_engine</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/upload_engine.py</code> — <code>run_upload_engine</code> around line 290.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add the validator call</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/upload_engine.py</code>, locate <code>run_upload_engine</code> (around line 236). The existing Bug C validator block iterates <code>list_pending_rows</code> once to build <code>validator_entries</code> and invokes <code>_validate_pending_asset_metadata_iter</code>. To avoid a second full iteration, restructure that block to collect both metadata entries AND lease entries in a single pass, then invoke both validators sequentially.</p>
+<p><strong>Before</strong> (existing Bug C code):</p>
+<pre><code class="language-python">    import json as _json
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+    store = ml.workspace.execution_state_store()
+    _statuses_to_validate = [
+        PendingRowStatus.staged,
+        PendingRowStatus.leasing,
+        PendingRowStatus.leased,
+        PendingRowStatus.uploading,
+    ]
+    if retry_failed:
+        _statuses_to_validate.append(PendingRowStatus.failed)
+    if execution_rids is None:
+        rids_for_validation = [row[&quot;rid&quot;] for row in store.list_executions()]
+    else:
+        rids_for_validation = list(execution_rids)
+    validator_entries: list[tuple[str, str, str, dict]] = []
+    for rid in rids_for_validation:
+        for row in store.list_pending_rows(
+            execution_rid=rid, status=_statuses_to_validate,
+        ):
+            if not row.get(&quot;asset_file_path&quot;):
+                continue
+            md = _json.loads(row[&quot;metadata_json&quot;]) if row[&quot;metadata_json&quot;] else {}
+            validator_entries.append((
+                f&quot;{row['execution_rid']}/{row['target_table']}/{row['key']}&quot;,
+                row[&quot;target_schema&quot;],
+                row[&quot;target_table&quot;],
+                md,
+            ))
+    if validator_entries:
+        _validate_pending_asset_metadata_iter(ml.model, validator_entries)
+</code></pre>
+<p><strong>After</strong> (Bug C + Bug E.2 combined in one iteration):</p>
+<pre><code class="language-python">    import json as _json
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+    from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+    store = ml.workspace.execution_state_store()
+    _statuses_to_validate = [
+        PendingRowStatus.staged,
+        PendingRowStatus.leasing,
+        PendingRowStatus.leased,
+        PendingRowStatus.uploading,
+    ]
+    if retry_failed:
+        _statuses_to_validate.append(PendingRowStatus.failed)
+    if execution_rids is None:
+        rids_for_validation = [row[&quot;rid&quot;] for row in store.list_executions()]
+    else:
+        rids_for_validation = list(execution_rids)
+    metadata_entries: list[tuple[str, str, str, dict]] = []
+    lease_entries: list[tuple[str, str]] = []
+    for rid in rids_for_validation:
+        for row in store.list_pending_rows(
+            execution_rid=rid, status=_statuses_to_validate,
+        ):
+            if not row.get(&quot;asset_file_path&quot;):
+                continue
+            key_str = f&quot;{row['execution_rid']}/{row['target_table']}/{row['key']}&quot;
+            md = _json.loads(row[&quot;metadata_json&quot;]) if row[&quot;metadata_json&quot;] else {}
+            metadata_entries.append((
+                key_str,
+                row[&quot;target_schema&quot;],
+                row[&quot;target_table&quot;],
+                md,
+            ))
+            if row.get(&quot;rid&quot;):
+                lease_entries.append((key_str, row[&quot;rid&quot;]))
+    if metadata_entries:
+        _validate_pending_asset_metadata_iter(ml.model, metadata_entries)
+    if lease_entries:
+        _validate_pending_asset_leases(ml.catalog, lease_entries)
+</code></pre>
+<p>(<code>metadata_entries</code> is just a rename of <code>validator_entries</code> to be more specific.)</p>
+<ul>
+<li>[ ] <strong>Step 2: Sanity import check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.upload_engine import run_upload_engine; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add src/deriva_ml/execution/upload_engine.py
+git commit -m &quot;feat(upload_engine): validate pre-leased RIDs at run_upload_engine (Bug E.2)&quot;
+</code></pre>
+<hr />
+<h2 id="task-12-live-catalog-integration-tests">Task 12: Live-catalog integration tests</h2>
+<p><strong>Files:</strong>
+- Create: <code>tests/execution/test_bug_e2_live_smoke.py</code> (new file).</p>
+<p>Three tests, all gated on <code>DERIVA_HOST</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_bug_e2_live_smoke.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Live-catalog integration tests for Bug E.2 (pre-allocated RID upload).
+
+Gated on DERIVA_HOST. Three tests:
+
+1. Happy path — upload uses pre-leased RID.
+2. Missing-lease validation — RID not in ERMrest_RID_Lease raises.
+3. Retry idempotent — partial failure + retry produces same catalog row.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from datetime import datetime, timezone
+
+import pytest
+
+
+requires_catalog = pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;Bug E.2 live tests require DERIVA_HOST&quot;,
+)
+
+
+def _make_workflow(test_ml, name: str):
+    from deriva_ml import MLVocab as vc
+    test_ml.add_term(
+        vc.workflow_type,
+        &quot;Test Workflow&quot;,
+        description=&quot;for Bug E.2 live tests&quot;,
+    )
+    return test_ml.create_workflow(
+        name=name,
+        workflow_type=&quot;Test Workflow&quot;,
+        description=&quot;for Bug E.2 live tests&quot;,
+    )
+
+
+def _lease_one_rid(test_ml) -&gt; tuple[str, str]:
+    &quot;&quot;&quot;POST a single lease to ERMrest_RID_Lease; return (token, rid).&quot;&quot;&quot;
+    from deriva_ml.execution.rid_lease import (
+        generate_lease_token, post_lease_batch,
+    )
+    token = generate_lease_token()
+    result = post_lease_batch(catalog=test_ml.catalog, tokens=[token])
+    return token, result[token]
+
+
+@requires_catalog
+def test_upload_asset_uses_pre_leased_rid(test_ml, tmp_path):
+    &quot;&quot;&quot;End-to-end: stage an asset with a pre-leased RID; assert the
+    catalog row has that RID (not a server-generated one).&quot;&quot;&quot;
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    f = tmp_path / &quot;bug-e2-happy.bin&quot;
+    f.write_bytes(b&quot;bug-e2 happy path &quot; * 32)
+
+    # Pre-lease a RID.
+    token, leased_rid = _lease_one_rid(test_ml)
+
+    wf = _make_workflow(test_ml, &quot;Bug E2 happy path&quot;)
+    exe = test_ml.create_execution(description=&quot;bug-e2-happy&quot;, workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    with exe.execute():
+        pass
+
+    # Stage a pending row with the pre-leased RID.
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid,
+        key=&quot;k1&quot;,
+        target_schema=&quot;deriva-ml&quot;,
+        target_table=&quot;Execution_Asset&quot;,
+        metadata_json=json.dumps({}),
+        created_at=now,
+        rid=leased_rid,
+        status=PendingRowStatus.leased,
+        lease_token=token,
+        asset_file_path=str(f),
+    )
+
+    report = exe.upload_outputs()
+    assert report.total_failed == 0, f&quot;failures: {report.errors}&quot;
+    assert report.total_uploaded == 1
+
+    # Catalog row must have our pre-leased RID.
+    pb = test_ml.pathBuilder()
+    asset_path = pb.schemas[&quot;deriva-ml&quot;].tables[&quot;Execution_Asset&quot;]
+    rows = list(
+        asset_path.filter(asset_path.RID == leased_rid)
+        .entities().fetch()
+    )
+    assert len(rows) == 1, (
+        f&quot;Execution_Asset row with RID={leased_rid} not found; &quot;
+        f&quot;got {len(rows)} results. Bug E.2 regression: server &quot;
+        f&quot;substituted its own RID instead of honoring our lease.&quot;
+    )
+    # Sanity: MD5 matches what we uploaded.
+    expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
+    assert rows[0][&quot;MD5&quot;] == expected_md5
+
+
+@requires_catalog
+def test_upload_asset_raises_validation_when_lease_missing(test_ml, tmp_path):
+    &quot;&quot;&quot;Staging an asset with a bogus RID (never in ERMrest_RID_Lease)
+    must raise DerivaMLValidationError before any hatrac I/O.&quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    f = tmp_path / &quot;bug-e2-missing.bin&quot;
+    f.write_bytes(b&quot;bug-e2 missing lease &quot; * 32)
+
+    # A plausible-looking RID that was never leased.
+    bogus_rid = &quot;0-FAKEFAKE&quot;
+
+    wf = _make_workflow(test_ml, &quot;Bug E2 missing lease&quot;)
+    exe = test_ml.create_execution(description=&quot;bug-e2-missing&quot;, workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    with exe.execute():
+        pass
+
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid,
+        key=&quot;k2&quot;,
+        target_schema=&quot;deriva-ml&quot;,
+        target_table=&quot;Execution_Asset&quot;,
+        metadata_json=json.dumps({}),
+        created_at=now,
+        rid=bogus_rid,
+        status=PendingRowStatus.leased,
+        lease_token=&quot;bogus-token&quot;,
+        asset_file_path=str(f),
+    )
+
+    with pytest.raises(DerivaMLValidationError) as ei:
+        exe.upload_outputs()
+    msg = str(ei.value)
+    assert bogus_rid in msg
+    assert &quot;ERMrest_RID_Lease&quot; in msg
+
+
+@requires_catalog
+def test_upload_asset_retry_idempotent_with_existing_row(test_ml, tmp_path):
+    &quot;&quot;&quot;Simulate partial success: pre-insert a row at the pre-leased RID.
+    A subsequent upload_outputs must detect the existing row and report
+    success without re-insert.&quot;&quot;&quot;
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    f = tmp_path / &quot;bug-e2-retry.bin&quot;
+    f.write_bytes(b&quot;bug-e2 retry &quot; * 32)
+
+    token, leased_rid = _lease_one_rid(test_ml)
+
+    wf = _make_workflow(test_ml, &quot;Bug E2 retry&quot;)
+    exe = test_ml.create_execution(description=&quot;bug-e2-retry&quot;, workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    with exe.execute():
+        pass
+
+    # Pre-populate a catalog row at the pre-leased RID, simulating a
+    # prior successful insert that the client didn't record locally.
+    expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
+    pb = test_ml.pathBuilder()
+    asset_path = pb.schemas[&quot;deriva-ml&quot;].tables[&quot;Execution_Asset&quot;]
+    asset_path.insert([{
+        &quot;RID&quot;: leased_rid,
+        &quot;Filename&quot;: &quot;bug-e2-retry.bin&quot;,
+        &quot;MD5&quot;: expected_md5,
+        &quot;Length&quot;: f.stat().st_size,
+        &quot;URL&quot;: &quot;/hatrac/fake-pre-existing-uri&quot;,
+    }])
+
+    # Now stage the row as pending with the SAME RID.
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid,
+        key=&quot;k3&quot;,
+        target_schema=&quot;deriva-ml&quot;,
+        target_table=&quot;Execution_Asset&quot;,
+        metadata_json=json.dumps({}),
+        created_at=now,
+        rid=leased_rid,
+        status=PendingRowStatus.leased,
+        lease_token=token,
+        asset_file_path=str(f),
+    )
+
+    # Retry must succeed (idempotency pre-check finds the existing row).
+    report = exe.upload_outputs()
+    assert report.total_failed == 0, f&quot;retry failures: {report.errors}&quot;
+    # At least one row reported uploaded (exact count semantics depend on
+    # whether deriva-py counts &quot;existing&quot; as uploaded, which is fine).
+    assert report.total_uploaded &gt;= 1
+
+    # Exactly ONE catalog row for this RID — no duplicates.
+    rows = list(
+        asset_path.filter(asset_path.RID == leased_rid)
+        .entities().fetch()
+    )
+    assert len(rows) == 1
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_bug_e2_live_smoke.py -v</code></p>
+<p>Expected: all 3 tests pass.</p>
+<p><strong>If the tests fail with <code>DerivaUploadConfigurationError: ...use_pre_allocated_rid=true but no RID...</code> or similar:</strong> the deriva-py PR (Tasks 1-4) hasn't landed yet. Check <code>uv.lock</code> to see which commit of deriva-py is pinned; if it predates the Phase 1 merge, run <code>uv lock --upgrade-package deriva</code> to pick up the latest <code>2.0-dev</code> head.</p>
+<p><strong>If the tests fail with <code>Server substituted its own RID</code> in test #1:</strong> deriva-ml's upload spec isn't emitting the flag OR the staging path doesn't include the RID segment. Verify Tasks 6-8 landed correctly.</p>
+<ul>
+<li>[ ] <strong>Step 3: Broader regression</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/ tests/execution/test_bug_c_live_smoke.py tests/execution/test_bug_e2_live_smoke.py tests/execution/test_pending_asset_lease_validator.py -q</code></p>
+<p>Expected: all tests pass (Bug C tests continue to pass — orthogonal fix).</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add tests/execution/test_bug_e2_live_smoke.py
+git commit -m &quot;test(bug_e2): live-catalog integration (happy, missing-lease, retry-idempotent)&quot;
+</code></pre>
+<hr />
+<h2 id="task-13-changelog-entry">Task 13: CHANGELOG entry</h2>
+<p><strong>Files:</strong>
+- Modify: <code>CHANGELOG.md</code> — prepend new Unreleased section.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add CHANGELOG entry</strong></li>
+</ul>
+<p>In <code>CHANGELOG.md</code>, immediately after the title/preamble and BEFORE the first existing <code>## Unreleased —</code> section, insert:</p>
+<pre><code class="language-markdown">## Unreleased — Bug E.2: asset uploads honor pre-leased RIDs
+
+### Fixed
+
+- **Asset-table catalog inserts now use the caller-supplied pre-leased RID** instead of silently accepting a server-generated one. Previously, the plain-row drain path honored `pending_rows.rid` but the asset-row path (via deriva-py's `GenericUploader`) looked up or created rows by MD5+Filename, discarding the pre-leased RID. Any client code that captured the pre-leased RID (e.g., for FK references) ended up with a dangling pointer. Fix is a two-repo change:
+  - **deriva-py** (`2.0-dev`): new opt-in `use_pre_allocated_rid: true` flag on asset mappings. When set, `_uploadAsset` bypasses `_getFileRecord` (MD5+Filename lookup) and routes to a new `_createFileRecordWithRid` method that does a RID-keyed existence check for idempotent retry, then creates with the caller-supplied RID in the payload. Legacy callers (flag absent) see no change.
+  - **deriva-ml**: `asset_table_upload_spec` emits the new flag automatically, adds `(?P&lt;RID&gt;[-A-Z0-9]+)` to the `file_pattern` regex, and includes `&quot;RID&quot;: &quot;{RID}&quot;` in the `column_map`. The two staging path-builders (`Execution._build_upload_staging`, `_invoke_deriva_py_uploader`) append the pre-leased RID as the final directory segment.
+
+### Added
+
+- **`_validate_pending_asset_leases(catalog, entries)`** — pre-flight validator in `deriva_ml.execution.rid_lease`. Batch-queries `public:ERMrest_RID_Lease` (chunked by `PENDING_ROWS_LEASE_CHUNK`) and raises an aggregated `DerivaMLValidationError` listing every pre-leased RID that is no longer present on the server. Called at the top of `Execution._upload_execution_dirs` and `run_upload_engine`, right after Bug C's metadata validator.
+
+### External-caller impact
+
+No action required. Any caller using the standard `asset_file_path` → `upload_execution_outputs` flow is automatically opted into pre-allocated-RID semantics. Callers who had captured a pre-leased RID for cross-references will find that RID now matches what's in the catalog after upload.
+
+Edge case: if a pre-leased RID has been cleared from `ERMrest_RID_Lease` (e.g., by manual cleanup or a dropped catalog), the upload is refused at pre-flight with a clear error message. Restart the execution to re-lease.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Verify file still parses</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; head -40 CHANGELOG.md</code></p>
+<p>Expected: new section appears between preamble and the first existing Unreleased section.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; git add CHANGELOG.md
+git commit -m &quot;docs(changelog): Bug E.2 asset uploads honor pre-leased RIDs&quot;
+</code></pre>
+<hr />
+<h2 id="final-verification">Final verification</h2>
+<ul>
+<li>[ ] <strong>Step 1: deriva-py tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-py &amp;&amp; python -m pytest tests/deriva/transfer/upload/test_pre_allocated_rid.py -v</code></p>
+<p>Expected: 6/6 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 2: deriva-ml unit tier</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/execution/test_pending_asset_lease_validator.py tests/asset/test_null_sentinel_processor.py tests/asset/test_metadata_validator.py tests/core/test_schema_cache.py tests/core/test_schema_diff.py tests/core/test_exceptions.py -q</code></p>
+<p>Expected: all tests pass. (Some may skip without DERIVA_HOST — acceptable.)</p>
+<ul>
+<li>[ ] <strong>Step 3: deriva-ml live tier</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/ tests/execution/test_bug_c_live_smoke.py tests/execution/test_bug_e2_live_smoke.py tests/execution/test_pending_asset_lease_validator.py -q</code></p>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 4: Ruff check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-e &amp;&amp; uv run ruff check src/deriva_ml/execution/rid_lease.py src/deriva_ml/execution/execution.py src/deriva_ml/execution/upload_engine.py src/deriva_ml/dataset/upload.py</code></p>
+<p>Expected: no new warnings on Bug E.2 changes. Pre-existing unrelated warnings are fine.</p>
+<hr />
+<h2 id="commit-summary-expected">Commit summary (expected)</h2>
+<h3 id="deriva-py-side-phase-1">deriva-py side (Phase 1)</h3>
+<ol>
+<li><code>docs(spec): Bug E.2 pre-allocated RID upload design</code> (already committed on deriva-ml worktree)</li>
+<li><code>feat(upload): fast-fail when use_pre_allocated_rid flag has no RID</code></li>
+<li><code>feat(upload): _createFileRecordWithRid bypasses MD5+Filename lookup</code></li>
+<li><code>feat(upload): route _uploadAsset Step 7 to _createFileRecordWithRid when flag set</code></li>
+</ol>
+<p>Then: PR against <code>2.0-dev</code>, merge.</p>
+<h3 id="deriva-ml-side-phase-2">deriva-ml side (Phase 2)</h3>
+<ol>
+<li><code>feat(rid_lease): _validate_pending_asset_leases for pre-flight lease-table check</code></li>
+<li><code>feat(dataset/upload): emit use_pre_allocated_rid + RID capture (Bug E.2)</code></li>
+<li><code>fix(execution): append pre-leased RID in _build_upload_staging (Bug E.2)</code></li>
+<li><code>fix(upload_engine): append pre-leased RID in _invoke_deriva_py_uploader (Bug E.2)</code></li>
+<li><code>feat(execution): validate pre-leased RIDs at _upload_execution_dirs (Bug E.2)</code></li>
+<li><code>feat(upload_engine): validate pre-leased RIDs at run_upload_engine (Bug E.2)</code></li>
+<li><code>test(bug_e2): live-catalog integration (happy, missing-lease, retry-idempotent)</code></li>
+<li><code>docs(changelog): Bug E.2 asset uploads honor pre-leased RIDs</code></li>
+</ol>
+<p>Total: 3 deriva-py commits (after spec) + 8 deriva-ml commits = 11 implementation commits across the two repos.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

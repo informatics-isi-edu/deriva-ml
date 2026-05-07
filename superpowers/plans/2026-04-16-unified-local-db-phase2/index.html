@@ -1,0 +1,2909 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-16-unified-local-db-phase2/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Unified Local SQLite Layer — Phase 2 Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#unified-local-sqlite-layer-phase-2-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Unified Local SQLite Layer — Phase 2 Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#environment-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment &amp; conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unchanged-files-verified-no-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unchanged files (verified no impact)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-update-path-helpers-for-directory-based-working-db" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Update path helpers for directory-based working DB
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-update-workspace-for-directory-based-working-db-local_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Update Workspace for directory-based working DB + local_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-multi-schema-slice-attachment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Multi-schema slice attachment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-cached-tabular-read-api-result_cachepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Cached tabular-read API (result_cache.py)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-unified-denormalization-engine-denormalizepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Unified denormalization engine (denormalize.py)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-wire-workspace-cached-read-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Wire workspace cached-read methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-rewire-datasetdenormalize_-and-datasetbagdenormalize_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Rewire Dataset.denormalize_* and DatasetBag.denormalize_*
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-rewire-derivaml-add-workspace-property-update-cache_tablecache_features-clean-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Rewire DerivaML — add workspace property, update cache_table/cache_features, clean up
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-update-__init__py-exports-full-test-suite-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: Update __init__.py exports + full test suite verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-checklist-run-before-declaring-phase-2-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification checklist (run before declaring Phase 2 done)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-plan-does-not-deliver-deferred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this plan does NOT deliver (deferred)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="unified-local-sqlite-layer-phase-2-implementation-plan">Unified Local SQLite Layer — Phase 2 Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Replace the two independent denormalization engines (catalog-side and bag-side) with a single unified engine that runs SQL joins against local SQLite, add a cached tabular-read API, and remove Phase 1 compatibility shims.</p>
+<p><strong>Architecture:</strong> The unified denormalizer uses <code>_prepare_wide_table()</code> for join planning (unchanged), <code>PagedFetcher</code> to populate the working DB with catalog rows, and SQLAlchemy SELECTs against the local SQLite (working DB or attached slice) for the actual joins. The cached tabular-read API stores results in <code>main.db</code> with a registry table. The working DB changes from a single file to a per-schema directory layout using <code>SchemaBuilder</code>'s ATTACH mechanism. <code>_LegacyWorkingDataView</code> and <code>WorkingDataCache</code> are deleted.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, SQLAlchemy 2.x, SQLite (WAL, ATTACH), deriva-py (ErmrestCatalog, ermrest_model), pandas, pytest.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-04-15-unified-local-db-phase2-design.md</code></p>
+<hr />
+<h2 id="environment-conventions">Environment &amp; conventions</h2>
+<ul>
+<li>Work in worktree <code>/Users/carl/GitHub/deriva-ml/.claude/worktrees/compassionate-visvesvaraya/</code> on branch <code>claude/compassionate-visvesvaraya</code>.</li>
+<li><code>uv</code> at <code>/Users/carl/.local/bin/uv</code>. Prepend to PATH if not found.</li>
+<li><code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest ...</code> for tests.</li>
+<li><code>uv run ruff format src/ tests/</code> and <code>uv run ruff check src/</code> after changes.</li>
+<li>Commit after each task. Messages use <code>feat(local_db):</code>, <code>refactor(local_db):</code>, <code>test(local_db):</code> prefixes.</li>
+</ul>
+<h2 id="file-structure">File structure</h2>
+<h3 id="new-files">New files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/local_db/denormalize.py</code></td>
+<td>Unified denormalization engine: <code>denormalize()</code> function + <code>DenormalizeResult</code> class.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/result_cache.py</code></td>
+<td>Cached tabular-read API: <code>ResultCache</code>, <code>CachedResult</code>, <code>CachedResultMeta</code> classes. Registry table management, cache key generation, query with sort/filter/pagination.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_denormalize.py</code></td>
+<td>Unit tests for the unified denormalizer against canned bag fixtures.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_result_cache.py</code></td>
+<td>Unit tests for the cached tabular-read API.</td>
+</tr>
+<tr>
+<td><code>tests/local_db/test_denormalize_live.py</code></td>
+<td>Integration tests for catalog denormalization via PagedFetcher (requires <code>DERIVA_HOST</code>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="modified-files">Modified files</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/local_db/paths.py</code></td>
+<td>Change <code>working_db_path()</code> to return a directory path (<code>working/</code>) instead of a file path (<code>working.db</code>). Add <code>working_main_db_path()</code> for the <code>main.db</code> inside.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/workspace.py</code></td>
+<td>Add <code>local_schema</code> property (lazy <code>LocalSchema</code> build from catalog <code>Model</code>). Add <code>orm_class(name)</code> convenience. Add <code>rebuild_schema()</code>. Update <code>engine</code> to use directory layout. Add <code>cached_table_read</code>, <code>cache_denormalized</code>, <code>list_cached_results</code>, <code>get_cached_result</code>, <code>invalidate_cache</code> methods. Delete <code>_LegacyWorkingDataView</code>, <code>legacy_working_data_view()</code>, <code>_RESERVED_TABLES</code>. Update <code>attach_slice</code> for multi-schema slice attachment (prefix aliases).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/schema.py</code></td>
+<td>No changes needed — <code>LocalSchema.build()</code> already handles directory-based multi-schema.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/__init__.py</code></td>
+<td>Add exports: <code>CachedResult</code>, <code>CachedResultMeta</code>, <code>ResultCache</code>, <code>DenormalizeResult</code>, <code>denormalize</code>.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/base.py</code></td>
+<td>Replace <code>working_data</code> property with <code>workspace</code> property. Rewire <code>cache_table</code>, <code>cache_features</code> to use workspace cached-read API. Remove <code>_LegacyWorkingDataView</code> usage.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset.py</code></td>
+<td><code>denormalize_as_dataframe</code>, <code>denormalize_as_dict</code> become 3-line delegates to unified <code>denormalize()</code>. <code>cache_denormalized</code> delegates to <code>workspace.cache_denormalized()</code>. Delete <code>_denormalize_datapath</code> (~190 lines).</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/dataset/dataset_bag.py</code></td>
+<td><code>denormalize_as_dataframe</code>, <code>denormalize_as_dict</code> become delegates. Delete <code>_denormalize</code> (~100 lines). Add <code>_workspace</code> property that wraps the bag's <code>DatabaseModel</code> as a lightweight <code>Workspace</code>.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/execution/execution.py</code></td>
+<td>Update <code>_get_manifest</code> to use <code>self._ml_object.workspace</code> instead of <code>self._ml_object.working_data.workspace</code>.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/core/working_data.py</code></td>
+<td>Deleted entirely.</td>
+</tr>
+<tr>
+<td><code>tests/test_working_data.py</code></td>
+<td>Deleted entirely.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="unchanged-files-verified-no-impact">Unchanged files (verified no impact)</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Why unchanged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/deriva_ml/local_db/sqlite_helpers.py</code></td>
+<td>Phase 1, no changes needed.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/paged_fetcher.py</code></td>
+<td>Phase 1, no changes needed.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/paged_fetcher_ermrest.py</code></td>
+<td>Phase 1, no changes needed.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/local_db/manifest_store.py</code></td>
+<td>Phase 1, no changes needed.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/model/catalog.py</code></td>
+<td><code>_prepare_wide_table()</code>, <code>_table_relationship()</code>, <code>_schema_to_paths()</code> are consumed as-is.</td>
+</tr>
+<tr>
+<td><code>src/deriva_ml/interfaces.py</code></td>
+<td><code>DatasetLike</code> protocol methods keep their signatures; implementations change.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-1-update-path-helpers-for-directory-based-working-db">Task 1: Update path helpers for directory-based working DB</h2>
+<p>The working DB changes from a single file (<code>working.db</code>) to a directory (<code>working/</code>) with per-schema files.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/paths.py</code>
+- Modify: <code>tests/local_db/test_paths.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests for the new path helpers.</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_paths.py</code>:</p>
+<pre><code class="language-python">class TestWorkingDir:
+    def test_working_dir_is_directory_not_file(self, tmp_path: Path) -&gt; None:
+        d = p.working_db_path(tmp_path, &quot;example.org&quot;, &quot;42&quot;)
+        # Should end with 'working' (a directory), not 'working.db' (a file)
+        assert d.name == &quot;working&quot;
+        assert not d.name.endswith(&quot;.db&quot;)
+
+    def test_working_dir_under_workspace_root(self, tmp_path: Path) -&gt; None:
+        d = p.working_db_path(tmp_path, &quot;example.org&quot;, &quot;42&quot;)
+        assert d == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;working&quot;
+
+
+class TestWorkingMainDbPath:
+    def test_main_db_inside_working_dir(self, tmp_path: Path) -&gt; None:
+        main = p.working_main_db_path(tmp_path, &quot;example.org&quot;, &quot;42&quot;)
+        assert main == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;working&quot; / &quot;main.db&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to confirm failure.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paths.py -v -k &quot;TestWorkingDir or TestWorkingMainDbPath&quot;
+</code></pre>
+<p>Expected: <code>AttributeError</code> or assertion failure (old <code>working_db_path</code> returns <code>working.db</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>paths.py</code>.</strong></li>
+</ul>
+<p>Change <code>working_db_path</code> to return a directory path, and add <code>working_main_db_path</code>:</p>
+<pre><code class="language-python">def working_db_path(working_dir: Path, hostname: str, catalog_id: str | int) -&gt; Path:
+    &quot;&quot;&quot;Return the per-catalog working DB directory path.
+
+    The working DB is a directory containing main.db plus per-schema .db files
+    (created by SchemaBuilder's multi-schema ATTACH pattern).
+
+    Layout: {workspace_root}/working/
+    &quot;&quot;&quot;
+    return workspace_root(working_dir, hostname, catalog_id) / &quot;working&quot;
+
+
+def working_main_db_path(working_dir: Path, hostname: str, catalog_id: str | int) -&gt; Path:
+    &quot;&quot;&quot;Return the main.db file inside the working DB directory.
+
+    This is the file the SQLAlchemy engine opens. Per-schema .db files are
+    ATTACH'd into connections on this engine.
+    &quot;&quot;&quot;
+    return working_db_path(working_dir, hostname, catalog_id) / &quot;main.db&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Fix the existing <code>TestWorkingDbPath</code> test</strong> that asserts <code>working.db</code>:</li>
+</ul>
+<pre><code class="language-python">class TestWorkingDbPath:
+    def test_under_workspace_root(self, tmp_path: Path) -&gt; None:
+        db = p.working_db_path(tmp_path, &quot;example.org&quot;, &quot;42&quot;)
+        assert db == tmp_path / &quot;catalogs&quot; / &quot;example.org__42&quot; / &quot;working&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Run all path tests — expect pass.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_paths.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/paths.py tests/local_db/test_paths.py
+uv run ruff check src/deriva_ml/local_db/paths.py
+git add src/deriva_ml/local_db/paths.py tests/local_db/test_paths.py
+git commit -m &quot;refactor(local_db): working DB path becomes directory for multi-schema ATTACH&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-update-workspace-for-directory-based-working-db-local_schema">Task 2: Update <code>Workspace</code> for directory-based working DB + <code>local_schema</code></h2>
+<p>The <code>Workspace</code> engine now opens <code>main.db</code> inside the <code>working/</code> directory. Add <code>local_schema</code> property (lazy <code>LocalSchema</code> build), <code>orm_class()</code> convenience, and <code>rebuild_schema()</code>.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/workspace.py</code>
+- Modify: <code>tests/local_db/test_workspace.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests for the new workspace capabilities.</strong></li>
+</ul>
+<p>Add to <code>tests/local_db/test_workspace.py</code>:</p>
+<pre><code class="language-python">class TestWorkspaceDirectoryLayout:
+    def test_engine_creates_working_directory(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            _ = ws.engine
+            working_dir = tmp_path / &quot;catalogs&quot; / &quot;h__1&quot; / &quot;working&quot;
+            assert working_dir.is_dir()
+            assert (working_dir / &quot;main.db&quot;).is_file()
+        finally:
+            ws.close()
+
+
+class TestLocalSchema:
+    def test_local_schema_is_none_before_build(self, tmp_path: Path) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            assert ws.local_schema is None
+        finally:
+            ws.close()
+
+    def test_build_local_schema_from_model(
+        self, tmp_path: Path, canned_bag_model
+    ) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(
+                model=canned_bag_model,
+                schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            )
+            assert ws.local_schema is not None
+            # ORM classes should be available
+            assert ws.orm_class(&quot;Image&quot;) is not None
+            assert ws.orm_class(&quot;Dataset&quot;) is not None
+        finally:
+            ws.close()
+
+    def test_local_schema_creates_per_schema_files(
+        self, tmp_path: Path, canned_bag_model
+    ) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(
+                model=canned_bag_model,
+                schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            )
+            working_dir = tmp_path / &quot;catalogs&quot; / &quot;h__1&quot; / &quot;working&quot;
+            assert (working_dir / &quot;isa.db&quot;).is_file()
+            assert (working_dir / &quot;deriva-ml.db&quot;).is_file()
+        finally:
+            ws.close()
+
+    def test_rebuild_schema_disposes_and_recreates(
+        self, tmp_path: Path, canned_bag_model
+    ) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            first = ws.local_schema
+            ws.rebuild_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            second = ws.local_schema
+            assert first is not second
+        finally:
+            ws.close()
+
+    def test_orm_class_returns_none_for_unknown(
+        self, tmp_path: Path, canned_bag_model
+    ) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            result = ws.orm_class(&quot;NonexistentTable&quot;)
+            assert result is None
+        finally:
+            ws.close()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to confirm failure.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v -k &quot;TestWorkspaceDirectoryLayout or TestLocalSchema&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>Workspace</code> implementation.</strong></li>
+</ul>
+<p>Key changes to <code>src/deriva_ml/local_db/workspace.py</code>:</p>
+<ol>
+<li>Update <code>working_db_path</code> property to use <code>paths.working_main_db_path</code> (returns <code>working/main.db</code>).</li>
+<li>Update <code>engine</code> property to create the engine on <code>main.db</code> inside the <code>working/</code> directory.</li>
+<li>Add <code>_local_schema: LocalSchema | None = None</code> to <code>__init__</code>.</li>
+<li>Add <code>local_schema</code> property (returns <code>_local_schema</code>, may be None).</li>
+<li>Add <code>build_local_schema(model, schemas)</code> method that creates a <code>LocalSchema</code> using <code>database_path=working_dir</code> (the directory, not <code>main.db</code> — <code>SchemaBuilder</code> handles the per-schema files).</li>
+<li>Add <code>rebuild_schema(model, schemas)</code> that disposes the old schema and builds a new one.</li>
+<li>Add <code>orm_class(name)</code> convenience that delegates to <code>local_schema.get_orm_class(name)</code>.</li>
+<li>Delete <code>_LegacyWorkingDataView</code> class, <code>legacy_working_data_view()</code> method, and <code>_RESERVED_TABLES</code>.</li>
+</ol>
+<p><strong>Important implementation detail:</strong> The <code>LocalSchema</code> and the <code>Workspace</code> engine must share the same <code>main.db</code> file. When <code>build_local_schema</code> is called, it creates the <code>LocalSchema</code> using <code>database_path=self.working_db_path</code> (the <code>working/</code> directory). <code>SchemaBuilder</code> will create <code>main.db</code> there and ATTACH per-schema files. The workspace's own engine (used by <code>ManifestStore</code>, result cache) also opens <code>main.db</code>. These must be the <strong>same engine</strong> to avoid two-engine conflicts over WAL. Solution: after <code>LocalSchema.build()</code>, set <code>self._engine = self._local_schema.engine</code>. The workspace engine IS the LocalSchema engine.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run all workspace tests — fix any failures from removed <code>_LegacyWorkingDataView</code>.</strong></li>
+</ul>
+<p>Tests that used <code>legacy_working_data_view()</code> or <code>_RESERVED_TABLES</code> must be removed or rewritten. The new tests from Step 1 must pass. Run:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v
+</code></pre>
+<p>Fix failures iteratively until all pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Update <code>ManifestStore</code> access path.</strong></li>
+</ul>
+<p><code>manifest_store()</code> on <code>Workspace</code> must still work. After the engine unification (Step 3), <code>ManifestStore(self.engine)</code> uses the shared engine. Verify manifest tests still pass:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_manifest_store.py tests/local_db/test_manifest_migration.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/ tests/local_db/
+uv run ruff check src/deriva_ml/local_db/
+git add src/deriva_ml/local_db/workspace.py tests/local_db/test_workspace.py
+git commit -m &quot;feat(local_db): directory-based working DB with local_schema and ORM&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-multi-schema-slice-attachment">Task 3: Multi-schema slice attachment</h2>
+<p>Update <code>attach_slice</code> to ATTACH each of the slice's per-schema files under prefixed aliases (<code>slice_isa</code>, <code>slice_deriva-ml</code>, etc.) so the denormalizer can join across working DB and slice tables in the same connection.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/workspace.py</code>
+- Modify: <code>tests/local_db/test_workspace.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<pre><code class="language-python">class TestMultiSchemaSliceAttach:
+    def test_attach_slice_multi_schema(self, tmp_path: Path, canned_bag_model) -&gt; None:
+        &quot;&quot;&quot;Attaching a multi-schema slice makes all schema tables visible.&quot;&quot;&quot;
+        from deriva_ml.local_db.schema import LocalSchema
+
+        # Create a slice with multi-schema data
+        slice_dir = tmp_path / &quot;catalogs&quot; / &quot;h__1&quot; / &quot;slices&quot; / &quot;s1&quot;
+        slice_dir.mkdir(parents=True)
+        ls = LocalSchema.build(
+            model=canned_bag_model,
+            schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=slice_dir,
+        )
+        # Insert a test row into the slice
+        from sqlalchemy import insert, text
+        image_t = ls.find_table(&quot;isa.Image&quot;)
+        with ls.engine.begin() as conn:
+            conn.execute(insert(image_t).values(RID=&quot;SLICE-IMG-1&quot;, Filename=&quot;test.jpg&quot;))
+        ls.dispose()
+
+        # Open workspace and attach the slice
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            with ws.attach_slice(&quot;s1&quot;) as conn:
+                # Slice tables should be visible under prefixed aliases
+                result = conn.execute(text(&quot;SELECT RID FROM slice_isa.Image&quot;)).fetchall()
+                assert len(result) == 1
+                assert result[0][0] == &quot;SLICE-IMG-1&quot;
+        finally:
+            ws.close()
+
+    def test_attach_slice_detaches_on_exit(self, tmp_path: Path, canned_bag_model) -&gt; None:
+        &quot;&quot;&quot;After the context manager exits, slice schemas are no longer visible.&quot;&quot;&quot;
+        from deriva_ml.local_db.schema import LocalSchema
+
+        slice_dir = tmp_path / &quot;catalogs&quot; / &quot;h__1&quot; / &quot;slices&quot; / &quot;s1&quot;
+        slice_dir.mkdir(parents=True)
+        ls = LocalSchema.build(
+            model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;],
+            database_path=slice_dir,
+        )
+        ls.dispose()
+
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            with ws.attach_slice(&quot;s1&quot;) as conn:
+                pass  # Just enter and exit
+            # After exit, slice schemas should be detached
+            from sqlalchemy import text
+            with ws.engine.connect() as conn:
+                import pytest
+                with pytest.raises(Exception):
+                    conn.execute(text(&quot;SELECT * FROM slice_isa.Image&quot;))
+        finally:
+            ws.close()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect failure.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v -k &quot;TestMultiSchemaSliceAttach&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Update <code>attach_slice</code> to handle multi-schema.</strong></li>
+</ul>
+<p>The current <code>attach_slice</code> does a single ATTACH of <code>slice.db</code>. Replace with:</p>
+<ol>
+<li>Read the slice directory for <code>*.db</code> files.</li>
+<li>For <code>main.db</code>, ATTACH as <code>slice_main</code>.</li>
+<li>For each <code>{schema}.db</code>, ATTACH as <code>slice_{schema}</code>.</li>
+<li>On context exit, DETACH all of them.</li>
+</ol>
+<p>Store the list of attached aliases so detach can clean them all up.</p>
+<p>Also update <code>slice_db_path</code> — it currently returns a single <code>slice.db</code> file. For multi-schema slices, the slice directory contains <code>main.db</code> + per-schema files (same layout as the working DB). The path helper should return the directory, not a single file. This parallels the Task 1 change for working DB.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run all workspace tests — expect pass.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/ tests/local_db/
+uv run ruff check src/deriva_ml/local_db/
+git add src/deriva_ml/local_db/workspace.py src/deriva_ml/local_db/paths.py \
+        tests/local_db/test_workspace.py
+git commit -m &quot;feat(local_db): multi-schema slice attachment with prefixed ATTACH aliases&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-cached-tabular-read-api-result_cachepy">Task 4: Cached tabular-read API (<code>result_cache.py</code>)</h2>
+<p>The <code>ResultCache</code> manages named cached tables in <code>main.db</code> with a registry for metadata, TTL, and re-query support.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/result_cache.py</code>
+- Create: <code>tests/local_db/test_result_cache.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_result_cache.py</code> covering:</p>
+<ul>
+<li><code>ResultCache</code> construction (creates registry table in engine).</li>
+<li><code>cache_key()</code> is deterministic — same params produce same key, different params produce different keys.</li>
+<li><code>store()</code> + <code>query()</code> roundtrip: store rows, query them back, verify column names, row count.</li>
+<li><code>query()</code> with <code>sort_by</code> — ascending and descending.</li>
+<li><code>query()</code> with <code>filter_col</code> + <code>filter_val</code> — substring match.</li>
+<li><code>query()</code> with <code>limit</code> + <code>offset</code> — pagination.</li>
+<li><code>list_cached()</code> returns metadata for all stored results.</li>
+<li><code>invalidate(cache_key=...)</code> removes one result.</li>
+<li><code>invalidate(source=...)</code> removes all results from a source.</li>
+<li><code>invalidate()</code> with no args removes everything.</li>
+<li>TTL expiry: store with <code>ttl_seconds=1</code>, sleep briefly, <code>has()</code> returns False.</li>
+<li><code>CachedResult.to_dataframe()</code> returns correct DataFrame.</li>
+<li><code>CachedResult.iter_rows()</code> yields dicts.</li>
+<li><code>CachedResult.query()</code> returns a new <code>CachedResult</code> with the query applied.</li>
+<li><code>CachedResult.invalidate()</code> removes the backing table.</li>
+</ul>
+<p>Use the workspace engine from a <code>Workspace</code> fixture (same as manifest store tests).</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect failure.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_result_cache.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>result_cache.py</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/result_cache.py</code> with:</p>
+<ul>
+<li><code>CachedResultMeta</code> dataclass: <code>cache_key</code>, <code>source</code>, <code>tool_name</code>, <code>params</code>, <code>columns</code>, <code>row_count</code>, <code>created_at</code>, <code>ttl_seconds</code>. Methods: <code>is_expired()</code>, <code>age_seconds()</code>, <code>to_summary()</code>.</li>
+<li><code>CachedResult</code> class: wraps a cache key + engine reference. Properties: <code>cache_key</code>, <code>source</code>, <code>row_count</code>, <code>columns</code>, <code>fetched_at</code>. Methods: <code>to_dataframe()</code>, <code>iter_rows()</code>, <code>query(sort_by, sort_desc, filter_col, filter_val, limit, offset) -&gt; CachedResult</code>, <code>invalidate()</code>.</li>
+<li><code>ResultCache</code> class: manages <code>cached_results_registry</code> table in <code>main.db</code>. Methods: <code>ensure_schema()</code>, <code>cache_key(**params) -&gt; str</code>, <code>has(key) -&gt; bool</code>, <code>store(key, columns, rows, meta)</code>, <code>query(key, ...) -&gt; CachedResult | None</code>, <code>list_cached() -&gt; list[CachedResultMeta]</code>, <code>invalidate(cache_key, source) -&gt; int</code>, <code>get(key) -&gt; CachedResult | None</code>.</li>
+</ul>
+<p>Key design decisions:
+- Use SQLAlchemy for all DB access (not raw sqlite3 like MCP's version).
+- Keep original column names (properly quoted via SQLAlchemy) — no <code>c0/c1</code> sanitization.
+- Cache key generation: <code>sha256(f"{tool_name}:{json.dumps(sorted_params)}")[:16]</code> prefixed with <code>rc_</code>.
+- Each cached result is a separate table named by its cache key.
+- <code>CachedResult.query()</code> executes SQL with WHERE/ORDER BY/LIMIT/OFFSET against the backing table and returns a new <code>CachedResult</code> wrapping the filtered view (as a temp table or in-memory list).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests — expect pass.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_result_cache.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/result_cache.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/result_cache.py
+git add src/deriva_ml/local_db/result_cache.py tests/local_db/test_result_cache.py
+git commit -m &quot;feat(local_db): add ResultCache with CachedResult handle and registry&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-unified-denormalization-engine-denormalizepy">Task 5: Unified denormalization engine (<code>denormalize.py</code>)</h2>
+<p>The core of Phase 2. One function that plans the join, ensures rows are present, builds the SQL, and executes it.</p>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/local_db/denormalize.py</code>
+- Create: <code>tests/local_db/test_denormalize.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests.</strong></li>
+</ul>
+<p>Write <code>tests/local_db/test_denormalize.py</code>. Use the <code>canned_bag_model</code> fixture from Phase 1's conftest. The test strategy:</p>
+<ol>
+<li>Create a workspace with a <code>LocalSchema</code> built from the canned model.</li>
+<li>Insert test rows directly into the per-schema SQLite files (via the ORM engine).</li>
+<li>Call <code>denormalize(workspace, model, dataset_rid, include_tables, source="catalog")</code>.</li>
+<li>Verify the result has the correct columns, row count, and joined values.</li>
+</ol>
+<p>Test cases:
+- <strong>Simple two-table join</strong> (Image → Subject via FK): insert images with Subject FK values, insert subjects. Denormalize <code>["Image", "Subject"]</code>. Verify each output row has both <code>Image.*</code> and <code>Subject.*</code> columns joined correctly.
+- <strong>Multi-hop chain</strong> (Image → Subject, Image → Diagnosis): verify three-table denormalization.
+- <strong>LEFT JOIN for nullable FK</strong>: Image with Subject=NULL should still appear in output, with Subject columns as NULL.
+- <strong>Multi-schema</strong>: Tables span <code>isa</code> and <code>deriva-ml</code> schemas. Verify cross-schema join works.
+- <strong>Slice source</strong> (<code>source="slice"</code>): Create a slice directory with per-schema files, populate it, call with <code>source="slice"</code>. Verify it reads from the slice, not the working DB.
+- <strong>Empty dataset</strong>: No dataset members. Verify empty result with correct column structure.
+- <strong>Ambiguous path detection</strong>: If the model has ambiguous FK paths, verify the denormalizer raises an appropriate error (delegated to <code>_prepare_wide_table</code>).</p>
+<p>For the canned model fixture: extend <code>conftest.py</code> to add <code>Dataset_Image</code> association table to the schema (so we can test the full Dataset → Dataset_Image → Image chain). Or use a simpler test that skips the Dataset-membership layer and just tests the join logic with directly-inserted rows.</p>
+<p>Note: <code>_prepare_wide_table()</code> requires a <code>DatasetLike</code> object as its first argument. For unit tests without a real <code>Dataset</code> or <code>DatasetBag</code>, create a minimal mock that satisfies the protocol — it needs <code>list_dataset_members()</code> and <code>list_dataset_children()</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run tests — expect failure.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>denormalize.py</code>.</strong></li>
+</ul>
+<p>Write <code>src/deriva_ml/local_db/denormalize.py</code> with:</p>
+<pre><code class="language-python">@dataclass
+class DenormalizeResult:
+    &quot;&quot;&quot;Result of a denormalization operation.&quot;&quot;&quot;
+    columns: list[tuple[str, str]]   # (name, type) pairs
+    cache_key: str | None
+    row_count: int
+    _rows: list[dict[str, Any]]      # materialized rows
+    _engine: Engine
+
+    def to_dataframe(self) -&gt; pd.DataFrame: ...
+    def iter_rows(self) -&gt; Generator[dict[str, Any], None, None]: ...
+
+
+def denormalize(
+    workspace: Workspace,
+    model: DerivaModel,
+    dataset_rid: str,
+    include_tables: list[str],
+    version: DatasetVersion | str | None = None,
+    slice_id: str | None = None,
+    source: str = &quot;catalog&quot;,
+) -&gt; DenormalizeResult: ...
+</code></pre>
+<p>The algorithm (five steps from the spec):</p>
+<ol>
+<li>
+<p><strong>Plan:</strong> Call <code>model._prepare_wide_table(dataset_mock, dataset_rid, include_tables)</code> where <code>dataset_mock</code> is a lightweight wrapper providing <code>list_dataset_members()</code>. Get <code>(element_tables, column_specs, multi_schema)</code>.</p>
+</li>
+<li>
+<p><strong>Ensure ORM:</strong> Access <code>workspace.local_schema</code> (triggers lazy build if needed).</p>
+</li>
+<li>
+<p><strong>Populate rows:</strong> For <code>"catalog"</code>: use <code>PagedFetcher</code> to fetch each table's rows into the working DB's per-schema SQLite tables. For <code>"slice"</code>: attach the slice via <code>workspace.attach_slice(slice_id)</code>. For <code>"hybrid"</code>: attach slice + fetch missing tables.</p>
+</li>
+<li>
+<p><strong>Build SQL:</strong> From <code>_prepare_wide_table</code>'s output, build a SQLAlchemy <code>select(*labeled_columns).join(...)</code> chain. Table references resolve to <code>{schema}.{table}</code> (working DB) or <code>slice_{schema}.{table}</code> (slice) based on source.</p>
+</li>
+<li>
+<p><strong>Execute:</strong> Run against workspace engine, collect rows, return <code>DenormalizeResult</code>.</p>
+</li>
+</ol>
+<p>The key challenge is Step 4: translating <code>_prepare_wide_table</code>'s <code>(path, join_conditions, join_types)</code> into SQLAlchemy SELECT with proper ATTACH alias references. Today's <code>DatasetBag._denormalize</code> already does this for the bag case (references ORM classes from the bag's <code>DatabaseModel</code>). The unified version does the same but with alias awareness.</p>
+<p>For the <code>"catalog"</code> source, a mock <code>DatasetLike</code> is needed to pass to <code>_prepare_wide_table</code>. This mock's <code>list_dataset_members()</code> returns the members fetched from the catalog (or pre-existing in the working DB). The simplest approach: fetch association-table rows first (e.g. <code>Dataset_Image</code> where <code>Dataset=dataset_rid</code>), then construct the mock from those.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests — iterate until all pass.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_denormalize.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/denormalize.py tests/local_db/
+uv run ruff check src/deriva_ml/local_db/denormalize.py
+git add src/deriva_ml/local_db/denormalize.py tests/local_db/test_denormalize.py
+git commit -m &quot;feat(local_db): unified denormalization engine&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-wire-workspace-cached-read-methods">Task 6: Wire workspace cached-read methods</h2>
+<p>Add <code>cached_table_read</code>, <code>cache_denormalized</code>, <code>list_cached_results</code>, <code>get_cached_result</code>, <code>invalidate_cache</code> to <code>Workspace</code>. These delegate to the <code>ResultCache</code> from Task 4 and the <code>denormalize()</code> from Task 5.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/workspace.py</code>
+- Modify: <code>tests/local_db/test_workspace.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests for the workspace cached-read surface.</strong></li>
+</ul>
+<pre><code class="language-python">class TestWorkspaceCachedReads:
+    def test_cached_table_read_stores_and_returns(
+        self, tmp_path: Path, canned_bag_model
+    ) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            # Insert rows into the Subject table via ORM
+            subject_t = ws.local_schema.find_table(&quot;Subject&quot;)
+            from sqlalchemy import insert
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID=&quot;S1&quot;, Name=&quot;Alice&quot;))
+                conn.execute(insert(subject_t).values(RID=&quot;S2&quot;, Name=&quot;Bob&quot;))
+
+            # cached_table_read should store and return
+            result = ws.cached_table_read(&quot;Subject&quot;, source=&quot;local&quot;)
+            assert result.row_count == 2
+            df = result.to_dataframe()
+            assert len(df) == 2
+        finally:
+            ws.close()
+
+    def test_list_cached_results(self, tmp_path: Path, canned_bag_model) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            subject_t = ws.local_schema.find_table(&quot;Subject&quot;)
+            from sqlalchemy import insert
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID=&quot;S1&quot;, Name=&quot;Alice&quot;))
+
+            ws.cached_table_read(&quot;Subject&quot;, source=&quot;local&quot;)
+            results = ws.list_cached_results()
+            assert len(results) &gt;= 1
+        finally:
+            ws.close()
+
+    def test_invalidate_cache(self, tmp_path: Path, canned_bag_model) -&gt; None:
+        ws = Workspace(working_dir=tmp_path, hostname=&quot;h&quot;, catalog_id=&quot;1&quot;)
+        try:
+            ws.build_local_schema(model=canned_bag_model, schemas=[&quot;isa&quot;, &quot;deriva-ml&quot;])
+            subject_t = ws.local_schema.find_table(&quot;Subject&quot;)
+            from sqlalchemy import insert
+            with ws.engine.begin() as conn:
+                conn.execute(insert(subject_t).values(RID=&quot;S1&quot;, Name=&quot;Alice&quot;))
+
+            cr = ws.cached_table_read(&quot;Subject&quot;, source=&quot;local&quot;)
+            ws.invalidate_cache(cache_key=cr.cache_key)
+            assert len(ws.list_cached_results()) == 0
+        finally:
+            ws.close()
+</code></pre>
+<ul>
+<li>
+<p>[ ] <strong>Step 2: Run tests — expect failure.</strong></p>
+</li>
+<li>
+<p>[ ] <strong>Step 3: Implement the cached-read methods on <code>Workspace</code>.</strong></p>
+</li>
+</ul>
+<p>Each method delegates to a <code>ResultCache</code> instance (lazy-created, stored as <code>self._result_cache</code>):</p>
+<ul>
+<li><code>cached_table_read(table, ...)</code>: generate cache key from params, check <code>result_cache.has(key)</code>, if miss: read rows from the local schema table (via <code>select(table).fetch()</code>), store, return <code>CachedResult</code>.</li>
+<li><code>cache_denormalized(model, dataset_rid, ...)</code>: generate cache key, check, if miss: call <code>denormalize(self, model, ...)</code>, store result, return <code>CachedResult</code>.</li>
+<li><code>list_cached_results()</code>: delegate to <code>result_cache.list_cached()</code>.</li>
+<li><code>get_cached_result(key)</code>: delegate to <code>result_cache.get(key)</code>.</li>
+<li>
+<p><code>invalidate_cache(...)</code>: delegate to <code>result_cache.invalidate(...)</code>.</p>
+</li>
+<li>
+<p>[ ] <strong>Step 4: Run tests — expect pass.</strong></p>
+</li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/test_workspace.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/ tests/local_db/
+uv run ruff check src/deriva_ml/local_db/
+git add src/deriva_ml/local_db/workspace.py src/deriva_ml/local_db/result_cache.py \
+        tests/local_db/test_workspace.py
+git commit -m &quot;feat(local_db): wire cached-read methods onto Workspace&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-rewire-datasetdenormalize_-and-datasetbagdenormalize_">Task 7: Rewire <code>Dataset.denormalize_*</code> and <code>DatasetBag.denormalize_*</code></h2>
+<p>Replace the two denormalization implementations with delegates to the unified <code>denormalize()</code>.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/dataset.py</code>
+- Modify: <code>src/deriva_ml/dataset/dataset_bag.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Rewire <code>Dataset.denormalize_as_dataframe</code> and <code>denormalize_as_dict</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset.py</code>:</p>
+<p>Replace <code>denormalize_as_dataframe</code> body (line 974–1044):</p>
+<pre><code class="language-python">def denormalize_as_dataframe(self, include_tables, version=None, **kwargs):
+    from deriva_ml.local_db.denormalize import denormalize
+    result = denormalize(
+        workspace=self._ml_instance.workspace,
+        model=self._ml_instance.model,
+        dataset_rid=self.rid,
+        include_tables=include_tables,
+        version=version,
+        source=&quot;catalog&quot;,
+    )
+    return result.to_dataframe()
+</code></pre>
+<p>Replace <code>denormalize_as_dict</code> body (line 1091–1147):</p>
+<pre><code class="language-python">def denormalize_as_dict(self, include_tables, version=None, **kwargs):
+    from deriva_ml.local_db.denormalize import denormalize
+    result = denormalize(
+        workspace=self._ml_instance.workspace,
+        model=self._ml_instance.model,
+        dataset_rid=self.rid,
+        include_tables=include_tables,
+        version=version,
+        source=&quot;catalog&quot;,
+    )
+    yield from result.iter_rows()
+</code></pre>
+<p>Replace <code>cache_denormalized</code> body (line 1047–1089):</p>
+<pre><code class="language-python">def cache_denormalized(self, include_tables, version=None, force=False):
+    result = self._ml_instance.workspace.cache_denormalized(
+        model=self._ml_instance.model,
+        dataset_rid=self.rid,
+        include_tables=include_tables,
+        version=version,
+        source=&quot;catalog&quot;,
+        refresh=force,
+    )
+    return result.to_dataframe()
+</code></pre>
+<p><strong>Delete</strong> <code>_denormalize_datapath</code> method entirely (~190 lines, lines 782–972).</p>
+<p><code>denormalize_columns</code> and <code>denormalize_info</code> stay unchanged — they use <code>_prepare_wide_table</code> directly and don't need the denormalize engine.</p>
+<ul>
+<li>[ ] <strong>Step 2: Rewire <code>DatasetBag.denormalize_as_dataframe</code> and <code>denormalize_as_dict</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/dataset_bag.py</code>:</p>
+<p>Add a <code>_workspace</code> property that wraps the bag's <code>DatabaseModel</code>:</p>
+<pre><code class="language-python">@property
+def _workspace(self) -&gt; &quot;Workspace&quot;:
+    &quot;&quot;&quot;Lightweight workspace wrapping the bag's SQLite files as a slice.&quot;&quot;&quot;
+    if not hasattr(self, &quot;__workspace&quot;) or self.__workspace is None:
+        from deriva_ml.local_db.workspace import Workspace
+        # The bag directory is both the working dir and the slice
+        bag_dir = self.model.database_dir
+        self.__workspace = Workspace(
+            working_dir=bag_dir.parent,
+            hostname=&quot;bag&quot;,
+            catalog_id=self.dataset_rid,
+        )
+        # Build schema from the bag's model
+        self.__workspace.build_local_schema(
+            model=self.model._model,  # the ERMrest Model
+            schemas=self.model.schemas,
+        )
+    return self.__workspace
+</code></pre>
+<p>Replace <code>denormalize_as_dataframe</code> body (line 865–930):</p>
+<pre><code class="language-python">def denormalize_as_dataframe(self, include_tables, version=None, **kwargs):
+    from deriva_ml.local_db.denormalize import denormalize
+    result = denormalize(
+        workspace=self._workspace,
+        model=self.model,
+        dataset_rid=self.dataset_rid,
+        include_tables=include_tables,
+        source=&quot;slice&quot;,
+    )
+    return result.to_dataframe()
+</code></pre>
+<p>Replace <code>denormalize_as_dict</code> similarly.</p>
+<p><strong>Delete</strong> <code>_denormalize</code> method entirely (~100 lines, lines 764–863).</p>
+<p><code>denormalize_columns</code> stays unchanged.</p>
+<ul>
+<li>[ ] <strong>Step 3: Run existing denormalization tests.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_denormalize.py -v
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_denormalize_info.py -v
+DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_composite_fk_denormalize.py -v
+</code></pre>
+<p>These are integration tests that require <code>DERIVA_HOST</code>. They exercise the full path. Fix any failures iteratively — the most likely issues are:
+- <code>self._ml_instance.workspace</code> not yet wired (Task 8 adds the <code>workspace</code> property to <code>DerivaML</code>).
+- The <code>_workspace</code> property on <code>DatasetBag</code> needing refinement to work with the bag's existing <code>DatabaseModel</code> / ORM.</p>
+<p><strong>Note:</strong> These tests may not pass until Task 8 (which adds <code>ml.workspace</code>). Mark this step as "verify after Task 8 if needed."</p>
+<ul>
+<li>[ ] <strong>Step 4: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/dataset/
+uv run ruff check src/deriva_ml/dataset/
+git add src/deriva_ml/dataset/dataset.py src/deriva_ml/dataset/dataset_bag.py
+git commit -m &quot;refactor(dataset): denormalize_* delegates to unified local_db engine&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-rewire-derivaml-add-workspace-property-update-cache_tablecache_features-clean-up">Task 8: Rewire <code>DerivaML</code> — add <code>workspace</code> property, update <code>cache_table</code>/<code>cache_features</code>, clean up</h2>
+<p>Replace <code>ml.working_data</code> with <code>ml.workspace</code>. Rewire cache methods. Delete <code>WorkingDataCache</code>.</p>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/core/base.py</code>
+- Modify: <code>src/deriva_ml/execution/execution.py</code>
+- Delete: <code>src/deriva_ml/core/working_data.py</code>
+- Delete: <code>tests/test_working_data.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>workspace</code> property to <code>DerivaML</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/core/base.py</code>, replace the <code>working_data</code> property (around line 437–476) with:</p>
+<pre><code class="language-python">@property
+def workspace(self) -&gt; &quot;Workspace&quot;:
+    &quot;&quot;&quot;Per-catalog Workspace for local caching, denormalization, and asset manifests.
+
+    Creates the workspace lazily on first access. Runs legacy manifest
+    import on creation.
+    &quot;&quot;&quot;
+    from deriva_ml.local_db.workspace import Workspace
+
+    if not hasattr(self, &quot;_workspace&quot;) or self._workspace is None:
+        self._workspace = Workspace(
+            working_dir=self.working_dir,
+            hostname=self.host_name,
+            catalog_id=self.catalog_id,
+        )
+        try:
+            n = self._workspace.import_legacy_manifests()
+            if n:
+                import logging
+                logging.getLogger(&quot;deriva_ml&quot;).info(
+                    &quot;Migrated %d legacy asset manifests into workspace&quot;, n,
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger(&quot;deriva_ml&quot;).warning(
+                &quot;Legacy manifest migration failed: %s&quot;, exc,
+            )
+        # Build the local schema so the ORM is available
+        self._workspace.build_local_schema(
+            model=self.model._model,
+            schemas=[self.ml_schema, *self.domain_schemas],
+        )
+    return self._workspace
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Rewire <code>cache_table</code>.</strong></li>
+</ul>
+<p>Replace the body of <code>cache_table</code> (around line 478–507):</p>
+<pre><code class="language-python">def cache_table(self, table_name: str, force: bool = False) -&gt; &quot;pd.DataFrame&quot;:
+    result = self.workspace.cached_table_read(
+        table=table_name, source=&quot;catalog&quot;, refresh=force,
+    )
+    return result.to_dataframe()
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Rewire <code>cache_features</code>.</strong></li>
+</ul>
+<p>Replace the body of <code>cache_features</code> (around line 509–545):</p>
+<pre><code class="language-python">def cache_features(self, table_name, feature_name, force=False, **kwargs):
+    import pandas as pd
+    from deriva_ml.local_db.result_cache import ResultCache
+
+    cache_key = ResultCache.cache_key(
+        &quot;features&quot;, table=table_name, feature=feature_name, **kwargs
+    )
+    if not force:
+        existing = self.workspace.get_cached_result(cache_key)
+        if existing is not None:
+            return existing.to_dataframe()
+
+    features = self.fetch_table_features(table_name, feature_name=feature_name, **kwargs)
+    records = [r.model_dump(mode=&quot;json&quot;) for r in features.get(feature_name, [])]
+    df = pd.DataFrame(records)
+    # Store via workspace result cache
+    columns = list(df.columns)
+    rows = df.to_dict(orient=&quot;records&quot;)
+    from deriva_ml.local_db.result_cache import CachedResultMeta
+    self.workspace._result_cache.store(
+        cache_key, columns, rows,
+        CachedResultMeta(cache_key=cache_key, source=&quot;catalog&quot;,
+                         tool_name=&quot;features&quot;, params={&quot;table&quot;: table_name, &quot;feature&quot;: feature_name},
+                         columns=columns, row_count=len(rows)),
+    )
+    return df
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Update <code>Execution._get_manifest</code>.</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, change (around line 1385–1390):</p>
+<pre><code class="language-python">def _get_manifest(self) -&gt; AssetManifest:
+    if not hasattr(self, &quot;_manifest&quot;) or self._manifest is None:
+        ws = self._ml_object.workspace
+        self._manifest = AssetManifest(ws.manifest_store(), self.execution_rid)
+    return self._manifest
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Delete <code>core/working_data.py</code> and <code>tests/test_working_data.py</code>.</strong></li>
+</ul>
+<pre><code class="language-bash">git rm src/deriva_ml/core/working_data.py
+git rm tests/test_working_data.py
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Remove any remaining <code>working_data</code> references.</strong></li>
+</ul>
+<p>Search and fix:</p>
+<pre><code class="language-bash">grep -rn &quot;working_data\|WorkingDataCache&quot; src/deriva_ml/ --include=&quot;*.py&quot; | grep -v __pycache__
+</code></pre>
+<p>Any remaining references must be updated to use <code>workspace</code>.</p>
+<ul>
+<li>[ ] <strong>Step 7: Run full test suite.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py -v
+</code></pre>
+<p>Also run any integration tests that are available:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/dataset/test_denormalize.py -v
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 8: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/ tests/
+uv run ruff check src/
+git add -A
+git commit -m &quot;refactor(core): replace working_data with workspace, delete WorkingDataCache&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-update-__init__py-exports-full-test-suite-verification">Task 9: Update <code>__init__.py</code> exports + full test suite verification</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/local_db/__init__.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Update exports.</strong></li>
+</ul>
+<pre><code class="language-python">&quot;&quot;&quot;Unified local SQLite layer for deriva-ml.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from deriva_ml.local_db.denormalize import DenormalizeResult, denormalize
+from deriva_ml.local_db.manifest_store import ManifestStore
+from deriva_ml.local_db.paged_fetcher import PagedFetcher
+from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+from deriva_ml.local_db.result_cache import CachedResult, CachedResultMeta, ResultCache
+from deriva_ml.local_db.schema import LocalSchema
+from deriva_ml.local_db.workspace import Workspace
+
+__all__ = [
+    &quot;CachedResult&quot;,
+    &quot;CachedResultMeta&quot;,
+    &quot;DenormalizeResult&quot;,
+    &quot;ErmrestPagedClient&quot;,
+    &quot;LocalSchema&quot;,
+    &quot;ManifestStore&quot;,
+    &quot;PagedFetcher&quot;,
+    &quot;ResultCache&quot;,
+    &quot;Workspace&quot;,
+    &quot;denormalize&quot;,
+]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Verify imports work.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;
+from deriva_ml.local_db import (
+    Workspace, PagedFetcher, LocalSchema, ManifestStore,
+    ErmrestPagedClient, ResultCache, CachedResult, CachedResultMeta,
+    DenormalizeResult, denormalize,
+)
+print('OK')
+&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the complete test suite.</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ tests/asset/test_manifest.py -v --tb=short
+</code></pre>
+<p>If <code>DERIVA_HOST=localhost</code> is available:</p>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/ -v --tb=short -x
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Lint + commit.</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff format src/deriva_ml/local_db/
+uv run ruff check src/deriva_ml/local_db/
+git add src/deriva_ml/local_db/__init__.py
+git commit -m &quot;docs(local_db): Phase 2 public exports&quot;
+</code></pre>
+<hr />
+<h2 id="verification-checklist-run-before-declaring-phase-2-done">Verification checklist (run before declaring Phase 2 done)</h2>
+<ul>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/local_db/ -v</code> — all pass.</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_manifest.py -v</code> — all pass.</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_denormalize.py -v</code> — all pass (requires <code>DERIVA_HOST</code>).</li>
+<li>[ ] <code>DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/dataset/test_denormalize_info.py -v</code> — all pass.</li>
+<li>[ ] <code>grep -rn "working_data\|WorkingDataCache" src/deriva_ml/ --include="*.py"</code> — zero hits (except comments).</li>
+<li>[ ] <code>grep -rn "_denormalize_datapath\|def _denormalize" src/deriva_ml/dataset/ --include="*.py"</code> — zero hits.</li>
+<li>[ ] <code>uv run ruff check src/</code> — clean.</li>
+<li>[ ] <code>from deriva_ml.local_db import ...</code> — all 10 exports work.</li>
+<li>[ ] <code>ls src/deriva_ml/core/working_data.py</code> — file does not exist.</li>
+<li>[ ] <code>ls tests/test_working_data.py</code> — file does not exist.</li>
+</ul>
+<h2 id="what-this-plan-does-not-deliver-deferred">What this plan does NOT deliver (deferred)</h2>
+<ul>
+<li>MCP migration (Phase 3, separate repo).</li>
+<li>Live integration test for full denormalize pipeline (<code>test_denormalize_live.py</code>) — noted in Task 5 as a test to add, but full end-to-end requires a populated catalog. The existing <code>tests/dataset/test_denormalize.py</code> serves as the live integration test.</li>
+<li>Upload-back from local DB (future spec).</li>
+<li>Cross-workspace slice attachment (future spec).</li>
+</ul>
+<p>Phase 2's deliverable is: <strong>one denormalization engine, one cache API, zero legacy code.</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2419 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-03-23-mcp-skill-boundary-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>MCP/Skill Boundary Design for Multi-Tenant DerivaML - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mcpskill-boundary-design-for-multi-tenant-derivaml" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MCP/Skill Boundary Design for Multi-Tenant DerivaML
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Principle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Classification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tool Classification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tier-1-keep-in-remote-mcp-72-tools-stateless-catalog-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: Keep in Remote MCP (~72 tools, stateless catalog proxy)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-2-redesign-for-remote-12-tools-hybrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: Redesign for Remote (~12 tools, hybrid)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-3-move-to-client-side-skills-30-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 3: Move to Client-Side Skills (~30 tools)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tier-4-remove-from-remote-mcp-12-tools-local-devtools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 4: Remove from Remote MCP (~12 tools, local devtools)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skill-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skill Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Skill Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-insight-skills-are-prompt-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Insight: Skills Are Prompt Documents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-script-generator-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Script Generator Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed Skills
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#portability-three-layer-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portability: Three-Layer Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-lifecycle-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Lifecycle Split
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rag-subsystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RAG Subsystem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#background-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background Tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-only-tools-mcp-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-Only Tools → MCP Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migration-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Migration Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-slim-the-mcp-server-non-breaking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Slim the MCP Server (non-breaking)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-create-client-side-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Create Client-Side Skills
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-remove-local-state-from-mcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Remove Local State from MCP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-multi-tenant-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Multi-Tenant Deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-expert-analysis-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix: Expert Analysis Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="mcpskill-boundary-design-for-multi-tenant-derivaml">MCP/Skill Boundary Design for Multi-Tenant DerivaML</h1>
+<p><strong>Date:</strong> 2026-03-23
+<strong>Status:</strong> Draft
+<strong>Authors:</strong> Carl (design), Claude (analysis synthesis)</p>
+<h2 id="problem-statement">Problem Statement</h2>
+<p>The DerivaML MCP server currently handles everything: catalog queries, dataset downloads (GB+), bag analytics, asset uploads, execution lifecycle, RAG indexing, notebook execution, and local dev tools. For multi-tenant remote deployment, this creates five problems:</p>
+<ol>
+<li><strong>Unbounded storage</strong> — Bags, execution working dirs, and caches consume GB per user on the shared server</li>
+<li><strong>Context bloat</strong> — <code>denormalize_dataset</code> and <code>query_table</code> can dump 50K+ tokens into context</li>
+<li><strong>Compute coupling</strong> — Notebook execution and model training require local GPU/venv</li>
+<li><strong>State fragility</strong> — In-memory task tracking, per-process ChromaDB, and SQLite caches are lost on restart</li>
+<li><strong>Security risk</strong> — Running arbitrary user code (notebooks, scripts) on a shared server</li>
+</ol>
+<h2 id="design-principle">Design Principle</h2>
+<p><strong>MCP = catalog API gateway. Skills = local workflow orchestrator. Library = all real logic.</strong></p>
+<pre><code>                     ┌─────────────┐
+                     │  deriva-ml  │  ← All real logic lives here
+                     │  (Python)   │
+                     └──────┬──────┘
+                            │
+              ┌─────────────┼─────────────┐
+              │             │             │
+        ┌─────┴─────┐ ┌────┴────┐ ┌──────┴──────┐
+        │ MCP Tools │ │ Skills  │ │ Direct CLI  │
+        │ (catalog  │ │ (local  │ │ (notebooks, │
+        │  proxy)   │ │  state) │ │  scripts)   │
+        └───────────┘ └─────────┘ └─────────────┘
+</code></pre>
+<p>The litmus test for each tool:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>No large state</th>
+<th>Large state</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Needs catalog</strong></td>
+<td><strong>MCP</strong></td>
+<td><strong>MCP orchestrates, skill stores</strong></td>
+</tr>
+<tr>
+<td><strong>No catalog needed</strong></td>
+<td><strong>Either</strong></td>
+<td><strong>Skill</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="tool-classification">Tool Classification</h2>
+<h3 id="tier-1-keep-in-remote-mcp-72-tools-stateless-catalog-proxy">Tier 1: Keep in Remote MCP (~72 tools, stateless catalog proxy)</h3>
+<p>All annotation, schema, vocabulary, workflow, feature, and most dataset/execution metadata tools. These are thin wrappers over ERMrest with small, bounded responses.</p>
+<p><strong>Catalog CRUD:</strong> <code>connect_catalog</code>, <code>query_table</code>, <code>count_table</code>, <code>get_record</code>, <code>insert_records</code>, <code>update_record</code>, <code>create_dataset</code>, <code>add_dataset_members</code>, <code>list_dataset_members</code>, <code>split_dataset</code>, <code>create_feature</code>, <code>add_feature_value</code>, <code>fetch_table_features</code>, <code>create_execution</code>, <code>start_execution</code>, <code>stop_execution</code>, <code>create_table</code>, <code>add_column</code>, <code>create_vocabulary</code>, <code>add_term</code>, all annotation tools.</p>
+<p><strong>Lightweight queries:</strong> <code>validate_rids</code>, <code>cite</code>, <code>estimate_bag_size</code>, <code>denormalize_columns</code>, <code>rag_search</code>.</p>
+<h3 id="tier-2-redesign-for-remote-12-tools-hybrid">Tier 2: Redesign for Remote (~12 tools, hybrid)</h3>
+<p>Tools with potentially large responses that need pagination or summary modes.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Issue</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>denormalize_dataset</code></td>
+<td>Can return 50K+ tokens</td>
+<td>Add <code>summary_only</code> mode; enforce strict pagination</td>
+</tr>
+<tr>
+<td><code>query_table</code> / <code>get_table</code></td>
+<td>Unbounded rows</td>
+<td>Hard cap at 50 rows per response with pagination cursor</td>
+</tr>
+<tr>
+<td><code>fetch_table_features</code></td>
+<td>All features for table</td>
+<td>Add pagination; default to summary</td>
+</tr>
+<tr>
+<td><code>clone_catalog_async</code></td>
+<td>Already async</td>
+<td>Keep; ensure task isolation per user</td>
+</tr>
+<tr>
+<td><code>connect_catalog</code></td>
+<td>Triggers RAG indexing</td>
+<td>Externalize RAG trigger to background service</td>
+</tr>
+<tr>
+<td>Result cache tools</td>
+<td>SQLite per connection</td>
+<td>Replace with shared cache (Redis) or remove</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tier-3-move-to-client-side-skills-30-tools">Tier 3: Move to Client-Side Skills (~30 tools)</h3>
+<p>Operations that download large data, process locally, or manage the filesystem.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Why Move</th>
+<th>Skill Pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>download_dataset</code></td>
+<td>Writes GB to disk</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>cache_dataset</code></td>
+<td>Same</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>download_execution_dataset</code></td>
+<td>Same</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>restructure_assets</code></td>
+<td>Downloads bag + reorganizes files</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>download_asset</code></td>
+<td>Writes files to disk</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>validate_dataset_bag</code></td>
+<td>Downloads + cross-validates</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>asset_file_path</code></td>
+<td>Stages files locally</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>upload_execution_outputs</code></td>
+<td>Reads local files, uploads to Hatrac</td>
+<td>Script Generator</td>
+</tr>
+<tr>
+<td><code>list_storage_contents</code> / <code>delete_storage</code></td>
+<td>Scans/mutates <code>~/.deriva-ml/</code></td>
+<td>MCP-Coordinated</td>
+</tr>
+<tr>
+<td><code>denormalize_dataset</code> (analytics)</td>
+<td>Large intermediate state</td>
+<td>Local-First Analysis</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tier-4-remove-from-remote-mcp-12-tools-local-devtools">Tier 4: Remove from Remote MCP (~12 tools, local devtools)</h3>
+<p>Tools that are CLI wrappers or spawn local processes. Meaningless on a remote server.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bump_version</code> / <code>get_current_version</code></td>
+<td><code>uv run bump-version</code> via Bash</td>
+</tr>
+<tr>
+<td><code>install_jupyter_kernel</code> / <code>list_jupyter_kernels</code></td>
+<td><code>uv run deriva-ml-install-kernel</code></td>
+</tr>
+<tr>
+<td><code>start_app</code> / <code>stop_app</code> / <code>start_schema_workbench</code> / <code>stop_schema_workbench</code></td>
+<td>Direct CLI or skill</td>
+</tr>
+<tr>
+<td><code>run_notebook</code> / <code>inspect_notebook</code></td>
+<td><code>uv run deriva-ml-run-notebook</code></td>
+</tr>
+<tr>
+<td><code>preview_handlebars_template</code> / <code>validate_template_syntax</code></td>
+<td>Pure functions, no server needed</td>
+</tr>
+<tr>
+<td><code>get_execution_working_dir</code></td>
+<td>Local path, meaningless remotely</td>
+</tr>
+</tbody>
+</table>
+<h2 id="skill-architecture">Skill Architecture</h2>
+<h3 id="key-insight-skills-are-prompt-documents">Key Insight: Skills Are Prompt Documents</h3>
+<p>Claude Code skills are SKILL.md files — static markdown that gets loaded into context. They cannot:
+- Execute code directly (only instruct Claude to call tools or run Bash)
+- Persist state between invocations
+- Call MCP tools directly (they instruct Claude to call them)</p>
+<p>All persistent state lives in: the MCP server (connection state), the filesystem (<code>~/.deriva-ml/</code>), or the catalog itself. Skills don't add a fourth state location.</p>
+<h3 id="the-script-generator-pattern">The Script Generator Pattern</h3>
+<p>The highest-leverage pattern for moving heavy operations to client-side:</p>
+<ol>
+<li>Skill loads into context with instructions</li>
+<li>Claude calls MCP tools for small metadata queries (bag_info, validate_rids)</li>
+<li>Skill instructs Claude to generate a short Python script using <code>deriva-ml</code></li>
+<li>Claude executes the script via Bash</li>
+<li>Script writes compact summary to stdout or a temp file</li>
+<li>Claude reads the summary (small) into context</li>
+</ol>
+<p><strong>Context savings:</strong> A denormalize-then-analyze via MCP dumps 1000 rows (50K tokens) into context. The Script Generator pattern returns a 20-line statistical summary (~200 tokens).</p>
+<h3 id="proposed-skills">Proposed Skills</h3>
+<table>
+<thead>
+<tr>
+<th>Skill</th>
+<th>Trigger</th>
+<th>Pattern</th>
+<th>MCP Calls</th>
+<th>Local Work</th>
+<th>Context Return</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>download-and-analyze</code></td>
+<td>"analyze dataset"</td>
+<td>Script Generator</td>
+<td><code>bag_info</code>, <code>cache_dataset</code></td>
+<td>Python: download + profile</td>
+<td>20-line stats summary</td>
+</tr>
+<tr>
+<td><code>restructure-for-training</code></td>
+<td>"prepare training data"</td>
+<td>Script Generator</td>
+<td><code>estimate_bag_size</code></td>
+<td>Python: download + restructure</td>
+<td>Dir tree + counts</td>
+</tr>
+<tr>
+<td><code>run-training-pipeline</code></td>
+<td>"train model"</td>
+<td>Script Generator</td>
+<td><code>validate_rids</code></td>
+<td><code>deriva-ml-run</code> CLI</td>
+<td>Execution RID + metrics</td>
+</tr>
+<tr>
+<td><code>bulk-feature-load</code></td>
+<td>"load labels from CSV"</td>
+<td>Script Generator</td>
+<td>None (after connect)</td>
+<td>Python: batch insert</td>
+<td>"Loaded N values"</td>
+</tr>
+<tr>
+<td><code>clone-catalog-workspace</code></td>
+<td>"clone catalog"</td>
+<td>MCP-Coordinated</td>
+<td><code>clone_catalog_async</code>, <code>get_task_status</code></td>
+<td>None (server-side)</td>
+<td>Clone summary</td>
+</tr>
+<tr>
+<td><code>analyze-cached-bag</code></td>
+<td>"what's in this bag"</td>
+<td>Local-First</td>
+<td><code>bag_info</code></td>
+<td>Python: bag analysis</td>
+<td>Stats summary</td>
+</tr>
+<tr>
+<td><code>execution-lifecycle</code></td>
+<td>"run experiment"</td>
+<td>Script Generator</td>
+<td><code>create_execution</code>, status updates</td>
+<td>Python: full lifecycle</td>
+<td>Execution RID + summary</td>
+</tr>
+</tbody>
+</table>
+<h3 id="portability-three-layer-architecture">Portability: Three-Layer Architecture</h3>
+<p>Skills are Claude Code specific. The same functionality must work in other MCP clients (Cursor, Windsurf) that don't have skills.</p>
+<pre><code>Layer 1: MCP Tools (universal — works in all MCP clients)
+  - catalog CRUD, metadata, bounded queries
+  - Always available, always small responses
+
+Layer 2: deriva-ml Python Library (universal — runs locally)
+  - DerivaML class with download, denormalize, restructure, upload
+  - Works from any Python environment (notebooks, scripts, CLI)
+
+Layer 3: Claude Code Skills (Claude Code specific — optional optimization)
+  - Orchestrate Layer 1 + Layer 2 for best UX
+  - Context-aware (minimize token consumption)
+  - Not required — Layer 1 + Layer 2 work without them
+</code></pre>
+<p>For non-skill clients, add <code>summary_only</code> parameter to large-response MCP tools:</p>
+<pre><code class="language-python"># Non-skill client gets compact response
+denormalize_dataset(..., summary_only=True)
+# → {&quot;row_count&quot;: 5000, &quot;columns&quot;: [...], &quot;sample&quot;: [3 rows], &quot;cache_key&quot;: &quot;...&quot;}
+
+# Then paginate with cache key
+query_cached_result(cache_key=&quot;...&quot;, limit=50, offset=0)
+</code></pre>
+<h2 id="execution-lifecycle-split">Execution Lifecycle Split</h2>
+<p>Currently the execution lifecycle spans both environments:</p>
+<pre><code>MCP (catalog CRUD):                    Skill (local orchestration):
+  create_execution()                     download input datasets (bags)
+  update_execution_status()              download input assets
+  stop_execution()                       stage output files (manifest)
+                                         build upload staging tree
+                                         upload to Hatrac
+</code></pre>
+<p>The MCP server coordinates catalog records. The skill (or Python library) handles all filesystem operations and data movement.</p>
+<h2 id="rag-subsystem">RAG Subsystem</h2>
+<p><strong>Current:</strong> In-process ChromaDB with fastembed ONNX model (~150MB RAM). Single collection shared across users. Schema indexed per-catalog, docs indexed globally.</p>
+<p><strong>Decision:</strong> Keep ChromaDB for now. A better multi-tenant RAG solution is being developed separately and will replace this when ready. No investment in Chroma server mode or external vector DB migration at this time.</p>
+<h2 id="background-tasks">Background Tasks</h2>
+<p><strong>Current:</strong> In-memory Python dict. Lost on restart. Not shared across instances.</p>
+<p><strong>Multi-tenant:</strong> Requires persistent storage. Options:
+- Redis-backed task queue (simplest)
+- Database-backed (PostgreSQL)
+- Cloud task queue (SQS/Cloud Tasks)</p>
+<p><strong>Recommendation:</strong> Redis for first deployment. Task state is small (status, progress, result pointer).</p>
+<h2 id="read-only-tools-mcp-resources">Read-Only Tools → MCP Resources</h2>
+<p>Several current Tools are pure read operations that fit the MCP Resource pattern better:</p>
+<table>
+<thead>
+<tr>
+<th>Current Tool</th>
+<th>Resource URI</th>
+<th>Benefit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>count_table(name)</code></td>
+<td><code>deriva://table/{name}/count</code></td>
+<td>Cacheable, no side effects</td>
+</tr>
+<tr>
+<td><code>list_dataset_children(rid)</code></td>
+<td><code>deriva://dataset/{rid}/children</code></td>
+<td>Already partially exists</td>
+</tr>
+<tr>
+<td><code>list_dataset_executions(rid)</code></td>
+<td><code>deriva://dataset/{rid}/executions</code></td>
+<td>Read-only provenance</td>
+</tr>
+<tr>
+<td><code>estimate_bag_size(rid, ver)</code></td>
+<td><code>deriva://dataset/{rid}/bag-size?version={ver}</code></td>
+<td>Cacheable estimate</td>
+</tr>
+<tr>
+<td><code>bag_info(rid, ver)</code></td>
+<td><code>deriva://dataset/{rid}/bag-info?version={ver}</code></td>
+<td>Cache status check</td>
+</tr>
+<tr>
+<td><code>get_execution_info()</code></td>
+<td><code>deriva://execution/active</code></td>
+<td>Read-only status</td>
+</tr>
+<tr>
+<td><code>rag_status()</code></td>
+<td><code>deriva://rag/status</code></td>
+<td>Index statistics</td>
+</tr>
+</tbody>
+</table>
+<h2 id="migration-strategy">Migration Strategy</h2>
+<h3 id="phase-1-slim-the-mcp-server-non-breaking">Phase 1: Slim the MCP Server (non-breaking)</h3>
+<ol>
+<li>Add <code>summary_only</code> parameter to <code>denormalize_dataset</code>, <code>query_table</code>, <code>fetch_table_features</code></li>
+<li>Enforce response size caps (50 rows default, 100 max)</li>
+<li>Convert read-only tools to Resources where beneficial</li>
+<li>Add pagination cursors to all list tools</li>
+</ol>
+<h3 id="phase-2-create-client-side-skills">Phase 2: Create Client-Side Skills</h3>
+<ol>
+<li>Build Script Generator skills for download, analyze, restructure, upload</li>
+<li>Keep MCP tools functional (backward compat) but add deprecation warnings for Tier 3/4 tools</li>
+<li>Skills call MCP for metadata, <code>deriva-ml</code> for heavy lifting</li>
+</ol>
+<h3 id="phase-3-remove-local-state-from-mcp">Phase 3: Remove Local State from MCP</h3>
+<ol>
+<li>RAG: keep ChromaDB for now; replace with multi-tenant RAG service when available</li>
+<li>Replace in-memory task tracking with Redis</li>
+<li>Remove filesystem-dependent tools from remote MCP profile</li>
+<li>Introduce <code>local</code> vs <code>remote</code> server profiles</li>
+</ol>
+<h3 id="phase-4-multi-tenant-deployment">Phase 4: Multi-Tenant Deployment</h3>
+<ol>
+<li>Per-user connection isolation (already exists via <code>ConnectionManager</code> + <code>contextvars</code>)</li>
+<li>Per-user RAG collection prefixes</li>
+<li>Per-user task queues</li>
+<li>Monitoring and quotas</li>
+</ol>
+<h2 id="open-questions">Open Questions</h2>
+<ol>
+<li><strong>Result cache location:</strong> Move entirely to skills (SQLite on client), keep in MCP (shared Redis), or hybrid?</li>
+<li><strong>RAG replacement:</strong> A multi-tenant RAG service is being developed separately. Keep ChromaDB until then.</li>
+<li><strong>Asset upload path:</strong> Should skills upload directly to Hatrac, or go through MCP as proxy?</li>
+<li><strong>Server profiles:</strong> One codebase with feature flags, or separate packages?</li>
+</ol>
+<h2 id="appendix-expert-analysis-sources">Appendix: Expert Analysis Sources</h2>
+<ul>
+<li><strong>ML Workflow Expert:</strong> Analyzed execution lifecycle, data flow, latency classification, reproducibility requirements</li>
+<li><strong>MCP Architecture Expert:</strong> Complete tool inventory (115 tools), classification, response size analysis, protocol best practices</li>
+<li><strong>Skills Architecture Expert:</strong> Skill state persistence analysis, interaction patterns, Script Generator design, portability assessment</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

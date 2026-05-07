@@ -1,0 +1,3043 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-22-bug-c-asset-metadata/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Bug C: Asset Metadata None-Stringification Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bug-c-asset-metadata-none-stringification-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bug C: Asset Metadata None-Stringification Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1-add-derivamodelasset_metadata_columns-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Add DerivaModel.asset_metadata_columns() helper
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-add-_validate_pending_asset_metadata-to-assetmanifestpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Add _validate_pending_asset_metadata to asset/manifest.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-add-nullsentinelprocessor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Add NullSentinelProcessor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-define-null_sentinel-and-wire-pre_processors-into-asset_table_upload_spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Define NULL_SENTINEL and wire pre_processors into asset_table_upload_spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-replace-none-with-null_sentinel-at-three-staging-sites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Replace "None" with NULL_SENTINEL at three staging sites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-call-validator-from-execution_upload_execution_dirs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Call validator from Execution._upload_execution_dirs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-call-validator-from-run_upload_engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Call validator from run_upload_engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-integration-tests-live-catalog-gated-on-deriva_host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: Integration tests (live-catalog, gated on DERIVA_HOST)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: CHANGELOG
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit-summary-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commit summary (expected)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bug-c-asset-metadata-none-stringification-implementation-plan">Bug C: Asset Metadata None-Stringification Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Fix the pre-S3 regression where missing asset metadata becomes the literal string <code>"None"</code> in catalog inserts. Replace with pre-upload validation for NOT-NULL columns plus a sentinel-based SQL-NULL path for nullable columns.</p>
+<p><strong>Architecture:</strong> Three units. Add a private validator function in <code>asset/manifest.py</code> that inspects <code>col.nullok</code> via a new <code>DerivaModel.asset_metadata_columns()</code> helper. Define a <code>NULL_SENTINEL = "__NULL__"</code> constant in <code>dataset/upload.py</code> replacing the current <code>"None"</code> string at three staging sites. Add a <code>NullSentinelProcessor(BaseProcessor)</code> to deriva-py's upload pre-processor pipeline, wired via <code>asset_table_upload_spec</code>, to translate the sentinel to Python <code>None</code> before catalog insert.</p>
+<p><strong>Tech Stack:</strong> Python ≥3.12, Pydantic v2, deriva-py (<code>BaseProcessor</code>, <code>find_processor</code>, <code>GenericUploader</code>), pytest. Built on the existing upload pipeline without modifying deriva-py.</p>
+<p><strong>Reference spec:</strong> <code>docs/superpowers/specs/2026-04-22-bug-c-asset-metadata-design.md</code></p>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<ul>
+<li>Modify: <code>src/deriva_ml/model/catalog.py</code> — add <code>DerivaModel.asset_metadata_columns(table) -&gt; list[Column]</code> alongside existing <code>asset_metadata()</code>.</li>
+<li>Modify: <code>src/deriva_ml/asset/manifest.py</code> — add private module-level <code>_validate_pending_asset_metadata(model, manifest)</code> function.</li>
+<li>Create: <code>src/deriva_ml/asset/null_sentinel_processor.py</code> — <code>NullSentinelProcessor(BaseProcessor)</code> class.</li>
+<li>Modify: <code>src/deriva_ml/dataset/upload.py</code> — add <code>NULL_SENTINEL</code> constant at module top, wire <code>pre_processors</code> into <code>asset_table_upload_spec</code>, replace <code>"None"</code> at line 691.</li>
+<li>Modify: <code>src/deriva_ml/execution/execution.py</code> — replace <code>"None"</code> at line 1074 (in <code>_build_upload_staging</code>); call validator at top of <code>_upload_execution_dirs</code>.</li>
+<li>Modify: <code>src/deriva_ml/execution/upload_engine.py</code> — replace <code>"None"</code> at line 644 (in <code>_invoke_deriva_py_uploader</code>); call validator at top of <code>run_upload_engine</code>.</li>
+<li>Create: <code>tests/asset/test_metadata_validator.py</code> — 8 unit tests for validator.</li>
+<li>Create: <code>tests/asset/test_null_sentinel_processor.py</code> — 4 unit tests for processor.</li>
+<li>Create: <code>tests/execution/test_bug_c_live_smoke.py</code> — 3 integration tests (live-catalog, gated on <code>DERIVA_HOST</code>).</li>
+<li>Modify: <code>CHANGELOG.md</code> — Unreleased entry.</li>
+</ul>
+<hr />
+<h2 id="task-1-add-derivamodelasset_metadata_columns-helper">Task 1: Add <code>DerivaModel.asset_metadata_columns()</code> helper</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/model/catalog.py</code> — add new method after existing <code>asset_metadata()</code> (line 580)
+- Test: <code>tests/model/test_asset_metadata_columns.py</code> (new file)</p>
+<p>Returns <code>list[Column]</code> (sorted by name) for asset-metadata columns. Used by the validator to inspect <code>nullok</code>. The existing <code>asset_metadata(table) -&gt; set[str]</code> remains unchanged.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing test</strong></li>
+</ul>
+<p>Create <code>tests/model/test_asset_metadata_columns.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for DerivaModel.asset_metadata_columns.&quot;&quot;&quot;
+from __future__ import annotations
+
+import pytest
+
+
+def test_asset_metadata_columns_returns_column_objects(test_ml):
+    &quot;&quot;&quot;For an asset table with metadata cols, returns sorted Column objects.&quot;&quot;&quot;
+    # Use Execution_Metadata which is a known asset table with known columns.
+    # We're not checking specific columns here; we're checking shape.
+    cols = test_ml.model.asset_metadata_columns(&quot;Execution_Metadata&quot;)
+    assert isinstance(cols, list)
+    for c in cols:
+        assert hasattr(c, &quot;name&quot;)
+        assert hasattr(c, &quot;nullok&quot;)
+
+
+def test_asset_metadata_columns_sorted_by_name(test_ml):
+    cols = test_ml.model.asset_metadata_columns(&quot;Execution_Metadata&quot;)
+    names = [c.name for c in cols]
+    assert names == sorted(names)
+
+
+def test_asset_metadata_columns_excludes_standard_asset_columns(test_ml):
+    &quot;&quot;&quot;Must not include Filename, URL, Length, MD5, Description, or system columns.&quot;&quot;&quot;
+    cols = test_ml.model.asset_metadata_columns(&quot;Execution_Metadata&quot;)
+    names = {c.name for c in cols}
+    for forbidden in (&quot;Filename&quot;, &quot;URL&quot;, &quot;Length&quot;, &quot;MD5&quot;, &quot;Description&quot;,
+                      &quot;RID&quot;, &quot;RCT&quot;, &quot;RMT&quot;, &quot;RCB&quot;, &quot;RMB&quot;):
+        assert forbidden not in names
+
+
+def test_asset_metadata_columns_matches_asset_metadata_set(test_ml):
+    &quot;&quot;&quot;The column-object list names must equal asset_metadata()'s set.&quot;&quot;&quot;
+    cols = test_ml.model.asset_metadata_columns(&quot;Execution_Metadata&quot;)
+    names = {c.name for c in cols}
+    assert names == test_ml.model.asset_metadata(&quot;Execution_Metadata&quot;)
+
+
+def test_asset_metadata_columns_raises_for_non_asset_table(test_ml):
+    from deriva_ml.core.exceptions import DerivaMLTableTypeError
+    with pytest.raises(DerivaMLTableTypeError):
+        test_ml.model.asset_metadata_columns(&quot;Workflow&quot;)   # not an asset
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/model/test_asset_metadata_columns.py -v</code></p>
+<p>Expected: FAIL with <code>AttributeError: 'DerivaModel' object has no attribute 'asset_metadata_columns'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the helper</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/model/catalog.py</code>, immediately after the existing <code>asset_metadata()</code> method (ending around line 587), insert:</p>
+<pre><code class="language-python">    def asset_metadata_columns(self, table: str | Table) -&gt; list[Column]:
+        &quot;&quot;&quot;Return Column objects for the asset-metadata columns of ``table``.
+
+        Like :meth:`asset_metadata` but returns the :class:`Column`
+        instances (not just names) so callers can inspect attributes
+        such as ``nullok``. Results are sorted by column name for
+        deterministic iteration.
+
+        Args:
+            table: Asset table name or Table object.
+
+        Returns:
+            Sorted list of Column objects.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not an asset table.
+        &quot;&quot;&quot;
+        table = self.name_to_table(table)
+        if not self.is_asset(table):
+            raise DerivaMLTableTypeError(&quot;asset table&quot;, table.name)
+        return sorted(
+            (c for c in table.columns if c.name not in DerivaAssetColumns),
+            key=lambda c: c.name,
+        )
+</code></pre>
+<p>Also verify <code>Column</code> is imported at the top of <code>catalog.py</code>. If not, add <code>from deriva.core.ermrest_model import Column, Table</code> to the existing import (most likely it's already imported).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/model/test_asset_metadata_columns.py -v</code></p>
+<p>Expected: all 5 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/model/catalog.py tests/model/test_asset_metadata_columns.py
+git commit -m &quot;feat(model): add asset_metadata_columns() helper returning Column objects&quot;
+</code></pre>
+<hr />
+<h2 id="task-2-add-_validate_pending_asset_metadata-to-assetmanifestpy">Task 2: Add <code>_validate_pending_asset_metadata</code> to <code>asset/manifest.py</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/asset/manifest.py</code> — add private module-level function
+- Test: <code>tests/asset/test_metadata_validator.py</code> (new file)</p>
+<p>Validator iterates pending manifest entries, collects per-entry missing-NOT-NULL-column errors, raises aggregated <code>DerivaMLValidationError</code> if any.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/asset/test_metadata_validator.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for _validate_pending_asset_metadata.&quot;&quot;&quot;
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+
+def _col(name: str, nullok: bool = True):
+    &quot;&quot;&quot;Build a mock Column with name + nullok.&quot;&quot;&quot;
+    c = MagicMock()
+    c.name = name
+    c.nullok = nullok
+    return c
+
+
+def _fake_model(columns_by_table: dict[str, list]):
+    &quot;&quot;&quot;Build a fake DerivaModel.asset_metadata_columns() for the given
+    mapping of table_name -&gt; list of mock Column objects.&quot;&quot;&quot;
+    model = MagicMock()
+    model.asset_metadata_columns.side_effect = lambda t: columns_by_table.get(t, [])
+    return model
+
+
+def _fake_manifest(entries: dict):
+    &quot;&quot;&quot;Build a fake AssetManifest.pending_assets() that returns the
+    given dict of {key: AssetEntry}.&quot;&quot;&quot;
+    from deriva_ml.asset.manifest import AssetEntry
+    manifest = MagicMock()
+    manifest.pending_assets.return_value = entries
+    return manifest
+
+
+def _entry(asset_table: str, schema: str = &quot;test-schema&quot;, metadata: dict | None = None):
+    from deriva_ml.asset.manifest import AssetEntry
+    return AssetEntry(
+        asset_table=asset_table,
+        schema=schema,
+        metadata=metadata or {},
+    )
+
+
+def test_empty_manifest_returns_none():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    model = _fake_model({})
+    manifest = _fake_manifest({})
+    # Should not raise.
+    assert _validate_pending_asset_metadata(model, manifest) is None
+
+
+def test_asset_with_no_metadata_columns_passes():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    model = _fake_model({&quot;Execution_Asset&quot;: []})
+    manifest = _fake_manifest({
+        &quot;Execution_Asset/f.bin&quot;: _entry(&quot;Execution_Asset&quot;),
+    })
+    assert _validate_pending_asset_metadata(model, manifest) is None
+
+
+def test_all_required_metadata_present_passes():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    model = _fake_model({
+        &quot;Image&quot;: [_col(&quot;Acquisition_Time&quot;, nullok=False)],
+    })
+    manifest = _fake_manifest({
+        &quot;Image/a.png&quot;: _entry(&quot;Image&quot;, metadata={&quot;Acquisition_Time&quot;: &quot;2026-01-01&quot;}),
+    })
+    assert _validate_pending_asset_metadata(model, manifest) is None
+
+
+def test_missing_single_not_null_column_raises():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        &quot;Image&quot;: [_col(&quot;Acquisition_Time&quot;, nullok=False)],
+    })
+    manifest = _fake_manifest({
+        &quot;Image/a.png&quot;: _entry(&quot;Image&quot;, metadata={}),
+    })
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_metadata(model, manifest)
+    msg = str(ei.value)
+    assert &quot;Image/a.png&quot; in msg
+    assert &quot;Acquisition_Time&quot; in msg
+
+
+def test_missing_multiple_columns_aggregated():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        &quot;Image&quot;: [
+            _col(&quot;Acquisition_Date&quot;, nullok=False),
+            _col(&quot;Acquisition_Time&quot;, nullok=False),
+        ],
+    })
+    manifest = _fake_manifest({
+        &quot;Image/a.png&quot;: _entry(&quot;Image&quot;, metadata={}),
+    })
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_metadata(model, manifest)
+    msg = str(ei.value)
+    # Both columns listed, sorted order
+    assert &quot;Acquisition_Date&quot; in msg
+    assert &quot;Acquisition_Time&quot; in msg
+    assert msg.index(&quot;Acquisition_Date&quot;) &lt; msg.index(&quot;Acquisition_Time&quot;)
+
+
+def test_missing_across_multiple_assets_aggregated():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        &quot;Image&quot;: [_col(&quot;Acquisition_Time&quot;, nullok=False)],
+        &quot;Plate&quot;: [_col(&quot;Well_Position&quot;, nullok=False)],
+    })
+    manifest = _fake_manifest({
+        &quot;Image/a.png&quot;: _entry(&quot;Image&quot;, metadata={}),
+        &quot;Plate/p.json&quot;: _entry(&quot;Plate&quot;, metadata={}),
+    })
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_metadata(model, manifest)
+    msg = str(ei.value)
+    assert &quot;Image/a.png&quot; in msg
+    assert &quot;Plate/p.json&quot; in msg
+    assert &quot;Acquisition_Time&quot; in msg
+    assert &quot;Well_Position&quot; in msg
+
+
+def test_nullable_missing_is_not_an_error():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    model = _fake_model({
+        &quot;Image&quot;: [_col(&quot;Description_Note&quot;, nullok=True)],  # nullable
+    })
+    manifest = _fake_manifest({
+        &quot;Image/a.png&quot;: _entry(&quot;Image&quot;, metadata={}),  # no value supplied
+    })
+    # Nullable missing is fine — sentinel path handles it.
+    assert _validate_pending_asset_metadata(model, manifest) is None
+
+
+def test_error_message_is_deterministic():
+    &quot;&quot;&quot;Same manifest twice → byte-identical error messages (sorted).&quot;&quot;&quot;
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        &quot;Image&quot;: [
+            _col(&quot;Zeta&quot;, nullok=False),
+            _col(&quot;Alpha&quot;, nullok=False),
+        ],
+    })
+    manifest = _fake_manifest({
+        &quot;Image/z.png&quot;: _entry(&quot;Image&quot;, metadata={}),
+        &quot;Image/a.png&quot;: _entry(&quot;Image&quot;, metadata={}),
+    })
+    msgs = []
+    for _ in range(2):
+        try:
+            _validate_pending_asset_metadata(model, manifest)
+        except DerivaMLValidationError as e:
+            msgs.append(str(e))
+    assert msgs[0] == msgs[1]
+    # Sorted: Alpha before Zeta, a.png before z.png
+    assert msgs[0].index(&quot;Image/a.png&quot;) &lt; msgs[0].index(&quot;Image/z.png&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_metadata_validator.py -v</code></p>
+<p>Expected: all 8 tests FAIL with <code>ImportError: cannot import name '_validate_pending_asset_metadata'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>_validate_pending_asset_metadata</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/asset/manifest.py</code>, append a new private module-level function at the end of the file:</p>
+<pre><code class="language-python">def _validate_pending_asset_metadata(
+    model: &quot;DerivaModel&quot;,
+    manifest: &quot;AssetManifest&quot;,
+) -&gt; None:
+    &quot;&quot;&quot;Raise DerivaMLValidationError if any pending asset entry is
+    missing a NOT-NULL metadata column value.
+
+    Iterates manifest entries where status == pending and the asset
+    table has metadata columns. For each NOT-NULL column absent from
+    the entry's metadata dict, records (manifest_key, schema, table,
+    column). If any errors collected, raises a single
+    :class:`DerivaMLValidationError` whose message lists every
+    failure in sorted order.
+
+    Nullable columns may be absent without error; downstream staging
+    substitutes ``NULL_SENTINEL`` which the upload pre-processor
+    translates to SQL NULL.
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    # Map manifest_key -&gt; sorted list of missing NOT-NULL column names
+    missing_by_key: dict[str, list[str]] = {}
+
+    for key, entry in sorted(manifest.pending_assets().items()):
+        cols = model.asset_metadata_columns(entry.asset_table)
+        if not cols:
+            continue
+        provided = set(entry.metadata.keys())
+        missing: list[str] = []
+        for col in cols:
+            if not col.nullok and col.name not in provided:
+                missing.append(col.name)
+        if missing:
+            missing_by_key[key] = sorted(missing)
+
+    if not missing_by_key:
+        return
+
+    lines = [
+        f&quot;Missing required metadata for {len(missing_by_key)} pending asset(s):&quot;
+    ]
+    for key in sorted(missing_by_key.keys()):
+        cols = missing_by_key[key]
+        noun = &quot;column&quot; if len(cols) == 1 else &quot;columns&quot;
+        lines.append(f&quot;  - {key}: missing {noun} {', '.join(cols)}&quot;)
+    lines.append(
+        &quot;Supply these values before calling upload_outputs(), either via &quot;
+        &quot;the ``metadata=`` arg to asset_file_path(...) or by assigning &quot;
+        &quot;to the returned AssetFilePath's ``metadata`` property.&quot;
+    )
+    raise DerivaMLValidationError(&quot;\n&quot;.join(lines))
+</code></pre>
+<p>Also add the TYPE_CHECKING import block at the top of <code>manifest.py</code> if not already present:</p>
+<pre><code class="language-python">if TYPE_CHECKING:
+    from deriva_ml.model.catalog import DerivaModel
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_metadata_validator.py -v</code></p>
+<p>Expected: all 8 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/asset/manifest.py tests/asset/test_metadata_validator.py
+git commit -m &quot;feat(asset/manifest): _validate_pending_asset_metadata for NOT-NULL columns&quot;
+</code></pre>
+<hr />
+<h2 id="task-3-add-nullsentinelprocessor">Task 3: Add <code>NullSentinelProcessor</code></h2>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/asset/null_sentinel_processor.py</code>
+- Test: <code>tests/asset/test_null_sentinel_processor.py</code> (new file)</p>
+<p>deriva-py <code>BaseProcessor</code> subclass that rewrites <code>"__NULL__"</code> → <code>None</code> in <code>self.metadata</code> before catalog insert.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write the failing tests</strong></li>
+</ul>
+<p>Create <code>tests/asset/test_null_sentinel_processor.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Unit tests for NullSentinelProcessor.&quot;&quot;&quot;
+from __future__ import annotations
+
+
+def test_single_sentinel_converted_to_none():
+    from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+    metadata = {&quot;Acquisition_Time&quot;: &quot;__NULL__&quot;, &quot;Acquisition_Date&quot;: &quot;2026-01-01&quot;}
+    proc = NullSentinelProcessor(metadata=metadata)
+    proc.process()
+    assert metadata[&quot;Acquisition_Time&quot;] is None
+    assert metadata[&quot;Acquisition_Date&quot;] == &quot;2026-01-01&quot;
+
+
+def test_multiple_sentinels_in_metadata_all_converted():
+    from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+    metadata = {&quot;a&quot;: &quot;__NULL__&quot;, &quot;b&quot;: &quot;__NULL__&quot;, &quot;c&quot;: &quot;real&quot;}
+    proc = NullSentinelProcessor(metadata=metadata)
+    proc.process()
+    assert metadata[&quot;a&quot;] is None
+    assert metadata[&quot;b&quot;] is None
+    assert metadata[&quot;c&quot;] == &quot;real&quot;
+
+
+def test_non_sentinel_values_unchanged():
+    from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+    metadata = {
+        &quot;x&quot;: &quot;hello&quot;,
+        &quot;y&quot;: 42,
+        &quot;z&quot;: None,         # already None — stays None
+        &quot;q&quot;: &quot;__NUL__&quot;,    # almost-sentinel — stays as-is
+        &quot;r&quot;: &quot;__NULLISH__&quot;,
+    }
+    proc = NullSentinelProcessor(metadata=metadata)
+    proc.process()
+    assert metadata[&quot;x&quot;] == &quot;hello&quot;
+    assert metadata[&quot;y&quot;] == 42
+    assert metadata[&quot;z&quot;] is None
+    assert metadata[&quot;q&quot;] == &quot;__NUL__&quot;
+    assert metadata[&quot;r&quot;] == &quot;__NULLISH__&quot;
+
+
+def test_empty_metadata_is_no_op():
+    from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+    metadata: dict = {}
+    proc = NullSentinelProcessor(metadata=metadata)
+    proc.process()
+    assert metadata == {}
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run tests to verify they fail</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_null_sentinel_processor.py -v</code></p>
+<p>Expected: FAIL with <code>ModuleNotFoundError: No module named 'deriva_ml.asset.null_sentinel_processor'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Create the processor module</strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/asset/null_sentinel_processor.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Pre-upload metadata pre-processor for deriva-py's GenericUploader.
+
+Part of the Bug C fix — see
+``docs/superpowers/specs/2026-04-22-bug-c-asset-metadata-design.md``.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+from deriva.transfer.upload.processors import BaseProcessor
+
+
+class NullSentinelProcessor(BaseProcessor):
+    &quot;&quot;&quot;Translate the ``&quot;__NULL__&quot;`` sentinel to Python ``None``.
+
+    Runs before deriva-py's ``interpolateDict`` expansion. Mutates
+    the in-flight ``self.metadata`` dict in place: any value equal
+    to ``&quot;__NULL__&quot;`` (see
+    :data:`deriva_ml.dataset.upload.NULL_SENTINEL`) is replaced
+    with ``None``. deriva-py then drops None-valued keys, causing
+    the resulting catalog insert to send SQL ``NULL`` for those
+    columns.
+
+    Not part of the end-user API — configured automatically by
+    :func:`deriva_ml.dataset.upload.asset_table_upload_spec`.
+
+    Note: if a user's legitimate metadata value equals the sentinel
+    string, it will be corrupted to NULL. Known constraint; chosen
+    sentinel is unlikely to collide naturally.
+    &quot;&quot;&quot;
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # BaseProcessor stores kwargs on self.kwargs; the metadata
+        # dict is passed via kwargs[&quot;metadata&quot;] by
+        # deriva-py's _execute_processors.
+        self.metadata = kwargs.get(&quot;metadata&quot;, {})
+
+    def process(self):
+        for k, v in list(self.metadata.items()):
+            if v == &quot;__NULL__&quot;:
+                self.metadata[k] = None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_null_sentinel_processor.py -v</code></p>
+<p>Expected: all 4 tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/asset/null_sentinel_processor.py tests/asset/test_null_sentinel_processor.py
+git commit -m &quot;feat(asset): NullSentinelProcessor for SQL NULL emission on nullable cols&quot;
+</code></pre>
+<hr />
+<h2 id="task-4-define-null_sentinel-and-wire-pre_processors-into-asset_table_upload_spec">Task 4: Define <code>NULL_SENTINEL</code> and wire <code>pre_processors</code> into <code>asset_table_upload_spec</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/upload.py</code></p>
+<p>Add the shared constant at module top. Emit <code>pre_processors</code> in the upload spec when the asset table has metadata columns.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add <code>NULL_SENTINEL</code> constant at the top of <code>src/deriva_ml/dataset/upload.py</code></strong></li>
+</ul>
+<p>Locate the module docstring / import block at the top of <code>src/deriva_ml/dataset/upload.py</code>. After the imports, before the first function/constant, insert:</p>
+<pre><code class="language-python">NULL_SENTINEL = &quot;__NULL__&quot;
+&quot;&quot;&quot;Directory-segment marker for nullable asset-metadata columns with
+no value. Written into the staging tree by the three path-builders
+(``Execution._build_upload_staging``, ``_invoke_deriva_py_uploader``,
+``asset_file_path``) and translated back to Python ``None`` by
+:class:`deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor`
+before deriva-py builds the catalog insert. See Bug C design doc.&quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Wire <code>pre_processors</code> into <code>asset_table_upload_spec</code></strong></li>
+</ul>
+<p>Find <code>asset_table_upload_spec()</code> in the same file (~line 276). Locate the spec dict being built; inside the spec dict add <code>pre_processors</code> entry, only when <code>metadata_columns</code> is non-empty.</p>
+<p>Change:</p>
+<pre><code class="language-python">    spec = {
+        # Upload assets into an asset table of an asset table.
+        &quot;column_map&quot;: {
+            &quot;MD5&quot;: &quot;{md5}&quot;,
+            &quot;URL&quot;: &quot;{URI}&quot;,
+            &quot;Length&quot;: &quot;{file_size}&quot;,
+            &quot;Filename&quot;: &quot;{file_name}&quot;,
+        }
+        | {c: f&quot;{{{c}}}&quot; for c in metadata_columns},
+        &quot;file_pattern&quot;: asset_path,
+        ...
+    }
+    return spec
+</code></pre>
+<p>to:</p>
+<pre><code class="language-python">    spec = {
+        # Upload assets into an asset table of an asset table.
+        &quot;column_map&quot;: {
+            &quot;MD5&quot;: &quot;{md5}&quot;,
+            &quot;URL&quot;: &quot;{URI}&quot;,
+            &quot;Length&quot;: &quot;{file_size}&quot;,
+            &quot;Filename&quot;: &quot;{file_name}&quot;,
+        }
+        | {c: f&quot;{{{c}}}&quot; for c in metadata_columns},
+        &quot;file_pattern&quot;: asset_path,
+        ...
+    }
+    # Wire the NullSentinelProcessor only when the table has metadata
+    # columns — otherwise no sentinel values can appear and the
+    # processor would be a no-op.
+    if metadata_columns:
+        spec[&quot;pre_processors&quot;] = [
+            {
+                &quot;processor&quot;: &quot;NullSentinelProcessor&quot;,
+                &quot;processor_type&quot;: (
+                    &quot;deriva_ml.asset.null_sentinel_processor.&quot;
+                    &quot;NullSentinelProcessor&quot;
+                ),
+            }
+        ]
+    return spec
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Write a unit test that verifies the spec includes <code>pre_processors</code> for tables with metadata</strong></li>
+</ul>
+<p>Append to <code>tests/asset/test_null_sentinel_processor.py</code>:</p>
+<pre><code class="language-python">def test_asset_table_upload_spec_includes_null_sentinel_processor_when_metadata_present(test_ml):
+    &quot;&quot;&quot;Upload spec for an asset table with metadata wires the processor.&quot;&quot;&quot;
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    # Execution_Metadata has metadata columns — expect the processor wired.
+    spec = asset_table_upload_spec(test_ml.model, &quot;Execution_Metadata&quot;)
+    pre = spec.get(&quot;pre_processors&quot;, [])
+    types = [p.get(&quot;processor_type&quot;) for p in pre]
+    assert any(
+        t and t.endswith(&quot;NullSentinelProcessor&quot;) for t in types
+    ), f&quot;pre_processors must wire NullSentinelProcessor; got {pre}&quot;
+
+
+def test_asset_table_upload_spec_omits_pre_processors_when_no_metadata(test_ml):
+    &quot;&quot;&quot;Asset tables with zero metadata columns don't need the processor.&quot;&quot;&quot;
+    from deriva_ml.dataset.upload import asset_table_upload_spec
+
+    # Execution_Asset has NO metadata columns (per the S3 live smoke).
+    spec = asset_table_upload_spec(test_ml.model, &quot;Execution_Asset&quot;)
+    assert &quot;pre_processors&quot; not in spec or not spec[&quot;pre_processors&quot;]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests to verify they pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/test_null_sentinel_processor.py -v</code></p>
+<p>Expected: all 6 tests pass (4 original + 2 new).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/dataset/upload.py tests/asset/test_null_sentinel_processor.py
+git commit -m &quot;feat(dataset/upload): NULL_SENTINEL constant + wire NullSentinelProcessor into asset_table_upload_spec&quot;
+</code></pre>
+<hr />
+<h2 id="task-5-replace-none-with-null_sentinel-at-three-staging-sites">Task 5: Replace <code>"None"</code> with <code>NULL_SENTINEL</code> at three staging sites</h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/dataset/upload.py:691</code> (staging-site A)
+- Modify: <code>src/deriva_ml/execution/execution.py:1074</code> (staging-site B)
+- Modify: <code>src/deriva_ml/execution/upload_engine.py:644</code> (staging-site C)</p>
+<p>Three single-line changes. No new tests needed — the end-to-end integration tests (Task 8) verify the full round-trip.</p>
+<ul>
+<li>[ ] <strong>Step 1: Edit <code>dataset/upload.py</code> staging site (line 691)</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/dataset/upload.py</code>, locate the <code>asset_file_path</code> function (~line 657). Change:</p>
+<pre><code class="language-python">    for m in asset_metadata:
+        path = path / str(metadata.get(m, &quot;None&quot;))
+</code></pre>
+<p>to:</p>
+<pre><code class="language-python">    for m in asset_metadata:
+        path = path / str(metadata.get(m, NULL_SENTINEL))
+</code></pre>
+<p>(<code>NULL_SENTINEL</code> is already defined at the top of this module — no import needed.)</p>
+<ul>
+<li>[ ] <strong>Step 2: Edit <code>execution/execution.py</code> staging site (line 1074)</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, locate <code>_build_upload_staging</code> (~line 1034). Find the existing line:</p>
+<pre><code class="language-python">            metadata_parts = [
+                str(entry.metadata.get(k, &quot;None&quot;)) for k in all_metadata_cols
+            ] if all_metadata_cols else []
+</code></pre>
+<p>Change to:</p>
+<pre><code class="language-python">            metadata_parts = [
+                str(entry.metadata.get(k, NULL_SENTINEL)) for k in all_metadata_cols
+            ] if all_metadata_cols else []
+</code></pre>
+<p>Also add the import to the top of <code>execution.py</code> (look for the <code>from deriva_ml.dataset.upload import ...</code> block around line 71 and extend it):</p>
+<pre><code class="language-python">from deriva_ml.dataset.upload import (
+    ...,
+    NULL_SENTINEL,
+    ...,
+)
+</code></pre>
+<p>(Add <code>NULL_SENTINEL</code> to the existing import list alphabetically.)</p>
+<p>Also remove or update the stale comment on line 1071:</p>
+<pre><code class="language-python">            # Missing metadata values get &quot;None&quot; (matching legacy asset_file_path).
+</code></pre>
+<p>Change to:</p>
+<pre><code class="language-python">            # Missing metadata values get NULL_SENTINEL which
+            # NullSentinelProcessor translates to SQL NULL at insert time.
+            # Only nullable columns reach here — the validator guards
+            # NOT-NULL columns upstream.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Edit <code>execution/upload_engine.py</code> staging site (line 644)</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/upload_engine.py</code>, locate <code>_invoke_deriva_py_uploader</code> (~line 562). Around line 644 find:</p>
+<pre><code class="language-python">            for col in metadata_cols:
+                target_dir = target_dir / str(metadata.get(col, &quot;None&quot;))
+</code></pre>
+<p>Change to:</p>
+<pre><code class="language-python">            for col in metadata_cols:
+                target_dir = target_dir / str(metadata.get(col, NULL_SENTINEL))
+</code></pre>
+<p>Add the import near the top of <code>upload_engine.py</code>. Look for an existing import from <code>deriva_ml.dataset.upload</code>. If present, extend it; otherwise add a new line:</p>
+<pre><code class="language-python">from deriva_ml.dataset.upload import NULL_SENTINEL
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run a sanity-check import plus the full unit test tier</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.dataset.upload import NULL_SENTINEL; assert NULL_SENTINEL == '__NULL__'; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<p>Then run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/ tests/core/test_schema_cache.py tests/core/test_schema_diff.py -q</code></p>
+<p>Expected: all tests pass (no regressions; none of these tests exercise the staging paths directly but they share the import graph).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/dataset/upload.py src/deriva_ml/execution/execution.py src/deriva_ml/execution/upload_engine.py
+git commit -m &quot;fix: use NULL_SENTINEL for missing metadata at three staging sites (Bug C)&quot;
+</code></pre>
+<hr />
+<h2 id="task-6-call-validator-from-execution_upload_execution_dirs">Task 6: Call validator from <code>Execution._upload_execution_dirs</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/execution.py</code> — <code>_upload_execution_dirs</code> at line 1100</p>
+<p>Add validator call as the first step before any staging work.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add the validator call</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/execution.py</code>, locate <code>_upload_execution_dirs</code> (~line 1100). Immediately after the method signature and docstring (before any existing code), insert:</p>
+<pre><code class="language-python">        # Bug C: refuse to upload if any pending asset is missing a
+        # required (NOT-NULL) metadata column. This raises a single
+        # DerivaMLValidationError that lists all failures at once.
+        from deriva_ml.asset.manifest import _validate_pending_asset_metadata
+        _validate_pending_asset_metadata(self._model, self._get_manifest())
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Sanity check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.execution import Execution; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/execution/execution.py
+git commit -m &quot;feat(execution): validate metadata at _upload_execution_dirs top (Bug C)&quot;
+</code></pre>
+<hr />
+<h2 id="task-7-call-validator-from-run_upload_engine">Task 7: Call validator from <code>run_upload_engine</code></h2>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/execution/upload_engine.py</code> — <code>run_upload_engine</code> at line 236</p>
+<p>Add validator call at the top of the engine's drain loop, before any work-item enumeration. The engine reads pending rows from SQLite (not a manifest), so we construct an AssetManifest from the same source to feed the validator.</p>
+<p>Wait — let me think about this. The engine doesn't have an <code>AssetManifest</code>; it has SQLite pending rows. We need to adapt.</p>
+<p>Actually the simpler and better approach: iterate the engine's own pending rows (which already include schema, table, metadata_json) directly. Instead of reusing <code>_validate_pending_asset_metadata</code>, extract a lower-level helper that takes an iterable of <code>(key, schema, table, metadata_dict)</code> tuples.</p>
+<p>Let me refactor the approach:</p>
+<ul>
+<li>[ ] <strong>Step 1: Refactor the validator to take an iterable of entries</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/asset/manifest.py</code>, replace <code>_validate_pending_asset_metadata</code> with two functions — the original public-ish manifest-based one plus a lower-level iterable-based one it delegates to:</p>
+<pre><code class="language-python">def _validate_pending_asset_metadata_iter(
+    model: &quot;DerivaModel&quot;,
+    entries: &quot;Iterable[tuple[str, str, str, dict]]&quot;,
+) -&gt; None:
+    &quot;&quot;&quot;Lower-level validator accepting (key, schema, asset_table, metadata_dict)
+    tuples. Used by both the manifest-based wrapper and the upload
+    engine (which reads pending rows from SQLite rather than a manifest).
+
+    See :func:`_validate_pending_asset_metadata` for semantics.
+    &quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    missing_by_key: dict[str, list[str]] = {}
+
+    for key, _schema, asset_table, metadata in sorted(entries):
+        cols = model.asset_metadata_columns(asset_table)
+        if not cols:
+            continue
+        provided = set(metadata.keys())
+        missing: list[str] = []
+        for col in cols:
+            if not col.nullok and col.name not in provided:
+                missing.append(col.name)
+        if missing:
+            missing_by_key[key] = sorted(missing)
+
+    if not missing_by_key:
+        return
+
+    lines = [
+        f&quot;Missing required metadata for {len(missing_by_key)} pending asset(s):&quot;
+    ]
+    for key in sorted(missing_by_key.keys()):
+        cols = missing_by_key[key]
+        noun = &quot;column&quot; if len(cols) == 1 else &quot;columns&quot;
+        lines.append(f&quot;  - {key}: missing {noun} {', '.join(cols)}&quot;)
+    lines.append(
+        &quot;Supply these values before calling upload_outputs(), either via &quot;
+        &quot;the ``metadata=`` arg to asset_file_path(...) or by assigning &quot;
+        &quot;to the returned AssetFilePath's ``metadata`` property.&quot;
+    )
+    raise DerivaMLValidationError(&quot;\n&quot;.join(lines))
+
+
+def _validate_pending_asset_metadata(
+    model: &quot;DerivaModel&quot;,
+    manifest: &quot;AssetManifest&quot;,
+) -&gt; None:
+    &quot;&quot;&quot;Raise DerivaMLValidationError if any pending manifest entry is
+    missing a NOT-NULL metadata column value.
+
+    Thin wrapper over :func:`_validate_pending_asset_metadata_iter`
+    that projects ``AssetManifest.pending_assets()`` into the
+    iterable shape the lower-level function expects.
+    &quot;&quot;&quot;
+    entries = (
+        (key, entry.schema, entry.asset_table, dict(entry.metadata))
+        for key, entry in manifest.pending_assets().items()
+    )
+    _validate_pending_asset_metadata_iter(model, entries)
+</code></pre>
+<p>Also make sure <code>from typing import Iterable</code> is imported at the top of <code>manifest.py</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write a test for the iterable-based validator</strong></li>
+</ul>
+<p>Append to <code>tests/asset/test_metadata_validator.py</code>:</p>
+<pre><code class="language-python">def test_iter_validator_accepts_tuples():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    model = _fake_model({
+        &quot;Image&quot;: [_col(&quot;Acquisition_Time&quot;, nullok=False)],
+    })
+    entries = [
+        (&quot;Image/x.png&quot;, &quot;test-schema&quot;, &quot;Image&quot;, {}),
+    ]
+    with pytest.raises(DerivaMLValidationError) as ei:
+        _validate_pending_asset_metadata_iter(model, entries)
+    assert &quot;Image/x.png&quot; in str(ei.value)
+    assert &quot;Acquisition_Time&quot; in str(ei.value)
+
+
+def test_iter_validator_happy_path():
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+    model = _fake_model({
+        &quot;Image&quot;: [_col(&quot;Acquisition_Time&quot;, nullok=False)],
+    })
+    entries = [
+        (&quot;Image/x.png&quot;, &quot;test-schema&quot;, &quot;Image&quot;, {&quot;Acquisition_Time&quot;: &quot;now&quot;}),
+    ]
+    assert _validate_pending_asset_metadata_iter(model, entries) is None
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run tests to verify both pass</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_metadata_validator.py -v</code></p>
+<p>Expected: all 10 tests pass (8 existing + 2 new).</p>
+<ul>
+<li>[ ] <strong>Step 4: Call the iter validator from <code>run_upload_engine</code></strong></li>
+</ul>
+<p>In <code>src/deriva_ml/execution/upload_engine.py</code>, locate <code>run_upload_engine</code> (~line 236). After the docstring and before the first work-item enumeration, insert:</p>
+<pre><code class="language-python">    # Bug C: refuse to drain if any pending row is missing a required
+    # (NOT-NULL) asset-metadata column. Looks up pending rows (all
+    # executions or the subset requested) and feeds them to the
+    # iter validator.
+    import json as _json
+    from deriva_ml.asset.manifest import _validate_pending_asset_metadata_iter
+
+    store = ml.workspace.execution_state_store()
+    rids = execution_rids if execution_rids else None
+    entries = []
+    for row in store.list_pending_asset_rows(execution_rids=rids):
+        # pending_asset_rows returns rows with asset_file_path set;
+        # key is &quot;exeRID/schema/table/key&quot; for disambiguation.
+        md = _json.loads(row[&quot;metadata_json&quot;]) if row[&quot;metadata_json&quot;] else {}
+        entries.append((
+            f&quot;{row['execution_rid']}/{row['target_table']}/{row['key']}&quot;,
+            row[&quot;target_schema&quot;],
+            row[&quot;target_table&quot;],
+            md,
+        ))
+    if entries:
+        _validate_pending_asset_metadata_iter(ml.model, entries)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 5: Check that <code>list_pending_asset_rows</code> exists; if not adapt</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.state_store import ExecutionStateStore; m = [m for m in dir(ExecutionStateStore) if 'pending' in m.lower()]; print(m)"</code></p>
+<p>Expected: prints a list of methods. If <code>list_pending_asset_rows</code> doesn't exist, find the closest equivalent (e.g., <code>list_pending_rows</code>) and add a filter for <code>asset_file_path IS NOT NULL</code>.</p>
+<p>If the method doesn't exist with that exact name, substitute the closest one in Step 4 and add a filter:</p>
+<pre><code class="language-python">    entries = []
+    for row in store.list_pending_rows(execution_rids=rids):
+        if not row.get(&quot;asset_file_path&quot;):
+            continue  # Skip non-asset rows
+        md = _json.loads(row[&quot;metadata_json&quot;]) if row[&quot;metadata_json&quot;] else {}
+        entries.append((
+            f&quot;{row['execution_rid']}/{row['target_table']}/{row['key']}&quot;,
+            row[&quot;target_schema&quot;],
+            row[&quot;target_table&quot;],
+            md,
+        ))
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Sanity check</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run python -c "from deriva_ml.execution.upload_engine import run_upload_engine; print('ok')"</code></p>
+<p>Expected: prints <code>ok</code>.</p>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add src/deriva_ml/asset/manifest.py src/deriva_ml/execution/upload_engine.py tests/asset/test_metadata_validator.py
+git commit -m &quot;feat(upload_engine): validate metadata at run_upload_engine top (Bug C)&quot;
+</code></pre>
+<hr />
+<h2 id="task-8-integration-tests-live-catalog-gated-on-deriva_host">Task 8: Integration tests (live-catalog, gated on <code>DERIVA_HOST</code>)</h2>
+<p><strong>Files:</strong>
+- Create: <code>tests/execution/test_bug_c_live_smoke.py</code></p>
+<p>Restore the Bug C live reproducer (from commit <code>df620c3</code>) as a passing test, plus two new tests for the nullable-path and the end-to-end happy path.</p>
+<ul>
+<li>[ ] <strong>Step 1: Confirm test fixture has an asset table with NOT-NULL metadata</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run python -c "
+from deriva_ml import DerivaML, ConnectionMode
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    ml = DerivaML(hostname='localhost', catalog_id='1', working_dir=tmp)
+    for t in ['Image', 'Execution_Metadata', 'Model']:
+        try:
+            cols = ml.model.asset_metadata_columns(t)
+            print(f'{t}: {[(c.name, c.nullok) for c in cols]}')
+        except Exception as e:
+            print(f'{t}: {e}')
+"</code></p>
+<p>Expected: prints each table's asset-metadata columns and their <code>nullok</code> values. Pick an asset table with at least one <code>nullok=False</code> (NOT-NULL) column; typical candidates are <code>Image</code> or a user-defined table.</p>
+<p>If NO table has <code>nullok=False</code> metadata, add a fixture tweak: in <code>tests/conftest.py</code> or the nearest relevant fixture, add a test-only asset table with a NOT-NULL metadata column (this is a well-trodden pattern in the codebase). Name the column <code>Required_Attr</code> of type <code>text</code>, <code>nullok=False</code>.</p>
+<ul>
+<li>[ ] <strong>Step 2: Write the integration tests</strong></li>
+</ul>
+<p>Create <code>tests/execution/test_bug_c_live_smoke.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Live-catalog integration tests for Bug C (asset metadata None-stringification).
+
+Gated on DERIVA_HOST. Three tests:
+
+1. End-to-end happy path with Execution_Asset (zero metadata cols).
+2. Upload refused when required metadata missing — validator raises.
+3. Upload succeeds with SQL NULL when nullable metadata missing.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from datetime import datetime, timezone
+
+import pytest
+
+
+requires_catalog = pytest.mark.skipif(
+    not os.environ.get(&quot;DERIVA_HOST&quot;),
+    reason=&quot;Bug C live tests require DERIVA_HOST&quot;,
+)
+
+
+def _make_workflow(test_ml, name: str):
+    from deriva_ml import MLVocab as vc
+    test_ml.add_term(
+        vc.workflow_type,
+        &quot;Test Workflow&quot;,
+        description=&quot;for Bug C live tests&quot;,
+    )
+    return test_ml.create_workflow(
+        name=name,
+        workflow_type=&quot;Test Workflow&quot;,
+        description=&quot;for Bug C live tests&quot;,
+    )
+
+
+@requires_catalog
+def test_upload_asset_with_full_metadata_end_to_end(test_ml, tmp_path):
+    &quot;&quot;&quot;Zero-metadata table (Execution_Asset) — upload succeeds, validator is no-op.&quot;&quot;&quot;
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    f = tmp_path / &quot;smoke.bin&quot;
+    f.write_bytes(b&quot;bug-c full-metadata smoke&quot; * 32)
+
+    wf = _make_workflow(test_ml, &quot;Bug C happy path&quot;)
+    exe = test_ml.create_execution(description=&quot;bug-c-happy&quot;, workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    with exe.execute():
+        pass
+
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid,
+        key=&quot;k1&quot;,
+        target_schema=&quot;deriva-ml&quot;,
+        target_table=&quot;Execution_Asset&quot;,
+        metadata_json=json.dumps({}),
+        created_at=now,
+        rid=&quot;EA-BUGC-HAPPY-1&quot;,
+        status=PendingRowStatus.leased,
+        lease_token=&quot;happy-lease&quot;,
+        asset_file_path=str(f),
+    )
+
+    report = exe.upload_outputs()
+    assert report.total_failed == 0, f&quot;failures: {report.errors}&quot;
+    assert report.total_uploaded == 1
+
+    # Catalog has the row with real URL + MD5.
+    expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
+    pb = test_ml.pathBuilder()
+    asset_path = pb.schemas[&quot;deriva-ml&quot;].tables[&quot;Execution_Asset&quot;]
+    rows = list(
+        asset_path.filter(asset_path.MD5 == expected_md5)
+        .filter(asset_path.Filename == &quot;smoke.bin&quot;)
+        .entities().fetch()
+    )
+    assert len(rows) == 1
+    assert &quot;/hatrac/&quot; in rows[0][&quot;URL&quot;]
+
+
+@requires_catalog
+def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_path):
+    &quot;&quot;&quot;Bug C reproducer — passing now. Staging an asset whose table has
+    a NOT-NULL metadata column, with no metadata supplied, must raise
+    DerivaMLValidationError and NOT attempt the upload.&quot;&quot;&quot;
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    # Pick an asset table with at least one NOT-NULL metadata column.
+    # Use &quot;Image&quot; if its Acquisition_Time / Acquisition_Date is NOT NULL,
+    # otherwise the test fixture should have been extended in Step 1.
+    candidate_table = &quot;Image&quot;
+    cols = test_ml.model.asset_metadata_columns(candidate_table)
+    required_cols = [c for c in cols if not c.nullok]
+    if not required_cols:
+        pytest.skip(
+            f&quot;Test catalog has no asset table with NOT-NULL metadata &quot;
+            f&quot;(tried {candidate_table}); add fixture per plan Step 1.&quot;
+        )
+
+    f = tmp_path / &quot;bug-c-required.bin&quot;
+    f.write_bytes(b&quot;bug-c required-missing&quot; * 32)
+
+    wf = _make_workflow(test_ml, &quot;Bug C required missing&quot;)
+    exe = test_ml.create_execution(description=&quot;bug-c-required&quot;, workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    with exe.execute():
+        pass
+
+    # Pending row with EMPTY metadata — missing required columns.
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid,
+        key=&quot;k2&quot;,
+        target_schema=&quot;deriva-ml&quot;,  # adjust if Image lives elsewhere
+        target_table=candidate_table,
+        metadata_json=json.dumps({}),
+        created_at=now,
+        rid=&quot;IMG-BUGC-REQ-1&quot;,
+        status=PendingRowStatus.leased,
+        lease_token=&quot;req-lease&quot;,
+        asset_file_path=str(f),
+    )
+
+    with pytest.raises(DerivaMLValidationError) as ei:
+        exe.upload_outputs()
+    msg = str(ei.value)
+    for c in required_cols:
+        assert c.name in msg, f&quot;expected column {c.name} in error message&quot;
+
+
+@requires_catalog
+def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_path):
+    &quot;&quot;&quot;The sentinel path. Staging an asset with a nullable metadata col
+    absent must upload successfully and write SQL NULL to the catalog.&quot;&quot;&quot;
+    from deriva_ml.execution.state_store import PendingRowStatus
+
+    # Find an asset table with at least one nullable metadata column
+    # AND NO NOT-NULL columns (so we can exercise the sentinel without
+    # tripping the validator). Fall back to skipping if none matches.
+    candidate_table = None
+    nullable_col_name = None
+    for t in (&quot;Image&quot;, &quot;Model&quot;, &quot;Execution_Metadata&quot;):
+        try:
+            cols = test_ml.model.asset_metadata_columns(t)
+        except Exception:
+            continue
+        required = [c for c in cols if not c.nullok]
+        nullable = [c for c in cols if c.nullok]
+        if nullable and not required:
+            candidate_table = t
+            nullable_col_name = nullable[0].name
+            break
+    if not candidate_table:
+        pytest.skip(&quot;No asset table with all-nullable metadata found in test fixture&quot;)
+
+    f = tmp_path / &quot;bug-c-null.bin&quot;
+    f.write_bytes(b&quot;bug-c nullable-missing&quot; * 32)
+
+    wf = _make_workflow(test_ml, &quot;Bug C nullable missing&quot;)
+    exe = test_ml.create_execution(description=&quot;bug-c-nullable&quot;, workflow=wf)
+    store = test_ml.workspace.execution_state_store()
+    now = datetime.now(timezone.utc)
+
+    with exe.execute():
+        pass
+
+    # Supply metadata for no columns — all are nullable.
+    store.insert_pending_row(
+        execution_rid=exe.execution_rid,
+        key=&quot;k3&quot;,
+        target_schema=&quot;deriva-ml&quot;,
+        target_table=candidate_table,
+        metadata_json=json.dumps({}),
+        created_at=now,
+        rid=&quot;NULL-BUGC-1&quot;,
+        status=PendingRowStatus.leased,
+        lease_token=&quot;null-lease&quot;,
+        asset_file_path=str(f),
+    )
+
+    report = exe.upload_outputs()
+    assert report.total_failed == 0, f&quot;failures: {report.errors}&quot;
+    assert report.total_uploaded == 1
+
+    # The catalog row's nullable column must be actual SQL NULL
+    # (Python None after fetch), not the string &quot;__NULL__&quot; and not
+    # &quot;None&quot;.
+    expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
+    pb = test_ml.pathBuilder()
+    asset_path = pb.schemas[&quot;deriva-ml&quot;].tables[candidate_table]
+    rows = list(
+        asset_path.filter(asset_path.MD5 == expected_md5)
+        .entities().fetch()
+    )
+    assert len(rows) == 1
+    assert rows[0][nullable_col_name] is None, (
+        f&quot;expected SQL NULL for {nullable_col_name}, &quot;
+        f&quot;got {rows[0][nullable_col_name]!r}&quot;
+    )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Run the tests</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/test_bug_c_live_smoke.py -v</code></p>
+<p>Expected: all 3 tests pass (or skip cleanly with a helpful reason if the test-fixture catalog lacks the required asset shapes — in that case, tweak per §7.4 of the spec).</p>
+<ul>
+<li>[ ] <strong>Step 4: Broader regression</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/ tests/model/test_asset_metadata_columns.py tests/execution/test_bug_c_live_smoke.py tests/core/test_schema_cache.py tests/core/test_schema_diff.py -v</code></p>
+<p>Expected: all tests pass.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add tests/execution/test_bug_c_live_smoke.py
+git commit -m &quot;test(bug_c): live-catalog integration tests (happy, required-missing, nullable-null)&quot;
+</code></pre>
+<hr />
+<h2 id="task-9-changelog">Task 9: CHANGELOG</h2>
+<p><strong>Files:</strong>
+- Modify: <code>CHANGELOG.md</code> — prepend new Unreleased section</p>
+<ul>
+<li>[ ] <strong>Step 1: Add CHANGELOG entry</strong></li>
+</ul>
+<p>In <code>CHANGELOG.md</code>, locate the existing first Unreleased section (currently <code>## Unreleased — Schema pin + diff</code>). Insert immediately above it (after the title + preamble):</p>
+<pre><code class="language-markdown">## Unreleased — Bug C: asset metadata None-stringification
+
+### Fixed
+
+- **Missing asset metadata no longer inserts the literal string `&quot;None&quot;`.** The three staging path-builders (`Execution._build_upload_staging`, `_invoke_deriva_py_uploader`, `asset_file_path` helper in `dataset/upload.py`) previously substituted `&quot;None&quot;` for any metadata value absent from the manifest entry. That string flowed through deriva-py's regex + `column_map` expansion into catalog inserts, causing 400 errors on non-string columns (e.g., `invalid input syntax for type timestamp: &quot;None&quot;`). Replaced with a two-branch approach:
+  - **NOT-NULL columns missing → `DerivaMLValidationError` at upload time.** New `_validate_pending_asset_metadata` runs at the top of `Execution._upload_execution_dirs` and `run_upload_engine`, listing every missing required column across every pending asset in a single aggregated message.
+  - **Nullable columns missing → SQL `NULL` in the catalog.** Staging writes the sentinel `&quot;__NULL__&quot;` as the directory segment; the new `NullSentinelProcessor` (a deriva-py `BaseProcessor` subclass wired into `asset_table_upload_spec`) translates the sentinel to Python `None` before deriva-py's `interpolateDict` drops the key from the insert row.
+
+### Added
+
+- **`DerivaModel.asset_metadata_columns(table) -&gt; list[Column]`** — companion to the existing `asset_metadata(table) -&gt; set[str]`, returning `Column` objects so callers can inspect `nullok`.
+- **`deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor`** — `BaseProcessor` subclass for sentinel→None translation.
+- **`NULL_SENTINEL = &quot;__NULL__&quot;`** — module-level constant in `deriva_ml.dataset.upload`.
+
+### External-caller impact
+
+No action required for callers who supply complete metadata. Callers who previously relied on the broken `&quot;None&quot;` substitution now get a `DerivaMLValidationError` (with an actionable message) at upload time instead of an opaque 400 from the catalog. Net outcome unchanged — the upload still can't succeed — but failure mode is clearer and cheaper (no network round-trip).
+
+A known constraint: if a legitimate metadata value is the string `&quot;__NULL__&quot;`, it will be corrupted to SQL `NULL` by the pre-processor. Highly unlikely in practice; documented in `NullSentinelProcessor`'s docstring.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Verify file parses</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; head -40 CHANGELOG.md</code></p>
+<p>Expected: new section appears between the preamble and the Schema Pin section.</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; git add CHANGELOG.md
+git commit -m &quot;docs(changelog): Bug C asset metadata None-stringification fix&quot;
+</code></pre>
+<hr />
+<h2 id="final-verification">Final verification</h2>
+<ul>
+<li>[ ] <strong>Step 1: Ruff</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; uv run ruff check src/deriva_ml/ tests/ 2&gt;&amp;1 | grep -v "pre-existing" | head -20</code></p>
+<p>Expected: no new warnings on Bug C files (<code>manifest.py</code>, <code>null_sentinel_processor.py</code>, <code>upload.py</code>, <code>execution.py</code>, <code>upload_engine.py</code>, <code>catalog.py</code>, and the new tests).</p>
+<ul>
+<li>[ ] <strong>Step 2: Unit + model subset (offline)</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/asset/test_metadata_validator.py tests/asset/test_null_sentinel_processor.py tests/model/test_asset_metadata_columns.py -v</code></p>
+<p>Expected: all tests pass (model tests need <code>DERIVA_HOST=localhost</code> — skip otherwise).</p>
+<ul>
+<li>[ ] <strong>Step 3: Live-catalog subset</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/asset/ tests/model/test_asset_metadata_columns.py tests/execution/test_bug_c_live_smoke.py -v</code></p>
+<p>Expected: all pass.</p>
+<ul>
+<li>[ ] <strong>Step 4: Broader regression</strong></li>
+</ul>
+<p>Run: <code>cd /Users/carl/GitHub/deriva-ml/.worktrees/bug-c &amp;&amp; DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/execution/ -q</code></p>
+<p>Expected: all tests pass (Bug C adds a validation check but with complete metadata this is a no-op for existing tests).</p>
+<hr />
+<h2 id="commit-summary-expected">Commit summary (expected)</h2>
+<p>After implementation, the branch will have these commits on top of main:</p>
+<ol>
+<li><code>docs(spec): Bug C asset metadata None-stringification design</code> (already committed, <code>0506163</code>)</li>
+<li><code>feat(model): add asset_metadata_columns() helper returning Column objects</code></li>
+<li><code>feat(asset/manifest): _validate_pending_asset_metadata for NOT-NULL columns</code></li>
+<li><code>feat(asset): NullSentinelProcessor for SQL NULL emission on nullable cols</code></li>
+<li><code>feat(dataset/upload): NULL_SENTINEL constant + wire NullSentinelProcessor into asset_table_upload_spec</code></li>
+<li><code>fix: use NULL_SENTINEL for missing metadata at three staging sites (Bug C)</code></li>
+<li><code>feat(execution): validate metadata at _upload_execution_dirs top (Bug C)</code></li>
+<li><code>feat(upload_engine): validate metadata at run_upload_engine top (Bug C)</code></li>
+<li><code>test(bug_c): live-catalog integration tests (happy, required-missing, nullable-null)</code></li>
+<li><code>docs(changelog): Bug C asset metadata None-stringification fix</code></li>
+</ol>
+<p>Nine implementation commits on top of the spec, plus the earlier revert of the scope-correction commit (landed before this plan).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

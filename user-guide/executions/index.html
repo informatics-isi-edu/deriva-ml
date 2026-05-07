@@ -1,0 +1,2824 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/user-guide/executions/">
+      
+      
+        <link rel="prev" href="../features/">
+      
+      
+        <link rel="next" href="../offline/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Running an experiment - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#running-an-experiment" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Running an experiment
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-execution-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The execution mental model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-describe-an-execution-with-executionconfiguration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to describe an execution with ExecutionConfiguration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-run-an-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to run an execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-write-asset-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to write asset files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-write-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to write feature values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-record-training-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to record training metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-upload-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to upload outputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-status-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution status lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-update-status-during-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to update status during a run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-handle-a-crash-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to handle a crash-resume
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CLI reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-run-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-run-notebook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-trace-an-artifacts-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to trace an artifact's lineage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-execution-mental-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The execution mental model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-describe-an-execution-with-executionconfiguration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to describe an execution with ExecutionConfiguration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-run-an-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to run an execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-write-asset-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to write asset files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-write-feature-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to write feature values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-record-training-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to record training metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-upload-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to upload outputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-status-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution status lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-update-status-during-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to update status during a run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-handle-a-crash-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to handle a crash-resume
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CLI reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deriva-ml-run-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deriva-ml-run-notebook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-trace-an-artifacts-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to trace an artifact's lineage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="running-an-experiment">Running an experiment</h1>
+<p>This chapter covers the full lifecycle of a DerivaML execution: configuring inputs, running a workflow inside the context manager, writing outputs, and uploading results to the catalog. By the end you will know how to run a reproducible experiment and understand every state the execution passes through along the way.</p>
+<h2 id="the-execution-mental-model">The execution mental model</h2>
+<p>An <strong>Execution</strong> is DerivaML's unit of provenance. It links a specific run of your code (a <strong>Workflow</strong>) to exactly the inputs it consumed and the outputs it produced, with a start time, stop time, and status record. Everything produced inside an execution — feature records, model files, metrics — can be traced back to the exact code version and dataset version that generated it.</p>
+<p>Executions are not self-contained scripts. They are catalog records that wrap your existing training or analysis code. The pattern is always: create an <code>ExecutionConfiguration</code>, open the context manager, do your work, then call <code>upload_execution_outputs()</code>. The catalog sees a clean audit trail; your code stays readable.</p>
+<h2 id="how-to-describe-an-execution-with-executionconfiguration">How to describe an execution with ExecutionConfiguration</h2>
+<p>Before running anything you need to declare what the execution will consume. <code>ExecutionConfiguration</code> is a Pydantic model that collects that declaration.</p>
+<p><strong>Motivation.</strong> Declaring inputs up front lets DerivaML download and validate them before your model starts, record the exact dataset version used, and attach input provenance to the catalog record automatically.</p>
+<pre><code class="language-python">from deriva_ml.execution import ExecutionConfiguration
+from deriva_ml.dataset.aux_classes import DatasetSpec
+
+workflow = ml.create_workflow(
+    name=&quot;ResNet50 Training&quot;,
+    workflow_type=&quot;Training&quot;,
+    description=&quot;Fine-tune ResNet50 on retinal images&quot;,
+)
+
+config = ExecutionConfiguration(
+    workflow=workflow,
+    description=&quot;Training run — learning rate 0.001&quot;,
+    datasets=[
+        DatasetSpec(rid=&quot;1-ABC&quot;),                   # current version
+        DatasetSpec(rid=&quot;1-DEF&quot;, version=&quot;2.1.0&quot;),  # pinned version
+    ],
+    assets=[&quot;2-GHI&quot;],  # bare RID strings are coerced to AssetSpec
+)
+</code></pre>
+<p><strong>Explanation.</strong> <code>workflow</code> holds the <code>Workflow</code> object returned by <code>ml.create_workflow()</code>. If you leave it <code>None</code> here you must pass <code>workflow=</code> to <code>ml.create_execution()</code> instead — the enforcement happens at <code>ml.create_execution()</code>, not at <code>ExecutionConfiguration</code> construction, so omitting it from both raises an exception only when you call <code>ml.create_execution()</code>. <code>description</code> is free-form Markdown. <code>datasets</code> accepts a list of <code>DatasetSpec</code> objects; <code>assets</code> accepts a list of RID strings or <code>AssetSpec</code> objects.</p>
+<p><strong>DatasetSpec options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rid</code></td>
+<td>str</td>
+<td>required</td>
+<td>Dataset RID</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>str</td>
+<td><code>None</code></td>
+<td>Specific version to use (default: current)</td>
+</tr>
+<tr>
+<td><code>materialize</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Download asset files; <code>False</code> = metadata only</td>
+</tr>
+</tbody>
+</table>
+<p>Pass <code>materialize=False</code> when you only need the metadata tables and want to skip downloading large asset files.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>ExecutionConfiguration.assets</code> accepts plain RID strings but coerces them to <code>AssetSpec</code> objects via a Pydantic validator. When comparing assets in code, use <code>[a.rid for a in config.assets]</code>.</li>
+<li>For large immutable inputs (pretrained weights), use <code>AssetSpec(rid="...", cache=True)</code> to cache by MD5 and avoid redundant downloads across executions.</li>
+<li>The <code>config_choices</code> field captures Hydra group selections when running via <code>deriva-ml-run</code>, making exact reproduction possible from config names alone.</li>
+</ul>
+<h2 id="how-to-run-an-execution">How to run an execution</h2>
+<p><strong>Motivation.</strong> The context manager handles timing and status transitions automatically. You focus on the science; DerivaML records when work started, when it stopped, and whether it succeeded.</p>
+<pre><code class="language-python">from deriva_ml.execution import ExecutionConfiguration
+from deriva_ml.dataset.aux_classes import DatasetSpec
+
+with ml.create_execution(config) as exe:
+    print(f&quot;Execution RID: {exe.execution_rid}&quot;)
+
+    # Input datasets are declared in the config; download them here.
+    bag = exe.download_dataset_bag(DatasetSpec(rid=&quot;1-ABC&quot;))
+
+    # Access members from the downloaded bag.
+    images = bag.list_dataset_members()[&quot;Image&quot;]
+
+    # Run your model.
+    model = train(images)
+
+    # Register output files (do NOT write directly to working_dir).
+    model_path = exe.asset_file_path(&quot;Model&quot;, &quot;best_model.pt&quot;)
+    torch.save(model.state_dict(), model_path)
+
+# IMPORTANT: upload is OUTSIDE the context manager.
+exe.upload_execution_outputs()
+</code></pre>
+<p><strong>Explanation.</strong> <code>ml.create_execution(config)</code> inserts an Execution record in the catalog with status <code>Created</code>, then <code>__enter__</code> transitions it to <code>Running</code>. On a clean exit, <code>__exit__</code> transitions to <code>Stopped</code> and records the stop time. On an exception, <code>__exit__</code> transitions to <code>Failed</code> and stores the error message — then re-raises so your code sees the exception.</p>
+<p><code>upload_execution_outputs()</code> is a separate call after the context manager exits. It transitions the execution from <code>Stopped</code> to <code>Pending_Upload</code>, uploads all registered files to Hatrac, INSERTs staged feature records into ERMrest, then transitions to <code>Uploaded</code>.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>exe.execution_rid</code> — the RID of the catalog Execution record; use it to look up the run later.</li>
+<li><code>exe.working_dir</code> — the local scratch directory for this execution; do not write output files here directly (they will not be uploaded). Use <code>asset_file_path()</code> instead.</li>
+<li><code>exe.datasets</code> — the list of <code>DatasetSpec</code> objects from the configuration; iterate these to download each declared dataset.</li>
+<li><code>exe.asset_paths</code> — a <code>dict[str, list[AssetFilePath]]</code> mapping asset table name → list of paths for downloaded input assets.</li>
+</ul>
+<h2 id="how-to-write-asset-files">How to write asset files</h2>
+<p><strong>Motivation.</strong> All output files must be registered through <code>exe.asset_file_path()</code>. Files written directly to <code>exe.working_dir</code> are invisible to the upload machinery and will never reach the catalog.</p>
+<pre><code class="language-python">with ml.create_execution(config) as exe:
+
+    # 1. Get a path for a new file — write to the returned path.
+    model_path = exe.asset_file_path(&quot;Model&quot;, &quot;classifier.pt&quot;)
+    torch.save(model.state_dict(), model_path)
+
+    # 2. Register an existing file (copied into staging).
+    exe.asset_file_path(&quot;Image&quot;, &quot;/tmp/processed.png&quot;, copy_file=True)
+    # Note: the return value is dropped here intentionally. The file is already
+    # on disk; you don't need to reference the AssetFilePath afterward unless
+    # you plan to update its metadata via .set_metadata() or .set_asset_types().
+
+    # 3. Rename during staging.
+    exe.asset_file_path(&quot;Image&quot;, &quot;/tmp/temp_scan.png&quot;,
+                        rename_file=&quot;scan_001.png&quot;)
+
+    # 4. Tag with asset type vocabulary terms.
+    exe.asset_file_path(&quot;Image&quot;, &quot;mask.png&quot;,
+                        asset_types=[&quot;Segmentation_Mask&quot;, &quot;Derived&quot;])
+
+    # 5. Supply domain metadata columns and/or a description.
+    path = exe.asset_file_path(
+        &quot;Image&quot;, &quot;scan.jpg&quot;,
+        description=&quot;Preprocessed fundus image&quot;,
+        metadata={&quot;Subject&quot;: subject_rid, &quot;Acquisition_Date&quot;: &quot;2026-01-15&quot;},
+    )
+    path.set_metadata(&quot;Acquisition_Time&quot;, &quot;14:30:00&quot;)  # update after registration
+
+exe.upload_execution_outputs()
+</code></pre>
+<p><strong>Explanation.</strong> <code>asset_file_path(asset_name, file_name, ...)</code> has three modes depending on whether <code>file_name</code> names an existing file:</p>
+<ul>
+<li><strong>New file</strong> (<code>file_name</code> does not exist): returns a <code>Path</code> to write to. Create the file after the call.</li>
+<li><strong>Symlink</strong> (<code>file_name</code> exists, <code>copy_file=False</code>): symlinks the file into the staging directory.</li>
+<li><strong>Copy</strong> (<code>file_name</code> exists, <code>copy_file=True</code>): copies the file into the staging directory.</li>
+</ul>
+<p>Every registration is written to a crash-safe JSON manifest (<code>asset-manifest.json</code>) inside the execution workspace. This manifest survives process death; see <a href="#how-to-handle-a-crash-resume">How to handle a crash-resume</a>.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>asset_name</code> must be a valid asset table in the catalog. For execution metadata files (configs, logs, metrics), use <code>"Execution_Metadata"</code>.</li>
+<li><code>asset_types</code> defaults to the asset table name if not provided.</li>
+<li>The returned <code>AssetFilePath</code> object supports <code>.set_metadata(key, value)</code> and <code>.set_asset_types([...])</code> for post-registration updates.</li>
+<li>For feature-asset files (segmentation masks, embeddings), supply the path in the <code>FeatureRecord</code> field — the upload step substitutes the uploaded-asset RID automatically before inserting the feature record. See <a href="../features/">Chapter 3</a> for details.</li>
+</ul>
+<h2 id="how-to-write-feature-values">How to write feature values</h2>
+<p><strong>Motivation.</strong> Feature records must be created inside an execution context for provenance. <code>exe.add_features()</code> stages them in a local SQLite table; they are flushed to ERMrest only after assets have been uploaded. This ordering guarantees that asset-column features carry valid RIDs at insert time.</p>
+<pre><code class="language-python">feature = ml.lookup_feature(&quot;Image&quot;, &quot;Glaucoma_Grade&quot;)
+RecordClass = feature.feature_record_class()
+
+records = [
+    RecordClass(Image=&quot;1-IMG1&quot;, Glaucoma_Grade=&quot;Mild&quot;),
+    RecordClass(Image=&quot;1-IMG2&quot;, Glaucoma_Grade=&quot;Severe&quot;),
+]
+
+with ml.create_execution(config) as exe:
+    n = exe.add_features(records)
+    print(f&quot;Staged {n} records&quot;)
+    # Records are NOT yet in ERMrest at this point.
+
+# Records appear in ERMrest only after this call:
+exe.upload_execution_outputs()
+</code></pre>
+<p><strong>Explanation.</strong> <code>add_features(features)</code> writes the list to the <code>execution_state__feature_records</code> SQLite table with status <code>Pending</code>. All records in a single call must belong to one feature definition; mixing features raises <code>DerivaMLValidationError</code>. <code>upload_execution_outputs()</code> calls <code>_flush_staged_features()</code> after asset uploads complete, substituting uploaded-asset RIDs into any asset-column fields before executing a bulk INSERT into ERMrest.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Staged rows survive process death. If the process crashes after <code>add_features()</code> but before <code>upload_execution_outputs()</code>, the rows are still in SQLite and will be flushed on the next <code>upload_execution_outputs()</code> call after resuming.</li>
+<li>Call <code>add_features()</code> as many times as needed; rows accumulate in SQLite and are flushed in one batch.</li>
+<li><code>exe.add_features()</code> is the only way to write feature values. The top-level <code>ml.add_features()</code> method has been retired; any code using it should be updated.</li>
+</ul>
+<h2 id="how-to-record-training-metrics">How to record training metrics</h2>
+<p><strong>Motivation.</strong> Training runs produce per-epoch numbers — loss, accuracy, any eval metric — that you want to keep alongside the execution for later comparison and plotting. Metrics are not features (features describe rows of data, not the run that produced them), and they are not parameters (parameters describe inputs to the run). They are their own thing: scalars tagged by the training step that produced them. DerivaML records them as a plain text file attached to the execution as an <code>Execution_Metadata</code> asset — no extra catalog tables, no schema surgery.</p>
+<pre><code class="language-python">import json
+
+with ml.create_execution(config) as exe:
+    model = build_model()
+    optimizer = build_optimizer(model)
+
+    for epoch in range(num_epochs):
+        train_loss = train_one_epoch(model, optimizer, train_loader)
+        val_loss = evaluate(model, val_loader)
+
+        with exe.metrics_file().open(&quot;a&quot;) as f:
+            json.dump(
+                {&quot;epoch&quot;: epoch, &quot;train_loss&quot;: train_loss, &quot;val_loss&quot;: val_loss},
+                f,
+            )
+            f.write(&quot;\n&quot;)
+
+exe.upload_execution_outputs()
+</code></pre>
+<p><strong>Explanation.</strong> <code>exe.metrics_file()</code> returns an <code>AssetFilePath</code> pointing at a file in the execution's staging directory, registers it with the asset manifest on first call, and stamps its asset type as <code>Metrics_File</code> so the catalog's <code>Execution_Metadata.Type</code> column honestly describes the purpose of the file. Repeat calls to <code>exe.metrics_file()</code> within the same execution return the same path, so appending across an epoch loop is safe. <code>upload_execution_outputs()</code> uploads the file to Hatrac and inserts a row into <code>Execution_Metadata</code> linked to the execution, just like any other asset.</p>
+<p>The default filename is <code>metrics.jsonl</code> — one JSON record per line is the shape that lets downstream readers stream through the file without loading it whole. You can pass a different filename if you want to distinguish multiple streams (for example, <code>"train_metrics.jsonl"</code> and <code>"eval_metrics.jsonl"</code>); each distinct filename becomes its own <code>Execution_Metadata</code> asset on upload.</p>
+<p><strong>Reading metrics back from a bag:</strong></p>
+<pre><code class="language-python">import json
+from deriva_ml.core.enums import MLAsset
+
+bag = dataset.download_dataset_bag(version=&quot;1.0.0&quot;)
+
+# Find the metrics file in the bag's Execution_Metadata assets
+metadata_dir = bag.path / &quot;data&quot; / &quot;assets&quot; / MLAsset.execution_metadata.value
+metric_files = list(metadata_dir.rglob(&quot;metrics.jsonl&quot;))
+
+records = []
+for path in metric_files:
+    for line in path.read_text().splitlines():
+        if line.strip():
+            records.append({&quot;execution_rid&quot;: path.parent.name, **json.loads(line)})
+
+# records is now a list[dict] suitable for pd.DataFrame(records)
+</code></pre>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>The file itself is plain text. JSON-lines is the recommended shape but CSV, YAML, or a single JSON object also work as long as your readback code knows the format. DerivaML never opens the file during upload — it only tracks it as a generic asset.</li>
+<li><code>metrics_file()</code> is sugar, not substance. It is equivalent to <code>asset_file_path(MLAsset.execution_metadata, "metrics.jsonl", asset_types=ExecMetadataType.metrics_file.value)</code>. If you need the full call (e.g. to pass extra metadata), call <code>asset_file_path()</code> directly.</li>
+<li>For high-throughput logging (thousands of writes per second inside a tight batch loop), file-append is the wrong shape — the fsync cost dominates. Either buffer in memory and flush once per epoch, or open an issue if you have a concrete use case that needs server-side queryable metrics.</li>
+<li>Metrics written this way are <strong>not</strong> queryable from the catalog like features are — comparing metrics across runs requires downloading each bag and parsing the file. This is an intentional trade-off: the file-as-asset design keeps the API simple for lab-scale use (tens of runs per experiment), at the cost of not scaling to MLflow-style leaderboard queries.</li>
+</ul>
+<h2 id="how-to-upload-outputs">How to upload outputs</h2>
+<p><strong>Motivation.</strong> Uploading is deliberately separate from running. Large file uploads can take minutes; keeping them outside the context manager means the execution timing reflects computation time, not upload latency. It also lets you inspect outputs before committing them to the catalog.</p>
+<pre><code class="language-python">with ml.create_execution(config) as exe:
+    # ... your work ...
+    model_path = exe.asset_file_path(&quot;Model&quot;, &quot;best_model.pt&quot;)
+    torch.save(model.state_dict(), model_path)
+
+# Context exits here: status → Stopped. Upload is NOT triggered.
+
+# Upload explicitly:
+exe.upload_execution_outputs()
+# Status: Stopped → Pending_Upload → Uploaded
+</code></pre>
+<p>For large files or slow connections, tune the upload parameters:</p>
+<pre><code class="language-python">exe.upload_execution_outputs(
+    timeout=(1800, 1800),         # 30 min per chunk (connect and read)
+    chunk_size=25 * 1024 * 1024,  # 25 MB chunks
+    max_retries=5,
+    retry_delay=10.0,             # seconds; doubles each retry
+)
+</code></pre>
+<p><strong>Upload parameter reference:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timeout</code></td>
+<td><code>(600, 600)</code></td>
+<td><code>(connect_timeout, read_timeout)</code> in seconds per chunk</td>
+</tr>
+<tr>
+<td><code>chunk_size</code></td>
+<td>50 MB</td>
+<td>Chunk size in bytes for Hatrac uploads</td>
+</tr>
+<tr>
+<td><code>max_retries</code></td>
+<td><code>3</code></td>
+<td>Maximum retry attempts for failed uploads</td>
+</tr>
+<tr>
+<td><code>retry_delay</code></td>
+<td><code>5.0</code></td>
+<td>Initial delay between retries (seconds; doubles each attempt)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Upload ordering.</strong> Asset files are uploaded first. Only after all asset uploads succeed does <code>_flush_staged_features()</code> run. This ordering is required because feature records that reference asset files need the uploaded-asset RIDs before the INSERT.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>__exit__</code> does NOT trigger upload. You must call <code>upload_execution_outputs()</code> explicitly.</li>
+<li>A <code>progress_callback</code> parameter accepts a callable <code>(UploadProgress) -&gt; None</code> for custom progress reporting.</li>
+<li>The return value is <code>dict[str, list[AssetFilePath]]</code> — the uploaded file manifest, keyed by asset table name.</li>
+</ul>
+<p>!!! warning "Upload is not automatic"
+    Exiting the <code>with</code> block transitions the execution to <code>Stopped</code> but does <strong>not</strong> upload
+    anything. If you omit <code>exe.upload_execution_outputs()</code>, the execution record stays in
+    <code>Stopped</code> state indefinitely and no outputs appear in the catalog. Always call it
+    explicitly after the context manager exits.</p>
+<h2 id="execution-status-lifecycle">Execution status lifecycle</h2>
+<p>Each execution moves through a defined set of states. Transitions are enforced by the state machine; attempting an illegal transition raises <code>InvalidTransitionError</code>.</p>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; Created
+    Created --&gt; Running : __enter__
+    Running --&gt; Stopped : __exit__ (clean)
+    Running --&gt; Failed : __exit__ (exception)
+    Running --&gt; Pending_Upload : hard-crash recovery
+    Stopped --&gt; Pending_Upload : upload_execution_outputs()
+    Pending_Upload --&gt; Uploaded : upload complete
+    Pending_Upload --&gt; Failed : upload error
+    Failed --&gt; Pending_Upload : upload_execution_outputs() (retry)
+    Uploaded --&gt; Pending_Upload : additive upload
+    Created --&gt; Aborted
+    Running --&gt; Aborted
+    Stopped --&gt; Aborted
+    Failed --&gt; Aborted
+    Uploaded --&gt; [*]
+    Aborted --&gt; [*]
+</code></pre>
+<p><strong>State reference:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>When set</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Created</code></td>
+<td><code>ml.create_execution()</code></td>
+<td>Execution record inserted; no work has started.</td>
+</tr>
+<tr>
+<td><code>Running</code></td>
+<td><code>__enter__</code> (or <code>execution_start()</code>)</td>
+<td>Work in progress; start time recorded.</td>
+</tr>
+<tr>
+<td><code>Stopped</code></td>
+<td><code>__exit__</code> (or <code>execution_stop()</code>)</td>
+<td>Work finished cleanly; stop time recorded.</td>
+</tr>
+<tr>
+<td><code>Failed</code></td>
+<td><code>__exit__</code> (exception) or upload error</td>
+<td>Error message stored in catalog.</td>
+</tr>
+<tr>
+<td><code>Pending_Upload</code></td>
+<td><code>upload_execution_outputs()</code> starts</td>
+<td>Upload in progress.</td>
+</tr>
+<tr>
+<td><code>Uploaded</code></td>
+<td><code>upload_execution_outputs()</code> completes</td>
+<td>All outputs uploaded. Re-entrant — can cycle to <code>Pending_Upload</code> for an additive upload.</td>
+</tr>
+<tr>
+<td><code>Aborted</code></td>
+<td>explicit abort</td>
+<td>Abandoned before completion; terminal.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Non-happy-path transitions:</strong></p>
+<ul>
+<li>
+<p><strong><code>Running → Pending_Upload</code></strong> — hard-crash recovery. The process was killed mid-run, so <code>__exit__</code> never fired and never moved status to <code>Stopped</code>. Resume the execution, call <code>update_status(ExecutionStatus.Pending_Upload)</code>, then <code>upload_execution_outputs()</code>. The audit trail stays honest: "Failed" means the run failed, not "the process died before it could mark itself finished."</p>
+</li>
+<li>
+<p><strong><code>Failed → Pending_Upload</code></strong> — retry from upload failure. If <code>upload_execution_outputs()</code> raised after the execution already reached <code>Failed</code> (e.g., a transient network error), staging is intact; call <code>upload_execution_outputs()</code> again to retry.</p>
+</li>
+<li>
+<p><strong><code>Uploaded → Pending_Upload</code></strong> — additive upload. The execution finished and its initial asset batch successfully uploaded, but a second lifecycle owner needs to ship more assets against the same execution. The classic case is a runner harness wrapping a kernel: the kernel uploads its own outputs (status reaches <code>Uploaded</code>), the runner then registers assets only it can produce safely (e.g., the Hydra job log it owns) and calls <code>upload_execution_outputs()</code> again. <code>upload_execution_outputs()</code> automatically takes this transition when there are pending manifest entries; if there are none, the call is a no-op and status stays <code>Uploaded</code>. Asset rows linked to an execution have no temporal constraint vs. its status — an execution's upload is a batch operation, not a wall.</p>
+</li>
+</ul>
+<p><strong>Disallowed transitions worth knowing:</strong></p>
+<ul>
+<li><code>Stopped → Failed</code> — an execution that stops cleanly can only move to <code>Pending_Upload</code> next. Failure has to happen inside an upload, not after work completed.</li>
+<li><code>Created → Stopped</code> — <code>Stopped</code> requires <code>Running</code> first; you cannot skip the active state.</li>
+<li><code>Uploaded → Failed</code> — once an upload succeeds, the only way back to upload activity is via <code>Pending_Upload</code> (the additive-upload path above), not directly into <code>Failed</code>.</li>
+</ul>
+<h2 id="how-to-update-status-during-a-run">How to update status during a run</h2>
+<p>Report progress inside a long-running loop so anyone monitoring the catalog can see where the execution is.</p>
+<pre><code class="language-python">from deriva_ml.execution.state_store import ExecutionStatus
+
+with ml.create_execution(config) as exe:
+    exe.update_status(ExecutionStatus.Running, &quot;Loading dataset...&quot;)
+    data = load_data()
+
+    for epoch in range(num_epochs):
+        loss = train_epoch(model, data)
+        exe.update_status(
+            ExecutionStatus.Running,
+            f&quot;Epoch {epoch + 1}/{num_epochs} — loss={loss:.4f}&quot;
+        )
+
+    exe.update_status(ExecutionStatus.Running, &quot;Saving checkpoint...&quot;)
+    model_path = exe.asset_file_path(&quot;Model&quot;, &quot;model_final.pt&quot;)
+    torch.save(model.state_dict(), model_path)
+
+exe.upload_execution_outputs()
+</code></pre>
+<p><code>update_status(status, message)</code> writes <code>status</code> to <code>Execution.Status</code> and <code>message</code> to <code>Execution.Status_Detail</code> in the catalog, making progress visible immediately. When you want to update the progress message without changing state, pass the current status (typically <code>Running</code>) as the first argument; only the message changes.</p>
+<h2 id="how-to-handle-a-crash-resume">How to handle a crash-resume</h2>
+<p><strong>Motivation.</strong> If the process dies mid-run — power failure, OOM, SIGKILL — staged feature records and registered asset files are preserved in the SQLite execution state store and the <code>asset-manifest.json</code> manifest. You can resume from where the upload left off without re-running the model.</p>
+<pre><code class="language-python"># Original run — process crashes after add_features() but before upload.
+with ml.create_execution(config) as exe:
+    rid = exe.execution_rid
+    records = build_feature_records()
+    exe.add_features(records)  # staged to SQLite; process dies here
+    # ... upload never called ...
+
+# Later — resume the execution by RID.
+exe = ml.resume_execution(rid)
+
+# Upload flushes the still-pending rows from SQLite.
+exe.upload_execution_outputs()
+</code></pre>
+<p><strong>Explanation.</strong> <code>ml.resume_execution(rid)</code> rebuilds an <code>Execution</code> object bound to the existing catalog record and its local SQLite state. When <code>upload_execution_outputs()</code> runs, it discovers the pending feature rows and asset manifest entries and processes them as if the run had just completed.</p>
+<p><strong>Two distinct crash scenarios:</strong></p>
+<p><strong>Scenario A — exception inside the <code>with</code> block.</strong> If your code raises and <code>__exit__</code> runs, the execution transitions to <code>Failed</code>. On restart, <code>ml.resume_execution(rid)</code> returns an execution already in <code>Failed</code> state. <code>upload_execution_outputs()</code> accepts <code>Failed</code> as a starting point (<code>Failed → Pending_Upload</code> is a legal transition) and flushes any staged outputs.</p>
+<p><strong>Scenario B — hard process crash (SIGKILL, OOM, power failure) inside the <code>with</code> block.</strong> <code>__exit__</code> never runs, so the execution stays in <code>Running</code> in both SQLite and the catalog. On restart, <code>ml.resume_execution(rid)</code> runs just-in-time reconciliation: since both sides agree on <code>Running</code>, reconciliation is a no-op and the execution is returned still in <code>Running</code> state. Advance it to <code>Pending_Upload</code> and then call the upload helper:</p>
+<pre><code class="language-python">exe = ml.resume_execution(rid)
+# Execution is in Running state — advance directly to Pending_Upload
+# to signal &quot;the owning process died; please upload what I staged.&quot;
+exe.update_status(ExecutionStatus.Pending_Upload)
+exe.upload_execution_outputs()   # Pending_Upload → Uploaded
+</code></pre>
+<p><code>Running → Pending_Upload</code> is an intentional recovery edge in the state graph: it documents "this run never got to mark itself finished" without lying about the run's outcome (the audit trail stays free of a spurious <code>Failed</code> marker). <code>upload_execution_outputs()</code> then flushes any staged feature rows and asset manifest entries that survived in SQLite, completing the upload without re-running the model.</p>
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Staged feature records survive process death because SQLite writes are fsync'd on every mutation.</li>
+<li>Asset files in the manifest with status <code>pending</code> are re-uploaded; already-uploaded entries are skipped.</li>
+<li><code>resume_execution()</code> is also useful when you want to add more outputs to a completed execution without re-running it, for example to attach post-hoc analysis files.</li>
+</ul>
+<h2 id="cli-reference">CLI reference</h2>
+<p><code>deriva-ml-run</code> and <code>deriva-ml-run-notebook</code> run model functions and Jupyter notebooks with Hydra-zen configuration and automatic execution tracking. Both tools create an <code>ExecutionConfiguration</code> from the config store, call <code>ml.create_execution()</code>, and call <code>upload_execution_outputs()</code> after the model function returns. You do not call these steps manually when using the CLI.</p>
+<h3 id="deriva-ml-run">deriva-ml-run</h3>
+<pre><code>deriva-ml-run [--host HOST] [--catalog CATALOG] [--config-dir DIR]
+              [--config-name NAME] [--info] [--multirun|-m] [OVERRIDES...]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--host HOST</code></td>
+<td>from config</td>
+<td>Deriva server hostname</td>
+</tr>
+<tr>
+<td><code>--catalog CATALOG</code></td>
+<td>from config</td>
+<td>Catalog ID</td>
+</tr>
+<tr>
+<td><code>--config-dir DIR</code>, <code>-c</code></td>
+<td><code>src/configs</code></td>
+<td>Path to the configs directory</td>
+</tr>
+<tr>
+<td><code>--config-name NAME</code></td>
+<td><code>deriva_model</code></td>
+<td>Name of the main Hydra-zen config</td>
+</tr>
+<tr>
+<td><code>--info</code></td>
+<td></td>
+<td>Show available config groups and options</td>
+</tr>
+<tr>
+<td><code>--multirun</code>, <code>-m</code></td>
+<td></td>
+<td>Enable Hydra multirun for parameter sweeps</td>
+</tr>
+<tr>
+<td><code>OVERRIDES</code></td>
+<td></td>
+<td>Hydra-zen configuration overrides (positional)</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-bash"># Run with defaults
+uv run deriva-ml-run
+
+# Override config group and parameter
+uv run deriva-ml-run model_config=quick model_config.epochs=5
+
+# Use an experiment preset
+uv run deriva-ml-run +experiment=cifar10_quick
+
+# Dry run (downloads inputs, skips catalog writes)
+uv run deriva-ml-run dry_run=true
+
+# Named parameter sweep
+uv run deriva-ml-run +multirun=lr_sweep
+</code></pre>
+<h3 id="deriva-ml-run-notebook">deriva-ml-run-notebook</h3>
+<pre><code>deriva-ml-run-notebook NOTEBOOK [--host HOST] [--catalog CATALOG]
+                       [--file FILE] [--parameter KEY VALUE]
+                       [--kernel KERNEL] [--inspect] [--info]
+                       [--log-output] [OVERRIDES...]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NOTEBOOK</code></td>
+<td>required</td>
+<td>Path to the <code>.ipynb</code> file</td>
+</tr>
+<tr>
+<td><code>--host HOST</code></td>
+<td>from config</td>
+<td>Deriva server hostname</td>
+</tr>
+<tr>
+<td><code>--catalog CATALOG</code></td>
+<td>from config</td>
+<td>Catalog ID</td>
+</tr>
+<tr>
+<td><code>--file FILE</code>, <code>-f</code></td>
+<td></td>
+<td>JSON or YAML file with parameter values</td>
+</tr>
+<tr>
+<td><code>--parameter KEY VALUE</code>, <code>-p</code></td>
+<td></td>
+<td>Inject a parameter (repeatable)</td>
+</tr>
+<tr>
+<td><code>--kernel KERNEL</code>, <code>-k</code></td>
+<td>auto-detected</td>
+<td>Jupyter kernel name</td>
+</tr>
+<tr>
+<td><code>--inspect</code></td>
+<td></td>
+<td>Show notebook parameters and exit</td>
+</tr>
+<tr>
+<td><code>--log-output</code></td>
+<td></td>
+<td>Stream cell output during execution</td>
+</tr>
+<tr>
+<td><code>OVERRIDES</code></td>
+<td></td>
+<td>Hydra-zen overrides (positional)</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-bash"># Run a notebook with defaults
+uv run deriva-ml-run-notebook notebooks/train.ipynb
+
+# Inject parameters into the notebook's parameters cell
+uv run deriva-ml-run-notebook notebooks/train.ipynb \
+    -p learning_rate 0.001 -p epochs 50
+
+# Override Hydra config groups
+uv run deriva-ml-run-notebook notebooks/analysis.ipynb \
+    assets=my_assets deriva_ml=production
+
+# Inspect available parameters without running
+uv run deriva-ml-run-notebook notebooks/train.ipynb --inspect
+</code></pre>
+<p>The CLI tools handle Jupyter kernel detection, <code>nbstripout</code>-based checksum computation, and environment variable injection automatically. See <a href="../hydra-zen/">Integrating with hydra-zen</a> for the full guide to setting up <code>configs/</code> and writing model functions.</p>
+<hr />
+<p>!!! warning "Common pitfalls"</p>
+<pre><code>**`__exit__` does not upload.** Exiting the `with` block records the stop time and
+transitions to `Stopped`. It does not upload anything. Always call
+`exe.upload_execution_outputs()` explicitly after the context manager exits. Omitting
+it leaves the execution in `Stopped` and no outputs appear in the catalog.
+
+**Writing files directly to `working_dir`.** Only files registered through
+`exe.asset_file_path()` are uploaded. Writing a file to
+`exe.working_dir / "Execution_Metadata" / "my-metrics.json"` directly bypasses the
+manifest and the file is silently ignored during upload.
+
+**Workflow deduplication.** `ml.add_workflow()` deduplicates by checksum. Running the
+same committed script twice reuses the same `Workflow` row — that is correct behavior.
+If you need distinct workflow records (for example, in tests), use different scripts or
+override `url` and `checksum` explicitly.
+
+**Dirty working tree.** Running with uncommitted changes causes a warning. The Workflow
+record records the last committed URL, which may not match the code that actually ran.
+Commit before running. `DERIVA_ML_ALLOW_DIRTY=true` suppresses the warning but is
+intended for tests only — using it in production pollutes your provenance record.
+</code></pre>
+<h2 id="how-to-trace-an-artifacts-lineage">How to trace an artifact's lineage</h2>
+<p>DerivaML records the full provenance graph for every artifact: which Execution produced
+it, what inputs that Execution consumed, what Executions produced those inputs, and so
+on back to the original raw data. To answer "how did this come to exist?" for any
+Dataset, Asset, Feature value, or Execution RID, use <code>lookup_lineage()</code>:</p>
+<pre><code class="language-python">from deriva_ml import DerivaML
+
+ml = DerivaML(hostname=&quot;data.example.org&quot;, catalog_id=&quot;1&quot;)
+
+# Single call walks the full chain back to the root.
+lineage = ml.lookup_lineage(&quot;2-PRED1&quot;)    # the predictions.csv asset RID
+
+print(lineage.root.type, lineage.root.description)
+# Asset Trained-model predictions on test set v0.4.0
+
+print(f&quot;Walked {lineage.executions_visited} executions; complete={lineage.walked_complete}&quot;)
+</code></pre>
+<p>The returned <code>LineageResult</code> is a Pydantic tree where each <code>LineageNode</code> carries a
+summary of its producing Execution (RID, description, workflow name, status), the
+input Datasets and Assets that Execution consumed, and the recursive <code>parents</code> list of
+producing Executions for each input.</p>
+<p><strong>Common patterns.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Call</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What produced this asset/dataset/feature?</td>
+<td><code>ml.lookup_lineage(rid)</code> — read <code>lineage.root.producing_execution</code></td>
+</tr>
+<tr>
+<td>What's the full chain back to the raw data?</td>
+<td><code>ml.lookup_lineage(rid)</code> — walk <code>lineage.lineage.parents</code> recursively</td>
+</tr>
+<tr>
+<td>Just the immediate producer, no parent chain</td>
+<td><code>ml.lookup_lineage(rid, depth=0)</code></td>
+</tr>
+<tr>
+<td>Two generations back, no further</td>
+<td><code>ml.lookup_lineage(rid, depth=2)</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bounds and safety.</strong> The walk is unbounded by default — provenance traversal is an
+infrequent, deliberate request, not a hot path. Cycle detection is mandatory: if the
+catalog is corrupted with a true execution-chain cycle, the response sets
+<code>cycle_detected=True</code> and the walk aborts on that branch. A <code>max_executions=500</code> hard
+cap prevents pathological runaway walks; if hit, <code>walked_complete=False</code>.</p>
+<p><strong>Diamond DAGs.</strong> When the same parent Execution is reachable via two different
+inputs, it appears once in the tree and subsequent encounters are marked
+<code>already_shown=True</code> to keep the response compact and the structure honest.</p>
+<p><strong>Data-flow only.</strong> <code>lookup_lineage</code> walks data-flow parents (the Executions that
+produced this Execution's consumed inputs). It does <strong>not</strong> walk
+<code>Execution_Execution</code> (orchestration parent-child links — the "this Execution called
+that Execution" relationship). For the orchestration view, use
+<code>list_nested_executions</code> instead. The two views answer different questions and are
+kept separate by design (see ADR-0001 in <code>docs/adr/</code>).</p>
+<p><strong>No producer.</strong> If the artifact has no producing-execution link (manually-inserted
+data, or data loaded outside an execution), the call still succeeds:
+<code>lineage.root.producing_execution</code> is <code>None</code> and <code>lineage.lineage</code> is <code>None</code>. "It has
+no recorded producer" is a valid answer to "how did this come to exist?".</p>
+<p>For the full method signature and the Pydantic model definitions, see
+<a href="../../api-reference/lineage/">API Reference — Lineage</a>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../features/">Chapter 3 — Defining and using features</a>: creating feature definitions, <code>FeatureRecord</code> classes, and asset-based features.</li>
+<li><a href="../offline/">Chapter 5 — Working offline</a>: <code>DatasetBag</code> API, <code>restructure_assets()</code>, working without a catalog connection.</li>
+<li><a href="../reproducibility/">Reproducibility</a>: <code>bump-version</code>, Git commit discipline, what DerivaML records per execution.</li>
+<li><a href="../hydra-zen/">Integrating with hydra-zen</a>: full project layout, <code>create_model_config()</code>, experiment presets, multirun sweeps.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../features/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Defining and using features">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Defining and using features
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../offline/" class="md-footer__link md-footer__link--next" aria-label="Next: Working offline">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Working offline
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3356 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-24-torch-dataset-adapter-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>PyTorch Dataset Adapter Design - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pytorch-dataset-adapter-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PyTorch Dataset Adapter Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-design-anchors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Design anchors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-public-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Public API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Public API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-signatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Signatures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-argument-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Argument semantics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-target-arity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Target arity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-__getitem__-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 __getitem__ contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-__len__-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 __len__ contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-error-behavior-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Error behavior summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-shared-target-specification-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Shared target-specification vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-package-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Package structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-package-extras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Package extras
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-testing-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Testing strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Testing strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-module-import-tests-framework-not-installed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Module-import tests (framework not installed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-pure-python-logic-framework-stubbed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Pure-Python logic (framework stubbed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-end-to-end-with-real-frameworks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 End-to-end with real frameworks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-shared-helper-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Shared-helper tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-test-catalog-fixture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Test catalog fixture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-documentation-deliverables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Documentation deliverables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Documentation deliverables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-docstrings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Docstrings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-user-guide-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 User guide section
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.2 User guide section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#721-using-with-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2.1 Using with PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#722-using-with-tensorflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2.2 Using with TensorFlow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#723-using-with-keras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2.3 Using with Keras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#724-using-with-imagefolder-third-party-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2.4 Using with ImageFolder / third-party tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#725-see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2.5 See also
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Cross-references
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-composition-with-existing-dataset-apis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Composition with existing dataset APIs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.4 Composition with existing dataset APIs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#741-stratified-trainvaltest-split-per-partition-torch-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4.1 Stratified train/val/test split → per-partition torch datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#742-restructure_assets-vs-as_torch_dataset-these-are-alternatives-not-a-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4.2 restructure_assets vs as_torch_dataset — these are alternatives, not a pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-restructure_assets-alignment-scope-same-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. restructure_assets alignment scope (same PR)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. restructure_assets alignment scope (same PR)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-parameter-renames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Parameter renames
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-new-parameter-target_transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 New parameter: target_transform
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-new-parameter-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 New parameter: missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-unchanged-restructure-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Unchanged restructure parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#85-internal-refactor-shared-resolution-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.5 Internal refactor: shared resolution helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#86-testing-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.6 Testing impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#87-documentation-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.7 Documentation impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-non-goals-explicit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Non-goals (explicit)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-deliverables-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Deliverables checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-future-work-named-for-future-spec-continuity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Future work (named for future-spec continuity)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="pytorch-dataset-adapter-design">PyTorch Dataset Adapter Design</h1>
+<p><strong>Date:</strong> 2026-04-24
+<strong>Status:</strong> Approved design; implementation plan to follow.
+<strong>Scope label:</strong> Post-S2 item D2.
+<strong>Source context:</strong> Reviewer #5 fit-for-purpose item #2 in
+<code>docs/superpowers/specs/2026-04-23-post-s2-findings.md</code> §5 — "the path
+from <code>DatasetBag</code> to <code>torch.utils.data.DataLoader</code> is 30 lines of
+boilerplate every user rewrites."</p>
+<h2 id="1-problem-statement">1. Problem statement</h2>
+<p>A deriva-ml user who downloads a <code>DatasetBag</code> and wants to train a
+model with it — whether in <strong>PyTorch</strong>, <strong>TensorFlow</strong>, or <strong>Keras</strong>
+— today writes ~35 lines of glue code per project: enumerate dataset
+members, pull feature values for labels, join with the asset table
+to resolve file paths, build <code>(path, label)</code> pairs, build a
+label-to-int encoder, subclass the framework's <code>Dataset</code> base or
+build a <code>tf.data.Dataset.from_generator</code> wrapper, implement length
+and iteration, and finally instantiate the training loop's data
+loader. The same boilerplate appears in every downstream project
+that targets this library, with minor variations in the label
+column name and the sample loader. It's error-prone (asset-path
+resolution is fragile, feature joins need <code>recurse=True</code> knowledge,
+label encoding is easy to get wrong across train/test splits) and
+every rewrite re-encodes decisions that deriva-ml already has typed
+answers for.</p>
+<p><code>DatasetBag.restructure_assets()</code> covers one shape — classification
+with a single scalar feature as the label, emitted as the
+<code>ImageFolder</code>-style directory layout. That's right for third-party
+trainers that expect class-folder trees (RetFound fine-tuning,
+<code>torchvision.datasets.ImageFolder</code>,
+<code>tf.keras.utils.image_dataset_from_directory</code>), but it breaks down
+for tabular datasets, multi-modal inputs, regression targets,
+multi-label classification, non-image data, and lazy streaming.</p>
+<p>Users want a one-line path from bag to the appropriate framework's
+native dataset type — <code>torch.utils.data.Dataset</code> for PyTorch (and
+Keras on the PyTorch backend), <code>tf.data.Dataset</code> for TensorFlow
+(and Keras on the TF backend) — that respects the library's existing
+feature-access API, stays consistent with the <code>DatasetBag</code>-vs-catalog
+parity the rest of the library promises, and doesn't force the user
+to materialize or copy their data. <code>restructure_assets()</code> stays as
+the right tool when you specifically need the class-folder layout
+for a third-party consumer; the new adapters handle everything else.</p>
+<h2 id="2-design-anchors">2. Design anchors</h2>
+<p>Non-negotiables that constrain all subsequent decisions.</p>
+<p><strong>Anchor 1: Labels come from features.</strong> The existing feature-access
+API is the source of truth for labels. The adapter calls
+<code>bag.feature_values(table, feature_name, selector=...)</code> internally; it
+does not invent a separate label-reading path. This keeps one mental
+model: a feature value is "a typed record describing an annotation on
+a domain-table row," whether the consumer is a user inspecting the
+dataset or a PyTorch training loop.</p>
+<p><strong>Anchor 2: User owns the label-to-integer mapping.</strong> The library
+surfaces <code>FeatureRecord</code> instances (typed with the feature's declared
+column types); the user's <code>target_transform</code> callable does the
+numeric encoding. The library does not hold a class-to-index table,
+does not auto-fit one on first pass, does not persist one. This avoids
+the worst failure mode of other ML data libraries — train/test label
+encoders silently diverging — and respects deriva-ml's broader
+convention of not opining on user numeric shapes.</p>
+<p><strong>Anchor 3: PyTorch and TensorFlow are optional dependencies.</strong> Each
+adapter lives behind a runtime framework-import guard (<code>import torch</code>
+for <code>as_torch_dataset</code>, <code>import tensorflow</code> for <code>as_tf_dataset</code>). The
+base library never imports either at module-load time. A user who
+installs deriva-ml without one or both frameworks can call every
+non-adapter API normally; calls to the corresponding adapter method
+raise a clean <code>ImportError</code> with install hints. Package extras
+<code>deriva-ml[torch]</code> and <code>deriva-ml[tf]</code> exist as conveniences.</p>
+<p><strong>Anchor 4: Bag-only in v1.</strong> Live-catalog adapter variants
+(<code>Dataset.as_torch_dataset</code>, <code>Dataset.as_tf_dataset</code>) are
+intentionally out of scope. Live-catalog datasets require
+download-during-<code>__getitem__</code>, which introduces network IO on hot
+paths, credential lifetime concerns, retry policy, cache eviction —
+all of which deserve their own spec. The bag case covers the primary
+training workflow (download the bag, then train locally) without any
+of that complexity. Live-catalog support is a named follow-up for
+both framework adapters.</p>
+<p><strong>Anchor 5: Feature-parallel consistency.</strong> The adapter's signature,
+error behavior, and selector handling mirror
+<code>bag.feature_values(...)</code>'s existing shape. A user who knows the
+feature API should be able to read the adapter's signature without
+surprise.</p>
+<p><strong>Anchor 6: Composition over replacement; no feature overlap.</strong>
+deriva-ml already answers several questions the adapter could try to
+re-solve:</p>
+<ul>
+<li><strong>Train/val/test splitting</strong> lives in <code>split_dataset</code> (with
+  stratification via <code>stratify_by_column</code>). Each partition becomes its
+  own catalog dataset and its own bag; the adapter handles each bag
+  independently. This is the one real <strong>composition</strong> pattern — see
+  §7.4.1.</li>
+<li><strong>Filesystem-layout rewrites for third-party tools</strong> (<code>ImageFolder</code>
+  et al.) live in <code>restructure_assets</code>. This is an <strong>alternative</strong> to
+  the adapter, not a pipeline step: the two tools solve the same
+  problem with different output shapes (lazy in-place read vs.
+  eager on-disk rewrite). See §7.4.2 for why they don't chain.</li>
+<li><strong>Catalog-level annotation joins</strong> live in
+  <code>bag.get_denormalized_as_dataframe</code> and <code>bag.feature_values</code>. The
+  adapter reads feature values through the existing API (anchor 1),
+  it doesn't invent a second path.</li>
+</ul>
+<p>The adapter's v1 job is exactly one thing: lazy iteration over an
+already-defined bag. It does not duplicate these neighboring tools,
+does not wrap them in competing convenience methods, and does not
+offer knobs that replicate theirs.</p>
+<p><strong>Anchor 7: Shared target-specification vocabulary across
+<code>as_torch_dataset</code> and <code>restructure_assets</code>.</strong> Both methods answer
+the same question — "given a bag element, which feature value becomes
+the label?" — so their inputs describing that question use the same
+parameter names, types, and semantics. The divergence is output-only:
+one returns a torch <code>Dataset</code>; the other writes a directory tree.
+This is NOT composition (§7.4.2 explains why they don't chain), it is
+<em>vocabulary alignment</em>: users who learn one method's label-selection
+arguments can transfer that knowledge directly. Concretely, both
+methods share the same <code>targets</code>, <code>target_transform</code>, and <code>missing</code>
+parameters with matching semantics. Achieving this requires small
+non-breaking changes to <code>restructure_assets</code>'s signature, which ship
+in the same PR as the adapter — see §8 for the alignment scope.</p>
+<h2 id="3-public-api">3. Public API</h2>
+<h3 id="31-signatures">3.1 Signatures</h3>
+<p>Two adapter methods, with identical shapes for their six shared
+keyword arguments:</p>
+<pre><code class="language-python">class DatasetBag:
+    def as_torch_dataset(
+        self,
+        element_type: str,
+        *,
+        sample_loader: Callable[[Path, dict[str, Any]], Any] | None = None,
+        transform: Callable[[Any], Any] | None = None,
+        targets: list[str] | dict[str, FeatureSelector] | None = None,
+        target_transform: Callable[
+            [FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord] | None],
+            Any,
+        ] | None = None,
+        missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;] = &quot;error&quot;,
+    ) -&gt; &quot;torch.utils.data.Dataset&quot;:
+        &quot;&quot;&quot;...&quot;&quot;&quot;
+
+    def as_tf_dataset(
+        self,
+        element_type: str,
+        *,
+        sample_loader: Callable[[Path, dict[str, Any]], Any] | None = None,
+        transform: Callable[[Any], Any] | None = None,
+        targets: list[str] | dict[str, FeatureSelector] | None = None,
+        target_transform: Callable[
+            [FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord] | None],
+            Any,
+        ] | None = None,
+        missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;] = &quot;error&quot;,
+        output_signature: &quot;tf.TensorSpec | tuple[tf.TensorSpec, ...] | None&quot; = None,
+    ) -&gt; &quot;tf.data.Dataset&quot;:
+        &quot;&quot;&quot;...&quot;&quot;&quot;
+</code></pre>
+<p>Both adapters share six keyword-only parameters with matching names,
+types, and semantics (<code>element_type</code>, <code>sample_loader</code>, <code>transform</code>,
+<code>targets</code>, <code>target_transform</code>, <code>missing</code>). <code>as_tf_dataset</code> adds one
+TF-specific parameter (<code>output_signature</code>) that has no counterpart in
+the torch shape; see §3.2 for its semantics. All arguments after
+<code>element_type</code> are keyword-only by intent: they are semantically
+independent and positional order would make future additions
+(e.g., <code>sampler=</code> on torch, <code>prefetch=</code> on tf) awkward.</p>
+<h3 id="32-argument-semantics">3.2 Argument semantics</h3>
+<p><strong><code>element_type</code></strong> — Name of the domain table whose rows become the
+dataset's samples. Must be a table present in the bag (covered by the
+same error path <code>list_dataset_members</code> uses). Whether <code>sample_loader</code>
+is required depends on whether the element_type is an asset table or
+not — see the <code>sample_loader</code> entry below.</p>
+<p><strong><code>sample_loader</code></strong> — <code>Callable[[Path | None, dict], Any]</code>. Invoked
+once per <code>__getitem__</code> call. Receives:
+- <code>Path | None</code>: absolute filesystem path under
+  <code>bag.path / "data/assets/&lt;element_type&gt;/&lt;rid&gt;/&lt;filename&gt;"</code> when
+  <code>element_type</code> is an asset table; <code>None</code> otherwise.
+- <code>dict[str, Any]</code>: the raw row dict from the element table (all
+  columns, not just those the framework needs). Lets the loader pull
+  non-asset columns, FK values, timestamps, etc.</p>
+<p>Return value is the sample (<code>PIL.Image</code>, tensor, array, dict of
+modalities, whatever the user's model expects). The library does not
+inspect it.</p>
+<p>Default: asymmetric by element-type kind.</p>
+<ul>
+<li><strong>Asset-table element_type</strong>: no default — the adapter raises
+  <code>DerivaMLException</code> at construction if <code>sample_loader</code> is <code>None</code>.
+  Returning raw bytes isn't useful (users can't train on bytes; they
+  need a decoded PIL Image / tensor / array), so demanding the loader
+  explicitly surfaces the decision the user needs to make. The error
+  message names common loaders the user might reach for
+  (<code>PIL.Image.open</code>, <code>nibabel.load</code>, <code>h5py.File</code>) as hints. Being
+  domain-specific about decoding is the user's job; the library stays
+  domain-agnostic.</li>
+<li><strong>Non-asset-table element_type</strong>: default returns <code>row_dict</code>
+  unchanged. Useful for tabular training where the element IS the row
+  data and no file-level decoding exists. Can be overridden.</li>
+</ul>
+<p>Either default can be overridden by passing any callable with the
+required signature.</p>
+<p><strong><code>transform</code></strong> — <code>Callable[[Any], Any]</code>. Applied to the sample after
+<code>sample_loader</code> returns. Standard torchvision-style transform pipeline
+goes here. No-op default.</p>
+<p><strong><code>targets</code></strong> — Source of label data. Three shapes accepted:
+- <code>None</code> (default) — unlabeled dataset. <code>__getitem__</code> returns just the
+  sample (not a tuple). Useful for inference loops and for
+  self-supervised pretext tasks.
+- <code>list[str]</code> — feature names to read via
+  <code>bag.feature_values(element_type, name)</code> with no selector. The
+  library aggregates one feature record per element.
+- <code>dict[str, FeatureSelector]</code> — feature names → selector callables,
+  passed verbatim to <code>bag.feature_values(element_type, name,
+  selector=...)</code>. The selector resolves multi-annotator cases. When a
+  selector returns <code>None</code> for a group, that element is treated as
+  "unlabeled for this feature" and handled per <code>missing=</code>.</p>
+<p><strong><code>target_transform</code></strong> — <code>Callable</code> consuming the raw feature-record
+shape (see §3.3 for arity) and returning whatever the user's loss
+function expects (typically an <code>int</code> or a <code>torch.Tensor</code>). No-op
+default returns the feature record(s) as-is.</p>
+<p><strong><code>missing</code></strong> — Behavior when a feature value is absent for an element:
+- <code>"error"</code> (default) — raise <code>DerivaMLException</code> at adapter
+  construction time, before any <code>__getitem__</code> call. Message includes
+  the list of unlabeled RIDs. Explicit-over-silent: users should know
+  if their dataset is partially labeled.
+- <code>"skip"</code> — drop unlabeled elements from the dataset entirely. The
+  resulting dataset's <code>__len__</code> reflects only labeled elements. Index
+  mapping is stable across the dataset's lifetime.
+- <code>"unknown"</code> — keep all elements; pass <code>None</code> to the user's
+  <code>target_transform</code> for unlabeled ones. The user's
+  <code>target_transform</code> must handle <code>None</code> (typically returning a
+  sentinel class index or an ignore-mask value). Useful for
+  semi-supervised / self-training work.</p>
+<p>Note the naming: <code>"unknown"</code> is the <strong>policy name</strong> (shared across
+  <code>as_torch_dataset</code>, <code>as_tf_dataset</code>, and <code>restructure_assets</code> —
+  see §3.7), while the runtime value the adapter hands to
+  <code>target_transform</code> is Python <code>None</code>. The same literal policy value
+  drives restructure's <code>unknown/</code> directory and the adapter's
+  <code>None</code> target — one name, two honest realizations of the same
+  "keep it, flag it" intent.</p>
+<p><strong><code>output_signature</code></strong> (<code>as_tf_dataset</code> only) — the <code>tf.TensorSpec</code>
+structure describing the <code>(sample, target)</code> tuple shape and dtype.
+TensorFlow's <code>tf.data.Dataset.from_generator</code> path requires this
+signature to do graph-mode tracing over the dataset.</p>
+<ul>
+<li><code>None</code> (default) — the adapter <strong>infers</strong> the signature from the
+  first <code>(sample, target)</code> tuple produced at construction time. The
+  adapter pulls one sample eagerly, builds the appropriate
+  <code>tf.TensorSpec</code> via <code>tf.type_spec_from_value</code>, and re-wraps the
+  generator so that eagerly-consumed first sample is not lost on
+  iteration. Cost: one extra iteration at adapter-construction. This
+  mirrors the behavior of <code>keras.utils.timeseries_dataset_from_array</code>
+  and other Keras data-loading helpers that auto-infer when they
+  can.</li>
+<li><code>tf.TensorSpec(...)</code> or nested tuple of same — the user provides
+  the signature explicitly. Recommended for production pipelines that
+  want deterministic startup (no eager first-sample read) or where
+  the first sample's shape isn't representative (e.g., ragged
+  tensors, variable-length sequences).</li>
+</ul>
+<p>Inference limitations: the inferred signature uses <code>tf.TensorSpec</code>
+with the first sample's exact shape. If later samples have different
+shapes (variable-height images, variable-length sequences), the user
+must pass <code>output_signature</code> explicitly with <code>shape=[None, ...]</code>
+markers where ragged. The docstring example covers this case.</p>
+<h3 id="33-target-arity">3.3 Target arity</h3>
+<p>Single-target (<code>targets=["Feature_A"]</code>): <code>target_transform</code> receives a
+<code>FeatureRecord</code> directly.</p>
+<p>Multi-target (<code>targets=["Feature_A", "Feature_B"]</code>): <code>target_transform</code>
+receives <code>dict[str, FeatureRecord]</code> keyed by feature name.</p>
+<p>Multi-valued feature (single-target where the feature is multi-valued
+— e.g., an <code>Image → list[Diagnosis]</code> feature): <code>target_transform</code>
+receives <code>list[FeatureRecord]</code>. Users who want "just pick the first"
+flatten in their <code>target_transform</code>.</p>
+<p>The arity is determined by the <code>targets</code> argument shape at
+construction time; <code>target_transform</code> always sees a stable, predictable
+type. No "do what I mean" inference at <code>__getitem__</code>.</p>
+<h3 id="34-__getitem__-contract">3.4 <code>__getitem__</code> contract</h3>
+<p>Returns:
+- <code>sample</code> when <code>targets=None</code> (unlabeled)
+- <code>(sample, target)</code> when <code>targets</code> is set</p>
+<p>Where:
+- <code>sample = transform(sample_loader(path, row_dict))</code>
+- <code>target = target_transform(feature_record_shape)</code> per §3.3</p>
+<p>This matches the torchvision convention exactly, keeping the adapter
+drop-in compatible with standard PyTorch training loops.</p>
+<h3 id="35-__len__-contract">3.5 <code>__len__</code> contract</h3>
+<p>Equals the count of labeled elements when <code>missing="skip"</code>, the total
+count otherwise.</p>
+<h3 id="36-error-behavior-summary">3.6 Error behavior summary</h3>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>element_type</code> not in bag</td>
+<td><code>DerivaMLException</code> at construction</td>
+</tr>
+<tr>
+<td>feature named in <code>targets</code> does not exist</td>
+<td><code>DerivaMLException</code> at construction (same message as <code>bag.feature_values</code> itself)</td>
+</tr>
+<tr>
+<td><code>missing="error"</code> + sparse labels</td>
+<td><code>DerivaMLException</code> at construction listing up to 20 unlabeled RIDs</td>
+</tr>
+<tr>
+<td><code>import torch</code> fails</td>
+<td><code>ImportError</code> at first call to <code>as_torch_dataset</code> with install hint</td>
+</tr>
+<tr>
+<td>asset-table element_type, no <code>sample_loader</code> supplied</td>
+<td><code>DerivaMLException</code> at construction — message suggests common loaders (PIL.Image.open, nibabel.load, h5py.File)</td>
+</tr>
+<tr>
+<td>non-asset element_type, no <code>sample_loader</code> supplied</td>
+<td>No error — default returns row_dict unchanged</td>
+</tr>
+<tr>
+<td>asset file missing on disk (bag corrupted)</td>
+<td><code>FileNotFoundError</code> on <code>__getitem__</code> (torch convention)</td>
+</tr>
+</tbody>
+</table>
+<p>All statically-detectable errors surface at construction time (rows 1-5
+above), so the dataset is valid as soon as it's returned for the
+overwhelmingly common cases. The <code>__getitem__</code>-time <code>FileNotFoundError</code>
+is unavoidable: the filesystem can change between construction and
+access (asset file removed, bag directory renamed, etc.), and torch's
+own convention is to propagate <code>OSError</code> subclasses from dataset
+access. No library-level retry or fallback.</p>
+<h3 id="37-shared-target-specification-vocabulary">3.7 Shared target-specification vocabulary</h3>
+<p>Per anchor 7, the two adapter methods (<code>as_torch_dataset</code>,
+<code>as_tf_dataset</code>) and <code>restructure_assets</code> share the vocabulary for
+describing how to resolve feature values into labels. The same three
+parameters appear on all three methods with identical names, types,
+and semantics:</p>
+<p><strong><code>targets: list[str] | dict[str, FeatureSelector] | None</code></strong></p>
+<p>Describes which features supply labels for a bag element.</p>
+<ul>
+<li><code>None</code> (adapter only; meaningless for restructure) — yields
+  unlabeled samples.</li>
+<li><code>list[str]</code> — list of feature names on <code>element_type</code> (or on
+  tables FK-reachable from it; see <code>restructure_assets</code>'s
+  "Finding assets through foreign key relationships" docstring).
+  Each feature resolves via <code>bag.feature_values(element_type, name)</code>
+  with no per-feature selector.</li>
+<li><code>dict[str, FeatureSelector]</code> — mapping from feature name to a
+  <code>Callable[[list[FeatureRecord]], FeatureRecord | None]</code> that
+  resolves multi-annotator cases. Passed through verbatim to
+  <code>bag.feature_values(element_type, name, selector=...)</code>. Built-in
+  selectors: <code>FeatureRecord.select_newest</code>, <code>select_first</code>,
+  <code>select_latest</code>, <code>select_majority_vote(column)</code>.</li>
+</ul>
+<p>Single-key vs multi-key behavior matches each method's output shape
+(see §3.3 for the adapter; §8 for restructure).</p>
+<p><strong><code>target_transform: Callable[[FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord]], Any]</code></strong></p>
+<p>User-supplied callable that maps the resolved feature record(s) into
+the final label value.</p>
+<ul>
+<li>For the adapters (both torch and tf): return value goes to the
+  training loop unchanged. Any type (int, <code>torch.Tensor</code>, <code>tf.Tensor</code>,
+  dict of tensors, etc.). The library does not inspect it.</li>
+<li>For restructure: return value MUST be a string (used as a
+  filesystem directory name). A non-string return raises
+  <code>DerivaMLValidationError</code> at construction with a message explaining
+  the string constraint.</li>
+</ul>
+<p>The input-shape contract is identical across methods:
+- Single-target (<code>targets=["A"]</code>): receives <code>FeatureRecord</code>.
+- Multi-target (<code>targets=["A", "B"]</code>): receives <code>dict[str, FeatureRecord]</code>.
+- Multi-valued single-target: receives <code>list[FeatureRecord]</code>.</p>
+<p>This means a user's <code>target_transform</code> written for one method works
+for the other with a return-type adjustment (e.g., <code>return CLASS_IDX[rec.Grade]</code>
+for adapter becomes <code>return rec.Grade</code> for restructure).</p>
+<p><strong><code>missing: Literal["error", "skip", "unknown"]</code></strong></p>
+<p>Policy for elements whose feature value is absent:</p>
+<ul>
+<li><code>"error"</code> — raise <code>DerivaMLException</code> at construction listing
+  unlabeled RIDs. Default for <strong>both adapters</strong> (torch and tf).</li>
+<li><code>"skip"</code> — drop unlabeled elements entirely. For restructure, the
+  asset file is not placed in the output tree. For the adapters, the
+  element is absent from <code>__len__</code> / iteration.</li>
+<li><code>"unknown"</code> — keep unlabeled elements. For restructure, the asset
+  goes into an <code>unknown/</code> directory (matches today's behavior).
+  For the adapters, the target is <code>None</code> (user's <code>target_transform</code>
+  must handle it). Default for <strong>restructure</strong>.</li>
+</ul>
+<p>The default differs by method because the failure modes differ:
+silent mislabeling during training is a correctness hazard (adapter
+defaults are <code>"error"</code>); silently placing an asset in <code>unknown/</code>
+during a filesystem lay-out is recoverable by inspection (restructure
+default is <code>"unknown"</code>, which preserves pre-alignment behavior and
+avoids breakage for unparameterized calls).</p>
+<p>Users who want the adapter strictness in restructure pass
+<code>missing="error"</code>; users who want restructure's leniency in an
+adapter pass <code>missing="unknown"</code> and handle <code>None</code> in their
+<code>target_transform</code>.</p>
+<p><strong>Per-method unique arguments.</strong> The required positional argument
+differs: both adapter methods take <code>element_type</code> (a table name);
+<code>restructure_assets</code> takes <code>output_dir</code> (a path). These can't unify
+without hiding what each method's input actually is. Additionally:
+<code>sample_loader</code> and <code>transform</code> apply only to the adapters
+(restructure doesn't load in-memory samples; its on-disk rewrite
+hook is <code>file_transformer</code>, which operates on paths).
+<code>output_signature</code> applies only to <code>as_tf_dataset</code>
+(TF-specific, no counterpart on torch or restructure).</p>
+<p><strong>Restructure-only parameters preserved unchanged.</strong>
+<code>restructure_assets</code> continues to accept every parameter it accepts
+today, unchanged in name, type, default, and behavior, with one
+exception: <code>group_by</code> was renamed to <code>targets</code> and <code>value_selector</code>
+was folded into the <code>targets</code> dict form as part of the vocabulary
+alignment (see §8). The parameters that stay exactly as they are
+today:</p>
+<ul>
+<li><code>output_dir</code>, <code>asset_table</code>, <code>use_symlinks</code></li>
+<li><code>type_selector</code>, <code>type_to_dir_map</code>, <code>enforce_vocabulary</code></li>
+<li><code>file_transformer</code></li>
+</ul>
+<p>Plus the algorithmic behavior: FK-reachability for finding assets,
+dataset-type-derived top-level directory naming, silent vs. strict
+missing-label handling (parameterized via <code>missing=</code> but default
+<code>"unknown"</code> preserves today's behavior). §8.4 enumerates these
+preserved parameters explicitly.</p>
+<h2 id="4-package-structure">4. Package structure</h2>
+<p>Three new modules: two framework adapters and a shared helper:</p>
+<ul>
+<li><code>src/deriva_ml/dataset/torch_adapter.py</code> — builds
+  <code>torch.utils.data.Dataset</code>. Imports torch lazily inside the builder
+  function body.</li>
+<li><code>src/deriva_ml/dataset/tf_adapter.py</code> — builds <code>tf.data.Dataset</code>.
+  Imports tensorflow lazily inside the builder function body. Handles
+  the <code>from_generator</code> + <code>output_signature</code> inference plumbing.</li>
+<li><code>src/deriva_ml/dataset/target_resolution.py</code> — private helper
+  <code>_resolve_targets(...)</code> consumed by both adapter modules AND by
+  <code>restructure_assets</code>. See §8.5.</li>
+</ul>
+<p>Public entry points are methods on <code>DatasetBag</code> that delegate to the
+module-level builders:</p>
+<pre><code class="language-python"># dataset_bag.py (class body):
+def as_torch_dataset(self, element_type, **kwargs):
+    &quot;&quot;&quot;...&quot;&quot;&quot;
+    from deriva_ml.dataset.torch_adapter import build_torch_dataset
+    return build_torch_dataset(self, element_type, **kwargs)
+
+def as_tf_dataset(self, element_type, **kwargs):
+    &quot;&quot;&quot;...&quot;&quot;&quot;
+    from deriva_ml.dataset.tf_adapter import build_tf_dataset
+    return build_tf_dataset(self, element_type, **kwargs)
+</code></pre>
+<p>This keeps the public signatures discoverable from the class
+docstring and IDE autocomplete, while isolating each framework's
+coupling to one module. Users who install deriva-ml without torch
+or without tensorflow can still import <code>DatasetBag</code> and call every
+other method; only the adapter method corresponding to the missing
+framework raises on first call, with an install-hint message.</p>
+<h2 id="5-package-extras">5. Package extras</h2>
+<p><code>pyproject.toml</code> gains:</p>
+<pre><code class="language-toml">[project.optional-dependencies]
+torch = [&quot;torch&gt;=2.0&quot;]
+tf    = [&quot;tensorflow&gt;=2.15&quot;]
+</code></pre>
+<p>Installation:
+- <code>pip install 'deriva-ml[torch]'</code> — for PyTorch users.
+- <code>pip install 'deriva-ml[tf]'</code> — for TensorFlow / Keras-on-TF users.
+- <code>pip install 'deriva-ml[torch,tf]'</code> — both (uncommon but valid).</p>
+<p>The existing <code>dependency-groups</code> table for dev / lint stays where
+it is — the new <code>optional-dependencies</code> section documents runtime
+extras users can opt into, which is distinct from dev tooling.</p>
+<p><strong>Version-floor rationale:</strong></p>
+<ul>
+<li><strong>PyTorch <code>&gt;=2.0</code></strong> — modern torch; torchvision users typically
+  already have this. Specific-version pinning is the user's concern.</li>
+<li><strong>TensorFlow <code>&gt;=2.15</code></strong> — recent-enough to cover Keras 3 migration
+  (Keras 3 requires TF 2.15+), and cleanly supports the modern
+  <code>tf.data.Dataset.from_generator(output_signature=...)</code> path this
+  adapter uses. Older TF versions had bugs in the generator
+  output-signature inference that we'd have to work around.</li>
+</ul>
+<p><strong>Platform note (tensorflow wheel selection):</strong></p>
+<p>On macOS (Apple Silicon) the conventional install is
+<code>tensorflow-macos</code> rather than vanilla <code>tensorflow</code>. On CUDA-enabled
+Linux it's <code>tensorflow[and-cuda]</code>. Our extra pins <code>tensorflow&gt;=2.15</code>
+as the package name; users on special platforms should install their
+preferred tf wheel separately and install <code>deriva-ml</code> without the
+<code>[tf]</code> extra (the import guard inside <code>as_tf_dataset</code> just checks
+that <code>tensorflow</code> is importable — it doesn't care which wheel). The
+UG section documents this.</p>
+<h2 id="6-testing-strategy">6. Testing strategy</h2>
+<p>Three test tiers per adapter (torch and TF), plus shared-helper tests
+and the existing catalog fixture.</p>
+<h3 id="61-module-import-tests-framework-not-installed">6.1 Module-import tests (framework not installed)</h3>
+<p>Verify the library still imports when a given framework is absent.
+Two parallel tests:</p>
+<ul>
+<li><code>tests/dataset/test_torch_adapter_no_torch.py</code> — removes torch via
+  <code>sys.modules</code> manipulation, confirms <code>DatasetBag</code> is importable and
+  every method except <code>as_torch_dataset</code> works, confirms
+  <code>as_torch_dataset</code> raises <code>ImportError</code> with install-hint message.</li>
+<li><code>tests/dataset/test_tf_adapter_no_tf.py</code> — same shape for
+  tensorflow. The two tests are independent (removing torch does not
+  touch the TF import path and vice versa).</li>
+</ul>
+<h3 id="62-pure-python-logic-framework-stubbed">6.2 Pure-Python logic (framework stubbed)</h3>
+<p>Exercises the join logic, selector pass-through, <code>missing=</code> branches,
+target arity, and error paths without a real framework install. Two
+parallel tests:</p>
+<ul>
+<li><code>tests/dataset/test_torch_adapter_logic.py</code> — stubs
+  <code>torch.utils.data.Dataset</code>.</li>
+<li><code>tests/dataset/test_tf_adapter_logic.py</code> — stubs <code>tf.data.Dataset</code>
+  plus <code>tf.TensorSpec</code> (the <code>output_signature</code> inference is tested
+  against the stub).</li>
+</ul>
+<p>Both tiers share the same test matrix:
+- <code>missing="error"</code> raises at construction with RID list.
+- <code>missing="skip"</code> drops unlabeled elements.
+- <code>missing="unknown"</code> passes <code>None</code> to <code>target_transform</code>.
+- Selector dict form vs list form yield equivalent results when no
+  selector is provided.
+- <code>target_transform</code> is called on the right shape (FeatureRecord /
+  dict / list per target arity).
+- Asset-table element with no <code>sample_loader</code> raises at construction.</p>
+<h3 id="63-end-to-end-with-real-frameworks">6.3 End-to-end with real frameworks</h3>
+<p>Runs only when the framework is importable. Two parallel tests:</p>
+<ul>
+<li><code>tests/dataset/test_torch_adapter_e2e.py</code> — gated by
+  <code>pytest.importorskip("torch")</code>. Builds a dataset from the
+  <code>catalog_with_datasets</code> fixture, iterates under a real
+  <code>DataLoader</code>, verifies tuple shape, label-encoding round-trip,
+  <code>missing="skip"</code> filtering, and (where applicable) multi-worker
+  behavior.</li>
+<li><code>tests/dataset/test_tf_adapter_e2e.py</code> — gated by
+  <code>pytest.importorskip("tensorflow")</code>. Same flow using
+  <code>tf.data.Dataset.batch(...)</code> / <code>.prefetch(...)</code>. Additionally
+  verifies <code>output_signature=None</code> inference works (caller passes
+  no signature; first <code>.take(1)</code> produces the expected shape).</li>
+</ul>
+<h3 id="64-shared-helper-tests">6.4 Shared-helper tests</h3>
+<p><code>tests/dataset/test_target_resolution.py</code> tests the
+<code>_resolve_targets</code> helper in isolation from any framework. Covers
+the contract enumerated in §8.5 (returns-dict-keyed-by-RID semantics,
+three <code>missing=</code> branches, selector dict behavior). Independent of
+torch and tf — pure-Python.</p>
+<h3 id="65-test-catalog-fixture">6.5 Test catalog fixture</h3>
+<p>Leverages the existing <code>catalog_with_datasets</code> fixture. The test
+doesn't need new catalog setup — the demo catalog already has
+subjects, images, and a Glaucoma_Grade-style feature via
+<code>create_demo_features</code>. The spec assumes that fixture is stable;
+implementation will verify.</p>
+<h2 id="7-documentation-deliverables">7. Documentation deliverables</h2>
+<p><strong>User-facing documentation is a first-class deliverable</strong>, not
+optional work to punt to a follow-up.</p>
+<h3 id="71-docstrings">7.1 Docstrings</h3>
+<p>Every public surface gets the full library docstring contract (one-line
+summary + extended description + Args + Returns + Raises + Example).</p>
+<p>Covered public surfaces:
+- <code>DatasetBag.as_torch_dataset(...)</code> — the method docstring
+- <code>build_torch_dataset(...)</code> — the module-level builder (if exposed
+  publicly; likely <code>_build_torch_dataset</code> private)</p>
+<p>For each argument with non-obvious semantics (<code>targets</code> shapes,
+<code>missing</code> behavior, <code>sample_loader</code> signature), include a dedicated
+paragraph in the Args section that shows what the user hands in and
+what they get back. The catalog-dependent end-to-end <code>Example:</code> block
+uses <code># doctest: +SKIP</code>; a smaller pure-Python assertion (e.g.,
+enum-value check or import-guard behavior) runs at doctest collection.</p>
+<h3 id="72-user-guide-section">7.2 User guide section</h3>
+<p>New section in <code>docs/user-guide/offline.md</code> (Chapter 5, which already
+covers <code>DatasetBag</code> and <code>restructure_assets</code>) titled <strong>"How to feed a
+bag to a training framework"</strong>. Structure follows the UG contract,
+with sub-subsections for each supported framework plus Keras routing:</p>
+<ol>
+<li><strong>Motivation.</strong> Two sentences explaining why these adapters exist
+   and when a user would reach for them instead of
+   <code>restructure_assets</code>.</li>
+<li><strong>Choosing your path.</strong> Short decision paragraph:</li>
+<li><code>as_torch_dataset</code> — if you're using PyTorch (native) or Keras
+     on the PyTorch backend.</li>
+<li><code>as_tf_dataset</code> — if you're using TensorFlow (native) or Keras
+     on the TensorFlow backend.</li>
+<li><code>restructure_assets</code> — if you're using a third-party trainer
+     that expects <code>ImageFolder</code> class-folder layout (e.g., RetFound
+     fine-tuning scripts, <code>torchvision.datasets.ImageFolder</code>,
+     <code>tf.keras.utils.image_dataset_from_directory</code>).</li>
+</ol>
+<h4 id="721-using-with-pytorch">7.2.1 Using with PyTorch</h4>
+<p>Structure:
+- <strong>Simple example.</strong> Image classification with one feature as
+  label, <code>PIL.Image.open</code> as loader, torchvision transform
+  pipeline. ~15 lines end-to-end.
+- <strong>Explanation.</strong> How labels come from features, how the selector
+  pattern handles multi-annotator cases, how <code>missing=</code> resolves
+  sparse-label choices.
+- <strong>Worked variations:</strong>
+  - Tabular regression (non-asset element_type, no <code>sample_loader</code>
+    override needed, continuous-valued feature).
+  - Multi-target (two features → dict target).
+  - Multi-annotator resolution (selector-dict form).
+- <strong>Notes:</strong> pointer to <code>deriva-ml[torch]</code> extra; explicit note that
+  <code>Dataset.as_torch_dataset</code> (live-catalog variant) is not yet
+  shipped.</p>
+<h4 id="722-using-with-tensorflow">7.2.2 Using with TensorFlow</h4>
+<p>Structure:
+- <strong>Simple example.</strong> Same image-classification task but returning
+  <code>tf.data.Dataset</code>, showing <code>.batch().prefetch()</code> pipeline. ~15
+  lines end-to-end.
+- <strong><code>output_signature</code> guidance.</strong> When to let inference happen
+  (default; one-shot research code), when to pass it explicitly
+  (production pipelines with deterministic startup; ragged tensors).
+- <strong>Worked variations:</strong> the same three from the PyTorch section,
+  translated to TF shape.
+- <strong>Notes:</strong> pointer to <code>deriva-ml[tf]</code> extra and to the platform
+  note (§5) about <code>tensorflow-macos</code> / <code>tensorflow[and-cuda]</code> for
+  users who want a specific wheel.</p>
+<h4 id="723-using-with-keras">7.2.3 Using with Keras</h4>
+<p>Keras 3 accepts data from either backend's native format. Users
+don't need a separate adapter; they pick the method matching their
+Keras backend:</p>
+<ul>
+<li><strong>Keras on PyTorch backend:</strong> wrap <code>as_torch_dataset(...)</code> in a
+  <code>DataLoader</code> and pass to <code>model.fit(...)</code>. Keras consumes
+  <code>torch.utils.data.DataLoader</code> natively.</li>
+<li><strong>Keras on TensorFlow backend:</strong> pass <code>as_tf_dataset(...)</code> directly
+  to <code>model.fit(...)</code>. Keras consumes <code>tf.data.Dataset</code> natively.</li>
+<li><strong>Keras on JAX backend:</strong> use either adapter; Keras 3 accepts
+  Python iterables of <code>(x, y)</code> tuples regardless of origin.</li>
+</ul>
+<p>A ~20-line worked example shows the backend choice via
+<code>os.environ["KERAS_BACKEND"] = "torch"</code> or <code>"tensorflow"</code> and then
+the appropriate adapter call. Explicit note: no <code>as_keras_dataset</code>
+method exists because Keras is a consumer of both adapters, not a
+third parallel one.</p>
+<h4 id="724-using-with-imagefolder-third-party-tools">7.2.4 Using with <code>ImageFolder</code> / third-party tools</h4>
+<p>Pointer to §7.4.2: <code>restructure_assets</code> is the tool when your
+downstream consumer wants the class-folder directory layout
+(including RetFound fine-tuning scripts,
+<code>torchvision.datasets.ImageFolder</code>,
+<code>tf.keras.utils.image_dataset_from_directory</code>, and similar).
+Aligned vocabulary (§3.7) means the <code>targets</code> / <code>target_transform</code>
+/ <code>missing</code> kwargs you'd use with <code>as_torch_dataset</code> work
+identically with <code>restructure_assets</code>.</p>
+<h4 id="725-see-also">7.2.5 See also</h4>
+<p>Chapter 3 (features API for selector pattern); the
+<code>DatasetBag.feature_values</code> docstring for the selector shape;
+the <code>split_dataset</code> docstring for the stratified-split flow that
+composes upstream of all three framework paths (see §7.4.1).</p>
+<h3 id="73-cross-references">7.3 Cross-references</h3>
+<ul>
+<li>The new UG section gets linked from Chapter 1 (exploring) where
+  users first learn about bags.</li>
+<li><code>DatasetBag.restructure_assets</code>'s docstring gets one sentence
+  pointing at <code>as_torch_dataset</code> as the general-case companion.</li>
+<li><code>split_dataset</code> (in <code>src/deriva_ml/dataset/split.py</code>) gets one
+  sentence in its docstring's Examples / See Also section pointing
+  at the composition pattern in §7.4 below. No signature change;
+  existing behavior preserved.</li>
+<li>The <code>DatasetBag</code> class-level docstring gets one bullet mentioning
+  the adapter alongside the existing <code>restructure_assets()</code> mention.
+  (The corresponding paragraph in <code>CLAUDE.md</code> — the project-level
+  codebase notes — gets the same one-sentence addition for future
+  agentic work, tracked as part of the plan's UG-integration task.)</li>
+</ul>
+<h3 id="74-composition-with-existing-dataset-apis">7.4 Composition with existing dataset APIs</h3>
+<p>The adapter <strong>composes</strong> with the other data-shaping primitives; it
+does not replace them. Three composition patterns need dedicated
+coverage in the UG section and in docstrings because they are the
+most common production flows.</p>
+<h4 id="741-stratified-trainvaltest-split-per-partition-torch-datasets">7.4.1 Stratified train/val/test split → per-partition torch datasets</h4>
+<p><code>split_dataset</code> creates a parent <code>Split</code> catalog dataset with child
+<code>Training</code>, <code>Testing</code>, and optionally <code>Validation</code> datasets. Each
+partition is a standalone dataset — download each as its own bag,
+then turn each bag into its own <code>torch.utils.data.Dataset</code> via the
+adapter. The adapter does not need split-awareness; each bag is
+independent.</p>
+<pre><code class="language-python">from deriva_ml.dataset.split import split_dataset
+
+# Upstream (online): create stratified split hierarchy in catalog
+split = split_dataset(
+    ml,
+    source_dataset_rid=&quot;28D0&quot;,
+    test_size=0.2,
+    val_size=0.1,
+    stratify_by_column=&quot;Image_Classification.Image_Class&quot;,
+    seed=42,
+)
+# split.training.rid, split.testing.rid, split.validation.rid are
+# three new catalog dataset RIDs.
+
+# Later (offline training): one bag per partition
+train_bag = ml.lookup_dataset(split.training.rid).download_dataset_bag(
+    version=&quot;1.0.0&quot;
+)
+val_bag   = ml.lookup_dataset(split.validation.rid).download_dataset_bag(
+    version=&quot;1.0.0&quot;
+)
+test_bag  = ml.lookup_dataset(split.testing.rid).download_dataset_bag(
+    version=&quot;1.0.0&quot;
+)
+
+# Build torch datasets from each bag independently.
+# Shared adapter config — everything except the per-partition transform:
+shared = dict(
+    element_type=&quot;Image&quot;,
+    sample_loader=lambda p, row: PIL.Image.open(p).convert(&quot;RGB&quot;),
+    targets=[&quot;Image_Classification&quot;],
+    target_transform=lambda rec: CLASS_TO_IDX[rec.Image_Class],
+)
+train_ds = train_bag.as_torch_dataset(**shared, transform=train_transform)
+val_ds   = val_bag.as_torch_dataset(**shared, transform=eval_transform)
+test_ds  = test_bag.as_torch_dataset(**shared, transform=eval_transform)
+
+train_loader = DataLoader(train_ds, batch_size=32, shuffle=True,  num_workers=4)
+val_loader   = DataLoader(val_ds,   batch_size=32, shuffle=False, num_workers=4)
+test_loader  = DataLoader(test_ds,  batch_size=32, shuffle=False, num_workers=4)
+</code></pre>
+<p><strong>Why this works cleanly:</strong> each partition inherits the full feature
+coverage of the source dataset (the split only selects RIDs; feature
+values for those RIDs remain attached). Stratification happens at
+split time against the denormalized catalog DataFrame, so the label
+distribution is correct by construction; the adapter just reads it
+back through <code>feature_values(...)</code> the same way it would for any bag.</p>
+<h4 id="742-restructure_assets-vs-as_torch_dataset-these-are-alternatives-not-a-pipeline">7.4.2 <code>restructure_assets</code> vs <code>as_torch_dataset</code> — these are alternatives, not a pipeline</h4>
+<p>A natural question: "can I call <code>restructure_assets</code> first and then feed
+the result into <code>as_torch_dataset</code>?" The short answer is <strong>no, and you
+wouldn't want to</strong>. These two tools solve the same problem with
+different shapes, not two halves of one workflow.</p>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lazy streaming, no disk rewrite, full <code>FeatureRecord</code> access, any element type</td>
+<td><code>as_torch_dataset</code></td>
+</tr>
+<tr>
+<td>Compatibility with <code>torchvision.datasets.ImageFolder</code> or a third-party trainer that expects the <code>ImageFolder</code> directory convention</td>
+<td><code>restructure_assets</code> + <code>ImageFolder</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why they don't chain:</strong> <code>restructure_assets</code> creates a <em>new directory</em>
+with the <code>ImageFolder</code> layout by copying or symlinking from the bag's
+flat <code>data/assets/&lt;type&gt;/&lt;rid&gt;/&lt;file&gt;</code> tree. It doesn't modify the
+bag. <code>as_torch_dataset</code>'s path resolution is hard-coded to
+<code>bag.path / "data/assets/&lt;type&gt;/&lt;rid&gt;/&lt;file&gt;"</code> — it reads from the
+bag, not from the restructured sibling tree. Restructuring first and
+then calling the adapter buys nothing: the adapter still reads the
+unchanged bag, and the restructured tree sits unused.</p>
+<p><strong>Picking between them:</strong></p>
+<ul>
+<li>If your downstream consumer is a <code>torchvision.datasets.ImageFolder</code>
+  instance (or any code that expects a class-folder directory layout),
+  use <code>restructure_assets</code>. The adapter is the wrong tool.</li>
+<li>If your downstream consumer is your own <code>torch.utils.data.DataLoader</code>
+  and you want the full <code>FeatureRecord</code> for each sample, use the
+  adapter. <code>restructure_assets</code> is the wrong tool.</li>
+<li>If you need <strong>both</strong> — e.g., you want an <code>ImageFolder</code> for a baseline
+  comparison and a custom adapter for your main model — run
+  <code>restructure_assets</code> once and call <code>as_torch_dataset</code> independently
+  on the same bag. They don't conflict; they just don't collaborate.</li>
+</ul>
+<p>The adapter deliberately does <strong>not</strong> offer a <code>layout="image_folder"</code>
+shortcut to drive <code>restructure_assets</code> under the hood. Keeping the two
+primitives separate means <code>restructure_assets</code> has a clear contract
+(it rewrites disk), the adapter has a clear contract (it reads disk
+lazily), and users see in their own code which tool they chose.</p>
+<p><strong>But they do share the target-specification vocabulary.</strong> Per
+anchor 7 and §3.7, both methods accept the same <code>targets</code>,
+<code>target_transform</code>, and <code>missing</code> parameters with matching semantics.
+A user who writes <code>targets={"Diagnosis": FeatureRecord.select_newest}</code>
+for the adapter can use the same dict for <code>restructure_assets</code>. The
+alignment is <em>input-shape</em> only; output shapes remain distinct. §8
+documents the specific changes to <code>restructure_assets</code> that achieve
+this alignment — a clean-break rename, not a deprecation cycle — and
+the migration guidance for any callers on the old parameter names.</p>
+<h2 id="8-restructure_assets-alignment-scope-same-pr">8. <code>restructure_assets</code> alignment scope (same PR)</h2>
+<p>Per anchor 7 and §3.7, the adapter work lands together with a
+coordinated signature update to <code>restructure_assets</code>. This section
+enumerates what changes on the restructure side and why.</p>
+<p><strong>The alignment preserves every capability <code>restructure_assets</code> has
+today.</strong> §8.4 enumerates the parameters that stay exactly as-is
+(unchanged in name, type, default, and behavior). The algorithmic
+behavior — FK-reachability for finding assets, dataset-type-derived
+top-level directory naming, silent vs. strict missing-label handling
+— is also preserved. What changes is the <strong>vocabulary for
+label-selection</strong>: <code>group_by</code> becomes <code>targets</code>, <code>value_selector</code> is
+subsumed by the <code>targets</code> dict form, and the <code>"Feature.column"</code>
+dotted-string syntax is replaced by <code>target_transform</code>. Every user
+workflow that works today works after this PR with a one-line
+kwarg-rename; no capability is removed.</p>
+<p>This is a <strong>clean break</strong> — the old parameter names are removed, not
+deprecated. Rationale: deriva-ml is not yet at the scale where
+maintaining a deprecation-warning surface pays for itself, and
+carrying legacy kwargs through the rename would bake in the exact
+naming inconsistency this alignment is meant to remove. Downstream
+impact is explicitly accepted and called out in §11 (risks).</p>
+<h3 id="81-parameter-renames">8.1 Parameter renames</h3>
+<table>
+<thead>
+<tr>
+<th>Today</th>
+<th>After</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>group_by: list[str] | None</code></td>
+<td><code>targets: list[str] | dict[str, FeatureSelector] | None</code></td>
+<td>"group_by" was SQL-flavored and misleading in the ML context. "targets" reads consistently across both methods: what determines the output, directory-name or label.</td>
+</tr>
+<tr>
+<td><code>value_selector: Callable | None</code></td>
+<td>merged into <code>targets</code> dict form</td>
+<td>Single-selector was strictly less expressive than per-feature selectors. The dict form subsumes it: <code>targets={"A": FeatureRecord.select_newest}</code> covers <code>value_selector=FeatureRecord.select_newest</code> for the single-feature case.</td>
+</tr>
+</tbody>
+</table>
+<p>Passing the old kwargs after this PR lands raises <code>TypeError</code>
+("unexpected keyword argument") — the standard Python signal for a
+removed keyword. No <code>DeprecationWarning</code> shim, no alias.</p>
+<h3 id="82-new-parameter-target_transform">8.2 New parameter: <code>target_transform</code></h3>
+<p>Restructure today derives directory names directly from feature values
+(or via the <code>"Feature.column"</code> dotted-string syntax). After alignment,
+<code>target_transform</code> is the canonical way to customize what goes into
+the directory name:</p>
+<pre><code class="language-python"># Before this PR:
+bag.restructure_assets(output_dir=&quot;./out&quot;, group_by=[&quot;Classification.Label&quot;])
+# → directories named after the Label column value
+
+# After this PR:
+bag.restructure_assets(
+    output_dir=&quot;./out&quot;,
+    targets=[&quot;Classification&quot;],
+    target_transform=lambda rec: rec.Label,   # returns str → directory name
+)
+</code></pre>
+<p>The <code>"Feature.column"</code> dotted-string syntax is <strong>removed</strong>. Calls that
+pass it raise <code>DerivaMLValidationError</code> at construction explaining the
+new form. Users rewrite their one-line <code>group_by=["Feature.column"]</code>
+as a two-line <code>targets=["Feature"]</code> + <code>target_transform=lambda rec: rec.column</code>.</p>
+<p>Runtime constraint: <code>target_transform</code>'s return type is checked at
+the first directory-naming call. A non-string return raises
+<code>DerivaMLValidationError</code> with a message explaining that restructure's
+target_transform must return a filesystem-name-compatible string.
+(The adapter version has no such constraint.)</p>
+<h3 id="83-new-parameter-missing">8.3 New parameter: <code>missing</code></h3>
+<p>Currently, <code>restructure_assets</code> silently places unlabeled assets in an
+<code>Unknown/</code> directory. This is effectively <code>missing="unknown"</code> in the
+unified vocabulary.</p>
+<p>After alignment:</p>
+<ul>
+<li><code>missing: Literal["error", "skip", "unknown"] = "unknown"</code></li>
+<li>Default <code>"unknown"</code> preserves today's behavior for callers that
+  don't explicitly pass the kwarg. This is the one concession to
+  continuity: the typical <code>bag.restructure_assets(output_dir="./out",
+  targets=["Diagnosis"])</code> call produces the same directory tree as
+  before.</li>
+<li><code>"error"</code> gives users the strict-mode option (raise at construction
+  listing unlabeled RIDs) for when they want to ensure their training
+  data is complete before committing to disk.</li>
+<li><code>"skip"</code> drops the asset from the output tree entirely (new behavior;
+  no directory for it).</li>
+</ul>
+<h3 id="84-unchanged-restructure-parameters">8.4 Unchanged restructure parameters</h3>
+<p>Everything else on <code>restructure_assets</code> stays as-is:</p>
+<ul>
+<li><code>output_dir</code>, <code>asset_table</code>, <code>use_symlinks</code>, <code>type_selector</code>,
+  <code>type_to_dir_map</code>, <code>enforce_vocabulary</code>, <code>file_transformer</code>.</li>
+<li>The FK-reachability behavior (find assets through foreign-key
+  relationships from the dataset).</li>
+<li>The <code>type_to_dir_map</code> default (<code>{"Training": "training",
+  "Testing": "testing", "Unknown": "unknown"}</code>).</li>
+</ul>
+<p>These are restructure-specific and don't map to adapter concepts.</p>
+<h3 id="85-internal-refactor-shared-resolution-helper">8.5 Internal refactor: shared resolution helper</h3>
+<p>The feature-resolution logic (lookup-features-by-name, apply-selector,
+handle-missing) gets extracted into a private helper in
+<code>src/deriva_ml/dataset/target_resolution.py</code> (or similar). Both
+<code>as_torch_dataset</code> and <code>restructure_assets</code> call into it. This makes
+the "same semantics" claim in anchor 7 enforceable by shared code
+rather than by parallel re-implementation.</p>
+<p>Shape of the helper (sketch; implementation-plan will firm up):</p>
+<pre><code class="language-python">def resolve_targets(
+    bag: &quot;DatasetBag&quot;,
+    element_type: str,
+    targets: list[str] | dict[str, FeatureSelector] | None,
+    missing: Literal[&quot;error&quot;, &quot;skip&quot;, &quot;unknown&quot;],
+) -&gt; dict[str, FeatureRecord | dict[str, FeatureRecord] | list[FeatureRecord] | None]:
+    &quot;&quot;&quot;Resolve feature values per element_rid for the requested targets.
+
+    Returns a dict keyed by element RID. The value shape matches §3.3:
+    single FeatureRecord, dict of FeatureRecords, or list per target arity.
+    Values are None for elements where missing=&quot;unknown&quot; / &quot;skip&quot; left
+    the label absent.
+
+    Raises DerivaMLException at construction when missing=&quot;error&quot; and
+    any target is absent, or when a target feature doesn't exist.
+    &quot;&quot;&quot;
+</code></pre>
+<p>This helper is private (<code>_resolve_targets</code>) — callers reach it through
+the public methods, not directly. Naming inside the module is an
+implementation-plan detail.</p>
+<h3 id="86-testing-impact">8.6 Testing impact</h3>
+<p>New tests verify the aligned semantics on restructure:
+- <code>targets=[...]</code> produces the expected directory layout.
+- <code>targets={"A": selector}</code> applies the selector per-feature.
+- <code>missing="error"</code> raises on sparse-labeled bags.
+- <code>missing="skip"</code> omits assets from the output tree.
+- <code>missing="unknown"</code> places unlabeled assets in <code>unknown/</code> (the
+  preserved default behavior).
+- <code>target_transform</code> returning a non-string raises
+  <code>DerivaMLValidationError</code>.
+- Passing <code>group_by=</code> raises <code>TypeError</code> (unexpected keyword).
+- Passing <code>value_selector=</code> raises <code>TypeError</code> (unexpected keyword).
+- Passing a <code>"Feature.column"</code> dotted string as a target raises
+  <code>DerivaMLValidationError</code> with the new-form hint.</p>
+<p><strong>Existing restructure tests that use <code>group_by</code> / <code>value_selector</code>
+must be updated as part of this PR</strong> — the break is intentional.
+The implementation plan's verification step includes converting the
+existing test suite to the new signature and confirming it still
+covers the same behavior.</p>
+<h3 id="87-documentation-impact">8.7 Documentation impact</h3>
+<p>Docstring for <code>restructure_assets</code> is rewritten to the new signature
+— no references to the old parameter names in the docstring body.
+A short "Migration note" section near the bottom of the docstring
+maps the old call shapes (<code>group_by=</code>, <code>value_selector=</code>,
+<code>"Feature.column"</code>) onto the new equivalents so users who find the
+docstring while debugging a <code>TypeError</code> can translate their code.
+The UG Chapter 5 section on <code>restructure_assets</code> gets updated
+examples in the same style as the adapter section — same vocabulary,
+same selector examples, same <code>missing</code> callouts. A one-paragraph
+"Vocabulary alignment with <code>as_torch_dataset</code>" sidebar explains the
+shared parameter names.</p>
+<h2 id="9-non-goals-explicit">9. Non-goals (explicit)</h2>
+<p>The following are intentionally <strong>out of scope</strong> to keep the v1
+surface focused:</p>
+<ul>
+<li><strong>Live-catalog adapter variants</strong> (<code>Dataset.as_torch_dataset</code>,
+  <code>Dataset.as_tf_dataset</code>). Covered in anchor 4 above. Named
+  follow-up; not v1.</li>
+<li><strong>DataLoader / <code>.batch()</code> construction.</strong> Both adapters return a
+  raw <code>Dataset</code> (torch) or <code>tf.data.Dataset</code> (tf). The user wraps in
+  <code>torch.utils.data.DataLoader</code> with their own <code>batch_size</code>,
+  <code>shuffle</code>, <code>num_workers</code>, or chains <code>.batch().prefetch()</code> on the
+  TF side. The library does not opine on batching.</li>
+<li><strong>Train/val/test splits.</strong> Already covered by
+  <code>split_dataset</code> / <code>stratify_by_column</code>. The adapters take whatever
+  bag you hand them; splitting happens upstream.</li>
+<li><strong>In-memory caching across epochs.</strong> Both frameworks have standard
+  idioms (<code>torch.utils.data.DataLoader</code> persistent workers,
+  <code>tf.data.Dataset.cache()</code>). The library doesn't layer on top.</li>
+<li><strong>Inference-result writeback.</strong> That's feature-record territory
+  (D1 + existing <code>add_features</code> path), orthogonal to the data-loading
+  adapters.</li>
+<li><strong>Label encoding helpers.</strong> Explicit non-goal per anchor 2.
+  Users own their encoder; the library surfaces typed records.</li>
+</ul>
+<h2 id="10-deliverables-checklist">10. Deliverables checklist</h2>
+<p>Implementation plan (separate document at
+<code>docs/superpowers/plans/2026-04-24-torch-dataset-adapter-plan.md</code>)
+will enumerate specific tasks; this spec's checklist names the
+deliverables the plan must cover.</p>
+<p><strong>Adapter deliverables (PyTorch):</strong></p>
+<ul>
+<li>[ ] <code>src/deriva_ml/dataset/torch_adapter.py</code> — new module</li>
+<li>[ ] <code>src/deriva_ml/dataset/dataset_bag.py</code> — <code>as_torch_dataset</code>
+  method added with full docstring</li>
+<li>[ ] <code>tests/dataset/test_torch_adapter_no_torch.py</code></li>
+<li>[ ] <code>tests/dataset/test_torch_adapter_logic.py</code></li>
+<li>[ ] <code>tests/dataset/test_torch_adapter_e2e.py</code> (pytest.importorskip)</li>
+</ul>
+<p><strong>Adapter deliverables (TensorFlow):</strong></p>
+<ul>
+<li>[ ] <code>src/deriva_ml/dataset/tf_adapter.py</code> — new module</li>
+<li>[ ] <code>src/deriva_ml/dataset/dataset_bag.py</code> — <code>as_tf_dataset</code>
+  method added with full docstring (incl. <code>output_signature</code>
+  inference behavior)</li>
+<li>[ ] <code>tests/dataset/test_tf_adapter_no_tf.py</code></li>
+<li>[ ] <code>tests/dataset/test_tf_adapter_logic.py</code></li>
+<li>[ ] <code>tests/dataset/test_tf_adapter_e2e.py</code> (pytest.importorskip;
+  verifies <code>output_signature=None</code> inference)</li>
+</ul>
+<p><strong>Shared infrastructure (per §8.5):</strong></p>
+<ul>
+<li>[ ] <code>src/deriva_ml/dataset/target_resolution.py</code> — private helper
+  <code>_resolve_targets(bag, element_type, targets, missing)</code> shared
+  among <code>as_torch_dataset</code>, <code>as_tf_dataset</code>, and <code>restructure_assets</code></li>
+<li>[ ] <code>tests/dataset/test_target_resolution.py</code> — tests for the
+  shared helper covering the three <code>missing=</code> branches and
+  selector-dict vs list forms</li>
+<li>[ ] <code>pyproject.toml</code> — <code>[project.optional-dependencies]</code> table
+  with <code>torch = [...]</code> and <code>tf = [...]</code> extras</li>
+</ul>
+<p><strong>User guide:</strong></p>
+<ul>
+<li>[ ] <code>docs/user-guide/offline.md</code> — new "How to feed a bag to a
+  training framework" section per §7.2 covering PyTorch, TensorFlow,
+  Keras (both backends), and <code>ImageFolder</code>-style layout</li>
+</ul>
+<p><strong>Restructure alignment deliverables (per §8):</strong></p>
+<ul>
+<li>[ ] <code>src/deriva_ml/dataset/dataset_bag.py</code> — <code>restructure_assets</code>
+  signature updated:</li>
+<li>Rename <code>group_by</code> → <code>targets</code> (clean break; old kwarg removed)</li>
+<li>Remove <code>value_selector</code> (replaced by <code>targets</code> dict form)</li>
+<li>Add <code>target_transform</code> parameter with string-return check</li>
+<li>Add <code>missing: Literal["error", "skip", "unknown"] = "unknown"</code></li>
+<li>Remove <code>"Feature.column"</code> dotted syntax in targets</li>
+<li>[ ] <code>restructure_assets</code> docstring rewritten to the new signature.
+  No references to the old parameter names beyond a single migration
+  note (see cross-cutting checklist below).</li>
+<li>[ ] <code>docs/user-guide/offline.md</code> — update existing restructure
+  section to use new parameter names; add short "Vocabulary
+  alignment with <code>as_torch_dataset</code>" sidebar</li>
+<li>[ ] <code>tests/dataset/test_restructure_*</code> — update existing tests to
+  use the new signature (intentional break, not a migration path);
+  add new tests per §8.6 covering the aligned semantics</li>
+<li>[ ] Grep sibling repos (<code>deriva-ml-model-template</code>, <code>deriva-ml-apps</code>,
+  <code>deriva-ml-demo</code>, <code>deriva-ml-template-test</code>) for callers of the
+  removed kwargs and flag them in the PR description so template
+  maintainers can update in lockstep</li>
+</ul>
+<p><strong>Cross-cutting:</strong></p>
+<ul>
+<li>[ ] Cross-references per §7.3</li>
+<li>[ ] mkdocs --strict clean (no new warnings)</li>
+<li>[ ] Fast suite green (<code>tests/local_db/ tests/asset/ tests/model/
+  tests/dataset/test_torch_adapter_* tests/dataset/test_restructure_*</code>)</li>
+<li>[ ] Ruff check + format clean (parity with main baseline)</li>
+<li>[ ] PR description includes a "Breaking changes" section naming
+  the removed <code>restructure_assets</code> kwargs and the required migration
+  (<code>group_by=</code> → <code>targets=</code>, <code>value_selector=</code> → <code>targets={feature:
+  selector}</code>, <code>"Feature.column"</code> → explicit <code>target_transform</code>)</li>
+</ul>
+<h2 id="11-risks-and-mitigations">11. Risks and mitigations</h2>
+<p><strong>Risk: PyTorch API changes between versions.</strong> Using only stable APIs
+(<code>torch.utils.data.Dataset</code>, no tensor ops in the adapter) keeps the
+surface insulated from PyTorch point-release churn. Pinning <code>torch&gt;=2.0</code>
+draws the line at a clear stability boundary.</p>
+<p><strong>Risk: Bag path resolution breaks if a future bag format changes the
+<code>data/assets/&lt;type&gt;/&lt;rid&gt;/...</code> layout.</strong> Mitigation: the adapter reads
+path structure via <code>bag.path</code> + the asset table's URL column rather
+than hard-coding the layout; if the layout ever changes, the same
+code path that breaks <code>restructure_assets</code> breaks the adapter, so
+they're in sync.</p>
+<p><strong>Risk: Selector-pattern inconsistency between bag and Dataset
+variants.</strong> Mitigation: bag-only v1 eliminates this by construction.
+When the <code>Dataset.as_torch_dataset</code> follow-up lands, the selector
+signature is lifted verbatim from the bag variant, preserving the
+parity promise.</p>
+<p><strong>Risk: Users expect MLflow-compat <code>log_metric</code>-style automatic
+metric writeback.</strong> Mitigation: docstring Notes section points at D1's
+<code>exe.metrics_file()</code> for that use case. The adapter does not write
+anything; it reads.</p>
+<p><strong>Risk: Torch dependency bloat for users who install
+<code>deriva-ml[torch]</code> accidentally.</strong> Mitigation: named extra; pip install
+without <code>[torch]</code> leaves torch out entirely. The default install
+remains lean. Same reasoning applies to <code>deriva-ml[tf]</code>.</p>
+<p><strong>Risk: TensorFlow wheel selection is platform-dependent and confuses
+users.</strong> On macOS (Apple Silicon) the canonical install is
+<code>tensorflow-macos</code>, not vanilla <code>tensorflow</code>. On CUDA-enabled Linux
+it's <code>tensorflow[and-cuda]</code>. Mitigation: document the wheel choice in
+both the package-extras section of pyproject.toml's PyPI description
+and in the UG TensorFlow sub-section. The import guard inside
+<code>as_tf_dataset</code> just checks that <code>tensorflow</code> is importable, so any
+properly-installed tf wheel satisfies it regardless of which variant
+the user chose.</p>
+<p><strong>Risk: <code>tf.data.Dataset.from_generator</code> is slower than
+<code>from_tensor_slices</code>.</strong> <code>from_generator</code> can't be traced into a
+tf.graph, so tf.data optimizations (autograph, XLA) don't apply
+inside our iteration. Mitigation: anchor 4 (no eager materialization)
+is a deliberate choice — the cost is acceptable for research-scale
+datasets, and the alternative (eager materialization) would violate
+our lazy-loading contract for any bag larger than RAM. Users with
+performance-critical pipelines and smaller datasets can use
+<code>.cache()</code> on the returned <code>tf.data.Dataset</code> as a standard TF
+escape hatch.</p>
+<p><strong>Risk: <code>output_signature=None</code> inference consumes one sample eagerly
+at adapter construction.</strong> For pipelines where even the first sample
+is expensive (e.g., huge 4D medical volumes), this adds measurable
+startup cost. Mitigation: documented in §3.2 and in the docstring;
+users with this concern pass <code>output_signature</code> explicitly to skip
+the eager-infer path.</p>
+<p><strong>Risk: <code>restructure_assets</code> parameter rename is a hard break for any
+downstream caller using <code>group_by=</code>, <code>value_selector=</code>, or the
+<code>"Feature.column"</code> dotted-string syntax in targets.</strong> This is an
+explicit choice (§8) — deriva-ml is not yet at the scale where a
+deprecation surface pays for itself, and keeping the old names as
+aliases would bake in the inconsistency that motivated the rename.
+Mitigation is twofold: (1) the implementation plan includes a grep of
+sibling repos (<code>deriva-ml-model-template</code>, <code>deriva-ml-apps</code>,
+<code>deriva-ml-demo</code>, <code>deriva-ml-template-test</code>) to enumerate callers and
+flag them in the PR description, so template maintainers can update
+in lockstep with this PR landing; (2) the PR description carries a
+"Breaking changes" section with a concrete migration mapping so
+downstream users who pull the new version see exactly what to
+substitute. The <code>missing</code> default stays at <code>"unknown"</code> so the
+most common unparameterized call (<code>bag.restructure_assets(output_dir=
+"./out", targets=["Diagnosis"])</code>) produces the same tree as before
+the PR — the break is contained to callers that were exercising the
+renamed surface.</p>
+<p><strong>Risk: Shared <code>_resolve_targets</code> helper introduces coupling that
+makes future per-method changes harder.</strong> Mitigation: the helper has a
+narrow contract (resolve feature values → dict keyed by element RID;
+apply missing policy). Method-specific concerns (directory-naming for
+restructure, label-in-tuple for adapter) stay in their respective
+methods. If a future change genuinely needs divergence, the helper
+can be inlined back per-method with a single commit.</p>
+<h2 id="12-future-work-named-for-future-spec-continuity">12. Future work (named for future-spec continuity)</h2>
+<ul>
+<li><strong>Live-catalog adapter variants</strong> (separate future spec):
+  <code>Dataset.as_torch_dataset</code> and <code>Dataset.as_tf_dataset</code> with
+  live-download-during-iteration semantics. Requires design work on
+  credential lifetime, retry policy, cache eviction, and
+  download-during-<code>__getitem__</code> performance. The bag-only v1 covers
+  the primary training workflow (download once, train many times)
+  without any of that complexity.</li>
+<li><strong>Numpy/Arrow adapters</strong> (lower priority): for users who want
+  framework-agnostic iteration over (sample, target) tuples.</li>
+<li><strong>Streaming / iterable datasets</strong> (lower priority): <code>IterableDataset</code>
+  variant for bags that exceed local disk.</li>
+<li><strong>Sampler hooks</strong> (lower priority): <code>WeightedRandomSampler</code> +
+  class-balance computation from feature values could be a helper,
+  but users can do this themselves from the dataset length + target
+  list today.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

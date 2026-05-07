@@ -1,0 +1,4757 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/plans/2026-04-21-schema-doc-source-of-truth/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>deriva-ml Schema Doc Source-of-Truth Implementation Plan - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deriva-ml-schema-doc-source-of-truth-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              deriva-ml Schema Doc Source-of-Truth Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#conventions-referenced-throughout-this-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conventions referenced throughout this plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-a-schemamodel-dataclass-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group A — SchemaModel dataclass hierarchy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group A — SchemaModel dataclass hierarchy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-a1-create-the-tools-sub-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task A1: Create the tools sub-package
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-a2-add-schemamodel-sub-dataclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task A2: Add SchemaModel + sub-dataclasses
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-b-load_from_doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group B — load_from_doc
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group B — load_from_doc">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-b1-markdown-yaml-block-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task B1: Markdown YAML-block extraction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-b2-load_from_doc-dict-schemamodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task B2: load_from_doc — dict → SchemaModel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-b3-handle-descriptions-in-doc-narrative-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task B3: Handle descriptions in doc (narrative-only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-c-load_from_code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group C — load_from_code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group C — load_from_code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-c1-skeleton-load_from_code-with-enum-ref-resolver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task C1: Skeleton load_from_code with enum-ref resolver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-c2-ast-parse-columndef-foreignkeydef-tabledef" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task C2: AST-parse ColumnDef / ForeignKeyDef / TableDef
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-c3-ast-parse-vocabularytabledef-_ensure_terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task C3: AST-parse VocabularyTableDef + _ensure_terms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-c4-ast-parse-tabledefine_association" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task C4: AST-parse Table.define_association
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-d-diff_schemas-comparator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group D — diff_schemas comparator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group D — diff_schemas comparator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-d1-mismatch-dataclass-empty-diff-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task D1: Mismatch dataclass + empty-diff case
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-d2-compare-columns-name-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task D2: Compare columns (name + type)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-d3-compare-fks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task D3: Compare FKs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-d4-compare-vocabulary-terms-associations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task D4: Compare vocabulary terms + associations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-e-cli-entry-point-output-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group E — CLI entry point + output format
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group E — CLI entry point + output format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-e1-cli-mainargv-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task E1: CLI main(argv) function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-e2-register-deriva-ml-validate-schema-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task E2: Register deriva-ml-validate-schema entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-e3-schemamodelto_doc_markdown-helper-for-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task E3: SchemaModel.to_doc_markdown() helper for bootstrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-f-bootstrap-the-doc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group F — Bootstrap the doc
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group F — Bootstrap the doc">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-f1-generate-initial-docsreferenceschemamd-from-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task F1: Generate initial docs/reference/schema.md from code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-f2-doc-structure-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task F2: Doc-structure tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-group-g-ci-workflow-changelog-final-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task Group G — CI workflow + CHANGELOG + final review
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task Group G — CI workflow + CHANGELOG + final review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-g1-add-github-actions-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task G1: Add GitHub Actions workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-g2-changelog-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task G2: CHANGELOG entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-g3-final-review-regression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task G3: Final review + regression
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deferred-from-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred from spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-subsystem-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Subsystem-0
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="deriva-ml-schema-doc-source-of-truth-implementation-plan">deriva-ml Schema Doc Source-of-Truth Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Establish <code>docs/reference/schema.md</code> as the authoritative description of the deriva-ml schema, with a CI validator that asserts the doc and <code>src/deriva_ml/schema/create_schema.py</code> agree on tables, columns, FKs, and vocabulary seeded terms.</p>
+<p><strong>Architecture:</strong> New dev-tool module <code>src/deriva_ml/tools/validate_schema_doc.py</code> exposes <code>SchemaModel</code>, two loaders (<code>load_from_doc</code> for Markdown + YAML, <code>load_from_code</code> for AST-parsed Python), and a <code>diff_schemas</code> comparator. CLI entry point <code>deriva-ml-validate-schema</code> runs the code↔doc comparison. GitHub Actions workflow runs the CLI on every PR. Bootstrap: generate initial doc from the existing <code>create_schema.py</code>, then hand-add prose and ordering.</p>
+<p><strong>Tech Stack:</strong> Python 3.12+, <code>ast</code> stdlib, PyYAML (already a direct dep), pytest, GitHub Actions.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design.md</code></p>
+<hr />
+<h2 id="conventions-referenced-throughout-this-plan">Conventions referenced throughout this plan</h2>
+<ul>
+<li><strong>Worktree root:</strong> <code>/Users/carl/github/deriva-ml/.claude/worktrees/phase2-status-enum/</code>. All paths below are relative to it.</li>
+<li><strong>Environment:</strong> <code>export PATH="/Users/carl/.local/bin:$PATH"</code> if <code>uv</code> not found. <code>DERIVA_ML_ALLOW_DIRTY=true</code> for tests. The validator itself needs NO catalog — pure static analysis + YAML parsing.</li>
+<li><strong>Module layout:</strong> tool lives at <code>src/deriva_ml/tools/validate_schema_doc.py</code> (a new sub-package of <code>deriva_ml</code>). Tests live at <code>tests/tools/test_*.py</code>. This matches how <code>src/deriva_ml/cli/upload.py</code> is structured (dev tool shipped in the wheel).</li>
+<li><strong>Enum shortcuts:</strong> <code>MLTable</code> and <code>MLVocab</code> are <code>StrEnum</code>s in <code>src/deriva_ml/core/enums.py</code>. They are safe to import at validator runtime — no catalog, no network calls. <code>load_from_code</code> imports them rather than AST-parsing their definitions.</li>
+<li><strong><code>create_schema.py</code> AST patterns:</strong> the validator recognizes these call patterns in <code>src/deriva_ml/schema/create_schema.py</code>:</li>
+<li><code>TableDef(name=..., columns=[...], foreign_keys=[...])</code> → table</li>
+<li><code>VocabularyTableDef(name=..., curie_template=...)</code> → vocab table</li>
+<li><code>Table.define_association(associates=[...], metadata=[...])</code> → association table</li>
+<li><code>ColumnDef(name, type, ...)</code> → column inside a TableDef</li>
+<li><code>ForeignKeyDef(columns=[...], referenced_schema=..., referenced_table=..., referenced_columns=[...])</code> → FK inside a TableDef</li>
+<li><code>_ensure_terms(vocab_name, [{"Name": ..., ...}, ...])</code> → seeded terms list for a vocab</li>
+<li>Call sites may reference <code>MLTable.xxx</code> / <code>MLVocab.xxx</code>; the validator resolves these via imported enum lookup.</li>
+</ul>
+<hr />
+<h2 id="task-group-overview">Task Group overview</h2>
+<p>Seven task groups, ordered so the tool builds bottom-up then the doc/CI integrate with it.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Scope</th>
+<th>Tasks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong></td>
+<td><code>SchemaModel</code> dataclass hierarchy + empty scaffold</td>
+<td>2 tasks</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td><code>load_from_doc</code> (Markdown + YAML parser)</td>
+<td>3 tasks</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td><code>load_from_code</code> (AST-based code parser)</td>
+<td>4 tasks</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td><code>diff_schemas</code> comparator</td>
+<td>4 tasks</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>CLI entry point + output format</td>
+<td>3 tasks</td>
+</tr>
+<tr>
+<td><strong>F</strong></td>
+<td>Bootstrap: generate initial <code>docs/reference/schema.md</code> + hand-edit + commit</td>
+<td>2 tasks</td>
+</tr>
+<tr>
+<td><strong>G</strong></td>
+<td>CI workflow + <code>CHANGELOG</code> + final review</td>
+<td>3 tasks</td>
+</tr>
+</tbody>
+</table>
+<p>Total: ~21 bite-sized tasks.</p>
+<hr />
+<h2 id="task-group-a-schemamodel-dataclass-hierarchy">Task Group A — <code>SchemaModel</code> dataclass hierarchy</h2>
+<p>Build the in-memory representation that both loaders produce and the comparator consumes. Pure data; no I/O.</p>
+<h3 id="task-a1-create-the-tools-sub-package">Task A1: Create the <code>tools</code> sub-package</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/tools/__init__.py</code>
+- Create: <code>tests/tools/__init__.py</code>
+- Create: <code>tests/tools/test_validate_schema_doc.py</code> (initially empty; tests accumulate through the plan)</p>
+<ul>
+<li>[ ] <strong>Step 1: Create the package init files</strong></li>
+</ul>
+<pre><code class="language-bash">mkdir -p src/deriva_ml/tools tests/tools
+touch src/deriva_ml/tools/__init__.py
+touch tests/tools/__init__.py
+</code></pre>
+<p>Create <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Tests for the schema-doc validator (spec §6).&quot;&quot;&quot;
+
+from __future__ import annotations
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Verify package is importable</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;import deriva_ml.tools&quot;
+</code></pre>
+<p>Expected: no output (successful import).</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/__init__.py tests/tools/__init__.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+chore(tools): scaffold deriva_ml.tools sub-package + tests/tools
+
+Empty sub-package for dev-tooling modules (schema validator, future
+ones). Matches src/deriva_ml/cli/ pattern.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-a2-add-schemamodel-sub-dataclasses">Task A2: Add <code>SchemaModel</code> + sub-dataclasses</h3>
+<p><strong>Files:</strong>
+- Create: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_schema_model_fields():
+    from deriva_ml.tools.validate_schema_doc import (
+        SchemaModel,
+        TableModel,
+    )
+    m = SchemaModel(tables=[])
+    assert m.tables == []
+
+    t = TableModel(
+        name=&quot;Dataset&quot;,
+        kind=&quot;table&quot;,
+        columns=[],
+        foreign_keys=[],
+        terms=[],
+        associates=[],
+        metadata=[],
+    )
+    assert t.name == &quot;Dataset&quot;
+    assert t.kind == &quot;table&quot;
+
+
+def test_column_model_fields():
+    from deriva_ml.tools.validate_schema_doc import ColumnModel
+    c = ColumnModel(name=&quot;Status&quot;, type=&quot;text&quot;)
+    assert c.name == &quot;Status&quot;
+    assert c.type == &quot;text&quot;
+
+
+def test_fk_model_fields():
+    from deriva_ml.tools.validate_schema_doc import ForeignKeyModel
+    fk = ForeignKeyModel(
+        columns=[&quot;Workflow&quot;],
+        referenced_schema=&quot;deriva-ml&quot;,
+        referenced_table=&quot;Workflow&quot;,
+        referenced_columns=[&quot;RID&quot;],
+    )
+    assert fk.columns == [&quot;Workflow&quot;]
+    assert fk.referenced_table == &quot;Workflow&quot;
+
+
+def test_vocabulary_term_model():
+    from deriva_ml.tools.validate_schema_doc import VocabularyTermModel
+    term = VocabularyTermModel(name=&quot;Running&quot;)
+    assert term.name == &quot;Running&quot;
+
+
+def test_mismatch_kinds_defined():
+    &quot;&quot;&quot;Enum of mismatch kinds is present.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import MismatchKind
+    assert MismatchKind.MISSING_TABLE.value == &quot;missing_table&quot;
+    assert MismatchKind.COLUMN_MISMATCH.value == &quot;column_mismatch&quot;
+    assert MismatchKind.FK_MISMATCH.value == &quot;fk_mismatch&quot;
+    assert MismatchKind.VOCAB_TERMS_MISMATCH.value == &quot;vocab_terms_mismatch&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: 5 FAIL with <code>ModuleNotFoundError: No module named 'deriva_ml.tools.validate_schema_doc'</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement the dataclasses</strong></li>
+</ul>
+<p>Create <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Validator: assert docs/reference/schema.md and create_schema.py agree.
+
+Path-1 architecture (per spec §2): both files are maintained by developers.
+The doc describes intended schema; the code defines it at runtime. This
+validator compares the two.
+
+Runs in CI via the deriva-ml-validate-schema entry point.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+@dataclass(frozen=True)
+class ColumnModel:
+    &quot;&quot;&quot;Column definition (name + ERMrest type).&quot;&quot;&quot;
+    name: str
+    type: str
+
+
+@dataclass(frozen=True)
+class ForeignKeyModel:
+    &quot;&quot;&quot;FK from a set of columns to a referenced table's columns.&quot;&quot;&quot;
+    columns: list[str]
+    referenced_schema: str
+    referenced_table: str
+    referenced_columns: list[str]
+
+
+@dataclass(frozen=True)
+class VocabularyTermModel:
+    &quot;&quot;&quot;One seeded term in a vocabulary table.&quot;&quot;&quot;
+    name: str
+
+
+@dataclass(frozen=True)
+class AssociationEndpointModel:
+    &quot;&quot;&quot;One endpoint of an association table.&quot;&quot;&quot;
+    table: str
+    role: str | None = None
+
+
+@dataclass(frozen=True)
+class TableModel:
+    &quot;&quot;&quot;One table in the schema — plain, vocabulary, or association.&quot;&quot;&quot;
+    name: str
+    kind: str  # &quot;table&quot;, &quot;vocabulary&quot;, &quot;association&quot;
+    columns: list[ColumnModel] = field(default_factory=list)
+    foreign_keys: list[ForeignKeyModel] = field(default_factory=list)
+    terms: list[VocabularyTermModel] = field(default_factory=list)
+    associates: list[AssociationEndpointModel] = field(default_factory=list)
+    metadata: list[ColumnModel] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SchemaModel:
+    &quot;&quot;&quot;The full schema — one list of tables.&quot;&quot;&quot;
+    tables: list[TableModel]
+
+
+class MismatchKind(StrEnum):
+    &quot;&quot;&quot;Categories of doc↔code mismatch.&quot;&quot;&quot;
+    MISSING_TABLE = &quot;missing_table&quot;
+    EXTRA_TABLE = &quot;extra_table&quot;
+    COLUMN_MISMATCH = &quot;column_mismatch&quot;
+    FK_MISMATCH = &quot;fk_mismatch&quot;
+    VOCAB_TERMS_MISMATCH = &quot;vocab_terms_mismatch&quot;
+    ASSOCIATION_MISMATCH = &quot;association_mismatch&quot;
+</code></pre>
+<p>Note: <code>TableModel</code> cannot be frozen if it contains mutable <code>list</code> defaults via <code>field(default_factory=list)</code>. Python's <code>@dataclass(frozen=True)</code> actually DOES allow <code>field(default_factory=list)</code> — the instance's attributes are immutable references, but the lists themselves are mutable. This matches the intended semantics (compare-by-value; don't let anyone reassign <code>.tables</code> but DO allow building the list incrementally during parsing).</p>
+<p>Wait — <code>frozen=True</code> disallows attribute assignment AFTER construction, but construction itself populates via the field default factories. That's fine. Keep <code>frozen=True</code> on all of them.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: 5 PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): SchemaModel dataclass hierarchy for schema-doc validator
+
+Data shape both loaders (doc, code) produce and diff_schemas consumes.
+Frozen dataclasses with list fields (defaults via field(default_factory)).
+
+Includes MismatchKind StrEnum for diff outputs.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-b-load_from_doc">Task Group B — <code>load_from_doc</code></h2>
+<p>Parse the Markdown file. Find fenced <code>yaml</code> code blocks. Deserialize each into a <code>TableModel</code>.</p>
+<h3 id="task-b1-markdown-yaml-block-extraction">Task B1: Markdown YAML-block extraction</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_extract_yaml_blocks_basic(tmp_path):
+    &quot;&quot;&quot;Extracts YAML-fenced blocks and parses each into a dict.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;# Intro\n&quot;
+        &quot;\n&quot;
+        &quot;## Dataset\n&quot;
+        &quot;\n&quot;
+        &quot;```yaml\n&quot;
+        &quot;table: Dataset\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;columns:\n&quot;
+        &quot;  - name: Name\n&quot;
+        &quot;    type: text\n&quot;
+        &quot;```\n&quot;
+        &quot;\n&quot;
+        &quot;More prose.\n&quot;
+        &quot;\n&quot;
+        &quot;```yaml\n&quot;
+        &quot;table: Workflow\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;```\n&quot;
+    )
+
+    blocks = _extract_yaml_blocks(doc)
+    assert len(blocks) == 2
+    assert blocks[0][&quot;table&quot;] == &quot;Dataset&quot;
+    assert blocks[0][&quot;columns&quot;][0][&quot;name&quot;] == &quot;Name&quot;
+    assert blocks[1][&quot;table&quot;] == &quot;Workflow&quot;
+
+
+def test_extract_yaml_blocks_ignores_non_yaml_fences(tmp_path):
+    &quot;&quot;&quot;Code blocks fenced as other languages are not parsed as YAML.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```python\n&quot;
+        &quot;x = 1\n&quot;
+        &quot;```\n&quot;
+        &quot;\n&quot;
+        &quot;```yaml\n&quot;
+        &quot;table: Dataset\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;```\n&quot;
+    )
+
+    blocks = _extract_yaml_blocks(doc)
+    assert len(blocks) == 1
+    assert blocks[0][&quot;table&quot;] == &quot;Dataset&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k extract_yaml_blocks
+</code></pre>
+<p>Expected: 2 FAIL with ImportError on <code>_extract_yaml_blocks</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>_extract_yaml_blocks</code></strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">import re
+from pathlib import Path
+
+import yaml
+
+_YAML_FENCE_RE = re.compile(
+    r&quot;^```yaml\s*$(.*?)^```\s*$&quot;,
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _extract_yaml_blocks(path: Path) -&gt; list[dict]:
+    &quot;&quot;&quot;Extract YAML-fenced code blocks from a Markdown file.
+
+    Args:
+        path: Path to the Markdown file.
+
+    Returns:
+        List of dicts, one per ```yaml block, in file order.
+
+    Raises:
+        SchemaDocError: If any block fails to parse as YAML.
+    &quot;&quot;&quot;
+    text = path.read_text()
+    blocks: list[dict] = []
+    for match in _YAML_FENCE_RE.finditer(text):
+        body = match.group(1)
+        line_number = text[: match.start()].count(&quot;\n&quot;) + 1
+        try:
+            parsed = yaml.safe_load(body)
+        except yaml.YAMLError as exc:
+            raise SchemaDocError(
+                f&quot;YAML parse error in {path}:{line_number}: {exc}&quot;
+            ) from exc
+        if parsed is None:
+            continue
+        if not isinstance(parsed, dict):
+            raise SchemaDocError(
+                f&quot;{path}:{line_number}: expected a mapping, got {type(parsed).__name__}&quot;
+            )
+        blocks.append(parsed)
+    return blocks
+
+
+class SchemaDocError(Exception):
+    &quot;&quot;&quot;Raised when the schema doc can't be parsed or is malformed.&quot;&quot;&quot;
+</code></pre>
+<p>Add <code>import yaml</code> to the module-level imports at the top of the file (above the <code>from dataclasses</code> line).</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k extract_yaml_blocks
+</code></pre>
+<p>Expected: 2 PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): _extract_yaml_blocks for Markdown with YAML fences
+
+Reads the doc, extracts fenced ```yaml code blocks, parses each via
+yaml.safe_load. Non-YAML fences (e.g. python) are skipped. Malformed
+YAML raises SchemaDocError with the Markdown line number.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-b2-load_from_doc-dict-schemamodel">Task B2: <code>load_from_doc</code> — dict → <code>SchemaModel</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_load_from_doc_plain_table(tmp_path):
+    &quot;&quot;&quot;A plain table becomes a TableModel with kind='table'.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Dataset\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;description: A data collection.\n&quot;
+        &quot;columns:\n&quot;
+        &quot;  - name: Name\n&quot;
+        &quot;    type: text\n&quot;
+        &quot;  - name: Description\n&quot;
+        &quot;    type: markdown\n&quot;
+        &quot;foreign_keys: []\n&quot;
+        &quot;```\n&quot;
+    )
+    model = load_from_doc(doc)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.name == &quot;Dataset&quot;
+    assert t.kind == &quot;table&quot;
+    assert len(t.columns) == 2
+    assert t.columns[0].name == &quot;Name&quot;
+    assert t.columns[0].type == &quot;text&quot;
+
+
+def test_load_from_doc_vocabulary(tmp_path):
+    &quot;&quot;&quot;A vocabulary table gets terms populated.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Asset_Type\n&quot;
+        &quot;kind: vocabulary\n&quot;
+        &quot;terms:\n&quot;
+        &quot;  - name: Execution_Config\n&quot;
+        &quot;  - name: Runtime_Env\n&quot;
+        &quot;```\n&quot;
+    )
+    model = load_from_doc(doc)
+    t = model.tables[0]
+    assert t.kind == &quot;vocabulary&quot;
+    assert len(t.terms) == 2
+    assert [term.name for term in t.terms] == [&quot;Execution_Config&quot;, &quot;Runtime_Env&quot;]
+
+
+def test_load_from_doc_association(tmp_path):
+    &quot;&quot;&quot;An association table gets associates populated.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Dataset_Execution\n&quot;
+        &quot;kind: association\n&quot;
+        &quot;associates:\n&quot;
+        &quot;  - table: Dataset\n&quot;
+        &quot;  - table: Execution\n&quot;
+        &quot;```\n&quot;
+    )
+    model = load_from_doc(doc)
+    t = model.tables[0]
+    assert t.kind == &quot;association&quot;
+    assert [a.table for a in t.associates] == [&quot;Dataset&quot;, &quot;Execution&quot;]
+
+
+def test_load_from_doc_foreign_keys(tmp_path):
+    &quot;&quot;&quot;FKs parse correctly.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Execution\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;columns:\n&quot;
+        &quot;  - name: Workflow\n&quot;
+        &quot;    type: text\n&quot;
+        &quot;foreign_keys:\n&quot;
+        &quot;  - columns: [Workflow]\n&quot;
+        &quot;    referenced_schema: deriva-ml\n&quot;
+        &quot;    referenced_table: Workflow\n&quot;
+        &quot;    referenced_columns: [RID]\n&quot;
+        &quot;```\n&quot;
+    )
+    model = load_from_doc(doc)
+    fk = model.tables[0].foreign_keys[0]
+    assert fk.columns == [&quot;Workflow&quot;]
+    assert fk.referenced_table == &quot;Workflow&quot;
+    assert fk.referenced_columns == [&quot;RID&quot;]
+
+
+def test_load_from_doc_invalid_kind_raises(tmp_path):
+    &quot;&quot;&quot;Unknown 'kind:' value raises SchemaDocError.&quot;&quot;&quot;
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Bogus\n&quot;
+        &quot;kind: not-a-real-kind\n&quot;
+        &quot;```\n&quot;
+    )
+    with pytest.raises(SchemaDocError, match=&quot;unknown kind&quot;):
+        load_from_doc(doc)
+
+
+def test_load_from_doc_missing_required_key_raises(tmp_path):
+    &quot;&quot;&quot;Missing required key 'kind' raises SchemaDocError.&quot;&quot;&quot;
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaDocError, load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Bogus\n&quot;
+        &quot;```\n&quot;
+    )
+    with pytest.raises(SchemaDocError, match=&quot;missing required key&quot;):
+        load_from_doc(doc)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k load_from_doc
+</code></pre>
+<p>Expected: 6 FAIL with ImportError on <code>load_from_doc</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>load_from_doc</code></strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">_VALID_KINDS = frozenset({&quot;table&quot;, &quot;vocabulary&quot;, &quot;association&quot;})
+
+
+def load_from_doc(path: Path) -&gt; SchemaModel:
+    &quot;&quot;&quot;Parse a schema doc Markdown file into a SchemaModel.
+
+    Args:
+        path: Path to docs/reference/schema.md or equivalent.
+
+    Returns:
+        SchemaModel with one TableModel per ```yaml block.
+
+    Raises:
+        SchemaDocError: If any block is malformed (unknown kind, missing
+            required keys, parse error).
+    &quot;&quot;&quot;
+    blocks = _extract_yaml_blocks(path)
+    tables: list[TableModel] = []
+    for block in blocks:
+        if &quot;table&quot; not in block:
+            raise SchemaDocError(
+                f&quot;{path}: block missing required key 'table': {block}&quot;
+            )
+        if &quot;kind&quot; not in block:
+            raise SchemaDocError(
+                f&quot;{path}: block missing required key 'kind' for table &quot;
+                f&quot;{block['table']!r}&quot;
+            )
+        kind = block[&quot;kind&quot;]
+        if kind not in _VALID_KINDS:
+            raise SchemaDocError(
+                f&quot;{path}: table {block['table']!r} has unknown kind {kind!r}; &quot;
+                f&quot;expected one of {sorted(_VALID_KINDS)}&quot;
+            )
+        columns = [
+            ColumnModel(name=c[&quot;name&quot;], type=c[&quot;type&quot;])
+            for c in block.get(&quot;columns&quot;, [])
+        ]
+        foreign_keys = [
+            ForeignKeyModel(
+                columns=fk[&quot;columns&quot;],
+                referenced_schema=fk[&quot;referenced_schema&quot;],
+                referenced_table=fk[&quot;referenced_table&quot;],
+                referenced_columns=fk[&quot;referenced_columns&quot;],
+            )
+            for fk in block.get(&quot;foreign_keys&quot;, [])
+        ]
+        terms = [
+            VocabularyTermModel(name=t[&quot;name&quot;])
+            for t in block.get(&quot;terms&quot;, [])
+        ]
+        associates = [
+            AssociationEndpointModel(table=a[&quot;table&quot;], role=a.get(&quot;role&quot;))
+            for a in block.get(&quot;associates&quot;, [])
+        ]
+        metadata = [
+            ColumnModel(name=m[&quot;name&quot;], type=m[&quot;type&quot;])
+            for m in block.get(&quot;metadata&quot;, [])
+        ]
+        tables.append(TableModel(
+            name=block[&quot;table&quot;],
+            kind=kind,
+            columns=columns,
+            foreign_keys=foreign_keys,
+            terms=terms,
+            associates=associates,
+            metadata=metadata,
+        ))
+    return SchemaModel(tables=tables)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): load_from_doc — parse Markdown YAML blocks → SchemaModel
+
+Handles plain tables, vocabularies, and association tables. Validates
+required keys ('table', 'kind') and rejects unknown kinds. Raises
+SchemaDocError with path context on malformed blocks.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-b3-handle-descriptions-in-doc-narrative-only">Task B3: Handle descriptions in doc (narrative-only)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<p>Per spec §2, descriptions are doc-side narrative and NOT validated. But <code>load_from_doc</code> should accept them without error — the parser currently doesn't look at the <code>description:</code> key, so it's already tolerated. We just need a test that asserts this.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_load_from_doc_accepts_descriptions(tmp_path):
+    &quot;&quot;&quot;Descriptions on tables and columns are tolerated (doc-side only).&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: Dataset\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;description: A collection of records.\n&quot;
+        &quot;columns:\n&quot;
+        &quot;  - name: Name\n&quot;
+        &quot;    type: text\n&quot;
+        &quot;    description: Human-readable label.\n&quot;
+        &quot;```\n&quot;
+    )
+    model = load_from_doc(doc)
+    # Description text is NOT preserved in the model (doc-side only).
+    t = model.tables[0]
+    assert t.name == &quot;Dataset&quot;
+    assert t.columns[0].name == &quot;Name&quot;
+    # ColumnModel has no description field.
+    assert not hasattr(t.columns[0], &quot;description&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py::test_load_from_doc_accepts_descriptions -v
+</code></pre>
+<p>Expected: PASS (nothing new to implement — the existing parser already ignores the <code>description:</code> key).</p>
+<ul>
+<li>[ ] <strong>Step 3: Commit (test addition only)</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/tools/test_validate_schema_doc.py
+git commit -m &quot;test(tools): confirm load_from_doc tolerates descriptions as narrative&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-c-load_from_code">Task Group C — <code>load_from_code</code></h2>
+<p>AST-parse <code>create_schema.py</code> without executing it. Walk the call tree for <code>TableDef</code>, <code>VocabularyTableDef</code>, <code>Table.define_association</code>, <code>ColumnDef</code>, <code>ForeignKeyDef</code>, <code>_ensure_terms</code>. Resolve <code>MLTable.xxx</code> / <code>MLVocab.xxx</code> references via imported enum lookup.</p>
+<h3 id="task-c1-skeleton-load_from_code-with-enum-ref-resolver">Task C1: Skeleton <code>load_from_code</code> with enum-ref resolver</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_resolve_enum_ref_mltable():
+    &quot;&quot;&quot;Resolver returns the enum value for MLTable.execution.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import _resolve_enum_ref
+
+    assert _resolve_enum_ref(&quot;MLTable&quot;, &quot;execution&quot;) == &quot;Execution&quot;
+    assert _resolve_enum_ref(&quot;MLTable&quot;, &quot;dataset&quot;) == &quot;Dataset&quot;
+
+
+def test_resolve_enum_ref_mlvocab():
+    from deriva_ml.tools.validate_schema_doc import _resolve_enum_ref
+
+    assert _resolve_enum_ref(&quot;MLVocab&quot;, &quot;workflow_type&quot;) == &quot;Workflow_Type&quot;
+    assert _resolve_enum_ref(&quot;MLVocab&quot;, &quot;asset_type&quot;) == &quot;Asset_Type&quot;
+
+
+def test_resolve_enum_ref_unknown_raises():
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaCodeError, _resolve_enum_ref
+
+    with pytest.raises(SchemaCodeError, match=&quot;unknown enum&quot;):
+        _resolve_enum_ref(&quot;UnknownEnum&quot;, &quot;whatever&quot;)
+
+
+def test_resolve_enum_ref_unknown_member_raises():
+    import pytest
+    from deriva_ml.tools.validate_schema_doc import SchemaCodeError, _resolve_enum_ref
+
+    with pytest.raises(SchemaCodeError, match=&quot;has no member&quot;):
+        _resolve_enum_ref(&quot;MLTable&quot;, &quot;no_such_member&quot;)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k resolve_enum_ref
+</code></pre>
+<p>Expected: 4 FAIL with ImportError.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement resolver + exception</strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">class SchemaCodeError(Exception):
+    &quot;&quot;&quot;Raised when create_schema.py contains a pattern the validator can't extract.&quot;&quot;&quot;
+
+
+# Enum lookup for resolving MLTable.xxx / MLVocab.xxx references.
+# Populated lazily via _resolve_enum_ref to avoid circular-import risk.
+_ENUM_LOOKUP: dict[str, dict[str, str]] = {}
+
+
+def _load_enum_lookup() -&gt; dict[str, dict[str, str]]:
+    &quot;&quot;&quot;Build {enum_name: {member_name: value}} for MLTable and MLVocab.&quot;&quot;&quot;
+    global _ENUM_LOOKUP
+    if _ENUM_LOOKUP:
+        return _ENUM_LOOKUP
+    from deriva_ml.core.enums import MLTable, MLVocab
+
+    _ENUM_LOOKUP = {
+        &quot;MLTable&quot;: {m.name: m.value for m in MLTable},
+        &quot;MLVocab&quot;: {m.name: m.value for m in MLVocab},
+    }
+    return _ENUM_LOOKUP
+
+
+def _resolve_enum_ref(enum_name: str, member: str) -&gt; str:
+    &quot;&quot;&quot;Resolve an enum-member reference like MLTable.execution → 'Execution'.&quot;&quot;&quot;
+    lookup = _load_enum_lookup()
+    if enum_name not in lookup:
+        raise SchemaCodeError(
+            f&quot;unknown enum {enum_name!r}; expected one of {sorted(lookup)}&quot;
+        )
+    members = lookup[enum_name]
+    if member not in members:
+        raise SchemaCodeError(
+            f&quot;{enum_name} has no member {member!r}; known: {sorted(members)}&quot;
+        )
+    return members[member]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k resolve_enum_ref
+</code></pre>
+<p>Expected: 4 PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): _resolve_enum_ref for MLTable/MLVocab references in AST
+
+The validator's load_from_code needs to resolve MLTable.execution →
+'Execution' when walking the AST. Builds a lookup on first call via
+runtime enum import (safe — StrEnum, no catalog required).
+
+SchemaCodeError is raised for unknown enums or members.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-c2-ast-parse-columndef-foreignkeydef-tabledef">Task C2: AST-parse <code>ColumnDef</code> / <code>ForeignKeyDef</code> / <code>TableDef</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_load_from_code_simple_tabledef(tmp_path):
+    &quot;&quot;&quot;A fixture module with one TableDef call produces a TableModel.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_code
+
+    fixture = tmp_path / &quot;fixture_schema.py&quot;
+    fixture.write_text(
+        'from deriva.core.typed import TableDef, ColumnDef, ForeignKeyDef, BuiltinType\n'
+        'from deriva_ml.core.definitions import MLTable\n'
+        '\n'
+        'def create_execution_table(schema):\n'
+        '    schema.create_table(TableDef(\n'
+        '        name=MLTable.execution,\n'
+        '        columns=[\n'
+        '            ColumnDef(&quot;Workflow&quot;, BuiltinType.text),\n'
+        '            ColumnDef(&quot;Description&quot;, BuiltinType.markdown),\n'
+        '            ColumnDef(&quot;Status&quot;, BuiltinType.text),\n'
+        '        ],\n'
+        '        foreign_keys=[\n'
+        '            ForeignKeyDef(\n'
+        '                columns=[&quot;Workflow&quot;],\n'
+        '                referenced_schema=&quot;deriva-ml&quot;,\n'
+        '                referenced_table=&quot;Workflow&quot;,\n'
+        '                referenced_columns=[&quot;RID&quot;],\n'
+        '            )\n'
+        '        ],\n'
+        '    ))\n'
+    )
+    model = load_from_code(fixture)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.name == &quot;Execution&quot;
+    assert t.kind == &quot;table&quot;
+    assert [c.name for c in t.columns] == [&quot;Workflow&quot;, &quot;Description&quot;, &quot;Status&quot;]
+    assert [c.type for c in t.columns] == [&quot;text&quot;, &quot;markdown&quot;, &quot;text&quot;]
+    assert len(t.foreign_keys) == 1
+    assert t.foreign_keys[0].columns == [&quot;Workflow&quot;]
+    assert t.foreign_keys[0].referenced_table == &quot;Workflow&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py::test_load_from_code_simple_tabledef -v
+</code></pre>
+<p>Expected: FAIL with ImportError on <code>load_from_code</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement AST walker</strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">import ast
+
+
+def _extract_ast_str(node: ast.AST) -&gt; str:
+    &quot;&quot;&quot;Extract a string from an ast.Constant or return the ast.unparse repr.&quot;&quot;&quot;
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    # Attribute access like BuiltinType.text → &quot;text&quot;
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    raise SchemaCodeError(
+        f&quot;expected string constant or attribute, got {ast.dump(node)}&quot;
+    )
+
+
+def _extract_ast_name_or_enum(node: ast.AST) -&gt; str:
+    &quot;&quot;&quot;Extract a table-name string from a literal, enum ref, or attr access.&quot;&quot;&quot;
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Attribute):
+        # Expect: MLTable.execution or MLVocab.workflow_type
+        if isinstance(node.value, ast.Name):
+            return _resolve_enum_ref(node.value.id, node.attr)
+    raise SchemaCodeError(
+        f&quot;expected string literal or enum reference, got {ast.dump(node)}&quot;
+    )
+
+
+def _extract_ast_str_list(node: ast.AST) -&gt; list[str]:
+    &quot;&quot;&quot;Extract a list[str] from an ast.List node.&quot;&quot;&quot;
+    if not isinstance(node, ast.List):
+        raise SchemaCodeError(
+            f&quot;expected list literal, got {ast.dump(node)}&quot;
+        )
+    return [_extract_ast_str(elt) for elt in node.elts]
+
+
+def _extract_column(node: ast.Call) -&gt; ColumnModel:
+    &quot;&quot;&quot;Extract a ColumnDef(...) call into a ColumnModel.&quot;&quot;&quot;
+    # Positional or keyword args: ColumnDef(&quot;Name&quot;, BuiltinType.text)
+    name: str | None = None
+    type_: str | None = None
+    if node.args:
+        name = _extract_ast_str(node.args[0])
+        if len(node.args) &gt; 1:
+            type_ = _extract_ast_str(node.args[1])
+    for kw in node.keywords:
+        if kw.arg == &quot;name&quot;:
+            name = _extract_ast_str(kw.value)
+        elif kw.arg == &quot;type&quot;:
+            type_ = _extract_ast_str(kw.value)
+    if name is None or type_ is None:
+        raise SchemaCodeError(
+            f&quot;ColumnDef missing name or type: {ast.dump(node)}&quot;
+        )
+    return ColumnModel(name=name, type=type_)
+
+
+def _extract_fk(node: ast.Call) -&gt; ForeignKeyModel:
+    &quot;&quot;&quot;Extract a ForeignKeyDef(...) call into a ForeignKeyModel.&quot;&quot;&quot;
+    columns: list[str] = []
+    referenced_schema: str = &quot;&quot;
+    referenced_table: str = &quot;&quot;
+    referenced_columns: list[str] = []
+    for kw in node.keywords:
+        if kw.arg == &quot;columns&quot;:
+            columns = _extract_ast_str_list(kw.value)
+        elif kw.arg == &quot;referenced_schema&quot;:
+            referenced_schema = _extract_ast_str(kw.value)
+        elif kw.arg == &quot;referenced_table&quot;:
+            referenced_table = _extract_ast_str(kw.value)
+        elif kw.arg == &quot;referenced_columns&quot;:
+            referenced_columns = _extract_ast_str_list(kw.value)
+    return ForeignKeyModel(
+        columns=columns,
+        referenced_schema=referenced_schema,
+        referenced_table=referenced_table,
+        referenced_columns=referenced_columns,
+    )
+
+
+def _extract_tabledef(node: ast.Call) -&gt; TableModel:
+    &quot;&quot;&quot;Extract a TableDef(name=..., columns=[...], foreign_keys=[...]) call.&quot;&quot;&quot;
+    name: str = &quot;&quot;
+    columns: list[ColumnModel] = []
+    foreign_keys: list[ForeignKeyModel] = []
+    for kw in node.keywords:
+        if kw.arg == &quot;name&quot;:
+            name = _extract_ast_name_or_enum(kw.value)
+        elif kw.arg == &quot;columns&quot;:
+            if isinstance(kw.value, ast.List):
+                columns = [
+                    _extract_column(elt)
+                    for elt in kw.value.elts
+                    if isinstance(elt, ast.Call) and _callable_name(elt) == &quot;ColumnDef&quot;
+                ]
+        elif kw.arg == &quot;foreign_keys&quot;:
+            if isinstance(kw.value, ast.List):
+                foreign_keys = [
+                    _extract_fk(elt)
+                    for elt in kw.value.elts
+                    if isinstance(elt, ast.Call) and _callable_name(elt) == &quot;ForeignKeyDef&quot;
+                ]
+    return TableModel(
+        name=name,
+        kind=&quot;table&quot;,
+        columns=columns,
+        foreign_keys=foreign_keys,
+    )
+
+
+def _callable_name(node: ast.Call) -&gt; str:
+    &quot;&quot;&quot;Return the callable's name: 'TableDef', 'Foo.bar', etc.&quot;&quot;&quot;
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        parts = []
+        cur: ast.AST = node.func
+        while isinstance(cur, ast.Attribute):
+            parts.insert(0, cur.attr)
+            cur = cur.value
+        if isinstance(cur, ast.Name):
+            parts.insert(0, cur.id)
+        return &quot;.&quot;.join(parts)
+    return &quot;&quot;
+
+
+def load_from_code(path: Path) -&gt; SchemaModel:
+    &quot;&quot;&quot;Parse create_schema.py AST into a SchemaModel.
+
+    Walks the tree looking for TableDef, VocabularyTableDef,
+    Table.define_association, and _ensure_terms calls.
+
+    Args:
+        path: Path to create_schema.py or a fixture module.
+
+    Returns:
+        SchemaModel with one TableModel per table definition found.
+
+    Raises:
+        SchemaCodeError: If a call pattern can't be statically extracted.
+    &quot;&quot;&quot;
+    tree = ast.parse(path.read_text(), filename=str(path))
+    tables: list[TableModel] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _callable_name(node)
+        if name == &quot;TableDef&quot;:
+            tables.append(_extract_tabledef(node))
+        # Vocabulary / association / _ensure_terms handled in C3 / C4.
+    return SchemaModel(tables=tables)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py::test_load_from_code_simple_tabledef -v
+</code></pre>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): load_from_code AST parser — TableDef + ColumnDef + ForeignKeyDef
+
+Walks the AST of create_schema.py-like modules, extracts TableDef
+calls and their column/FK lists. Resolves MLTable.xxx enum references
+via _resolve_enum_ref.
+
+Vocabulary/association/_ensure_terms handling comes in C3/C4.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-c3-ast-parse-vocabularytabledef-_ensure_terms">Task C3: AST-parse <code>VocabularyTableDef</code> + <code>_ensure_terms</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_load_from_code_vocabulary_with_terms(tmp_path):
+    &quot;&quot;&quot;A VocabularyTableDef plus _ensure_terms yields a vocabulary TableModel.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_code
+
+    fixture = tmp_path / &quot;fixture_vocab.py&quot;
+    fixture.write_text(
+        'from deriva.core.typed import VocabularyTableDef\n'
+        'from deriva_ml.core.definitions import MLVocab\n'
+        '\n'
+        'def create():\n'
+        '    schema.create_table(\n'
+        '        VocabularyTableDef(name=MLVocab.workflow_type, curie_template=&quot;x:{RID}&quot;)\n'
+        '    )\n'
+        '\n'
+        'def seed():\n'
+        '    _ensure_terms(MLVocab.workflow_type, [\n'
+        '        {&quot;Name&quot;: &quot;Training&quot;, &quot;Description&quot;: &quot;Train a model&quot;},\n'
+        '        {&quot;Name&quot;: &quot;Testing&quot;, &quot;Description&quot;: &quot;Evaluate a model&quot;},\n'
+        '    ])\n'
+    )
+    model = load_from_code(fixture)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.name == &quot;Workflow_Type&quot;
+    assert t.kind == &quot;vocabulary&quot;
+    assert [term.name for term in t.terms] == [&quot;Training&quot;, &quot;Testing&quot;]
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py::test_load_from_code_vocabulary_with_terms -v
+</code></pre>
+<p>Expected: FAIL — VocabularyTableDef not extracted yet.</p>
+<ul>
+<li>[ ] <strong>Step 3: Extend <code>load_from_code</code> to handle vocabulary + terms</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/tools/validate_schema_doc.py</code>, add helpers and extend <code>load_from_code</code>:</p>
+<pre><code class="language-python">def _extract_vocabulary(node: ast.Call) -&gt; TableModel:
+    &quot;&quot;&quot;Extract a VocabularyTableDef(name=..., curie_template=...) call.&quot;&quot;&quot;
+    name: str = &quot;&quot;
+    for kw in node.keywords:
+        if kw.arg == &quot;name&quot;:
+            name = _extract_ast_name_or_enum(kw.value)
+    return TableModel(name=name, kind=&quot;vocabulary&quot;)
+
+
+def _extract_ensure_terms(node: ast.Call) -&gt; tuple[str, list[VocabularyTermModel]]:
+    &quot;&quot;&quot;Extract (vocab_name, terms) from an _ensure_terms(vocab, [...]) call.&quot;&quot;&quot;
+    if len(node.args) &lt; 2:
+        raise SchemaCodeError(
+            f&quot;_ensure_terms expects 2 positional args, got {len(node.args)}&quot;
+        )
+    vocab_name = _extract_ast_name_or_enum(node.args[0])
+    terms_list = node.args[1]
+    if not isinstance(terms_list, ast.List):
+        raise SchemaCodeError(
+            f&quot;_ensure_terms second arg must be a list literal, got &quot;
+            f&quot;{ast.dump(terms_list)}&quot;
+        )
+    terms: list[VocabularyTermModel] = []
+    for elt in terms_list.elts:
+        if not isinstance(elt, ast.Dict):
+            raise SchemaCodeError(
+                f&quot;_ensure_terms term must be a dict literal, got &quot;
+                f&quot;{ast.dump(elt)}&quot;
+            )
+        name_val: str | None = None
+        for k, v in zip(elt.keys, elt.values, strict=True):
+            if (
+                isinstance(k, ast.Constant)
+                and k.value == &quot;Name&quot;
+                and isinstance(v, ast.Constant)
+                and isinstance(v.value, str)
+            ):
+                name_val = v.value
+        if name_val is None:
+            raise SchemaCodeError(
+                f&quot;_ensure_terms term missing 'Name': {ast.dump(elt)}&quot;
+            )
+        terms.append(VocabularyTermModel(name=name_val))
+    return vocab_name, terms
+</code></pre>
+<p>Rewrite <code>load_from_code</code> to include vocab + ensure_terms handling:</p>
+<pre><code class="language-python">def load_from_code(path: Path) -&gt; SchemaModel:
+    &quot;&quot;&quot;Parse create_schema.py AST into a SchemaModel.
+
+    Walks the tree for:
+      - TableDef(...)              → plain table
+      - VocabularyTableDef(...)    → vocabulary table (terms populated below)
+      - Table.define_association(...) → association table (C4)
+      - _ensure_terms(vocab, [...]) → seed terms for a vocab table
+
+    After walking, vocab tables have their terms populated by matching
+    _ensure_terms vocab_name to TableModel.name.
+
+    Args:
+        path: Path to create_schema.py or a fixture.
+
+    Returns:
+        SchemaModel with all discovered TableModels, vocab terms filled in.
+
+    Raises:
+        SchemaCodeError: If a call pattern can't be statically extracted.
+    &quot;&quot;&quot;
+    tree = ast.parse(path.read_text(), filename=str(path))
+    tables: list[TableModel] = []
+    # Map from vocab table name → list of VocabularyTermModel to apply later.
+    terms_by_vocab: dict[str, list[VocabularyTermModel]] = {}
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = _callable_name(node)
+        if name == &quot;TableDef&quot;:
+            tables.append(_extract_tabledef(node))
+        elif name == &quot;VocabularyTableDef&quot;:
+            tables.append(_extract_vocabulary(node))
+        elif name == &quot;_ensure_terms&quot;:
+            vocab_name, terms = _extract_ensure_terms(node)
+            terms_by_vocab.setdefault(vocab_name, []).extend(terms)
+
+    # Apply accumulated terms to matching vocab tables.
+    tables_with_terms: list[TableModel] = []
+    for t in tables:
+        if t.kind == &quot;vocabulary&quot; and t.name in terms_by_vocab:
+            tables_with_terms.append(TableModel(
+                name=t.name,
+                kind=t.kind,
+                columns=t.columns,
+                foreign_keys=t.foreign_keys,
+                terms=terms_by_vocab[t.name],
+                associates=t.associates,
+                metadata=t.metadata,
+            ))
+        else:
+            tables_with_terms.append(t)
+    return SchemaModel(tables=tables_with_terms)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS (C1-C3 tests plus earlier A/B tests).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): load_from_code handles VocabularyTableDef + _ensure_terms
+
+Extracts vocabulary tables and their seeded terms. Terms are collected
+across the entire module and then grafted onto the matching vocab
+TableModel by name.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-c4-ast-parse-tabledefine_association">Task C4: AST-parse <code>Table.define_association</code></h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_load_from_code_association_table(tmp_path):
+    &quot;&quot;&quot;Table.define_association produces a TableModel with kind='association'.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import load_from_code
+
+    fixture = tmp_path / &quot;fixture_assoc.py&quot;
+    fixture.write_text(
+        'from deriva.core.ermrest_model import Table\n'
+        'from deriva.core.typed import ColumnDef, BuiltinType\n'
+        '\n'
+        'def create():\n'
+        '    schema.create_table(\n'
+        '        Table.define_association(\n'
+        '            associates=[\n'
+        '                (&quot;Execution&quot;, execution_table),\n'
+        '                (&quot;Nested_Execution&quot;, execution_table),\n'
+        '            ],\n'
+        '            metadata=[\n'
+        '                ColumnDef(name=&quot;Sequence&quot;, type=&quot;int4&quot;, nullok=True),\n'
+        '            ],\n'
+        '        )\n'
+        '    )\n'
+    )
+    model = load_from_code(fixture)
+    assert len(model.tables) == 1
+    t = model.tables[0]
+    assert t.kind == &quot;association&quot;
+    # Name isn't given directly; derived from the associates pair.
+    # We expect &quot;Execution_Nested_Execution&quot; as the default-constructed name.
+    assert t.name == &quot;Execution_Nested_Execution&quot;
+    assert [a.table for a in t.associates] == [&quot;Execution&quot;, &quot;Nested_Execution&quot;]
+    assert [m.name for m in t.metadata] == [&quot;Sequence&quot;]
+</code></pre>
+<p><strong>Note</strong>: <code>Table.define_association</code> is actually a factory method from deriva-py that returns a <code>TableDef</code> with a derived name. We can't know the derived name without executing code. Two options:</p>
+<p>(a) Have the test fixture and the doc agree that association-table names are derived as <code>"{assoc1}_{assoc2}"</code> (the common convention used by define_association). Document this as a convention.</p>
+<p>(b) Require an explicit <code>name=</code> kwarg on the <code>Table.define_association(...)</code> call in the doc comparison context. Since the underlying code doesn't pass <code>name=</code>, the validator derives the name from <code>associates</code>.</p>
+<p>Going with (a) — simpler and matches deriva-py's actual behavior. Most cases pass an explicit pair like <code>("Dataset", dataset_table), ("Dataset_Type", dataset_type)</code> and the library builds <code>"Dataset_Dataset_Type"</code> from them.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py::test_load_from_code_association_table -v
+</code></pre>
+<p>Expected: FAIL — association not extracted yet.</p>
+<ul>
+<li>[ ] <strong>Step 3: Extend <code>load_from_code</code> for associations</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def _extract_association(node: ast.Call) -&gt; TableModel:
+    &quot;&quot;&quot;Extract Table.define_association(associates=[...], metadata=[...]).&quot;&quot;&quot;
+    associates: list[AssociationEndpointModel] = []
+    metadata: list[ColumnModel] = []
+    for kw in node.keywords:
+        if kw.arg == &quot;associates&quot;:
+            if not isinstance(kw.value, ast.List):
+                raise SchemaCodeError(
+                    f&quot;define_association associates must be a list, got &quot;
+                    f&quot;{ast.dump(kw.value)}&quot;
+                )
+            for elt in kw.value.elts:
+                if not isinstance(elt, ast.Tuple) or len(elt.elts) &lt; 1:
+                    raise SchemaCodeError(
+                        f&quot;associates entry must be a tuple (name, table), got &quot;
+                        f&quot;{ast.dump(elt)}&quot;
+                    )
+                table_name = _extract_ast_name_or_enum(elt.elts[0])
+                associates.append(AssociationEndpointModel(table=table_name))
+        elif kw.arg == &quot;metadata&quot;:
+            if isinstance(kw.value, ast.List):
+                for m_elt in kw.value.elts:
+                    if isinstance(m_elt, ast.Call) and _callable_name(m_elt) == &quot;ColumnDef&quot;:
+                        metadata.append(_extract_column(m_elt))
+    # Association name: derived from associates — '{first}_{second}'.
+    derived_name = &quot;_&quot;.join(a.table for a in associates)
+    return TableModel(
+        name=derived_name,
+        kind=&quot;association&quot;,
+        associates=associates,
+        metadata=metadata,
+    )
+</code></pre>
+<p>Add a branch in <code>load_from_code</code>'s walker:</p>
+<pre><code class="language-python">elif name == &quot;Table.define_association&quot;:
+    tables.append(_extract_association(node))
+</code></pre>
+<p>Place this branch alongside the TableDef / VocabularyTableDef branches.</p>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS (C1-C4 plus earlier).</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): load_from_code handles Table.define_association
+
+Extracts association-table definitions. The derived name follows
+deriva-py's convention: '{first_associate}_{second_associate}'.
+Metadata columns are extracted as ColumnModels.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-d-diff_schemas-comparator">Task Group D — <code>diff_schemas</code> comparator</h2>
+<p>Compare two <code>SchemaModel</code> instances; emit a list of typed mismatches. No I/O.</p>
+<h3 id="task-d1-mismatch-dataclass-empty-diff-case">Task D1: <code>Mismatch</code> dataclass + empty-diff case</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_mismatch_dataclass_fields():
+    from deriva_ml.tools.validate_schema_doc import Mismatch, MismatchKind
+    m = Mismatch(
+        kind=MismatchKind.MISSING_TABLE,
+        table=&quot;Execution_Status&quot;,
+        detail=&quot;declared in doc but not in code&quot;,
+    )
+    assert m.kind == MismatchKind.MISSING_TABLE
+    assert m.table == &quot;Execution_Status&quot;
+
+
+def test_diff_identical_schemas_empty():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel,
+        SchemaModel,
+        TableModel,
+        diff_schemas,
+    )
+    s1 = SchemaModel(tables=[
+        TableModel(
+            name=&quot;Dataset&quot;,
+            kind=&quot;table&quot;,
+            columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;text&quot;)],
+        ),
+    ])
+    s2 = SchemaModel(tables=[
+        TableModel(
+            name=&quot;Dataset&quot;,
+            kind=&quot;table&quot;,
+            columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;text&quot;)],
+        ),
+    ])
+    assert diff_schemas(expected=s1, actual=s2) == []
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k &quot;Mismatch or identical&quot;
+</code></pre>
+<p>Expected: FAIL with ImportError.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement Mismatch + empty diff</strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">@dataclass(frozen=True)
+class Mismatch:
+    &quot;&quot;&quot;One discrepancy between expected and actual schemas.&quot;&quot;&quot;
+    kind: &quot;MismatchKind&quot;
+    table: str | None
+    detail: str
+
+
+def diff_schemas(*, expected: SchemaModel, actual: SchemaModel) -&gt; list[Mismatch]:
+    &quot;&quot;&quot;Compare two schemas; return list of Mismatches.
+
+    Args:
+        expected: The &quot;expected&quot; schema — typically the doc side.
+        actual: The &quot;actual&quot; schema — typically the code side.
+
+    Returns:
+        Empty list if schemas match. Otherwise one Mismatch per discrepancy.
+    &quot;&quot;&quot;
+    mismatches: list[Mismatch] = []
+    expected_tables = {t.name: t for t in expected.tables}
+    actual_tables = {t.name: t for t in actual.tables}
+
+    # Missing from actual (in doc but not in code).
+    for name in sorted(expected_tables.keys() - actual_tables.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.MISSING_TABLE,
+            table=name,
+            detail=f&quot;table {name!r} is in the doc but not in the code&quot;,
+        ))
+    # Extra in actual (in code but not in doc).
+    for name in sorted(actual_tables.keys() - expected_tables.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.EXTRA_TABLE,
+            table=name,
+            detail=f&quot;table {name!r} is in the code but not in the doc&quot;,
+        ))
+    # Tables in both: D2-D4 extend this loop.
+    for name in sorted(expected_tables.keys() &amp; actual_tables.keys()):
+        _compare_tables(mismatches, expected_tables[name], actual_tables[name])
+    return mismatches
+
+
+def _compare_tables(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    &quot;&quot;&quot;Compare two same-named TableModels; append any differences.&quot;&quot;&quot;
+    # D2-D4 populate this. Skeleton only for D1.
+    pass
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v -k &quot;Mismatch or identical&quot;
+</code></pre>
+<p>Expected: PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): diff_schemas skeleton — Mismatch dataclass + missing/extra table
+
+Empty-diff case works: two identical SchemaModels return []. Missing
+tables (doc-only) and extra tables (code-only) emit Mismatches.
+Per-table column/FK/term comparison comes in D2-D4.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-d2-compare-columns-name-type">Task D2: Compare columns (name + type)</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_diff_column_missing_in_actual():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name=&quot;Dataset&quot;, kind=&quot;table&quot;,
+        columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;text&quot;), ColumnModel(name=&quot;Extra&quot;, type=&quot;text&quot;)],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name=&quot;Dataset&quot;, kind=&quot;table&quot;,
+        columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;text&quot;)],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert len(mismatches) == 1
+    assert mismatches[0].kind == MismatchKind.COLUMN_MISMATCH
+    assert &quot;Extra&quot; in mismatches[0].detail
+
+
+def test_diff_column_type_mismatch():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name=&quot;Dataset&quot;, kind=&quot;table&quot;,
+        columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;text&quot;)],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name=&quot;Dataset&quot;, kind=&quot;table&quot;,
+        columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;markdown&quot;)],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(
+        m.kind == MismatchKind.COLUMN_MISMATCH
+        and &quot;text&quot; in m.detail and &quot;markdown&quot; in m.detail
+        for m in mismatches
+    )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<p>Expected: FAIL — <code>_compare_tables</code> is a pass-through currently.</p>
+<ul>
+<li>[ ] <strong>Step 3: Populate column comparison in <code>_compare_tables</code></strong></li>
+</ul>
+<p>Modify <code>_compare_tables</code> in <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def _compare_tables(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    &quot;&quot;&quot;Compare two same-named TableModels; append any differences.&quot;&quot;&quot;
+    _compare_columns(mismatches, expected, actual)
+    # D3 adds _compare_fks; D4 adds _compare_terms / _compare_associates.
+
+
+def _compare_columns(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    &quot;&quot;&quot;Column-by-column diff.&quot;&quot;&quot;
+    expected_cols = {c.name: c for c in expected.columns}
+    actual_cols = {c.name: c for c in actual.columns}
+    for col_name in sorted(expected_cols.keys() - actual_cols.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.COLUMN_MISMATCH,
+            table=expected.name,
+            detail=f&quot;column {col_name!r} in doc but not in code&quot;,
+        ))
+    for col_name in sorted(actual_cols.keys() - expected_cols.keys()):
+        mismatches.append(Mismatch(
+            kind=MismatchKind.COLUMN_MISMATCH,
+            table=expected.name,
+            detail=f&quot;column {col_name!r} in code but not in doc&quot;,
+        ))
+    for col_name in sorted(expected_cols.keys() &amp; actual_cols.keys()):
+        exp_c = expected_cols[col_name]
+        act_c = actual_cols[col_name]
+        if exp_c.type != act_c.type:
+            mismatches.append(Mismatch(
+                kind=MismatchKind.COLUMN_MISMATCH,
+                table=expected.name,
+                detail=(
+                    f&quot;column {col_name!r}: doc type {exp_c.type!r} &quot;
+                    f&quot;vs code type {act_c.type!r}&quot;
+                ),
+            ))
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): diff_schemas — column name + type comparison
+
+_compare_columns yields COLUMN_MISMATCH Mismatches for columns
+present in one model but not the other, or present in both with
+differing types.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-d3-compare-fks">Task D3: Compare FKs</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_diff_fk_target_mismatch():
+    from deriva_ml.tools.validate_schema_doc import (
+        ColumnModel, ForeignKeyModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name=&quot;Execution&quot;, kind=&quot;table&quot;,
+        columns=[ColumnModel(name=&quot;Workflow&quot;, type=&quot;text&quot;)],
+        foreign_keys=[ForeignKeyModel(
+            columns=[&quot;Workflow&quot;],
+            referenced_schema=&quot;deriva-ml&quot;,
+            referenced_table=&quot;Workflow&quot;,
+            referenced_columns=[&quot;RID&quot;],
+        )],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name=&quot;Execution&quot;, kind=&quot;table&quot;,
+        columns=[ColumnModel(name=&quot;Workflow&quot;, type=&quot;text&quot;)],
+        foreign_keys=[ForeignKeyModel(
+            columns=[&quot;Workflow&quot;],
+            referenced_schema=&quot;deriva-ml&quot;,
+            referenced_table=&quot;SomeOtherTable&quot;,
+            referenced_columns=[&quot;RID&quot;],
+        )],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<p>Expected: FAIL — FK comparison not implemented.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add FK comparison</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def _compare_fks(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    &quot;&quot;&quot;FK comparison — by tuple (columns, referenced_table, referenced_columns).
+
+    FKs are matched by their source columns tuple. If a doc FK and a code
+    FK share columns, their referenced_* must match.
+    &quot;&quot;&quot;
+    def key(fk: ForeignKeyModel) -&gt; tuple[str, ...]:
+        return tuple(fk.columns)
+
+    expected_fks = {key(fk): fk for fk in expected.foreign_keys}
+    actual_fks = {key(fk): fk for fk in actual.foreign_keys}
+
+    for k in sorted(expected_fks.keys() - actual_fks.keys()):
+        fk = expected_fks[k]
+        mismatches.append(Mismatch(
+            kind=MismatchKind.FK_MISMATCH,
+            table=expected.name,
+            detail=f&quot;FK on {list(k)} in doc but not in code&quot;,
+        ))
+    for k in sorted(actual_fks.keys() - expected_fks.keys()):
+        fk = actual_fks[k]
+        mismatches.append(Mismatch(
+            kind=MismatchKind.FK_MISMATCH,
+            table=expected.name,
+            detail=f&quot;FK on {list(k)} in code but not in doc&quot;,
+        ))
+    for k in sorted(expected_fks.keys() &amp; actual_fks.keys()):
+        exp_fk = expected_fks[k]
+        act_fk = actual_fks[k]
+        if (exp_fk.referenced_schema, exp_fk.referenced_table, tuple(exp_fk.referenced_columns)) != (
+            act_fk.referenced_schema, act_fk.referenced_table, tuple(act_fk.referenced_columns)
+        ):
+            mismatches.append(Mismatch(
+                kind=MismatchKind.FK_MISMATCH,
+                table=expected.name,
+                detail=(
+                    f&quot;FK on {list(k)} differs: &quot;
+                    f&quot;doc → {exp_fk.referenced_schema}.{exp_fk.referenced_table}{exp_fk.referenced_columns}; &quot;
+                    f&quot;code → {act_fk.referenced_schema}.{act_fk.referenced_table}{act_fk.referenced_columns}&quot;
+                ),
+            ))
+</code></pre>
+<p>Extend <code>_compare_tables</code> to call <code>_compare_fks</code>:</p>
+<pre><code class="language-python">def _compare_tables(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    _compare_columns(mismatches, expected, actual)
+    _compare_fks(mismatches, expected, actual)
+    # D4 adds _compare_terms / _compare_associates.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): diff_schemas — FK comparison by column tuple + target
+
+_compare_fks matches FKs by their source-column tuple. Emits
+FK_MISMATCH for presence differences and for shared-key differences
+in referenced_schema/table/columns.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-d4-compare-vocabulary-terms-associations">Task D4: Compare vocabulary terms + associations</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_diff_vocab_terms_differ():
+    from deriva_ml.tools.validate_schema_doc import (
+        MismatchKind, SchemaModel, TableModel, VocabularyTermModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name=&quot;Asset_Type&quot;,
+        kind=&quot;vocabulary&quot;,
+        terms=[
+            VocabularyTermModel(name=&quot;Execution_Config&quot;),
+            VocabularyTermModel(name=&quot;Extra_DocOnly_Term&quot;),
+        ],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name=&quot;Asset_Type&quot;,
+        kind=&quot;vocabulary&quot;,
+        terms=[
+            VocabularyTermModel(name=&quot;Execution_Config&quot;),
+            VocabularyTermModel(name=&quot;Extra_CodeOnly_Term&quot;),
+        ],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(
+        m.kind == MismatchKind.VOCAB_TERMS_MISMATCH
+        and &quot;Extra_DocOnly_Term&quot; in m.detail
+        and &quot;Extra_CodeOnly_Term&quot; in m.detail
+        for m in mismatches
+    )
+
+
+def test_diff_association_endpoints_differ():
+    from deriva_ml.tools.validate_schema_doc import (
+        AssociationEndpointModel, MismatchKind, SchemaModel, TableModel, diff_schemas,
+    )
+    expected = SchemaModel(tables=[TableModel(
+        name=&quot;Dataset_Execution&quot;,
+        kind=&quot;association&quot;,
+        associates=[
+            AssociationEndpointModel(table=&quot;Dataset&quot;),
+            AssociationEndpointModel(table=&quot;Execution&quot;),
+        ],
+    )])
+    actual = SchemaModel(tables=[TableModel(
+        name=&quot;Dataset_Execution&quot;,
+        kind=&quot;association&quot;,
+        associates=[
+            AssociationEndpointModel(table=&quot;Dataset&quot;),
+            AssociationEndpointModel(table=&quot;Workflow&quot;),  # differs
+        ],
+    )])
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    assert any(m.kind == MismatchKind.ASSOCIATION_MISMATCH for m in mismatches)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<p>Expected: FAIL.</p>
+<ul>
+<li>[ ] <strong>Step 3: Add vocab + associates comparison</strong></li>
+</ul>
+<p>In <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def _compare_terms(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    &quot;&quot;&quot;Compare vocabulary seeded terms (by Name).&quot;&quot;&quot;
+    expected_terms = {t.name for t in expected.terms}
+    actual_terms = {t.name for t in actual.terms}
+    if expected_terms != actual_terms:
+        doc_only = sorted(expected_terms - actual_terms)
+        code_only = sorted(actual_terms - expected_terms)
+        mismatches.append(Mismatch(
+            kind=MismatchKind.VOCAB_TERMS_MISMATCH,
+            table=expected.name,
+            detail=f&quot;doc-only: {doc_only}; code-only: {code_only}&quot;,
+        ))
+
+
+def _compare_associates(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    &quot;&quot;&quot;Compare association-table endpoints (by table name).&quot;&quot;&quot;
+    expected_assoc = [a.table for a in expected.associates]
+    actual_assoc = [a.table for a in actual.associates]
+    if expected_assoc != actual_assoc:
+        mismatches.append(Mismatch(
+            kind=MismatchKind.ASSOCIATION_MISMATCH,
+            table=expected.name,
+            detail=f&quot;associates doc {expected_assoc} vs code {actual_assoc}&quot;,
+        ))
+</code></pre>
+<p>Extend <code>_compare_tables</code>:</p>
+<pre><code class="language-python">def _compare_tables(
+    mismatches: list[Mismatch],
+    expected: TableModel,
+    actual: TableModel,
+) -&gt; None:
+    _compare_columns(mismatches, expected, actual)
+    _compare_fks(mismatches, expected, actual)
+    if expected.kind == &quot;vocabulary&quot; or actual.kind == &quot;vocabulary&quot;:
+        _compare_terms(mismatches, expected, actual)
+    if expected.kind == &quot;association&quot; or actual.kind == &quot;association&quot;:
+        _compare_associates(mismatches, expected, actual)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): diff_schemas — vocabulary terms + association endpoints
+
+_compare_terms emits VOCAB_TERMS_MISMATCH with doc-only and code-only
+term-name sets. _compare_associates compares associate-table-name
+sequences; emits ASSOCIATION_MISMATCH on any divergence.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-e-cli-entry-point-output-format">Task Group E — CLI entry point + output format</h2>
+<h3 id="task-e1-cli-mainargv-function">Task E1: CLI <code>main(argv)</code> function</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_cli_match_returns_0(tmp_path, capsys):
+    &quot;&quot;&quot;Identical schemas: exit 0, success message.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import main
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: X\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;columns: []\n&quot;
+        &quot;foreign_keys: []\n&quot;
+        &quot;```\n&quot;
+    )
+    code = tmp_path / &quot;code.py&quot;
+    code.write_text(
+        'from deriva.core.typed import TableDef\n'
+        'schema.create_table(TableDef(name=&quot;X&quot;, columns=[], foreign_keys=[]))\n'
+    )
+
+    exit_code = main([&quot;--doc&quot;, str(doc), &quot;--code&quot;, str(code)])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert &quot;agree&quot; in captured.out
+
+
+def test_cli_mismatch_returns_1(tmp_path, capsys):
+    &quot;&quot;&quot;Divergent schemas: exit 1, mismatch lines.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import main
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: X\n&quot;
+        &quot;kind: table\n&quot;
+        &quot;columns:\n&quot;
+        &quot;  - name: A\n&quot;
+        &quot;    type: text\n&quot;
+        &quot;foreign_keys: []\n&quot;
+        &quot;```\n&quot;
+    )
+    code = tmp_path / &quot;code.py&quot;
+    code.write_text(
+        'from deriva.core.typed import TableDef, ColumnDef, BuiltinType\n'
+        'schema.create_table(TableDef(\n'
+        '    name=&quot;X&quot;,\n'
+        '    columns=[ColumnDef(&quot;B&quot;, BuiltinType.text)],\n'
+        '    foreign_keys=[],\n'
+        '))\n'
+    )
+
+    exit_code = main([&quot;--doc&quot;, str(doc), &quot;--code&quot;, str(code)])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert &quot;COLUMN MISMATCH&quot; in captured.out or &quot;column&quot; in captured.out.lower()
+
+
+def test_cli_parse_error_returns_2(tmp_path, capsys):
+    &quot;&quot;&quot;Malformed doc: exit 2.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import main
+
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(
+        &quot;```yaml\n&quot;
+        &quot;table: X\n&quot;
+        &quot;kind: invalid-kind\n&quot;
+        &quot;```\n&quot;
+    )
+    code = tmp_path / &quot;code.py&quot;
+    code.write_text(&quot;&quot;)
+
+    exit_code = main([&quot;--doc&quot;, str(doc), &quot;--code&quot;, str(code)])
+    assert exit_code == 2
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failures</strong></li>
+</ul>
+<p>Expected: FAIL — <code>main</code> not defined.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>main</code> + formatted output</strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">import argparse
+import sys
+from collections import defaultdict
+
+
+def _format_mismatches(mismatches: list[Mismatch]) -&gt; str:
+    &quot;&quot;&quot;Render mismatches in the §5.5 format.&quot;&quot;&quot;
+    if not mismatches:
+        return &quot;deriva-ml-validate-schema: schema.md and create_schema.py agree.\n&quot;
+
+    buckets: dict[MismatchKind, list[Mismatch]] = defaultdict(list)
+    for m in mismatches:
+        buckets[m.kind].append(m)
+
+    lines = [
+        &quot;deriva-ml-validate-schema: schema.md and create_schema.py disagree.&quot;,
+        &quot;&quot;,
+    ]
+
+    def add_section(title: str, kind: MismatchKind) -&gt; None:
+        lines.append(f&quot;{title}:&quot;)
+        if kind in buckets:
+            for m in buckets[kind]:
+                lines.append(f&quot;  - {m.detail}&quot;)
+        else:
+            lines.append(&quot;  (none)&quot;)
+        lines.append(&quot;&quot;)
+
+    add_section(&quot;MISSING FROM CODE&quot;, MismatchKind.MISSING_TABLE)
+    add_section(&quot;EXTRA IN CODE&quot;, MismatchKind.EXTRA_TABLE)
+    add_section(&quot;COLUMN MISMATCH&quot;, MismatchKind.COLUMN_MISMATCH)
+    add_section(&quot;FOREIGN KEY MISMATCH&quot;, MismatchKind.FK_MISMATCH)
+    add_section(&quot;VOCABULARY TERMS MISMATCH&quot;, MismatchKind.VOCAB_TERMS_MISMATCH)
+    add_section(&quot;ASSOCIATION MISMATCH&quot;, MismatchKind.ASSOCIATION_MISMATCH)
+    return &quot;\n&quot;.join(lines)
+
+
+def _build_parser() -&gt; argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog=&quot;deriva-ml-validate-schema&quot;,
+        description=(
+            &quot;Validate that docs/reference/schema.md and &quot;
+            &quot;src/deriva_ml/schema/create_schema.py agree on tables, &quot;
+            &quot;columns, foreign keys, and vocabulary seeded terms.&quot;
+        ),
+    )
+    p.add_argument(
+        &quot;--doc&quot;,
+        default=&quot;docs/reference/schema.md&quot;,
+        help=&quot;Path to the schema doc (default: docs/reference/schema.md).&quot;,
+    )
+    p.add_argument(
+        &quot;--code&quot;,
+        default=&quot;src/deriva_ml/schema/create_schema.py&quot;,
+        help=&quot;Path to create_schema.py (default: src/deriva_ml/schema/create_schema.py).&quot;,
+    )
+    return p
+
+
+def main(argv: list[str] | None = None) -&gt; int:
+    &quot;&quot;&quot;CLI entry point: compare doc vs code.
+
+    Returns:
+        0 if schemas agree.
+        1 if they differ.
+        2 if parsing failed on either side.
+    &quot;&quot;&quot;
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        expected = load_from_doc(Path(args.doc))
+    except (SchemaDocError, FileNotFoundError) as exc:
+        print(f&quot;error loading doc: {exc}&quot;, file=sys.stderr)
+        return 2
+
+    try:
+        actual = load_from_code(Path(args.code))
+    except (SchemaCodeError, FileNotFoundError) as exc:
+        print(f&quot;error loading code: {exc}&quot;, file=sys.stderr)
+        return 2
+
+    mismatches = diff_schemas(expected=expected, actual=actual)
+    print(_format_mismatches(mismatches))
+    return 1 if mismatches else 0
+
+
+if __name__ == &quot;__main__&quot;:
+    sys.exit(main())
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): main() CLI — exit codes 0/1/2, formatted mismatch output
+
+main(argv) parses --doc and --code args (default to production paths),
+runs load_from_doc + load_from_code + diff_schemas, prints either the
+'agree' single-liner or the bucketed mismatch report. Exit codes
+0 (match), 1 (mismatch), 2 (parse error).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-e2-register-deriva-ml-validate-schema-entry-point">Task E2: Register <code>deriva-ml-validate-schema</code> entry point</h3>
+<p><strong>Files:</strong>
+- Modify: <code>pyproject.toml</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Read the current scripts section</strong></li>
+</ul>
+<pre><code class="language-bash">grep -B1 -A15 &quot;\[project\.scripts\]&quot; pyproject.toml
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Add the new entry</strong></li>
+</ul>
+<p>Append to the <code>[project.scripts]</code> section (matching existing <code>deriva-ml-*</code> naming):</p>
+<pre><code class="language-toml">deriva-ml-validate-schema = &quot;deriva_ml.tools.validate_schema_doc:main&quot;
+</code></pre>
+<p>Place it alphabetically with the others (after <code>deriva-ml-upload</code>).</p>
+<ul>
+<li>[ ] <strong>Step 3: Verify the entry is usable via <code>uv run</code></strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run python -m deriva_ml.tools.validate_schema_doc --help
+</code></pre>
+<p>Expected: argparse <code>--help</code> output listing <code>--doc</code> and <code>--code</code> flags.</p>
+<ul>
+<li>[ ] <strong>Step 4: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add pyproject.toml
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+build(scripts): register deriva-ml-validate-schema entry point
+
+The schema-doc validator is now runnable as a first-class CLI via the
+project's [project.scripts] section.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-e3-schemamodelto_doc_markdown-helper-for-bootstrap">Task E3: <code>SchemaModel.to_doc_markdown()</code> helper for bootstrap</h3>
+<p><strong>Files:</strong>
+- Modify: <code>src/deriva_ml/tools/validate_schema_doc.py</code>
+- Modify: <code>tests/tools/test_validate_schema_doc.py</code></p>
+<p>Per spec §8: ship a helper that renders a <code>SchemaModel</code> to the doc Markdown format. Used for the F1 bootstrap and as an "emergency regenerate from code" tool.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing test</strong></li>
+</ul>
+<p>Append to <code>tests/tools/test_validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def test_to_doc_markdown_roundtrip(tmp_path):
+    &quot;&quot;&quot;A SchemaModel rendered to Markdown can be loaded back losslessly.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import (
+        AssociationEndpointModel, ColumnModel, ForeignKeyModel,
+        SchemaModel, TableModel, VocabularyTermModel,
+        load_from_doc, to_doc_markdown,
+    )
+    original = SchemaModel(tables=[
+        TableModel(
+            name=&quot;Dataset&quot;,
+            kind=&quot;table&quot;,
+            columns=[ColumnModel(name=&quot;Name&quot;, type=&quot;text&quot;)],
+            foreign_keys=[],
+        ),
+        TableModel(
+            name=&quot;Workflow_Type&quot;,
+            kind=&quot;vocabulary&quot;,
+            terms=[VocabularyTermModel(name=&quot;Training&quot;)],
+        ),
+        TableModel(
+            name=&quot;Dataset_Dataset_Type&quot;,
+            kind=&quot;association&quot;,
+            associates=[
+                AssociationEndpointModel(table=&quot;Dataset&quot;),
+                AssociationEndpointModel(table=&quot;Dataset_Type&quot;),
+            ],
+        ),
+    ])
+    md = to_doc_markdown(original)
+    doc = tmp_path / &quot;schema.md&quot;
+    doc.write_text(md)
+    roundtripped = load_from_doc(doc)
+
+    assert len(roundtripped.tables) == 3
+    assert [t.name for t in roundtripped.tables] == [
+        &quot;Dataset&quot;, &quot;Workflow_Type&quot;, &quot;Dataset_Dataset_Type&quot;,
+    ]
+    assert roundtripped.tables[0].columns[0].name == &quot;Name&quot;
+    assert roundtripped.tables[1].terms[0].name == &quot;Training&quot;
+    assert roundtripped.tables[2].associates[0].table == &quot;Dataset&quot;
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run to verify failure</strong></li>
+</ul>
+<p>Expected: FAIL — <code>to_doc_markdown</code> not defined.</p>
+<ul>
+<li>[ ] <strong>Step 3: Implement <code>to_doc_markdown</code></strong></li>
+</ul>
+<p>Append to <code>src/deriva_ml/tools/validate_schema_doc.py</code>:</p>
+<pre><code class="language-python">def to_doc_markdown(model: SchemaModel) -&gt; str:
+    &quot;&quot;&quot;Render a SchemaModel to the docs/reference/schema.md format.
+
+    Used for bootstrap (generate an initial doc from the code) and for
+    emergency regeneration. The output is round-trip identical with
+    load_from_doc.
+
+    Args:
+        model: SchemaModel instance.
+
+    Returns:
+        Multi-section Markdown string.
+    &quot;&quot;&quot;
+    sections: list[str] = []
+    for t in model.tables:
+        header = f&quot;## {t.name}\n&quot;
+        yaml_body: dict = {
+            &quot;table&quot;: t.name,
+            &quot;kind&quot;: t.kind,
+        }
+        if t.columns:
+            yaml_body[&quot;columns&quot;] = [
+                {&quot;name&quot;: c.name, &quot;type&quot;: c.type} for c in t.columns
+            ]
+        if t.foreign_keys:
+            yaml_body[&quot;foreign_keys&quot;] = [
+                {
+                    &quot;columns&quot;: list(fk.columns),
+                    &quot;referenced_schema&quot;: fk.referenced_schema,
+                    &quot;referenced_table&quot;: fk.referenced_table,
+                    &quot;referenced_columns&quot;: list(fk.referenced_columns),
+                }
+                for fk in t.foreign_keys
+            ]
+        elif t.kind == &quot;table&quot;:
+            yaml_body[&quot;foreign_keys&quot;] = []
+        if t.terms:
+            yaml_body[&quot;terms&quot;] = [{&quot;name&quot;: term.name} for term in t.terms]
+        if t.associates:
+            yaml_body[&quot;associates&quot;] = [
+                {&quot;table&quot;: a.table} for a in t.associates
+            ]
+        if t.metadata:
+            yaml_body[&quot;metadata&quot;] = [
+                {&quot;name&quot;: m.name, &quot;type&quot;: m.type} for m in t.metadata
+            ]
+        yaml_text = yaml.safe_dump(
+            yaml_body, sort_keys=False, default_flow_style=False,
+        )
+        block = &quot;```yaml\n&quot; + yaml_text + &quot;```\n&quot;
+        sections.append(header + &quot;\n&quot; + block)
+    return &quot;\n&quot;.join(sections)
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_validate_schema_doc.py -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add src/deriva_ml/tools/validate_schema_doc.py tests/tools/test_validate_schema_doc.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+feat(tools): to_doc_markdown — render SchemaModel back to Markdown
+
+Used by the F1 bootstrap task and as an emergency regeneration helper.
+Roundtrip through load_from_doc is lossless.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-f-bootstrap-the-doc">Task Group F — Bootstrap the doc</h2>
+<h3 id="task-f1-generate-initial-docsreferenceschemamd-from-code">Task F1: Generate initial <code>docs/reference/schema.md</code> from code</h3>
+<p><strong>Files:</strong>
+- Create: <code>docs/reference/schema.md</code>
+- Create: <code>docs/reference/README.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Generate the initial doc from the real <code>create_schema.py</code></strong></li>
+</ul>
+<pre><code class="language-bash">mkdir -p docs/reference
+DERIVA_ML_ALLOW_DIRTY=true uv run python -c &quot;
+from pathlib import Path
+from deriva_ml.tools.validate_schema_doc import load_from_code, to_doc_markdown
+
+model = load_from_code(Path('src/deriva_ml/schema/create_schema.py'))
+print(to_doc_markdown(model))
+&quot; &gt; docs/reference/schema.md
+</code></pre>
+<p>This produces a pure-generated doc with no prose. The validator should run clean against it.</p>
+<ul>
+<li>[ ] <strong>Step 2: Run validator against the generated doc</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run deriva-ml-validate-schema
+</code></pre>
+<p>Expected: <code>deriva-ml-validate-schema: schema.md and create_schema.py agree.</code> Exit 0.</p>
+<p>If mismatches appear, they fall into two buckets:</p>
+<ol>
+<li><strong>Validator bugs</strong> — a pattern in <code>create_schema.py</code> the validator misparses. Fix the validator; re-generate.</li>
+<li><strong>Intentional code-side dynamic patterns</strong> — e.g., f-strings in <code>curie_template</code> — these are out of scope per spec §2. Document in the doc's top-of-file narrative which code patterns are ignored.</li>
+</ol>
+<p>Iterate Step 1 + Step 2 until clean.</p>
+<ul>
+<li>[ ] <strong>Step 3: Hand-edit — add top-of-file prose</strong></li>
+</ul>
+<p>Prepend to <code>docs/reference/schema.md</code>:</p>
+<pre><code class="language-markdown"># deriva-ml Schema Reference
+
+This document is the authoritative description of the deriva-ml schema. It is kept in sync with `src/deriva_ml/schema/create_schema.py` by the `deriva-ml-validate-schema` CI check.
+
+## Editing this doc
+
+Schema changes are **doc-first** per Phase-2-Subsystem-0. To change the schema:
+
+1. Edit the relevant `## &lt;Table&gt;` section below (or add a new one).
+2. Edit `src/deriva_ml/schema/create_schema.py` to match.
+3. Run `uv run deriva-ml-validate-schema` locally to verify agreement.
+4. Commit both files together. CI re-runs the validator.
+
+## What is and isn't validated
+
+The validator enforces: **table names, columns (name + type), foreign keys, vocabulary seeded terms, and association-table endpoints.**
+
+The validator does NOT enforce: descriptions (narrative on both sides), ERMrest annotations (dynamic Python in the code), `curie_template` values (dynamic f-strings), indexes, or display configs. These may differ between doc and code without CI failure.
+
+See `docs/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design.md` for the full rationale.
+
+## Table of contents
+
+(Ordered as: core entities, then vocabularies, then association tables.)
+
+---
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Hand-edit — add per-table descriptions</strong></li>
+</ul>
+<p>For each <code>## &lt;Table&gt;</code> section, add a short paragraph of description text between the header and the YAML block. Example:</p>
+<pre><code class="language-markdown">## Execution
+
+Per-execution lifecycle row. Created once per workflow run; status transitions through the Phase-1 state machine (`src/deriva_ml/execution/state_machine.py`).
+
+```yaml
+table: Execution
+kind: table
+...
+```
+</code></pre>
+<p>Do this for every table. Keep descriptions short (1-3 sentences). Avoid restating the YAML's structural content.</p>
+<ul>
+<li>[ ] <strong>Step 5: Verify validator still passes</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run deriva-ml-validate-schema
+</code></pre>
+<p>Expected: still clean (descriptions aren't validated).</p>
+<ul>
+<li>[ ] <strong>Step 6: Write <code>docs/reference/README.md</code></strong></li>
+</ul>
+<p>Create <code>docs/reference/README.md</code>:</p>
+<pre><code class="language-markdown"># Reference docs
+
+## schema.md
+
+Authoritative description of the `deriva-ml` schema.
+
+To change the schema:
+
+1. Edit `schema.md` to describe the intended state.
+2. Edit `src/deriva_ml/schema/create_schema.py` to match.
+3. Run `uv run deriva-ml-validate-schema` locally.
+4. Commit both files together.
+
+See `schema.md` for what is and isn't validated.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 7: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/reference/
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(reference): bootstrap schema.md from create_schema.py
+
+Initial generation via to_doc_markdown + hand-added prose and
+per-table descriptions. Validator runs clean.
+
+Adds docs/reference/README.md with the doc-first workflow instructions.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-f2-doc-structure-tests">Task F2: Doc-structure tests</h3>
+<p><strong>Files:</strong>
+- Create: <code>tests/tools/test_schema_doc_structure.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write tests</strong></li>
+</ul>
+<p>Create <code>tests/tools/test_schema_doc_structure.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Structure tests for docs/reference/schema.md.
+
+These tests enforce invariants about the doc itself, separate from the
+doc-vs-code comparison:
+
+- Every MLTable and MLVocab enum member has a doc entry.
+- Every YAML block parses.
+- Tables are ordered: core entities → vocabularies → associations.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+DOC_PATH = Path(__file__).resolve().parent.parent.parent / &quot;docs&quot; / &quot;reference&quot; / &quot;schema.md&quot;
+
+
+def test_schema_doc_exists():
+    assert DOC_PATH.exists(), f&quot;{DOC_PATH} does not exist&quot;
+
+
+def test_schema_doc_yaml_blocks_all_valid():
+    &quot;&quot;&quot;Every fenced YAML block parses as a dict.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
+    blocks = _extract_yaml_blocks(DOC_PATH)
+    assert len(blocks) &gt; 0
+    for b in blocks:
+        assert isinstance(b, dict)
+        assert &quot;table&quot; in b
+        assert &quot;kind&quot; in b
+
+
+def test_schema_doc_has_entry_per_mltable_member():
+    &quot;&quot;&quot;Every MLTable enum member appears as a table in the doc.&quot;&quot;&quot;
+    from deriva_ml.core.enums import MLTable
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    model = load_from_doc(DOC_PATH)
+    doc_names = {t.name for t in model.tables}
+    for member in MLTable:
+        assert member.value in doc_names, (
+            f&quot;MLTable.{member.name} ({member.value!r}) is missing from &quot;
+            f&quot;{DOC_PATH.name}. Add a ## {member.value} section with a &quot;
+            f&quot;fenced yaml block.&quot;
+        )
+
+
+def test_schema_doc_has_entry_per_mlvocab_member():
+    &quot;&quot;&quot;Every MLVocab enum member appears as a vocabulary table in the doc.&quot;&quot;&quot;
+    from deriva_ml.core.enums import MLVocab
+    from deriva_ml.tools.validate_schema_doc import load_from_doc
+
+    model = load_from_doc(DOC_PATH)
+    vocab_names = {t.name for t in model.tables if t.kind == &quot;vocabulary&quot;}
+    for member in MLVocab:
+        assert member.value in vocab_names, (
+            f&quot;MLVocab.{member.name} ({member.value!r}) is missing as a &quot;
+            f&quot;vocabulary table in {DOC_PATH.name}.&quot;
+        )
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/test_schema_doc_structure.py -v
+</code></pre>
+<p>Expected: all PASS. If MLTable members are missing, F1's generated doc was incomplete — investigate (the generator may have skipped an AST pattern). Fix and regenerate.</p>
+<ul>
+<li>[ ] <strong>Step 3: Write the integration test for repo-scale validation</strong></li>
+</ul>
+<p>Create <code>tests/tools/test_validate_schema_doc_integration.py</code>:</p>
+<pre><code class="language-python">&quot;&quot;&quot;Integration tests — run the validator on the real repo files.
+
+If this test fails, docs/reference/schema.md has drifted from
+src/deriva_ml/schema/create_schema.py. Fix one or both.
+&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def test_validator_runs_clean_on_current_repo():
+    &quot;&quot;&quot;The authoritative doc and code agree. This IS the CI gate.&quot;&quot;&quot;
+    from deriva_ml.tools.validate_schema_doc import (
+        diff_schemas, load_from_code, load_from_doc,
+    )
+
+    doc_path = REPO_ROOT / &quot;docs&quot; / &quot;reference&quot; / &quot;schema.md&quot;
+    code_path = REPO_ROOT / &quot;src&quot; / &quot;deriva_ml&quot; / &quot;schema&quot; / &quot;create_schema.py&quot;
+
+    expected = load_from_doc(doc_path)
+    actual = load_from_code(code_path)
+    mismatches = diff_schemas(expected=expected, actual=actual)
+
+    assert mismatches == [], (
+        &quot;schema.md and create_schema.py disagree:\n&quot;
+        + &quot;\n&quot;.join(f&quot;  - {m.kind.value}: {m.detail}&quot; for m in mismatches)
+    )
+
+
+def test_cli_exits_zero_on_current_repo():
+    &quot;&quot;&quot;Invoking the CLI against the real paths returns exit 0.&quot;&quot;&quot;
+    result = subprocess.run(
+        [sys.executable, &quot;-m&quot;, &quot;deriva_ml.tools.validate_schema_doc&quot;],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, (
+        f&quot;stdout: {result.stdout}\nstderr: {result.stderr}&quot;
+    )
+    assert &quot;agree&quot; in result.stdout
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Run all tests</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/ -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add tests/tools/test_schema_doc_structure.py tests/tools/test_validate_schema_doc_integration.py
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+test(tools): schema doc structure + integration tests
+
+test_schema_doc_structure.py asserts every MLTable / MLVocab enum
+member appears in the doc — catches 'added a table to the enum but
+forgot the doc.'
+
+test_validate_schema_doc_integration.py runs the full doc-vs-code
+diff on the real repo files. This IS the CI gate.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h2 id="task-group-g-ci-workflow-changelog-final-review">Task Group G — CI workflow + CHANGELOG + final review</h2>
+<h3 id="task-g1-add-github-actions-workflow">Task G1: Add GitHub Actions workflow</h3>
+<p><strong>Files:</strong>
+- Create: <code>.github/workflows/validate-schema.yml</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write the workflow</strong></li>
+</ul>
+<p>Create <code>.github/workflows/validate-schema.yml</code>:</p>
+<pre><code class="language-yaml">name: Validate deriva-ml schema doc
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  validate-schema:
+    name: schema.md ↔ create_schema.py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Sync deps
+        run: uv sync
+      - name: Run validator
+        run: uv run deriva-ml-validate-schema
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Verify workflow locally with act (if available) or by lint-only</strong></li>
+</ul>
+<pre><code class="language-bash"># If actionlint is available:
+actionlint .github/workflows/validate-schema.yml 2&gt;&amp;1 || echo &quot;actionlint not installed; skipping&quot;
+# Or just visually review.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add .github/workflows/validate-schema.yml
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+ci: add validate-schema workflow for every PR
+
+Runs uv run deriva-ml-validate-schema on each pull request and on
+pushes to main. Fails the build if docs/reference/schema.md and
+src/deriva_ml/schema/create_schema.py disagree.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-g2-changelog-entry">Task G2: CHANGELOG entry</h3>
+<p><strong>Files:</strong>
+- Modify: <code>CHANGELOG.md</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Insert new section</strong></li>
+</ul>
+<p>Near the top of <code>CHANGELOG.md</code>, above any existing Phase-2 entries:</p>
+<pre><code class="language-markdown">## Unreleased — Phase 2 Subsystem 0: Schema-doc source of truth
+
+### New
+
+- **`docs/reference/schema.md`** — authoritative description of the `deriva-ml` schema (tables, columns, FKs, vocabulary seeded terms). Edit this file **first** when changing the schema, then update `src/deriva_ml/schema/create_schema.py` to match.
+- **`deriva-ml-validate-schema`** CLI (`src/deriva_ml/tools/validate_schema_doc.py`) — asserts the doc and code agree on structure and seeded terms. Exit 0 on match, 1 on mismatch, 2 on parse error.
+- **CI workflow** `.github/workflows/validate-schema.yml` — runs the validator on every PR and push to main.
+- **`docs/reference/README.md`** — developer workflow instructions for doc-first schema changes.
+
+### Changed
+
+- Schema changes now **require editing two files together**: `docs/reference/schema.md` and `src/deriva_ml/schema/create_schema.py`. CI enforces they agree.
+
+### Not yet supported (filed follow-ups)
+
+- Direction 2: `deriva-ml-validate-schema --against=catalog` for live-catalog drift detection.
+- Description validation (table/column prose on doc vs `comment=` on code).
+- Annotation validation.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Commit</strong></li>
+</ul>
+<pre><code class="language-bash">git add CHANGELOG.md
+git commit -m &quot;$(cat &lt;&lt;'EOF'
+docs(changelog): Phase 2 Subsystem 0 — schema-doc source of truth
+
+Announces the new doc-first workflow for schema changes, the
+deriva-ml-validate-schema CLI, and the CI workflow.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)&quot;
+</code></pre>
+<hr />
+<h3 id="task-g3-final-review-regression">Task G3: Final review + regression</h3>
+<p><strong>Files:</strong> none (verification only)</p>
+<ul>
+<li>[ ] <strong>Step 1: Full tool test run</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/tools/ -v
+</code></pre>
+<p>Expected: all PASS.</p>
+<ul>
+<li>[ ] <strong>Step 2: Verify the CLI runs clean</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run deriva-ml-validate-schema
+echo &quot;exit=$?&quot;
+</code></pre>
+<p>Expected: "agree" message, <code>exit=0</code>.</p>
+<ul>
+<li>[ ] <strong>Step 3: Regression across the rest of the suite</strong></li>
+</ul>
+<pre><code class="language-bash">DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/core/ tests/local_db/ -q 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: no Phase-2-Subsystem-0-introduced regressions. (We haven't touched library code, only tools + docs.)</p>
+<ul>
+<li>[ ] <strong>Step 4: Ruff on new files</strong></li>
+</ul>
+<pre><code class="language-bash">uv run ruff check src/deriva_ml/tools/ tests/tools/
+</code></pre>
+<p>Expected: clean.</p>
+<ul>
+<li>[ ] <strong>Step 5: Dispatch a <code>superpowers:code-reviewer</code> subagent for final review</strong></li>
+</ul>
+<p>Per <code>superpowers:subagent-driven-development</code>:</p>
+<pre><code>Subagent: superpowers:code-reviewer
+Task: review the Phase 2 Subsystem 0 diff (commits A1 through G2) against
+spec docs/superpowers/specs/2026-04-21-schema-doc-source-of-truth-design.md.
+
+Check: spec coverage (§§1-11), Path-1 architecture correctness, validator
+behavior (structure-only per Q6/Q8), CI workflow shape, doc completeness.
+
+Report blockers, important issues, and nits. Implementer fixes blockers
+and important issues before merge.
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 6: Address reviewer findings</strong></li>
+</ul>
+<p>Follow subagent-driven-development pattern: re-dispatch implementer for each fix, re-run reviewer until approved.</p>
+<ul>
+<li>[ ] <strong>Step 7: Finish branch</strong></li>
+</ul>
+<p>Once approved, invoke <code>superpowers:finishing-a-development-branch</code> to PR and merge.</p>
+<hr />
+<p><em>(End of Task Group G — Phase 2 Subsystem 0 complete.)</em></p>
+<hr />
+<h2 id="deferred-from-spec">Deferred from spec</h2>
+<ul>
+<li><strong>Spec §6.3 test #18</strong> (<code>test_schema_doc_table_order</code> — warn-not-fail on section-ordering violations): not implemented in this plan. Pytest's warn-not-fail semantics are fiddly, and the §4.1 ordering (core → vocab → association) is a readability convention that doesn't need CI enforcement. If the ordering drifts in practice, add this test as a follow-up.</li>
+</ul>
+<h2 id="post-subsystem-0">Post-Subsystem-0</h2>
+<p>After Subsystem 0 merges to main, resume <strong>Subsystem 1 (status-enum reconciliation)</strong>. The existing spec (<code>2026-04-21-status-enum-reconciliation-design.md</code>) is already written; the WIP plan (<code>2026-04-21-status-enum-reconciliation.md</code>) needs the following edits to reflect the Path-1 workflow:</p>
+<ul>
+<li>Each task that modifies <code>src/deriva_ml/schema/create_schema.py</code> must also update <code>docs/reference/schema.md</code> in the same commit.</li>
+<li>Subsystem 1's Q6 (vocab table shape — Execution_Status as a direct FK) is resolvable once Subsystem 0 merges: the schema doc's yaml shape for FK vs. association-table patterns is established, so the decision about Execution_Status becomes "which pattern does the doc describe?"</li>
+</ul>
+<p>Then: Subsystem 3 (upload engine), Subsystem 4 (hygiene), Subsystem 2 (feature-consistency, the real Phase 2).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2791 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://informatics-isi-edu.github.io/deriva-ml/superpowers/specs/2026-04-17-denormalization-semantics-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Denormalization Semantics — Implementation Spec - DerivaML</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#denormalization-semantics-implementation-spec" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="DerivaML" class="md-header__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DerivaML
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Denormalization Semantics — Implementation Spec
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="DerivaML" class="md-nav__button md-logo" aria-label="DerivaML" data-md-component="logo">
+      
+  <img src="../../../assets/deriva-logo.png" alt="logo">
+
+    </a>
+    DerivaML
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/exploring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exploring a catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working with datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Defining and using features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/executions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/offline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Working offline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/sharing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and collaboration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/hydra-zen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrating with hydra-zen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from previous versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Groups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments and Multiruns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/notebooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notebook Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sample Notebooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Sample Notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../Notebooks/DerivaML%20Vocabulary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML Vocabulary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Classes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core Classes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_ml_base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DerivaModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Datasets
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_bag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DatasetBag
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Splitting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/dataset_aux_classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Auxiliary Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/execution_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ExecutionConfiguration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/lineage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lineage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/deriva_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Definitions & Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goals-and-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goals and scope
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Goals and scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-migration-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Migration posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-denormalizer-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Denormalizer class
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Denormalizer class">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Location
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-constructors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Constructors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-dataset-side-sugar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Dataset-side sugar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#241-naming-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4.1 Naming rationale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-removed-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Removed methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-semantic-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Semantic rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Semantic rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-rule-1-row-cardinality-row_per-rows-in-scope-orphan-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Rule 1: Row cardinality = |row_per rows in scope| + |orphan rows|
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-rule-2-auto-inference-of-row_per" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Rule 2: Auto-inference of row_per
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-rule-3-column-projection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Rule 3: Column projection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-rule-4-upstream-hoisting-star-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Rule 4: Upstream hoisting (star schema)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-rule-5-explicit-row_per-with-downstream-table-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Rule 5: Explicit row_per with downstream table → error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-rule-6-multiple-fk-paths-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Rule 6: Multiple FK paths → error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-rule-7-anchor-contribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Rule 7: Anchor contribution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#38-rule-8-unrelated-anchors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.8 Rule 8: Unrelated anchors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#39-rule-9-nested-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.9 Rule 9: Nested datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#310-rule-10-version-parameter-deferred" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.10 Rule 10: Version parameter (deferred)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Algorithm
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Algorithm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-high-level-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 High-level flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-fk-subgraph-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 FK subgraph construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-sink-finding-rule-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Sink-finding (Rule 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-path-enumeration-rule-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Path enumeration (Rule 6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-orphan-row-emission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Orphan row emission
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-plan-output-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. plan() output structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-explore_schema-output-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. explore_schema() output structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Testing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-unit-tests-no-live-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Unit tests (no live catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-integration-tests-live-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Integration tests (live catalog)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-regression-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Regression safety
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-implementation-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Implementation order
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Implementation order">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-breaking-change-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Breaking-change summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-open-questions-future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Open questions / future work
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="denormalization-semantics-implementation-spec">Denormalization Semantics — Implementation Spec</h1>
+<p><strong>Status:</strong> Draft, pending review.
+<strong>Date:</strong> 2026-04-17.
+<strong>Companion doc:</strong> <code>docs/concepts/denormalization.md</code> (user-facing).
+<strong>Scope:</strong> Defines the semantics and implementation contract for the
+<code>Denormalizer</code> class and the denormalization primitive. Supersedes the
+prior ad-hoc behavior of <code>_prepare_wide_table</code> path selection.</p>
+<h2 id="1-goals-and-scope">1. Goals and scope</h2>
+<h3 id="11-goals">1.1 Goals</h3>
+<ol>
+<li><strong>Deterministic, predictable denormalization.</strong> Users can reason about
+   row count, column set, and orphan handling without understanding the FK
+   graph internals.</li>
+<li><strong>ML-native default shape.</strong> One row per observation, upstream context
+   hoisted and repeated — the classic star-schema denormalization.</li>
+<li><strong>Clear errors for ambiguous cases.</strong> When the request is
+   under-specified, produce actionable errors that list the exact options
+   for resolution.</li>
+<li><strong>Unambiguous <code>row_per</code> and <code>via</code> semantics.</strong> Give users explicit knobs
+   for cases auto-inference cannot resolve.</li>
+<li><strong>Generalize beyond Dataset.</strong> Support arbitrary RID anchor sets for
+   workflows that don't start from a Dataset.</li>
+<li><strong>Preserve the LEFT-JOIN-like "all anchors contribute" property.</strong>
+   Orphan anchors emit rows rather than being silently dropped.</li>
+</ol>
+<h3 id="12-non-goals">1.2 Non-goals</h3>
+<ul>
+<li>Downstream-to-leaf aggregation (collapsing N rows per leaf). Explicitly
+  deferred; rejected with clear error in v1.</li>
+<li>New caching behavior. The existing <code>Workspace.cache_denormalized</code> and
+  <code>ResultCache</code> machinery continues to serve caching concerns.</li>
+<li>Upload-back semantics. Out of scope.</li>
+<li>Version-pinned denormalization (the <code>version</code> parameter remains a
+  deprecated no-op with a UserWarning, as in current code).</li>
+</ul>
+<h3 id="13-migration-posture">1.3 Migration posture</h3>
+<p>Direct replacement. <code>Denormalizer</code> is introduced as the new public class.
+The old methods <code>Dataset.denormalize_as_dataframe</code>, <code>denormalize_as_dict</code>,
+<code>denormalize_columns</code>, and <code>denormalize_info</code> are <strong>removed outright</strong> and
+replaced with the new sugar methods in §2.4. Same for <code>DatasetBag</code>.</p>
+<p>No deprecation window — callers are updated to the new API in the same
+change. This is safe because the new API is a superset of the old API
+(every legitimate previous call has an equivalent new form with better
+semantics).</p>
+<h2 id="2-the-denormalizer-class">2. The <code>Denormalizer</code> class</h2>
+<h3 id="21-location">2.1 Location</h3>
+<p><code>src/deriva_ml/local_db/denormalize.py</code> (existing module). The public
+interface becomes the <code>Denormalizer</code> class.</p>
+<p>The existing free <code>denormalize()</code> function is renamed to the private
+<code>_denormalize_impl()</code> and continues to host the SQL-generation and
+fetch-orchestration work, now driven by <code>Denormalizer</code> methods rather
+than called directly. Its previous callers in <code>Dataset</code> and <code>DatasetBag</code>
+are rewired to use <code>Denormalizer</code> via the sugar methods described in §2.4.</p>
+<p>The <code>DenormalizeResult</code> dataclass (already exported from this module)
+remains the return type of the SQL-generation step and is surfaced as the
+internal representation that <code>Denormalizer.as_dataframe()</code> /
+<code>.as_dict()</code> convert into their user-facing return types.</p>
+<h3 id="22-constructors">2.2 Constructors</h3>
+<pre><code class="language-python">class Denormalizer:
+    def __init__(self, dataset: DatasetLike):
+        &quot;&quot;&quot;Construct from a Dataset or DatasetBag.
+
+        The dataset's members (recursively, including nested datasets) become
+        the anchor set. Catalog, workspace, and model are derived from the
+        dataset's ML instance (for Dataset) or the bag's DatabaseModel (for
+        DatasetBag).
+        &quot;&quot;&quot;
+
+    @classmethod
+    def from_rids(
+        cls,
+        anchors: list[str | tuple[str, str]],
+        *,
+        ml: &quot;DerivaML | None&quot; = None,
+        catalog: &quot;ErmrestCatalog | None&quot; = None,
+        workspace: &quot;Workspace | None&quot; = None,
+        model: &quot;DerivaModel | None&quot; = None,
+        ignore_unrelated_anchors: bool = False,
+    ) -&gt; &quot;Denormalizer&quot;:
+        &quot;&quot;&quot;Construct from an explicit anchor set.
+
+        Anchors may be bare RIDs (table looked up via catalog) or
+        ``(table_name, RID)`` tuples (lookup skipped). Mixed forms supported.
+
+        Pass either ``ml=`` (common) or all three of ``catalog``,
+        ``workspace``, ``model`` (escape hatch for testing / custom setups).
+        &quot;&quot;&quot;
+</code></pre>
+<h3 id="23-methods">2.3 Methods</h3>
+<pre><code class="language-python">def as_dataframe(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; pd.DataFrame:
+    &quot;&quot;&quot;Materialize the denormalized table as a pandas DataFrame.&quot;&quot;&quot;
+
+def as_dict(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; Generator[dict[str, Any], None, None]:
+    &quot;&quot;&quot;Stream the denormalized table row-by-row as dicts.&quot;&quot;&quot;
+
+def columns(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; list[tuple[str, str]]:
+    &quot;&quot;&quot;Preview (column_name, type_name) pairs. No data fetch. Model-only.&quot;&quot;&quot;
+
+def describe(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;Dry-run the call. Returns planning metadata (see §5).&quot;&quot;&quot;
+
+def list_paths(
+    self,
+    tables: list[str] | None = None,
+) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;List FK paths from the dataset's/anchors' reachable tables.&quot;&quot;&quot;
+</code></pre>
+<h3 id="24-dataset-side-sugar">2.4 Dataset-side sugar</h3>
+<p>Add to <code>Dataset</code> (in <code>src/deriva_ml/dataset/dataset.py</code>) and <code>DatasetBag</code>
+(in <code>src/deriva_ml/dataset/dataset_bag.py</code>). Naming aligns with the
+existing <code>get_table_as_*</code> and <code>list_*</code> conventions already present on
+these classes:</p>
+<pre><code class="language-python">def get_denormalized_as_dataframe(
+    self,
+    include_tables: list[str],
+    *,
+    row_per: str | None = None,
+    via: list[str] | None = None,
+    ignore_unrelated_anchors: bool = False,
+) -&gt; pd.DataFrame:
+    &quot;&quot;&quot;Shortcut for ``Denormalizer(self).as_dataframe(...)``.
+
+    Analogous to ``get_table_as_dataframe(table)`` but for a virtual
+    denormalized table constructed from *include_tables*.
+    &quot;&quot;&quot;
+
+def get_denormalized_as_dict(self, ...) -&gt; Generator[dict, None, None]:
+    &quot;&quot;&quot;Shortcut for ``Denormalizer(self).as_dict(...)``.
+
+    Analogous to ``get_table_as_dict(table)``; streams rows one at a time.
+    &quot;&quot;&quot;
+
+def list_denormalized_columns(self, ...) -&gt; list[tuple[str, str]]:
+    &quot;&quot;&quot;Shortcut for ``Denormalizer(self).columns(...)``.
+
+    Returns a list of ``(column_name, column_type)`` tuples for the
+    denormalized table that would be produced, without fetching data.
+    &quot;&quot;&quot;
+
+def describe_denormalized(self, ...) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;Shortcut for ``Denormalizer(self).describe(...)``.
+
+    Dry-run the denormalization; returns planning metadata (row_per,
+    join path, estimated row count, ambiguities, etc.). See §5.
+    &quot;&quot;&quot;
+
+def list_schema_paths(self, ...) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;Shortcut for ``Denormalizer(self).list_paths(...)``.
+
+    Returns a description of FK paths reachable from the dataset's
+    members, useful for picking ``include_tables``. See §6.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="241-naming-rationale">2.4.1 Naming rationale</h3>
+<ul>
+<li><code>get_*_as_dataframe</code> / <code>get_*_as_dict</code> match the existing pattern for
+  methods that return materialized row data
+  (<code>get_table_as_dataframe(table)</code>, <code>get_table_as_dict(table)</code>).</li>
+<li><code>list_*</code> matches the pattern for methods that return lists/iterables
+  of metadata (<code>list_dataset_members</code>, <code>list_dataset_element_types</code>).</li>
+<li><code>describe_*</code> is a new verb introduced here for the planner dict. It
+  doesn't conflict with any existing convention and reads naturally for
+  "returns a structured description of what would happen."</li>
+</ul>
+<p>The stem <code>denormalized</code> (past-participle adjective) is used instead of
+<code>wide_table</code> because it's the established term in existing docstrings
+and the <code>denormalize.py</code> module name.</p>
+<h3 id="25-removed-methods">2.5 Removed methods</h3>
+<p>All denormalize-related methods on <code>Dataset</code> and <code>DatasetBag</code> are
+renamed to follow the <code>get_*_as_*</code> / <code>list_*</code> / <code>describe_*</code>
+conventions. The old names are <strong>removed outright</strong> (no deprecation):</p>
+<table>
+<thead>
+<tr>
+<th>Removed</th>
+<th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>denormalize_as_dataframe(...)</code></td>
+<td><code>get_denormalized_as_dataframe(...)</code></td>
+</tr>
+<tr>
+<td><code>denormalize_as_dict(...)</code></td>
+<td><code>get_denormalized_as_dict(...)</code></td>
+</tr>
+<tr>
+<td><code>denormalize_columns(...)</code></td>
+<td><code>list_denormalized_columns(...)</code></td>
+</tr>
+<tr>
+<td><code>denormalize_info(...)</code></td>
+<td><code>describe_denormalized(...)</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>DatasetLike</code> protocol in <code>src/deriva_ml/interfaces.py</code> is updated to
+match: old method names removed; the new names plus <code>list_schema_paths</code>
+become the documented protocol methods.</p>
+<h2 id="3-semantic-rules">3. Semantic rules</h2>
+<h3 id="31-rule-1-row-cardinality-row_per-rows-in-scope-orphan-rows">3.1 Rule 1: Row cardinality = <code>|row_per rows in scope|</code> + <code>|orphan rows|</code></h3>
+<p>Each output row corresponds to one of:</p>
+<ul>
+<li>A <strong><code>row_per</code> row in scope</strong>: a row of the <code>row_per</code> table that is
+  reachable from at least one anchor via the FK graph.</li>
+<li>An <strong>orphan row</strong>: a row of some anchor whose table is in
+  <code>include_tables</code> and upstream of <code>row_per</code>, when no <code>row_per</code> row is
+  reachable from that anchor. Its columns are populated from the anchor
+  and its own upstream FKs; <code>row_per</code> and downstream columns are NULL.</li>
+</ul>
+<h3 id="32-rule-2-auto-inference-of-row_per">3.2 Rule 2: Auto-inference of <code>row_per</code></h3>
+<p>Given <code>include_tables = {T₁, …, Tₙ}</code>, build the directed graph on
+<code>include_tables ∪ via</code> where an edge <code>A → B</code> means A has an outbound FK to
+B (directly or via non-member association-table intermediates). Find
+sinks — tables with no outbound edges in this subgraph.</p>
+<ul>
+<li>Exactly one sink → <code>row_per = that sink</code>.</li>
+<li>Zero sinks → cycle; raise <code>DerivaMLException</code>.</li>
+<li>Multiple sinks → multi-leaf ambiguity; raise with candidates listed.</li>
+</ul>
+<h3 id="33-rule-3-column-projection">3.3 Rule 3: Column projection</h3>
+<ul>
+<li>Columns come <strong>only</strong> from tables in <code>include_tables</code>.</li>
+<li><code>via</code> tables contribute to the join path but not to columns.</li>
+<li>Association tables on a necessary chain between two requested tables are
+  <strong>transparent intermediates</strong>: joined through, columns omitted.</li>
+<li>Non-requested tables that are neither <code>via</code> nor transparent
+  intermediates are not joined at all.</li>
+</ul>
+<h3 id="34-rule-4-upstream-hoisting-star-schema">3.4 Rule 4: Upstream hoisting (star schema)</h3>
+<p>For each <code>row_per</code> row R:</p>
+<ul>
+<li>Walk outbound FKs from R to every table T in <code>include_tables</code>.</li>
+<li>The columns of the reached row of T are repeated verbatim in R's output
+  row, labeled with <code>{T}.{column_name}</code> prefix.</li>
+<li>If T is reached via an N-to-N link (through an association table or
+  M-to-N linking table), one output row is emitted per (R, T-row)
+  combination. The <code>row_per</code> count grows accordingly — the output then has
+  <code>|row_per × (average T-links per row_per)|</code> rows.</li>
+</ul>
+<h3 id="35-rule-5-explicit-row_per-with-downstream-table-error">3.5 Rule 5: Explicit <code>row_per</code> with downstream table → error</h3>
+<p>If <code>row_per</code> is explicitly specified and any table in <code>include_tables</code> is
+<strong>downstream</strong> of <code>row_per</code> (i.e., <code>row_per</code> has an outbound FK path to
+it), raise:</p>
+<pre><code>DerivaMLException:
+  Table {T} is downstream of row_per={row_per}. One row per {row_per}
+  would require aggregating multiple {T} rows per {row_per} row —
+  aggregation is not yet supported.
+
+  Options:
+    • Drop row_per to get one row per {T}.
+    • Remove {T} from include_tables.
+</code></pre>
+<h3 id="36-rule-6-multiple-fk-paths-error">3.6 Rule 6: Multiple FK paths → error</h3>
+<p>If between <code>row_per</code> and another table T in <code>include_tables ∪ via</code> there
+exist two or more distinct FK paths, raise:</p>
+<pre><code>DerivaMLException:
+  Multiple FK paths between {row_per} and {T}:
+    {path1}
+    {path2}
+    ...
+
+  Options:
+    • Add an intermediate table to include_tables (its columns will be in output).
+    • Add an intermediate table to via= (routing only, no columns).
+    • Narrow the requested set to eliminate one path.
+
+  Suggested intermediates: {list of candidates}
+</code></pre>
+<p>The "suggested intermediates" list is the set of tables that appear in at
+least one path but not in <code>include_tables</code>.</p>
+<h3 id="37-rule-7-anchor-contribution">3.7 Rule 7: Anchor contribution</h3>
+<p>Every anchor must contribute to the output in exactly one way, determined
+by its table and reachability:</p>
+<ol>
+<li><strong>Anchor table == <code>row_per</code></strong>: contributes one output row (the anchor
+   row itself, upstream cols hoisted).</li>
+<li><strong>Anchor table ∈ <code>include_tables</code>, upstream of <code>row_per</code>, reaches at
+   least one <code>row_per</code> row</strong>: filter-only contribution (the <code>row_per</code> rows
+   reachable from this anchor are in scope). Does not produce its own row
+   — that row appears via the <code>row_per</code> row that hoists this anchor.</li>
+<li><strong>Anchor table ∈ <code>include_tables</code>, upstream of <code>row_per</code>, reaches no
+   <code>row_per</code> row</strong>: produces one orphan row (Rule 1 §3.1).</li>
+<li><strong>Anchor table ∉ <code>include_tables</code>, upstream of <code>row_per</code>, reaches at
+   least one <code>row_per</code> row</strong>: filter-only contribution. No orphan row
+   because the anchor's columns aren't in the output.</li>
+<li><strong>Anchor table ∉ <code>include_tables</code>, upstream of <code>row_per</code>, reaches no
+   <code>row_per</code> row</strong>: contributes nothing. Would be silently dropped except
+   see §3.8.</li>
+<li><strong>Anchor table has no FK path to or from any table in <code>include_tables
+   ∪ via</code></strong>: raise <code>DerivaMLException</code> unless <code>ignore_unrelated_anchors=
+   True</code>.</li>
+</ol>
+<h3 id="38-rule-8-unrelated-anchors">3.8 Rule 8: Unrelated anchors</h3>
+<p>If any anchor falls under case 6 above and <code>ignore_unrelated_anchors=False</code>
+(the default), raise:</p>
+<pre><code>DerivaMLException:
+  Anchors of table {T} have no FK path to any table in include_tables=
+  {list}. They will not affect the output.
+
+  Options:
+    • Remove these anchors from the anchor set.
+    • Add {T} (or a linking table) to include_tables.
+    • Pass ignore_unrelated_anchors=True to silently drop them.
+</code></pre>
+<p>When <code>ignore_unrelated_anchors=True</code>, unrelated anchors are silently
+ignored (they contribute no row and no filter).</p>
+<p>Anchors of case 5 (table ∉ include_tables, unreachable) are silently
+dropped regardless of the flag — they contribute no output either way, so
+there's nothing to warn about.</p>
+<h3 id="39-rule-9-nested-datasets">3.9 Rule 9: Nested datasets</h3>
+<p>When constructed from a <code>Dataset</code>/<code>DatasetBag</code>, the anchor set is the
+dataset's members <strong>recursively</strong>, including all members of nested
+datasets. This matches current
+<code>Dataset.list_dataset_members(recurse=True)</code> behavior. The
+<code>Denormalizer.__init__(dataset)</code> constructor is responsible for
+materializing the recursive member list; <code>from_rids</code> takes anchors
+directly and does no recursion.</p>
+<h3 id="310-rule-10-version-parameter-deferred">3.10 Rule 10: Version parameter (deferred)</h3>
+<p>A <code>version</code> parameter is accepted by the deprecated aliases for backward
+compatibility but emits a <code>UserWarning</code> and has no effect. Proper
+version-pinned denormalization is deferred to a future spec.</p>
+<h2 id="4-algorithm">4. Algorithm</h2>
+<h3 id="41-high-level-flow">4.1 High-level flow</h3>
+<pre><code>Denormalizer(anchors, ml/catalog/workspace/model)
+  .as_dataframe(include_tables, row_per=?, via=?, ignore_unrelated=?)
+
+1. Resolve anchor tables
+     For any bare-RID anchor, look up its owning table via catalog.
+     Produce a uniform list[(table_name, RID)].
+
+2. Validate the request
+     - include_tables must be non-empty and all names must exist in model.
+     - via tables, if any, must exist in model.
+     - row_per, if explicit, must be in include_tables.
+
+3. Build FK subgraph
+     Restricted to include_tables ∪ via. Treat association tables that
+     bridge two requested/via tables as transparent transitive edges.
+
+4. Determine row_per
+     If explicit: validate per Rule 5 (downstream-to-row_per check).
+     Else: run sink-finding per Rule 2.
+
+5. Check path ambiguity (Rule 6)
+     For each (row_per, T) where T ∈ include_tables ∪ via, enumerate FK
+     paths. If &gt;1, raise with suggestions.
+
+6. Validate anchors (Rule 7 + Rule 8)
+     Partition anchors by their relationship to include_tables and
+     row_per. Raise if any are unrelated unless ignore_unrelated_anchors.
+
+7. Build join plan
+     Produce a list of join edges (fk_col, pk_col) + join_types
+     (inner/left) per FK along the row_per→... paths.
+
+8. Populate local SQLite
+     If source is &quot;catalog&quot;: use PagedFetcher to populate rows per table.
+     If source is &quot;slice&quot;: use already-attached slice rows.
+
+9. Emit main SQL
+     SELECT projected columns FROM row_per LEFT JOIN ... WHERE
+     row_per rows are in scope of anchors.
+
+10. Emit orphan rows (Rule 7 case 3)
+     For each anchor in include_tables that's upstream of row_per and has
+     no reachable row_per row, emit one orphan row with NULL row_per cols.
+
+11. Combine via UNION ALL
+     Main result + orphan rows.
+
+12. Return materialized DataFrame / iterator.
+</code></pre>
+<h3 id="42-fk-subgraph-construction">4.2 FK subgraph construction</h3>
+<p>The subgraph edges are:</p>
+<ul>
+<li><strong>Direct FK from A to B</strong> where A, B ∈ include_tables ∪ via: direct
+  edge A → B.</li>
+<li><strong>Transitive path A → C₁ → ... → Cₙ → B</strong> where all <code>Cᵢ</code> are pure
+  association tables not in <code>include_tables</code>: adds a single transitive
+  edge A → B.</li>
+<li>No other edges.</li>
+</ul>
+<p>Pure association tables are detected via a predicate: a table with only
+system columns (RID, RCT, RMT, RCB, RMB) and exactly two domain FKs (not
+counting system FKs to ERMrest_Client etc.) is a pure association table.</p>
+<h3 id="43-sink-finding-rule-2">4.3 Sink-finding (Rule 2)</h3>
+<p>Standard graph algorithm: a sink is a node with no outgoing edges.
+Complexity: O(|E|) where E is the edge count of the subgraph.</p>
+<h3 id="44-path-enumeration-rule-6">4.4 Path enumeration (Rule 6)</h3>
+<p>For each pair (row_per, T) where T ∈ include_tables ∪ via, enumerate all
+distinct simple paths. Distinctness is by sequence of intermediate tables.
+Complexity: O(paths × length). For typical schemas (10s of tables, small
+branching), this is trivially fast.</p>
+<h3 id="45-orphan-row-emission">4.5 Orphan row emission</h3>
+<p>For anchors classified as Rule 7 case 3:</p>
+<ol>
+<li>For each such anchor, emit a single row.</li>
+<li>Populate columns for tables upstream of the anchor's table (along the
+   subgraph) by running a small SQL query per orphan anchor to fetch the
+   upstream row chain.</li>
+<li><code>row_per</code> and downstream columns are left NULL.</li>
+</ol>
+<p>The orphan rows are UNION-ALL'd with the main result.</p>
+<h2 id="5-plan-output-structure">5. <code>plan()</code> output structure</h2>
+<pre><code class="language-python">{
+    &quot;row_per&quot;: &quot;Image&quot;,
+    &quot;row_per_source&quot;: &quot;auto-inferred&quot; | &quot;explicit&quot;,
+    &quot;row_per_candidates&quot;: [&quot;Image&quot;],   # from sink-finding
+    &quot;columns&quot;: [(&quot;Image.RID&quot;, &quot;text&quot;), ...],
+    &quot;include_tables&quot;: [&quot;Image&quot;, &quot;Subject&quot;],
+    &quot;via&quot;: [],
+    &quot;join_path&quot;: [&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;],
+    &quot;transparent_intermediates&quot;: [&quot;Observation&quot;],
+    &quot;ambiguities&quot;: [
+        # Empty if no ambiguities, else:
+        {
+            &quot;type&quot;: &quot;multiple_paths&quot;,
+            &quot;from&quot;: &quot;Image&quot;,
+            &quot;to&quot;: &quot;Subject&quot;,
+            &quot;paths&quot;: [&quot;Image → Subject (direct)&quot;, &quot;Image → Observation → Subject&quot;],
+            &quot;suggestions&quot;: {
+                &quot;add_to_include_tables&quot;: [&quot;Observation&quot;],
+                &quot;add_to_via&quot;: [&quot;Observation&quot;],
+            },
+        },
+    ],
+    &quot;estimated_row_count&quot;: {
+        &quot;in_scope_row_per_rows&quot;: 42,
+        &quot;orphan_rows&quot;: 3,
+        &quot;total&quot;: 45,
+    },
+    &quot;anchors&quot;: {
+        &quot;total&quot;: 20,
+        &quot;by_type&quot;: {&quot;Image&quot;: 12, &quot;Subject&quot;: 8},
+        &quot;unrelated&quot;: [],    # populated if any case-6 anchors exist
+    },
+    &quot;source&quot;: &quot;catalog&quot; | &quot;slice&quot;,
+}
+</code></pre>
+<p><code>estimated_row_count</code> requires a catalog <code>COUNT(*)</code> per table involved —
+still much cheaper than a full denormalize. Can be omitted / marked
+<code>None</code> if estimation is costly (e.g., for very large schemas with many
+joins).</p>
+<h2 id="6-explore_schema-output-structure">6. <code>explore_schema()</code> output structure</h2>
+<pre><code class="language-python">{
+    &quot;member_types&quot;: [&quot;Image&quot;, &quot;Subject&quot;],   # if constructed from a dataset
+    &quot;anchor_types&quot;: [&quot;Image&quot;, &quot;Subject&quot;],   # all distinct anchor tables
+    &quot;reachable_tables&quot;: {
+        &quot;Image&quot;: [&quot;Subject&quot;, &quot;Observation&quot;, &quot;Diagnosis&quot;, &quot;Execution_Image_Quality&quot;],
+        &quot;Subject&quot;: [&quot;Observation&quot;, &quot;Diagnosis&quot;],
+    },
+    &quot;association_tables&quot;: [&quot;Dataset_Image&quot;, &quot;ClinicalRecord_Observation&quot;],
+    &quot;feature_tables&quot;: [&quot;Execution_Image_Quality&quot;],  # detected via naming/structure
+    &quot;schema_paths&quot;: {
+        (&quot;Image&quot;, &quot;Subject&quot;): [
+            {&quot;path&quot;: [&quot;Image&quot;, &quot;Subject&quot;], &quot;direct&quot;: True},
+            {&quot;path&quot;: [&quot;Image&quot;, &quot;Observation&quot;, &quot;Subject&quot;], &quot;direct&quot;: False},
+        ],
+        (&quot;Image&quot;, &quot;ClinicalRecord&quot;): [
+            {&quot;path&quot;: [&quot;Image&quot;, &quot;Observation&quot;, &quot;ClinicalRecord_Observation&quot;,
+                     &quot;ClinicalRecord&quot;], &quot;direct&quot;: False},
+        ],
+    },
+}
+</code></pre>
+<p>If <code>tables=[...]</code> is given, the output is filtered to paths involving at
+least one of those tables.</p>
+<h2 id="7-errors">7. Errors</h2>
+<p>All errors raised by <code>Denormalizer</code> are <code>DerivaMLException</code> or subclasses:</p>
+<ul>
+<li><code>DerivaMLDenormalizeAmbiguousPath</code> — Rule 6.</li>
+<li><code>DerivaMLDenormalizeMultiLeaf</code> — Rule 2 (multiple sinks).</li>
+<li><code>DerivaMLDenormalizeNoSink</code> — Rule 2 (cycle).</li>
+<li><code>DerivaMLDenormalizeDownstreamLeaf</code> — Rule 5.</li>
+<li><code>DerivaMLDenormalizeUnrelatedAnchor</code> — Rule 8.</li>
+</ul>
+<p>Each error message includes:</p>
+<ol>
+<li>A plain-English description of the problem.</li>
+<li>A list of the exact option(s) to fix it.</li>
+<li>The concrete suggestions (e.g., the list of intermediate tables to add).</li>
+</ol>
+<h2 id="8-testing">8. Testing</h2>
+<h3 id="81-unit-tests-no-live-catalog">8.1 Unit tests (no live catalog)</h3>
+<p>Location: <code>tests/local_db/test_denormalize.py</code> (existing file, extend).</p>
+<p>New test classes:</p>
+<ul>
+<li><strong><code>TestRowPerInference</code></strong>: sink-finding on all supported topologies —
+  linear chain, diamond, fork, cycle, feature-table, association-only.</li>
+<li><strong><code>TestPathAmbiguity</code></strong>: detect and report every variant of Rule 6
+  — direct + indirect, two indirect, three-way.</li>
+<li><strong><code>TestOrphanRows</code></strong>: Rule 7 cases 1–5 exhaustively.</li>
+<li><strong><code>TestUnrelatedAnchors</code></strong>: Rule 8 both with and without the flag.</li>
+<li><strong><code>TestExplicitRowPer</code></strong>: downstream-leaf rejection (Rule 5); leaf
+  override that agrees with auto-inference; leaf override that forces
+  non-default sink.</li>
+<li><strong><code>TestVia</code></strong>: path routing without column projection; via combined
+  with include_tables.</li>
+<li><strong><code>TestExploreSchema</code></strong>: schema reachability, association/feature table
+  detection, path enumeration.</li>
+<li><strong><code>TestPlan</code></strong>: plan output structure, ambiguity reporting, row-count
+  estimation.</li>
+<li><strong><code>TestFromRids</code></strong>: bare RIDs, <code>(table, RID)</code> tuples, mixed forms; with
+  <code>ml=</code> vs separate deps; unrelated anchor rejection.</li>
+</ul>
+<p>Each test uses fixtures that pre-populate a minimal schema (no live
+catalog). The <code>canned_bag_model</code> pattern from Phase 1 is reused.</p>
+<h3 id="82-integration-tests-live-catalog">8.2 Integration tests (live catalog)</h3>
+<p>Location: <code>tests/dataset/test_denormalize.py</code>.</p>
+<p>The three currently-xfailed tests become expected passes:</p>
+<ul>
+<li><code>test_diamond_resolved_with_intermediate</code> — Rule 2 selects Image,
+  intermediate Observation disambiguates path.</li>
+<li><code>test_association_mandatory_intermediate</code> — association table ACTS as
+  transparent intermediate.</li>
+<li><code>test_feature_table_included</code> — Rule 2 selects the feature table as
+  <code>row_per</code>.</li>
+</ul>
+<p>New integration tests:</p>
+<ul>
+<li>Heterogeneous dataset with orphan Subject members.</li>
+<li><code>Denormalizer.from_rids</code> against a live catalog.</li>
+<li><code>denormalize_plan</code> on a real dataset.</li>
+<li><code>explore_schema</code> on a real dataset.</li>
+</ul>
+<h3 id="83-regression-safety">8.3 Regression safety</h3>
+<p>All existing passing tests in <code>tests/dataset/test_denormalize.py</code> must
+continue to pass. The two <code>pytest.mark.skip</code> tests (for the deleted
+<code>bag._denormalize()</code> private method) remain skipped.</p>
+<h2 id="9-implementation-order">9. Implementation order</h2>
+<ol>
+<li>Introduce <code>Denormalizer</code> class with core <code>as_dataframe</code>, <code>as_dict</code>,
+   <code>columns</code>, <code>describe</code>, <code>list_paths</code> methods. Implement new rule system.</li>
+<li>Add <code>from_rids</code> constructor + RID lookup.</li>
+<li>Add sugar methods on <code>Dataset</code> and <code>DatasetBag</code> per §2.4:</li>
+<li><code>get_denormalized_as_dataframe</code></li>
+<li><code>get_denormalized_as_dict</code></li>
+<li><code>list_denormalized_columns</code></li>
+<li><code>describe_denormalized</code></li>
+<li><code>list_schema_paths</code></li>
+<li><strong>Remove</strong> all four old methods from <code>Dataset</code>, <code>DatasetBag</code>, and
+   the <code>DatasetLike</code> protocol:</li>
+<li><code>denormalize_as_dataframe</code></li>
+<li><code>denormalize_as_dict</code></li>
+<li><code>denormalize_columns</code></li>
+<li><code>denormalize_info</code></li>
+<li>Update every in-repo caller of the removed methods to the new names
+   (per §2.5 table). Use <code>grep -rn</code> to find all callers; expected
+   locations include <code>tests/dataset/</code>, possibly
+   <code>src/deriva_ml/dataset/split.py</code>, and any notebooks under <code>docs/</code>.</li>
+<li>Extend unit tests per §8.1.</li>
+<li>Remove <code>xfail</code> markers from the three integration tests per §8.2.</li>
+<li>Run full test suite (unit + live); confirm no regressions.</li>
+</ol>
+<h3 id="91-breaking-change-summary">9.1 Breaking-change summary</h3>
+<p>The assumption is that no external code uses the old interface, so
+removal is clean. Two semantic changes are in play regardless:</p>
+<ol>
+<li><strong>Ambiguous paths now error.</strong> Previously silent path selection (the
+   direct FK would be picked in diamond cases) now raises. Callers must
+   disambiguate via <code>include_tables</code> or <code>via</code>.</li>
+<li><strong>Row counts may change in diamond cases.</strong> Calls that happened to
+   work before may produce different (more correct) row counts under the
+   new rules.</li>
+</ol>
+<p>Neither is a migration concern given the "no external users" assumption
+— they are correctness improvements that propagate automatically to
+tests, which is where regressions would surface.</p>
+<h2 id="10-open-questions-future-work">10. Open questions / future work</h2>
+<ul>
+<li><strong>Aggregation</strong>: future spec for downstream-to-row_per with aggregation
+  rules (<code>count</code>, <code>first</code>, <code>list</code>, <code>sum</code>, ...). Would relax Rule 5.</li>
+<li><strong>Version pinning</strong>: future spec for <code>version</code> parameter + <code>ErmrestSnapshot</code>.</li>
+<li><strong>Feature table column projection</strong>: if a feature has asset columns
+  (e.g., pointers to files), how should they be serialized in the output?</li>
+<li><strong>Caching interaction</strong>: <code>cache_denormalized</code> uses the old call
+  signature. Needs updating to pass <code>row_per</code> and <code>via</code> through, and to
+  include them in the cache key.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.expand", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
