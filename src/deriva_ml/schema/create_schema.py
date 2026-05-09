@@ -105,7 +105,14 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) 
                 name="Version",
                 type=BuiltinType.text,
                 default="0.1.0",
-                comment="Semantic version of dataset",
+                comment=(
+                    "PEP 440 version label for this dataset version. "
+                    "Released rows carry `MAJOR.MINOR.PATCH` (e.g. `0.4.0`). "
+                    "Dev rows carry `<last_release>.post1.devN` "
+                    "(e.g. `0.4.0.post1.dev3`) to denote drift since the "
+                    "last release. The default `0.1.0` applies to the "
+                    "initial release row created at dataset creation time."
+                ),
             ),
             ColumnDef("Description", BuiltinType.markdown),
             ColumnDef("Dataset", BuiltinType.text, comment="RID of dataset"),
@@ -120,7 +127,14 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) 
             ColumnDef(
                 name="Snapshot",
                 type=BuiltinType.text,
-                comment="Catalog Snapshot ID for dataset",
+                comment=(
+                    "Catalog snapshot ID this version row pins. Populated for "
+                    "released rows (the snapshot stamped at release time). "
+                    "`NULL` on dev rows, denoting that the row tracks live "
+                    "catalog state with no pinned snapshot — the bag this "
+                    "dataset would download right now is whatever the "
+                    "catalog has at request time."
+                ),
             ),
         ],
         annotations=annotation if annotation else {},
