@@ -20,7 +20,7 @@ dependencies = [
     "pyyaml",
     "regex",
     "scikit-learn",
-    "semver>3.0.0",
+    "packaging>=24",
     "setuptools>=80",
     "setuptools-scm>=8.0",
     "nbstripout",

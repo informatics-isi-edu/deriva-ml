@@ -257,7 +257,7 @@ class TestDataset:
 
         # Verify version was incremented (minor bump)
         new_version = dataset.current_version
-        expected_version = initial_version.increment_version(VersionPart.minor)
+        expected_version = initial_version.next_release(VersionPart.minor)
         assert new_version == expected_version, f"Expected version {expected_version}, got {new_version}"
 
         # Verify members were removed

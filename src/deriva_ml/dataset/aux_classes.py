@@ -11,6 +11,7 @@ from pprint import pformat
 from typing import Any, Optional, SupportsInt
 
 from hydra_zen import hydrated_dataclass
+from packaging.version import Version
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -21,7 +22,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from semver import Version
 
 from deriva_ml.core.definitions import RID
 
@@ -37,13 +37,19 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 
 class VersionPart(Enum):
-    """Simple enumeration for semantic versioning.
+    """Names the component of a dataset version to advance on release.
+
+    DerivaML uses a ``major.minor.patch`` release segment within the broader
+    PEP 440 version space (see ADR-0004). Picking a ``VersionPart`` selects
+    which component is incremented when a dev period is promoted to a
+    released version.
 
     Attributes:
-        major (int): Major version number
-        minor (int): Minor version number
-        patch (int): Patch version number
-
+        major: Schema-altering changes that break backward compatibility.
+        minor: Additive changes — new members, new feature values, new
+            annotations.
+        patch: Small clean-ups and edits that don't change the dataset's
+            shape.
     """
 
     major = "major"
@@ -52,79 +58,151 @@ class VersionPart(Enum):
 
 
 class DatasetVersion(Version):
-    """Represent the version associated with a dataset using semantic versioning.
+    """A PEP 440 version associated with a dataset.
 
-    Methods:
-        replace(major, minor, patch): Replace the major and minor versions
+    Released versions are written as ``"MAJOR.MINOR.PATCH"`` (e.g., ``"0.4.0"``).
+    Dev versions use the ``setuptools-scm``-compatible post-release form
+    ``"<last_release>.post1.devN"`` (e.g., ``"0.4.0.post1.dev3"``) — they sort
+    *after* the last release and *before* the next, and are queryable via
+    :attr:`is_devrelease`. See ADR-0004 for the rationale behind PEP 440 over
+    semver pre-release suffixes.
+
+    The wire format for released versions is unchanged from the previous
+    semver-backed implementation: a string like ``"0.4.0"`` parses and
+    serialises identically.
+
+    Example:
+        Construct from positional integers (release-segment form):
+
+            >>> v = DatasetVersion(0, 4, 0)
+            >>> str(v)
+            '0.4.0'
+            >>> v.is_devrelease
+            False
+
+        Construct from a string (any PEP 440 form):
+
+            >>> dev = DatasetVersion.parse("0.4.0.post1.dev3")
+            >>> dev.is_devrelease
+            True
+            >>> DatasetVersion(0, 4, 0) < dev < DatasetVersion(0, 5, 0)
+            True
+
+        Advance the release-segment for a release:
+
+            >>> DatasetVersion(0, 4, 0).next_release(VersionPart.minor)
+            <Version('0.5.0')>
     """
 
-    def __init__(self, major: SupportsInt, minor: SupportsInt = 0, patch: SupportsInt = 0) -> None:
-        """Initialize a DatasetVersion object.
+    def __init__(
+        self,
+        major: SupportsInt,
+        minor: SupportsInt = 0,
+        patch: SupportsInt = 0,
+    ) -> None:
+        """Construct a released ``DatasetVersion`` from a release-segment tuple.
+
+        For PEP 440 forms beyond ``MAJOR.MINOR.PATCH`` (post-release, dev,
+        local, etc.), use :meth:`parse` with the canonical string form.
 
         Args:
-            major: Major version number. Used to indicate schema changes.
-            minor: Minor version number.  Used to indicate additional members added, or change in member values.
-            patch: Patch number of the dataset.  Used to indicate minor clean-up and edits
+            major: Major version number. Schema-altering changes.
+            minor: Minor version number. Additive changes.
+            patch: Patch number. Small clean-ups and edits.
         """
-        super().__init__(major, minor, patch)
+        super().__init__(f"{int(major)}.{int(minor)}.{int(patch)}")
 
-    def to_dict(self) -> dict[str, Any]:
+    @property
+    def patch(self) -> int:
+        """The patch component of the release segment.
+
+        ``packaging.Version`` exposes this as :attr:`micro`. ``patch`` is
+        kept on ``DatasetVersion`` because it matches the ``VersionPart``
+        vocabulary and the column meaning.
         """
+        return self.micro
+
+    def to_dict(self) -> dict[str, int]:
+        """Serialise the release segment as a ``{major, minor, patch}`` dict.
+
+        Used by :class:`DatasetSpec`'s field serializer for hydra-zen
+        round-tripping. Pre-release / post-release / dev / local segments
+        are *not* preserved in this form — it represents only the
+        release-segment tuple. Use ``str(self)`` for a lossless serialisation.
 
         Returns:
-            dictionary of version information
+            A dict with integer ``major``, ``minor``, and ``patch`` fields.
 
+        Example:
+            >>> DatasetVersion(1, 2, 3).to_dict()
+            {'major': 1, 'minor': 2, 'patch': 3}
         """
         return {"major": self.major, "minor": self.minor, "patch": self.patch}
 
-    def to_tuple(self) -> tuple[int, int, int]:
-        """
-
-        Returns:
-            tuple of version information
-
-        """
-        return self.major, self.minor, self.patch
-
     @classmethod
-    def parse(cls, version: str, optional_minor_an_path: bool = False) -> "DatasetVersion":
-        """Parse a semantic version string into a DatasetVersion.
+    def parse(cls, version: str) -> "DatasetVersion":
+        """Parse a PEP 440 version string into a ``DatasetVersion``.
 
         Args:
-            version: A semantic version string (e.g., ``"1.2.3"``).
-            optional_minor_an_path: Unused; kept for API compatibility with
-                :meth:`semver.Version.parse`.
+            version: A PEP 440 version string. Released forms like
+                ``"1.2.3"`` and dev forms like ``"1.2.3.post1.dev4"`` are
+                both accepted.
 
         Returns:
-            A new DatasetVersion corresponding to the parsed string.
+            A new ``DatasetVersion`` corresponding to the parsed string.
 
         Raises:
-            ValueError: If *version* is not a valid semantic version string.
+            packaging.version.InvalidVersion: If *version* is not a valid
+                PEP 440 version string.
+
+        Example:
+            >>> str(DatasetVersion.parse("0.4.0"))
+            '0.4.0'
+            >>> DatasetVersion.parse("0.4.0.post1.dev3").is_devrelease
+            True
         """
-        v = Version.parse(version)
-        return DatasetVersion(v.major, v.minor, v.patch)
+        # __new__ on the parent does the parse; we just need to return a
+        # subclass instance with the same internal state.
+        v = Version(version)
+        instance = cls.__new__(cls)
+        Version.__init__(instance, str(v))
+        return instance
 
-    def increment_version(self, component: VersionPart) -> "DatasetVersion":
-        """Return a new DatasetVersion with the specified component incremented.
+    def next_release(self, bump: "VersionPart") -> "DatasetVersion":
+        """Return the next released ``DatasetVersion`` after this one.
 
-        Follows standard semantic versioning rules: incrementing a higher-order
-        component resets all lower-order components to zero.
+        Applies a release-segment bump to ``(major, minor, patch)`` and
+        discards any post-release / dev / local segments — the new value
+        is always a clean released version. Higher-order bumps reset
+        lower-order components to zero, matching the standard
+        ``major.minor.patch`` convention.
 
         Args:
-            component: Which part of the version to bump (major, minor, or patch).
+            bump: Which part of the release segment to advance.
 
         Returns:
-            A new DatasetVersion with the requested component incremented.
+            A new released ``DatasetVersion`` with the requested
+            component advanced.
+
+        Example:
+            >>> DatasetVersion(0, 4, 0).next_release(VersionPart.minor)
+            <Version('0.5.0')>
+            >>> DatasetVersion(0, 4, 7).next_release(VersionPart.major)
+            <Version('1.0.0')>
+            >>> DatasetVersion.parse("0.4.0.post1.dev3").next_release(
+            ...     VersionPart.minor
+            ... )
+            <Version('0.5.0')>
         """
-        match component:
+        match bump:
             case VersionPart.major:
-                return self.bump_major()
+                return DatasetVersion(self.major + 1, 0, 0)
             case VersionPart.minor:
-                return self.bump_minor()
+                return DatasetVersion(self.major, self.minor + 1, 0)
             case VersionPart.patch:
-                return self.bump_patch()
-            case _:
-                return self
+                return DatasetVersion(self.major, self.minor, self.patch + 1)
+            case _:  # pragma: no cover - defensive; VersionPart is closed
+                raise ValueError(f"unknown VersionPart: {bump!r}")
 
 
 class DatasetHistory(BaseModel):
@@ -312,9 +390,7 @@ class DatasetSpec(BaseModel):
             return cls(rid=parts[0], version="0.0.0")
         if len(parts) == 2:
             return cls(rid=parts[0], version=parts[1])
-        raise ValueError(
-            f"dataset shorthand has too many '@' separators: {s!r}"
-        )
+        raise ValueError(f"dataset shorthand has too many '@' separators: {s!r}")
 
 
 # Interface for hydra-zen

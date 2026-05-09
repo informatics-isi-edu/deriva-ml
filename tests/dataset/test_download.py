@@ -162,7 +162,7 @@ class TestDatasetDownload:
 
         dataset_description.dataset.add_dataset_members(subjects[-2:])
         new_version = dataset_description.dataset.current_version
-        assert new_version == current_version.increment_version(VersionPart.minor)
+        assert new_version == current_version.next_release(VersionPart.minor)
 
         current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset.download_dataset_bag(new_version, use_minid=False)
