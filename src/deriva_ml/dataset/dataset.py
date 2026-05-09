@@ -662,34 +662,42 @@ class Dataset:
         return self._ml_instance.list_workflow_executions(workflow)
 
     def dataset_history(self) -> list[DatasetHistory]:
-        """Retrieves the version history of a dataset.
+        """List every ``Dataset_Version`` row for this dataset, oldest first.
 
-        Returns a chronological list of dataset versions, including their version numbers,
-        creation times, and associated metadata.
+        Returns one entry per row, including the dev row when one exists.
+        Released and dev rows are not separated — they are different states
+        of the same row type, and filtering belongs at the call site.
+        Callers who want released-only filter on the typed property::
+
+            released = [
+                h for h in ds.dataset_history()
+                if not h.dataset_version.is_devrelease
+            ]
+
+        Results are sorted by ``dataset_version`` in ascending PEP 440
+        order. With the dev-versioning model, that reads
+        chronologically: ``[0.1.0, ..., 0.4.0, 0.4.0.post1.devN]``.
 
         Returns:
-            list[DatasetHistory]: List of history entries, each containing:
-                - dataset_version: Version number (major.minor.patch)
-                - minid: Minimal Viable Identifier
-                - snapshot: Catalog snapshot time
-                - dataset_rid: Dataset Resource Identifier
-                - version_rid: Version Resource Identifier
-                - description: Version description
-                - execution_rid: Associated execution RID
+            A list of :class:`DatasetHistory` entries. Each carries the
+            parsed version, the version row's RID, the dataset's RID,
+            the description and execution link, and the snapshot ID
+            (``None`` for dev rows).
 
         Raises:
-            DerivaMLException: If dataset_rid is not a valid dataset RID.
+            DerivaMLException: If this dataset's RID is not a valid
+                dataset RID.
 
         Example:
-            >>> history = ml.dataset_history("1-abc123")  # doctest: +SKIP
+            >>> history = dataset.dataset_history()  # doctest: +SKIP
             >>> for entry in history:  # doctest: +SKIP
-            ...     print(f"Version {entry.dataset_version}: {entry.description}")
+            ...     mark = " (dev)" if entry.dataset_version.is_devrelease else ""
+            ...     print(f"v{entry.dataset_version}{mark}: {entry.description}")
         """
-
         if not self._ml_instance.model.is_dataset_rid(self.dataset_rid):
             raise DerivaMLException(f"RID is not for a data set: {self.dataset_rid}")
         version_path = self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
-        return [
+        entries = [
             DatasetHistory(
                 dataset_version=DatasetVersion.parse(v["Version"]),
                 minid=v["Minid"],
@@ -702,36 +710,51 @@ class Dataset:
             )
             for v in version_path.filter(version_path.Dataset == self.dataset_rid).entities().fetch()
         ]
+        entries.sort(key=lambda h: h.dataset_version)
+        return entries
 
     @property
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def current_version(self) -> DatasetVersion:
-        """Retrieve the current (most recent) version of this dataset.
+        """Return the dataset's current version label.
 
-        Returns the highest semantic version from the dataset's version history.
-        If the dataset has no version history, returns ``0.1.0`` as the default.
+        The current version is the highest entry in
+        :meth:`dataset_history` under PEP 440 ordering. When a dev row
+        exists, the dev label sorts after every released label and is
+        returned. Otherwise the latest released label is returned.
 
-        Note that each version captures the state of the catalog at the time the
-        version was created, not the current state. Values associated with an
-        object in the catalog may differ from the values in a given dataset version.
+        Released versions pin a catalog snapshot — reading the dataset
+        at a released version always returns the same content. Dev
+        versions track live catalog state — the row's ``Snapshot`` is
+        ``NULL`` and reads resolve against the current catalog. Callers
+        who want a stable reference should use a released version, not
+        a dev version.
 
         Returns:
-            DatasetVersion: The most recent semantic version of this dataset.
+            The most recent ``DatasetVersion``, dev or released.
 
         Raises:
-            DerivaMLException: If the catalog query fails.
+            DerivaMLException: If the dataset has no ``Dataset_Version``
+                rows. ``create_dataset`` always inserts an initial
+                released row, so an empty history indicates a catalog
+                inconsistency rather than a normal state.
 
         Example:
-            >>> ver = dataset.current_version  # doctest: +SKIP
-            >>> print(str(ver))  # doctest: +SKIP
+            >>> v = dataset.current_version  # doctest: +SKIP
+            >>> if v.is_devrelease:  # doctest: +SKIP
+            ...     print(f"in dev period at {v}; call release() to mint a release")
+            ... else:  # doctest: +SKIP
+            ...     print(f"at released {v}")
         """
         history = self.dataset_history()
         if not history:
-            return DatasetVersion(0, 1, 0)
-        else:
-            # Ensure we return a DatasetVersion, not a string
-            versions = [h.dataset_version for h in history]
-            return max(versions) if versions else DatasetVersion(0, 1, 0)
+            raise DerivaMLException(
+                f"Dataset {self.dataset_rid} has no Dataset_Version rows. "
+                "Every dataset is initialised with an initial released row "
+                "at creation time; an empty history indicates a catalog "
+                "inconsistency."
+            )
+        return max(h.dataset_version for h in history)
 
     def get_chaise_url(self) -> str:
         """Get the Chaise URL for viewing this dataset in the browser.
@@ -899,6 +922,177 @@ class Dataset:
             self._ml_instance, version_update_list, description=description, execution_rid=execution_rid
         )
         return next((d.version for d in version_update_list if d.rid == self.dataset_rid))
+
+    def _create_or_advance_dev_row(
+        self,
+        description: str,
+        execution_rid: RID | None = None,
+    ) -> None:
+        """Create or advance this dataset's dev row.
+
+        Internal primitive that backs :meth:`mark_dev` and (in a later
+        PR) the member-mutation operations. Implements the dev-row
+        lifecycle from ADR-0003:
+
+        * If the dataset has no dev row, INSERT one at
+          ``<last_released>.post1.dev1`` with ``Snapshot=NULL``,
+          ``Description`` set to *description*, and ``Execution`` set to
+          *execution_rid* (or ``NULL`` if not supplied). Update the
+          dataset's ``Version`` FK to point at the new row.
+        * If the dataset has a dev row, UPDATE that row in place:
+          advance ``.devN`` by 1, replace ``Description``, overwrite
+          ``Execution``. Use a conditional update on the row's observed
+          ``RMT`` so concurrent writers can be detected.
+
+        Concurrency: a competing writer that landed between this
+        method's read and write is detected by the ``RMT`` predicate
+        on the UPDATE — if zero rows match, the call raises
+        :class:`DerivaMLException` rather than silently overwriting
+        the other writer's work.
+
+        Args:
+            description: Description of the change being recorded.
+                Replaces any existing dev-row description (not
+                appended — the catalog's audit log preserves prior
+                values).
+            execution_rid: Optional RID of the calling execution.
+                Stored on the dev row's ``Execution`` column.
+
+        Raises:
+            DerivaMLException: If a concurrent writer modified the dev
+                row between this call's read and write.
+        """
+        history = self.dataset_history()
+        dev_entries = [h for h in history if h.dataset_version.is_devrelease]
+        schema_path = self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema]
+        version_table = schema_path.tables["Dataset_Version"]
+
+        if not dev_entries:
+            # No dev row yet: anchor a new one at the latest release.
+            released = max(
+                (h.dataset_version for h in history if not h.dataset_version.is_devrelease),
+                default=None,
+            )
+            if released is None:
+                # Defensive: every dataset has at least one released row at
+                # creation time. If this fires, the catalog is in an
+                # inconsistent state that this method cannot fix.
+                raise DerivaMLException(
+                    f"Dataset {self.dataset_rid} has no released version to anchor a dev row against."
+                )
+            new_label = f"{released}.post1.dev1"
+            inserted = list(
+                version_table.insert(
+                    [
+                        {
+                            "Dataset": self.dataset_rid,
+                            "Version": new_label,
+                            "Description": description,
+                            "Execution": execution_rid,
+                        }
+                    ]
+                )
+            )
+            new_rid = inserted[0]["RID"]
+            schema_path.tables["Dataset"].update([{"RID": self.dataset_rid, "Version": new_rid}])
+            return
+
+        # Dev row exists: advance .devN, replace description, overwrite
+        # execution. Use a conditional update keyed on the row's observed
+        # RMT so a concurrent writer can be detected.
+        if len(dev_entries) > 1:
+            # Should be impossible — at most one dev row per dev period.
+            raise DerivaMLException(
+                f"Dataset {self.dataset_rid} has {len(dev_entries)} dev rows; expected at most one."
+            )
+        current_dev = dev_entries[0]
+        # Re-fetch the row by RID to capture its RMT for the conditional
+        # update. dataset_history doesn't expose RMT.
+        current_rows = list(version_table.filter(version_table.RID == current_dev.version_rid).entities().fetch())
+        if not current_rows:
+            raise DerivaMLException(
+                f"Dev version row {current_dev.version_rid} disappeared between read and update — concurrent deletion?"
+            )
+        observed_rmt = current_rows[0]["RMT"]
+        next_n = current_dev.dataset_version.dev + 1
+        next_label = (
+            f"{current_dev.dataset_version.major}."
+            f"{current_dev.dataset_version.minor}."
+            f"{current_dev.dataset_version.micro}"
+            f".post{current_dev.dataset_version.post}.dev{next_n}"
+        )
+        updated = list(
+            version_table.update(
+                [
+                    {
+                        "RID": current_dev.version_rid,
+                        "RMT": observed_rmt,
+                        "Version": next_label,
+                        "Description": description,
+                        "Execution": execution_rid,
+                    }
+                ],
+                correlation={"RID", "RMT"},
+            )
+        )
+        if not updated:
+            raise DerivaMLException(
+                f"Concurrent modification of dev row {current_dev.version_rid} "
+                "for dataset {self.dataset_rid}: another writer advanced the "
+                "row between this call's read and write. Re-read the dataset "
+                "and retry if the new state is still what you intended."
+            )
+
+    def mark_dev(
+        self,
+        description: str,
+        execution: "Execution | None" = None,
+    ) -> None:
+        """Flip this dataset to a dev version, recording catalog drift.
+
+        Use ``mark_dev`` when the catalog has changed in a way that
+        affects this dataset's contents, but no dataset-API operation
+        flipped the dataset to dev automatically. Typical case: a
+        feature value was added by a separate execution against a row
+        that's a member of this dataset — the dataset's own row and
+        member list are untouched, but the bag the dataset would
+        download today differs from the last release.
+
+        On the first call after a release, a new dev row is created at
+        ``<last_release>.post1.dev1`` with ``Snapshot=NULL``. Subsequent
+        calls during the same dev period advance the ``.devN`` counter
+        (the dev row is mutable; one row per dev period). The
+        ``Description`` is replaced on each call — prior values are
+        recoverable from the catalog's audit log.
+
+        ``mark_dev`` returns ``None`` rather than the new dev label
+        because dev labels are not addressable across time: by the
+        time a caller might use a returned label for anything, the
+        next mutation has advanced ``.devN`` and the returned value no
+        longer resolves. Callers who want to display the new label
+        read :attr:`current_version` after the call.
+
+        Args:
+            description: What changed. Replaces any existing dev-row
+                description.
+            execution: Optional execution that observed the drift.
+                Stored on the dev row's ``Execution`` column.
+
+        Raises:
+            DerivaMLException: If a concurrent writer modified the dev
+                row between this call's read and write.
+
+        Example:
+            >>> # A separate execution recorded labels for some images  # doctest: +SKIP
+            >>> # that are members of this dataset. Flag the drift:
+            >>> dataset.mark_dev("Picked up classifier output for the test split")
+            >>> str(dataset.current_version)  # e.g. "0.4.0.post1.dev1"
+        """
+        execution_rid = execution.execution_rid if execution is not None else None
+        self._create_or_advance_dev_row(
+            description=description,
+            execution_rid=execution_rid,
+        )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def list_dataset_members(
