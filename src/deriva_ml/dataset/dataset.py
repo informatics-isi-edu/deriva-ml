@@ -891,7 +891,7 @@ class Dataset:
         version_update_list = [
             DatasetSpec(
                 rid=ds.dataset_rid,
-                version=ds.current_version.increment_version(component),
+                version=ds.current_version.next_release(component),
             )
             for ds in related_datasets
         ]
