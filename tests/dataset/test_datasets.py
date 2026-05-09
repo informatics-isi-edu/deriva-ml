@@ -136,7 +136,7 @@ class TestDataset:
         # Create with required fields
         spec = DatasetSpec(rid="1234", version="1.0.0")
         assert spec.rid == "1234"
-        assert spec.version == "1.0.0"
+        assert str(spec.version) == "1.0.0"
         assert spec.materialize  # Default value
 
         # Create with all fields
