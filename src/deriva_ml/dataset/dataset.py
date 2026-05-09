@@ -2396,7 +2396,9 @@ class Dataset:
                 version_path = (
                     self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
                 )
-                version_rid = [h for h in self.dataset_history() if str(h.dataset_version) == str(version)][0].version_rid
+                version_rid = [h for h in self.dataset_history() if str(h.dataset_version) == str(version)][
+                    0
+                ].version_rid
                 version_path.update([{"RID": version_rid, "Minid": minid_page_url, "Minid_Spec_Hash": spec_hash}])
                 return minid_page_url
             else:
