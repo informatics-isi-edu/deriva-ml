@@ -16,7 +16,7 @@ from deriva_ml import (
     MLVocab,
     TableDefinition,
 )
-from deriva_ml.dataset.aux_classes import DatasetSpec, VersionPart
+from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.execution.execution import ExecutionConfiguration
@@ -207,14 +207,16 @@ class TestDataset:
         history = dataset.dataset_history()
         assert manual_execution.execution_rid == history[0].execution_rid
 
-    def test_delete_dataset_members_increments_version(self, test_ml):
-        """Test that delete_dataset_members increments the dataset version correctly.
+    def test_delete_dataset_members_lands_on_dev(self, test_ml):
+        """Test that delete_dataset_members flips the dataset to a dev version.
 
-        This test verifies:
-        1. Version is incremented when members are deleted
-        2. The increment is a minor version bump
-        3. The description is properly recorded
-        4. The members are actually removed
+        Per ADR-0003 / PR 4: every mutation lands on dev; release is the
+        only path to a released version. This test verifies:
+
+        1. Version flips to a dev label (``.post1.dev1``) anchored at
+           the previous released version after a successful delete
+        2. The description is recorded on the dev row
+        3. The members are actually removed
         """
         ml_instance = test_ml
 
@@ -255,10 +257,12 @@ class TestDataset:
         rids_to_delete = test_rids[:2]
         dataset.delete_dataset_members(members=rids_to_delete, description="Removed 2 test items")
 
-        # Verify version was incremented (minor bump)
+        # Per ADR-0003 / PR 4: delete_dataset_members lands on dev.
+        # The dev label is anchored at the previous released version.
         new_version = dataset.current_version
-        expected_version = initial_version.next_release(VersionPart.minor)
-        assert new_version == expected_version, f"Expected version {expected_version}, got {new_version}"
+        assert new_version.is_devrelease, f"Expected dev version, got {new_version}"
+        assert new_version.release == initial_version.release
+        assert new_version.dev == 1
 
         # Verify members were removed
         remaining_members = dataset.list_dataset_members()

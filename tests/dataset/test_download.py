@@ -162,7 +162,12 @@ class TestDatasetDownload:
 
         dataset_description.dataset.add_dataset_members(subjects[-2:])
         new_version = dataset_description.dataset.current_version
-        assert new_version == current_version.next_release(VersionPart.minor)
+        # Per ADR-0003: add_dataset_members lands on a dev version, not a
+        # released minor bump. The dev label is anchored at the previous
+        # release (`current_version`).
+        assert new_version.is_devrelease
+        assert new_version.release == current_version.release
+        assert new_version.dev == 1
 
         current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset.download_dataset_bag(new_version, use_minid=False)

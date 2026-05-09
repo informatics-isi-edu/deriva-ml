@@ -341,14 +341,19 @@ class Dataset:
     ) -> None:
         """Add a dataset type to this dataset.
 
-        Adds a type term to this dataset if it's not already present. The term must
-        exist in the Dataset_Type vocabulary. Also increments the dataset's minor
-        version to reflect the metadata change.
+        Adds a type term to this dataset if it's not already present.
+        The term must exist in the Dataset_Type vocabulary. Flips the
+        dataset to a dev version to record the metadata change (per
+        ADR-0003: every mutation lands on dev). If the term is already
+        present, the call is a no-op and does not advance the dev
+        counter.
 
         Args:
             dataset_type: Term name (string) or VocabularyTerm object from Dataset_Type vocabulary.
-            _skip_version_increment: Internal parameter to skip version increment when
-                called from add_dataset_types (which handles versioning itself).
+            _skip_version_increment: Internal parameter to skip the
+                dev-row update when called from ``add_dataset_types`` or
+                during initial dataset creation, which handle the
+                version transition themselves.
 
         Raises:
             DerivaMLInvalidTerm: If the term doesn't exist in the Dataset_Type vocabulary.
@@ -371,18 +376,22 @@ class Dataset:
         _, atable_path = self._get_dataset_type_association_table()
         atable_path.insert([{MLVocab.dataset_type: vocab_term.name, "Dataset": self.dataset_rid}])
 
-        # Increment minor version to reflect metadata change (unless called from add_dataset_types)
+        # Flip to dev to record the metadata change (unless called from add_dataset_types
+        # during initial creation, which sets _skip_version_increment).
         if not _skip_version_increment:
-            self.increment_dataset_version(
-                VersionPart.minor,
+            self._create_or_advance_dev_row(
                 description=f"Added dataset type: {vocab_term.name}",
             )
 
     def remove_dataset_type(self, dataset_type: str | VocabularyTerm) -> None:
         """Remove a dataset type from this dataset.
 
-        Removes a type term from this dataset if it's currently associated. The term
-        must exist in the Dataset_Type vocabulary.
+        Removes a type term from this dataset if it's currently
+        associated. The term must exist in the Dataset_Type vocabulary.
+        Flips the dataset to a dev version on successful removal (per
+        ADR-0003: every mutation lands on dev). If the term isn't
+        currently associated with this dataset, the call is a no-op
+        and does not advance the dev counter.
 
         Args:
             dataset_type: Term name (string) or VocabularyTerm object from Dataset_Type vocabulary.
@@ -399,7 +408,7 @@ class Dataset:
         else:
             vocab_term = self._ml_instance.lookup_term(MLVocab.dataset_type, dataset_type)
 
-        # Check if present
+        # Check if present — no-op input doesn't advance the dev counter.
         if vocab_term.name not in self.dataset_types:
             return
 
@@ -408,6 +417,9 @@ class Dataset:
         atable_path.filter(
             (atable_path.Dataset == self.dataset_rid) & (atable_path.Dataset_Type == vocab_term.name)
         ).delete()
+        self._create_or_advance_dev_row(
+            description=f"Removed dataset type: {vocab_term.name}",
+        )
 
     def add_dataset_types(
         self,
@@ -416,16 +428,19 @@ class Dataset:
     ) -> None:
         """Add one or more dataset types to this dataset.
 
-        Convenience method for adding multiple types at once. Each term must exist
-        in the Dataset_Type vocabulary. Types that are already associated with the
-        dataset are silently skipped. Increments the dataset's minor version once
-        after all types are added.
+        Convenience method for adding multiple types at once. Each term
+        must exist in the Dataset_Type vocabulary. Types that are
+        already associated with the dataset are silently skipped.
+        Flips the dataset to a dev version once after all new types are
+        added (per ADR-0003: every mutation lands on dev). If every
+        supplied type is already associated, the call is a no-op and
+        does not advance the dev counter.
 
         Args:
             dataset_types: Single term or list of terms. Can be strings (term names)
                 or VocabularyTerm objects.
-            _skip_version_increment: Internal parameter to skip version increment
-                (used during initial dataset creation).
+            _skip_version_increment: Internal parameter to skip the
+                dev-row update during initial dataset creation.
 
         Raises:
             DerivaMLInvalidTerm: If any term doesn't exist in the Dataset_Type vocabulary.
@@ -451,11 +466,10 @@ class Dataset:
                 self.add_dataset_type(term, _skip_version_increment=True)
                 added_types.append(term_name)
 
-        # Increment version once for all added types (if any were added)
+        # Flip to dev once for all added types (if any were added).
         if added_types and not _skip_version_increment:
             type_names = ", ".join(added_types)
-            self.increment_dataset_version(
-                VersionPart.minor,
+            self._create_or_advance_dev_row(
                 description=f"Added dataset type(s): {type_names}",
             )
 
@@ -1477,9 +1491,11 @@ class Dataset:
         description: str | None = "",
         execution_rid: RID | None = None,
     ) -> None:
-        """Adds members to a dataset.
+        """Add records to this dataset.
 
-        Associates one or more records with a dataset. Members can be provided in two forms:
+        Associates one or more records with this dataset and flips the
+        dataset to a dev version (per ADR-0003: every mutation lands on
+        dev). Members can be provided in two forms:
 
         **List of RIDs (simpler but slower):**
         When `members` is a list of RIDs, each RID is resolved to determine which table
@@ -1495,7 +1511,11 @@ class Dataset:
         dataset element types. Use :meth:`DerivaML.add_dataset_element_type` to register
         a table before adding its records to datasets.
 
-        Adding members automatically increments the dataset's minor version.
+        After this call, ``current_version`` is a dev label of the form
+        ``<last_release>.post1.devN``. Call :meth:`release` to mint a
+        released version when the dev period is complete. A call with
+        an empty ``members`` argument is a no-op and does not advance
+        the dev counter.
 
         Args:
             members: Either:
@@ -1585,6 +1605,7 @@ class Dataset:
             dataset_elements = {t: list(set(ms)) for t, ms in members.items()}
         # Now make the entries into the association tables.
         pb = self._ml_instance.pathBuilder()
+        any_added = False
         for table, elements in dataset_elements.items():
             # Determine schema: ML schema for Dataset/File, otherwise use the table's actual schema
             if table == "Dataset" or table == "File":
@@ -1600,11 +1621,15 @@ class Dataset:
                 schema_path.tables[association_map[table]].insert(
                     [{"Dataset": self.dataset_rid, fk_column: e} for e in elements]
                 )
-        self.increment_dataset_version(
-            VersionPart.minor,
-            description=description,
-            execution_rid=execution_rid,
-        )
+                any_added = True
+        # Per ADR-0003 / Q18: a call that doesn't change any row is a no-op
+        # and doesn't advance the dev counter. Only flip to dev if at least
+        # one association row was inserted.
+        if any_added:
+            self._create_or_advance_dev_row(
+                description=description,
+                execution_rid=execution_rid,
+            )
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def delete_dataset_members(
@@ -1615,14 +1640,21 @@ class Dataset:
     ) -> None:
         """Remove members from this dataset.
 
-        Removes the specified members from the dataset. In addition to removing members,
-        the minor version number of the dataset is incremented and the description,
-        if provided, is applied to that new version.
+        Removes the specified members and flips the dataset to a dev
+        version (per ADR-0003: every mutation lands on dev).
+
+        After this call, ``current_version`` is a dev label of the form
+        ``<last_release>.post1.devN``. Call :meth:`release` to mint a
+        released version when the dev period is complete. A call with
+        an empty ``members`` argument is a no-op and does not advance
+        the dev counter.
 
         Args:
             members: List of member RIDs to remove from the dataset.
             description: Optional description of the removal operation.
-            execution_rid: Optional RID of execution associated with this operation.
+                Replaces the dev row's existing description.
+            execution_rid: Optional RID of execution associated with
+                this operation. Stored on the dev row.
 
         Raises:
             DerivaMLException: If any RID is invalid or not part of this dataset.
@@ -1632,8 +1664,13 @@ class Dataset:
             ...     members=["1-ABC", "1-DEF"],
             ...     description="Removed corrupted samples"
             ... )
+            >>> dataset.current_version  # doctest: +SKIP
+            <Version('0.4.0.post1.dev1')>
         """
         members = set(members)
+        # Per ADR-0003 / Q18: no-op input doesn't advance the dev counter.
+        if not members:
+            return
         description = description or "Deleted dataset members"
 
         # Go through every rid to be deleted and sort them based on what association table entries
@@ -1680,8 +1717,13 @@ class Dataset:
                 & (atable_path.columns[fk_column] == AnyQuantifier(*elements)),
             ).delete()
 
-        self.increment_dataset_version(
-            VersionPart.minor,
+        # Per ADR-0003: every mutation lands on dev. The caller passed a
+        # non-empty `members` list, so this is a real mutation attempt
+        # (the validation step above resolved the RIDs and confirmed they
+        # belong to dataset element types). RIDs that didn't actually
+        # match a membership row are a benign DELETE no-op at the table
+        # level but still represent caller intent — flip to dev.
+        self._create_or_advance_dev_row(
             description=description,
             execution_rid=execution_rid,
         )
