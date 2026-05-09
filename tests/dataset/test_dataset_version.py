@@ -5,6 +5,7 @@ try:
 except ImportError:
     ic = lambda *a, **kw: None
 
+from deriva_ml import BuiltinTypes, ColumnDefinition, MLVocab, TableDefinition
 from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
 from deriva_ml.execution.execution import ExecutionConfiguration
 
@@ -203,3 +204,135 @@ class TestMarkDev:
         dev = next(h for h in history if h.dataset_version.is_devrelease)
         # DatasetHistory normalises empty/missing execution_rid to None.
         assert dev.execution_rid is None
+
+
+class TestMutationsLandOnDev:
+    """Integration tests for PR 4: member and type mutations flip to dev.
+
+    Verifies the behavior change committed in ADR-0003 / PR 4: every
+    mutation that today bumped to a released version now lands on a dev
+    version instead. The dev counter advances per call (Q18), and
+    no-op input doesn't advance.
+    """
+
+    def _setup_dataset_with_table(self, ml_instance):
+        """Helper: register an element-type table and a fresh dataset.
+
+        Returns (dataset, test_rids) where test_rids are five rows
+        in the registered element type.
+        """
+        ml_instance.add_term(MLVocab.dataset_type, "DevDataMutation", description="A test type")
+        ml_instance.add_term(MLVocab.dataset_type, "AnotherType", description="A second test type")
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="Manual workflow")
+        ml_instance.model.create_table(
+            TableDefinition(
+                name="MutationTestItem",
+                columns=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+            )
+        )
+        ml_instance.add_dataset_element_type("MutationTestItem")
+        table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["MutationTestItem"]
+        table_path.insert([{"Col1": f"Item{i}"} for i in range(5)])
+        test_rids = [r["RID"] for r in table_path.entities().fetch()]
+
+        workflow = ml_instance.create_workflow(
+            name="Mutation Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for mutation tests",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Mutation Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(
+            dataset_types=["DevDataMutation"],
+            description="Dataset for mutation tests",
+            version=DatasetVersion(0, 4, 0),
+        )
+        return dataset, test_rids
+
+    def test_add_dataset_members_flips_to_dev(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        # Sanity check the starting state — released at 0.4.0.
+        assert str(dataset.current_version) == "0.4.0"
+
+        dataset.add_dataset_members({"MutationTestItem": test_rids[:2]})
+
+        new_version = dataset.current_version
+        assert new_version.is_devrelease, f"Expected dev version, got {new_version}"
+        assert str(new_version) == "0.4.0.post1.dev1"
+
+    def test_add_dataset_members_advances_devN_on_subsequent_calls(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"MutationTestItem": test_rids[:1]})
+        dataset.add_dataset_members({"MutationTestItem": test_rids[1:2]})
+        dataset.add_dataset_members({"MutationTestItem": test_rids[2:3]})
+
+        assert str(dataset.current_version) == "0.4.0.post1.dev3"
+
+    def test_add_dataset_members_with_empty_input_is_noop(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+        version_before = dataset.current_version
+
+        dataset.add_dataset_members({"MutationTestItem": []})
+
+        version_after = dataset.current_version
+        # No row was inserted, so the dev counter does not advance.
+        assert version_after == version_before
+        assert not version_after.is_devrelease
+
+    def test_add_dataset_type_flips_to_dev(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+        assert not dataset.current_version.is_devrelease
+
+        dataset.add_dataset_type("AnotherType")
+
+        new_version = dataset.current_version
+        assert new_version.is_devrelease
+        assert str(new_version) == "0.4.0.post1.dev1"
+
+    def test_add_dataset_type_for_existing_type_is_noop(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+        version_before = dataset.current_version
+
+        # The dataset was created with type "DevDataMutation"; re-adding it is a no-op.
+        dataset.add_dataset_type("DevDataMutation")
+
+        version_after = dataset.current_version
+        assert version_after == version_before
+        assert not version_after.is_devrelease
+
+    def test_remove_dataset_type_flips_to_dev(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+        # First add a second type so we have something to remove without
+        # leaving the dataset typeless.
+        dataset.add_dataset_types(["AnotherType"])
+        # That advanced to .dev1; now remove it.
+        dataset.remove_dataset_type("AnotherType")
+
+        new_version = dataset.current_version
+        assert new_version.is_devrelease
+        # First add was .dev1; remove was .dev2.
+        assert str(new_version) == "0.4.0.post1.dev2"
+
+    def test_remove_dataset_type_for_absent_type_is_noop(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+        version_before = dataset.current_version
+
+        # "AnotherType" was added to the vocabulary but never associated
+        # with this dataset, so removing it is a no-op.
+        dataset.remove_dataset_type("AnotherType")
+
+        version_after = dataset.current_version
+        assert version_after == version_before
+        assert not version_after.is_devrelease
+
+    def test_existing_release_path_still_works(self, test_ml):
+        """``increment_dataset_version`` (renamed in PR 5) still produces released rows."""
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+
+        # Direct release — bypasses the dev-versioning model entirely.
+        # Will be renamed to release() in PR 5.
+        new_version = dataset.increment_dataset_version(VersionPart.minor)
+
+        assert not new_version.is_devrelease
+        assert str(new_version) == "0.5.0"
