@@ -1642,7 +1642,11 @@ def _reinitialize_dataset_versions(
 
         for dataset in ml.find_datasets():
             try:
-                dataset.increment_dataset_version(
+                # Catalog clone reinitialises versions on every dataset to
+                # stamp fresh snapshot pointers. This is structural, not a
+                # user-facing release — bypass the dev-versioning model
+                # via the internal force-bump primitive.
+                dataset._increment_dataset_version(
                     component=VersionPart.patch,
                     description=description,
                 )
