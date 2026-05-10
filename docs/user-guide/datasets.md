@@ -107,7 +107,7 @@ dataset.add_dataset_members(
 )
 ```
 
-Both forms trigger a minor version increment on the dataset. To link the addition to the execution that created the data, pass `execution_rid`:
+Both forms flip the dataset to a *dev* version (a mutable, in-progress label of the form `<last_release>.post1.devN` — see ["How to version a dataset"](#how-to-version-a-dataset) below for the full model). To link the addition to the execution that created the data, pass `execution_rid`:
 
 ```python
 dataset.add_dataset_members(
@@ -133,7 +133,7 @@ ml.add_dataset_element_type("Subject")
 **Notes**
 
 - Use the dict form whenever you know which table the RIDs come from. The list form issues an extra catalog query per batch to identify tables.
-- Each call to `add_dataset_members` automatically increments the dataset's minor version. If you need to add members in multiple batches without creating intermediate versions, consider collecting all RIDs first and calling `add_dataset_members` once.
+- Each call to `add_dataset_members` advances the dataset's dev version (`.dev1` → `.dev2` → …). The dev row is a single mutable record, so multiple calls don't create intermediate released versions — they just bump `.devN` on the same row. When you're ready to mint a stable, citable version, call `dataset.release(...)`.
 - Members can only come from tables registered with `add_dataset_element_type`. Attempting to add a RID from an unregistered table raises `DerivaMLException`.
 
 ## Parent and child datasets
@@ -177,46 +177,96 @@ Bag export honors the hierarchy: downloading a parent dataset includes all recor
 
 ## How to version a dataset
 
-Every dataset starts at version `0.1.0` and increments its minor version each time `add_dataset_members` is called. You can also increment a version explicitly and control which component changes.
+DerivaML datasets use a two-state versioning model: **released versions** are stable, snapshot-pinned, citable references; **dev versions** are mutable working states that accumulate changes between releases. Every mutation lands on dev; `release()` is the only operation that produces a released version.
+
+A new dataset is created at a released version (`0.1.0` by default). Mutations — adding or removing members, adding or removing dataset types — flip it to a dev label of the form `<last_release>.post1.devN` and advance `.devN` on each subsequent mutation. When the working state is ready to be cited or consumed by an execution, call `release()` to mint a clean released version.
 
 ```python
 from deriva_ml.dataset import VersionPart
 
-# Read the current version
-print(dataset.current_version)  # e.g., DatasetVersion(0, 3, 0)
+# Read the current version. .is_devrelease tells you which state.
+print(dataset.current_version)        # DatasetVersion("0.1.0")
+print(dataset.current_version.is_devrelease)  # False
 
-# View the version history
-for entry in dataset.dataset_history():
-    print(f"v{entry.dataset_version}: {entry.description} ({entry.snapshot})")
+# Mutate — flips to dev.
+dataset.add_dataset_members(members={"Image": image_rids})
+print(dataset.current_version)        # DatasetVersion("0.1.0.post1.dev1")
 
-# Bump to 1.0.0 when the dataset is stable for a training run
-new_version = dataset.increment_dataset_version(
-    component=VersionPart.major,
+# More mutations — advance .devN on the same dev row.
+dataset.add_dataset_members(members={"Image": more_image_rids})
+print(dataset.current_version)        # DatasetVersion("0.1.0.post1.dev2")
+
+# Promote the dev period to a clean released version.
+new_version = dataset.release(
+    bump=VersionPart.minor,
     description="Stable release for experiment 1",
 )
-print(new_version)  # DatasetVersion(1, 0, 0)
+print(new_version)                    # DatasetVersion("0.2.0")
 ```
 
-`increment_dataset_version` propagates the bump through the parent/child graph using a topological sort, so all related datasets move to consistent version numbers together.
+**The dev row is mutable** — there is at most one dev row per dataset per dev period, and `.devN` advances by `UPDATE`, not `INSERT`. Consequence: a dev label is observable only at the moment that's its current value. By the time you read `.dev2` and try to use it later, the catalog may already say `.dev3`. Dev labels are notational, not citational. If you want a stable reference, call `release()`.
 
-Each version is tied to a catalog snapshot. To read members as they existed at a specific version, pass `version=` to `list_dataset_members()` or download the versioned bag:
+### Recording indirect drift with `mark_dev`
+
+Sometimes the catalog drifts under the dataset without `add_dataset_members` having been called — for example, a separate execution records a feature value for a member of this dataset, or an asset's metadata changes. The dataset's row is untouched but its content has changed. To flag that drift explicitly:
 
 ```python
-# List members as they existed at v1.0.0 (uses the catalog snapshot for that version)
-members = dataset.list_dataset_members(version="1.0.0")
-
-# Or download the versioned bag for fully offline use
-versioned_bag = dataset.download_dataset_bag(version="1.0.0")
+dataset.mark_dev("Picked up classifier output for the test split")
+print(dataset.current_version)        # DatasetVersion("0.1.0.post1.dev1")
 ```
 
-This is the guarantee that makes dataset downloads reproducible. Downloading a versioned dataset always returns the same rows.
+`mark_dev` returns `None` (a returned dev label can't be passed to anything later — the next mutation would invalidate it).
+
+### Detecting drift
+
+Three methods report what's drifted, all using the same FK-path walk under the hood:
+
+```python
+# Has anything reachable changed since the last release?
+if dataset.is_dirty():
+    # Per-table change counts since the last release
+    for table_name, count in dataset.release_diff().items():
+        print(f"{table_name}: {count} rows changed")
+
+# Compare two specific versions
+diff = dataset.compare_versions("0.1.0", "0.2.0")
+```
+
+**Limitations**: deletions of catalog rows that this dataset references are not detected by these methods. If you delete catalog content that affects a dataset, call `mark_dev()` manually to record the drift.
+
+### Release and citation
+
+Each released version pins a catalog snapshot. To read members as they existed at a specific released version, pass `version=` to `list_dataset_members()` or `download_dataset_bag()`:
+
+```python
+# List members as they existed at v0.2.0 (uses the catalog snapshot for that version)
+members = dataset.list_dataset_members(version="0.2.0")
+
+# Or download the versioned bag for fully offline use
+versioned_bag = dataset.download_dataset_bag(version="0.2.0")
+```
+
+This is the guarantee that makes dataset downloads reproducible: downloading a *released* version always returns the same rows.
+
+!!! warning
+    **Always release before downloading.** As of 2.0, `download_dataset_bag()` requires a *released* version label — passing a dev label (or letting `current_version` default to a dev label when the dataset is in a dev period) raises a Pydantic `ValidationError` because dev rows have no pinned snapshot. Call `dataset.release(...)` to mint a released version, then download:
+
+    ```python
+    dataset.add_dataset_members(...)
+    dataset.release(VersionPart.minor, "Cut for download")
+    bag = dataset.download_dataset_bag(dataset.current_version)
+    ```
+
+    Downloading at the live dev state is on the roadmap — see [issue #89](https://github.com/informatics-isi-edu/deriva-ml/issues/89). Until that lands, the dev-vs-released distinction is enforced by the download path itself.
 
 **Notes**
 
-- Every call to `add_dataset_members` unconditionally bumps the minor version once. There is no parameter to suppress this. If you want fewer version bumps, **batch all members into a single `add_dataset_members` call** rather than making multiple small calls.
-- To mark a milestone (major or patch version) without adding members, call `increment_dataset_version` explicitly.
+- Each call to `add_dataset_members` advances `.devN` once. Multiple calls during a dev period accumulate on the same dev row — there are no intermediate released versions until you call `release()`.
+- `release()` errors if the dataset has no dev period to promote. To mint a release without a real change (for example, to attach release notes), call `mark_dev()` first.
 - `VersionPart` lives in `deriva_ml.dataset.aux_classes` alongside `DatasetVersion` and related types, and is re-exported from `deriva_ml.dataset` for convenience.
-- Version pinning for executions (`DatasetSpec(rid=..., version="1.0.0")`) is covered in Chapter 7 ("Reproducibility").
+- The version vocabulary is PEP 440 (the same form `setuptools-scm` uses for between-release labels). This is sortable: `0.1.0 < 0.1.0.post1.dev1 < 0.2.0`.
+- Version pinning for executions (`DatasetSpec(rid=..., version="0.2.0")`) is covered in Chapter 7 ("Reproducibility").
+- Executions consume **released** versions only — dev labels are not stable references.
 
 ## How to split a dataset
 
@@ -479,9 +529,11 @@ Non-element-type tables (such as `Device`) are always traversed normally.
     The column name must be in the format `TableName.ColumnName` (e.g., `Image_Classification.Image_Class`). A common mistake is using the underscore-joined form (`Image_Classification_Image_Class`), which is the denormalized DataFrame column name — not the argument to `stratify_by_column`.
 
 !!! warning
-    **Version numbers do not update automatically when members change.**
+    **Indirect drift does not update version numbers automatically.**
 
-    `add_dataset_members` auto-increments the minor version as a convenience, but if you never call `add_dataset_members` (for example, you added members in a previous session and now want to mark the dataset as stable), you must call `increment_dataset_version()` explicitly. The version counter is not driven by catalog state — it only advances when you tell it to.
+    `add_dataset_members` and `delete_dataset_members` flip the dataset to a dev version. But changes to catalog rows the dataset *references* — for example, a feature value added to a member by a separate execution — do not flip the dataset to dev automatically; that would require every catalog write to know which datasets reference it, which is impractical.
+
+    Use `dataset.is_dirty()` to detect indirect drift, and `dataset.mark_dev(...)` to record it explicitly when it matters. To mint a stable release, call `dataset.release(bump, description)` — the dev period must be in progress.
 
 !!! warning
     **`materialize=False` gives you table metadata, not asset files.**

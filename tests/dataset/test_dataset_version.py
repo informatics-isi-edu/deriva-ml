@@ -516,3 +516,134 @@ class TestRelease:
 
         # Anchored at 0.5.0 (the new last-released), not 0.4.0.
         assert str(dataset.current_version) == "0.5.0.post1.dev1"
+
+
+class TestDriftDetection:
+    """Integration tests for ``is_dirty`` / ``release_diff`` / ``compare_versions`` per ADR-0003 / PR 6.
+
+    Covers the drift-detection trio. All three share one internal walk
+    that filters reachable rows by ``RMT`` time predicate. The trio
+    differs only in the predicate and what's returned (bool vs.
+    per-table counts).
+    """
+
+    def _setup_dataset_with_table(self, ml_instance):
+        """Helper: create a fresh dataset with an element-type table.
+
+        Returns (dataset, test_rids).
+        """
+        ml_instance.add_term(MLVocab.dataset_type, "DriftTest", description="A test type")
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="Manual workflow")
+        ml_instance.model.create_table(
+            TableDefinition(
+                name="DriftTestItem",
+                columns=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+            )
+        )
+        ml_instance.add_dataset_element_type("DriftTestItem")
+        table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["DriftTestItem"]
+        table_path.insert([{"Col1": f"Item{i}"} for i in range(5)])
+        test_rids = [r["RID"] for r in table_path.entities().fetch()]
+
+        workflow = ml_instance.create_workflow(
+            name="Drift Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for drift tests",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Drift Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(
+            dataset_types=["DriftTest"],
+            description="Dataset for drift tests",
+            version=DatasetVersion(0, 4, 0),
+        )
+        return dataset, test_rids
+
+    def test_is_dirty_false_immediately_after_creation(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+
+        assert dataset.is_dirty() is False
+
+    def test_is_dirty_true_after_mutation(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:2]})
+
+        assert dataset.is_dirty() is True
+
+    def test_is_dirty_false_after_release(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:2]})
+        dataset.release(bump=VersionPart.minor, description="0.5.0")
+
+        assert dataset.is_dirty() is False
+
+    def test_release_diff_empty_when_clean(self, test_ml):
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+
+        assert dataset.release_diff() == {}
+
+    def test_release_diff_reports_added_members(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:3]})
+
+        diff = dataset.release_diff()
+        # The Dataset_DriftTestItem association table should appear as drifted.
+        # (Or the DriftTestItem table itself, depending on path traversal.)
+        assert diff, f"Expected non-empty drift, got {diff}"
+        # All values are positive counts.
+        assert all(v > 0 for v in diff.values())
+
+    def test_compare_versions_between_two_releases(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:2]})
+        dataset.release(bump=VersionPart.minor, description="v0.5.0 with 2 members")
+        # Now at 0.5.0 released. Add more members and release again.
+        dataset.add_dataset_members({"DriftTestItem": test_rids[2:5]})
+        dataset.release(bump=VersionPart.minor, description="v0.6.0 with 5 members")
+
+        diff = dataset.compare_versions("0.5.0", "0.6.0")
+        assert diff, f"Expected non-empty diff between 0.5.0 and 0.6.0, got {diff}"
+        # All values are positive.
+        assert all(v > 0 for v in diff.values())
+
+    def test_compare_versions_argument_order_is_symmetric(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:2]})
+        dataset.release(bump=VersionPart.minor, description="v0.5.0")
+        dataset.add_dataset_members({"DriftTestItem": test_rids[2:5]})
+        dataset.release(bump=VersionPart.minor, description="v0.6.0")
+
+        ab = dataset.compare_versions("0.5.0", "0.6.0")
+        ba = dataset.compare_versions("0.6.0", "0.5.0")
+
+        assert ab == ba, "compare_versions should be symmetric in argument order"
+
+    def test_compare_versions_same_version_returns_empty(self, test_ml):
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:2]})
+        dataset.release(bump=VersionPart.minor, description="v0.5.0")
+
+        # Comparing the same version against itself yields nothing.
+        diff = dataset.compare_versions("0.5.0", "0.5.0")
+        assert diff == {}
+
+    def test_compare_versions_with_unknown_version_raises(self, test_ml):
+        import pytest
+
+        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
+
+        with pytest.raises(Exception) as exc_info:
+            dataset.compare_versions("0.4.0", "9.9.9")
+        assert "9.9.9" in str(exc_info.value)
+
+    def test_compare_versions_dev_label_resolves_to_live(self, test_ml):
+        """A dev label that matches the current dev row resolves to live state."""
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DriftTestItem": test_rids[:2]})
+        # Now at 0.4.0.post1.dev1 (dev). Compare to 0.4.0 — should show drift.
+        current = str(dataset.current_version)
+
+        diff = dataset.compare_versions("0.4.0", current)
+        assert diff, f"Expected non-empty diff between 0.4.0 and {current}, got {diff}"
