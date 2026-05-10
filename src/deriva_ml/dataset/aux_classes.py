@@ -271,8 +271,15 @@ class DatasetMinid(BaseModel):
 
     @computed_field
     @property
-    def dataset_snapshot(self) -> str:
-        return self.version_rid.split("@")[1]
+    def dataset_snapshot(self) -> str | None:
+        """The catalog snapshot ID this minid pins, or ``None`` for live (dev) state.
+
+        For released versions the ``version_rid`` carries an
+        ``@<snaptime>`` suffix; for dev versions the rid is bare (the
+        snapshot is ``NULL`` on the underlying ``Dataset_Version`` row).
+        """
+        parts = self.version_rid.split("@", 1)
+        return parts[1] if len(parts) == 2 else None
 
     @model_validator(mode="before")
     @classmethod

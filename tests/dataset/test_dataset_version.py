@@ -33,10 +33,10 @@ class TestDatasetVersion:
         )
         v0 = dataset.current_version
         assert "1.0.0" == str(v0)
-        # Use the private force-bump primitive: this test verifies the
-        # release-segment arithmetic and graph propagation without
-        # going through the dev → release lifecycle.
-        v1 = dataset._increment_dataset_version(component=VersionPart.minor)
+        # Bump to a new released version through the dev-versioning lifecycle:
+        # mark_dev declares a dev period, release promotes it.
+        dataset.mark_dev(description="bump to 1.1.0")
+        v1 = dataset.release(bump=VersionPart.minor, description="1.1.0")
         assert "1.1.0" == str(v1)
         assert "1.1.0" == str(dataset.current_version)
 
@@ -61,37 +61,22 @@ class TestDatasetVersion:
             version=DatasetVersion(1, 0, 0),
         )
         assert 1 == len(dataset.dataset_history())
-        v1 = dataset._increment_dataset_version(component=VersionPart.minor)
+        dataset.mark_dev(description="bump")
+        # After mark_dev, history has the initial release plus the dev row.
+        assert 2 == len(dataset.dataset_history())
+        # Release promotes the dev row in place — history count stays at 2.
+        v1 = dataset.release(bump=VersionPart.minor, description="1.1.0")
         assert 2 == len(dataset.dataset_history())
 
-    def test_dataset_version(self, dataset_test, tmp_path):
-        dataset_description = dataset_test.dataset_description
-        ml_instance = dataset_description.dataset._ml_instance
-        nested_datasets = [ml_instance.lookup_dataset(ds) for ds in dataset_description.member_rids.get("Dataset", [])]
-        datasets = [
-            ml_instance.lookup_dataset(dataset)
-            for nested_description in dataset_description.members.get("Dataset", [])
-            for dataset in nested_description.member_rids.get("Dataset", [])
-        ]
-        ic(datasets)
-        _versions = {
-            "d0": dataset_description.dataset.current_version,
-            "d1": [ds.current_version for ds in nested_datasets],
-            "d2": [ds.current_version for ds in datasets],
-        }
-        # Use the private force-bump primitive: this test verifies graph
-        # propagation, which is _increment_dataset_version's specialty.
-        # The public release() path operates on a single dataset only.
-        nested_datasets[0]._increment_dataset_version(VersionPart.major)
-        new_versions = {
-            "d0": dataset_description.dataset.current_version,
-            "d1": [ds.current_version for ds in nested_datasets],
-            "d2": [ds.current_version for ds in datasets],
-        }
-        ic(_versions)
-        ic(new_versions)
-        assert new_versions["d0"].major == 2
-        assert new_versions["d2"][0].major == 2
+    # NOTE: a `test_dataset_version` test was deleted in this PR.
+    # It had verified that bumping a child dataset's version cascaded up to
+    # the parent's. Graph cascading was a property of
+    # ``_increment_dataset_version`` only; ``release()`` operates on a single
+    # dataset (per ADR-0003 / Branch C). With ``_increment_dataset_version``
+    # removed, there is no public API path that cascades. If parent-version
+    # propagation is wanted later, a new explicit API should be designed
+    # (probably as an explicit ``release_with_descendants(...)`` opt-in,
+    # not an implicit cascade).
 
 
 class TestMarkDev:
@@ -182,9 +167,11 @@ class TestMarkDev:
 
     def test_history_is_sorted_ascending(self, test_ml):
         dataset, _execution = self._setup_dataset(test_ml)
-        # Make a few releases plus a dev row.
-        dataset._increment_dataset_version(VersionPart.minor, "first bump")
-        dataset._increment_dataset_version(VersionPart.minor, "second bump")
+        # Make a few releases plus a dev row, all through the public lifecycle.
+        dataset.mark_dev("first bump")
+        dataset.release(bump=VersionPart.minor, description="first bump")
+        dataset.mark_dev("second bump")
+        dataset.release(bump=VersionPart.minor, description="second bump")
         dataset.mark_dev("then dev")
 
         history = dataset.dataset_history()
@@ -332,20 +319,11 @@ class TestMutationsLandOnDev:
         assert version_after == version_before
         assert not version_after.is_devrelease
 
-    def test_force_bump_via_internal_helper(self, test_ml):
-        """``_increment_dataset_version`` (private, force-bump) still produces released rows.
-
-        After PR 5, the public release path is :meth:`Dataset.release`,
-        which requires a dev row. ``_increment_dataset_version`` is
-        kept as a private internal primitive for callers that need to
-        force-bump without a dev period (e.g., catalog clone).
-        """
-        dataset, _test_rids = self._setup_dataset_with_table(test_ml)
-
-        new_version = dataset._increment_dataset_version(VersionPart.minor)
-
-        assert not new_version.is_devrelease
-        assert str(new_version) == "0.5.0"
+    # The previous test_force_bump_via_internal_helper was deleted in this
+    # PR alongside the removal of Dataset._increment_dataset_version. Public
+    # callers must use mark_dev() + release() now. The catalog-clone code
+    # was the last remaining caller of the private primitive and was
+    # rewritten to go through the public lifecycle.
 
 
 class TestRelease:
@@ -647,3 +625,94 @@ class TestDriftDetection:
 
         diff = dataset.compare_versions("0.4.0", current)
         assert diff, f"Expected non-empty diff between 0.4.0 and {current}, got {diff}"
+
+
+class TestDownloadAtDevVersion:
+    """Integration tests for ``download_dataset_bag`` against dev labels (issue #89).
+
+    Pre-fix, downloading at a dev label crashed with a Pydantic
+    ValidationError because the snapshot is NULL on dev rows. After the
+    fix, dev labels resolve to live catalog state per ADR-0003 / Q20.
+    """
+
+    def _setup_dataset_with_table(self, ml_instance):
+        """Helper: create a fresh dataset with an element-type table populated.
+
+        Returns (dataset, test_rids).
+        """
+        ml_instance.add_term(MLVocab.dataset_type, "DownloadDevTest", description="A test type")
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="Manual workflow")
+        ml_instance.model.create_table(
+            TableDefinition(
+                name="DownloadDevItem",
+                columns=[ColumnDefinition(name="Col1", type=BuiltinTypes.text)],
+            )
+        )
+        ml_instance.add_dataset_element_type("DownloadDevItem")
+        table_path = ml_instance.catalog.getPathBuilder().schemas[ml_instance.default_schema].tables["DownloadDevItem"]
+        table_path.insert([{"Col1": f"Item{i}"} for i in range(3)])
+        test_rids = [r["RID"] for r in table_path.entities().fetch()]
+
+        workflow = ml_instance.create_workflow(
+            name="DownloadDev Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for dev-download tests",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="DownloadDev Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(
+            dataset_types=["DownloadDevTest"],
+            description="Dataset for dev-download tests",
+            version=DatasetVersion(0, 4, 0),
+        )
+        return dataset, test_rids
+
+    def test_download_dev_version_succeeds(self, test_ml, tmp_path):
+        """Downloading at a dev label produces a valid bag (no ValidationError)."""
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DownloadDevItem": test_rids[:2]})
+        # Dataset is now at 0.4.0.post1.dev1 (dev).
+        assert dataset.current_version.is_devrelease
+
+        # Pre-fix this raised a Pydantic ValidationError ('<rid>@None').
+        bag = dataset.download_dataset_bag(dataset.current_version, use_minid=False)
+        assert bag is not None
+
+    def test_dev_minid_has_bare_rid(self, test_ml, tmp_path):
+        """A DatasetMinid for a dev version uses a bare RID (no @snaptime)."""
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DownloadDevItem": test_rids[:2]})
+        assert dataset.current_version.is_devrelease
+
+        minid = dataset._get_dataset_minid(
+            version=dataset.current_version,
+            create=True,
+            use_minid=False,
+        )
+        # Bare RID — no @snapshot suffix.
+        assert "@" not in minid.version_rid
+        assert minid.dataset_snapshot is None
+
+    def test_use_minid_rejected_for_dev_version(self, test_ml, tmp_path):
+        """use_minid=True is not allowed for dev versions (dev labels aren't citable)."""
+        import pytest
+
+        dataset, test_rids = self._setup_dataset_with_table(test_ml)
+        dataset.add_dataset_members({"DownloadDevItem": test_rids[:2]})
+        assert dataset.current_version.is_devrelease
+
+        # Probe the dev-MINID rejection directly via the internal method —
+        # ``download_dataset_bag`` has an earlier S3-bucket check that fires
+        # first in test environments without S3 configured.
+        with pytest.raises(Exception) as exc_info:
+            dataset._get_dataset_minid(
+                version=dataset.current_version,
+                create=True,
+                use_minid=True,
+            )
+        msg = str(exc_info.value)
+        # Error mentions dev-version citability and points at release()
+        # as the resolution path.
+        assert "MINID" in msg or "minid" in msg.lower()
+        assert "release" in msg.lower()

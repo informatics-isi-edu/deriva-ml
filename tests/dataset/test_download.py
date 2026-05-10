@@ -46,7 +46,12 @@ class TestDatasetDownload:
         for ds in sorted(reference_datasets, key=lambda d: d.dataset_rid):
             dataset_bag = db_catalog.lookup_dataset(ds.dataset_rid)  # Get nested bag from the dataset.
             snapshot_ds = ml_instance.lookup_dataset(dataset=ds.dataset_rid)
-            catalog_elements = snapshot_ds.list_dataset_members(version=dataset_spec.version, recurse=recurse)
+            # Each dataset has its own version timeline — there's no
+            # cross-dataset version cascade after issue #90's clone
+            # rework. Look up members at each dataset's own current
+            # version rather than the parent's version.
+            child_version = snapshot_ds.current_version
+            catalog_elements = snapshot_ds.list_dataset_members(version=child_version, recurse=recurse)
             del catalog_elements["File"]  # Files is not in the bag.
             bag_elements = dataset_bag.list_dataset_members(recurse=recurse)
 
@@ -153,7 +158,17 @@ class TestDatasetDownload:
         dataset_description = dataset_test.dataset_description
         dataset = dataset_description.dataset
 
+        # Pin a stable released `current_version` for later download.
+        # The fixture leaves the dataset in a dev period (its
+        # add_dataset_members calls flip to dev under the new model), so
+        # we must release first before capturing — a captured dev label
+        # is not a stable reference (per ADR-0003 / Q20: the dev row
+        # gets advanced in place by the next mutation, so the captured
+        # dev label stops resolving).
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.patch, description="release fixture state")
         current_version = dataset.current_version
+        assert not current_version.is_devrelease
         current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         self.compare_datasets(ml_instance, dataset_test, current_spec)
 
@@ -161,13 +176,14 @@ class TestDatasetDownload:
         subjects = [s["RID"] for s in pb.schemas[ml_instance.default_schema].tables["Subject"].path.entities().fetch()]
 
         dataset_description.dataset.add_dataset_members(subjects[-2:])
+        # Per ADR-0003: add_dataset_members lands on a dev version. We
+        # release the dev period to mint a stable label for download
+        # (downloading a dev label works for the current dev state, but
+        # caching is disabled — releasing produces a snapshot-pinned
+        # reference more suitable for a comparison test).
+        dataset_description.dataset.release(bump=VersionPart.minor, description="release after adding subjects")
         new_version = dataset_description.dataset.current_version
-        # Per ADR-0003: add_dataset_members lands on a dev version, not a
-        # released minor bump. The dev label is anchored at the previous
-        # release (`current_version`).
-        assert new_version.is_devrelease
-        assert new_version.release == current_version.release
-        assert new_version.dev == 1
+        assert not new_version.is_devrelease
 
         current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset.download_dataset_bag(new_version, use_minid=False)
@@ -185,7 +201,16 @@ class TestDatasetDownload:
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
 
+        # Pin a stable released `current_version` for later download.  The
+        # fixture leaves the dataset in a dev period (its add_dataset_members
+        # calls flip to dev under the new model), so we must release first
+        # before capturing — a captured dev label is not a stable
+        # reference (per ADR-0003 / Q20: the dev row gets promoted in place
+        # at release time, so the dev label stops resolving).
+        if dataset_description.dataset.current_version.is_devrelease:
+            dataset_description.dataset.release(bump=VersionPart.patch, description="release fixture state")
         current_version = dataset_description.dataset.current_version
+        assert not current_version.is_devrelease
 
         ml_instance.create_table(
             TableDefinition(
@@ -193,9 +218,13 @@ class TestDatasetDownload:
                 columns=[],
             )
         )
-        # Use the private force-bump primitive: this test stamps a new
-        # snapshot to capture a schema change, not to release a dev period.
-        new_version = dataset_description.dataset._increment_dataset_version(component=VersionPart.minor)
+        # Stamp a new snapshot to capture the schema change above. Goes
+        # through the public dev → release lifecycle.
+        dataset_description.dataset.mark_dev(description="schema change probe")
+        new_version = dataset_description.dataset.release(
+            bump=VersionPart.minor,
+            description="schema change probe",
+        )
 
         current_bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset_description.dataset.download_dataset_bag(new_version, use_minid=False)
@@ -433,12 +462,10 @@ class TestDatabasePathCaching:
         bag1 = dataset.download_dataset_bag(version=current_version, use_minid=False)
         dbase_path1 = bag1.model.database_dir
 
-        # Force-bump to a new released version to test downloading two
-        # distinct snapshots. The private primitive is appropriate here —
-        # the test isn't exercising the dev → release lifecycle.
-        new_version = dataset._increment_dataset_version(
-            component=VersionPart.minor, description="Test version increment"
-        )
+        # Bump to a new released version to test downloading two
+        # distinct snapshots — through the public dev → release lifecycle.
+        dataset.mark_dev(description="Test version increment")
+        new_version = dataset.release(bump=VersionPart.minor, description="Test version increment")
 
         # Download the new version
         bag2 = dataset.download_dataset_bag(version=new_version, use_minid=False)

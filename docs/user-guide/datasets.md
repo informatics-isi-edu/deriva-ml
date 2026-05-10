@@ -248,16 +248,15 @@ versioned_bag = dataset.download_dataset_bag(version="0.2.0")
 
 This is the guarantee that makes dataset downloads reproducible: downloading a *released* version always returns the same rows.
 
-!!! warning
-    **Always release before downloading.** As of 2.0, `download_dataset_bag()` requires a *released* version label — passing a dev label (or letting `current_version` default to a dev label when the dataset is in a dev period) raises a Pydantic `ValidationError` because dev rows have no pinned snapshot. Call `dataset.release(...)` to mint a released version, then download:
+Downloading at a *dev* label (1.35+) generates a bag against live catalog state. The bag's contents depend on the catalog at request time, so two consecutive downloads of the same dev label may differ if the catalog drifted between them. Local caching is also disabled for dev versions for the same reason. If you want a stable, snapshot-pinned reference, call `release()` first to mint a released version:
 
-    ```python
-    dataset.add_dataset_members(...)
-    dataset.release(VersionPart.minor, "Cut for download")
-    bag = dataset.download_dataset_bag(dataset.current_version)
-    ```
+```python
+dataset.add_dataset_members(...)
+dataset.release(VersionPart.minor, "Cut for download")
+bag = dataset.download_dataset_bag(dataset.current_version)
+```
 
-    Downloading at the live dev state is on the roadmap — see [issue #89](https://github.com/informatics-isi-edu/deriva-ml/issues/89). Until that lands, the dev-vs-released distinction is enforced by the download path itself.
+`use_minid=True` is rejected for dev versions — MINIDs are for citable references, and dev labels are not citable.
 
 **Notes**
 

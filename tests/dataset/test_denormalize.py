@@ -1591,10 +1591,9 @@ class TestVersionPinnedDenormalize:
         v0_rids = set(df_v0["Subject.RID"].dropna())
 
         # Bump to v1 (creates a new snapshot) without changing members.
-        # Uses the private force-bump primitive; this test stamps a fresh
-        # snapshot to test denormalization at multiple versions, not to
-        # exercise the dev → release lifecycle.
-        v1 = str(dataset._increment_dataset_version(component=VersionPart.patch))
+        # Goes through the public dev → release lifecycle.
+        dataset.mark_dev(description="snapshot for v1")
+        v1 = str(dataset.release(bump=VersionPart.patch, description="v1"))
         assert v0 != v1, "Version increment should produce a distinct version string"
 
         df_v1 = dataset.get_denormalized_as_dataframe(
@@ -1632,9 +1631,9 @@ class TestVersionPinnedDenormalize:
         bag_v0 = dataset.download_dataset_bag(v0, use_minid=False)
         bag_v0_rids = {m["RID"] for m in bag_v0.list_dataset_members(recurse=True).get("Subject", [])}
 
-        # Bump the live catalog to v1 via the private force-bump primitive
-        # (this test stamps a snapshot, not exercises dev → release).
-        dataset._increment_dataset_version(component=VersionPart.patch)
+        # Bump the live catalog to v1 through the public dev → release lifecycle.
+        dataset.mark_dev(description="snapshot for divergence test")
+        dataset.release(bump=VersionPart.patch, description="snapshot for divergence test")
 
         # The bag remains at v0 — bag's own SQLite is unchanged.
         df = bag_v0.get_denormalized_as_dataframe(include_tables=["Subject"])

@@ -420,7 +420,7 @@ Three changes in the signature:
 
 **`release()` errors if the dataset has no dev period to promote.** This is intentional — every release must come from a real working state. If you want to mint a release without any actual change (for example, to attach release notes), call `mark_dev(description)` first to declare a dev period, then `release()` to close it.
 
-A private `_increment_dataset_version` is preserved as an internal force-bump primitive. **Don't use it for application code** — it bypasses the dev-versioning model and exists for system-internal use cases (catalog clone version reinitialization). Public callers should always use `release()`.
+> **Note (1.35+):** A private `_increment_dataset_version` was briefly preserved as an internal force-bump primitive in 1.34. It was removed in 1.35 once no callers remained. If you reached for it from application code, switch to `mark_dev(...)` + `release(...)`. There is no public API path that cascades a version bump through nested datasets — that was a side effect of the old `_increment_dataset_version` and was never part of the documented contract.
 
 ### Member mutations now land on dev
 
@@ -469,17 +469,22 @@ grep -rnE "current_version == |== current_version|\.version == \"" your_project/
 grep -rn "add_dataset_members" your_project/ --include="*.py"
 ```
 
-### Known limitation: download requires released versions
+### Downloading at a dev label (1.35+)
 
-`download_dataset_bag()` does not yet accept a dev label. If your test fixtures or scripts call `add_dataset_members(...)` and then `download_dataset_bag(current_version)` without releasing in between, the download will raise `ValidationError` (the dev row has no snapshot). Add an explicit `release()` between the mutation and the download:
+In 1.34 there was a known limitation: `download_dataset_bag()` did not accept a dev label and raised `ValidationError` for any dataset currently in a dev period. **This is fixed in 1.35** ([issue #89](https://github.com/informatics-isi-edu/deriva-ml/issues/89)). Calling `download_dataset_bag(current_version)` on a dataset in a dev period now generates a fresh bag against live catalog state.
+
+Two corollaries to be aware of:
+
+- **Local caching is disabled for dev versions.** The catalog can drift between calls, so a cached bag for a dev label could go stale silently. Each download produces a fresh bag.
+- **`use_minid=True` is rejected for dev versions** with a clear error pointing at `release()`. Dev labels are not citable references — MINIDs are stable identifiers, so they only make sense for released versions.
+
+If you want a *stable, snapshot-pinned* bag (re-downloadable across catalog drift), call `release()` first to mint a released version, then download:
 
 ```python
 dataset.add_dataset_members(...)
 dataset.release(VersionPart.minor, "Cut for download")
 bag = dataset.download_dataset_bag(dataset.current_version)
 ```
-
-Tracked as [issue #89](https://github.com/informatics-isi-edu/deriva-ml/issues/89). Resolving downloads against live dev state is on the roadmap.
 
 ### Out-of-repo follow-ups
 

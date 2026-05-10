@@ -36,7 +36,6 @@ import shutil
 from collections import defaultdict
 
 # Standard library imports
-from graphlib import TopologicalSorter
 from pathlib import Path
 
 # Local imports
@@ -843,109 +842,6 @@ class Dataset:
         from IPython.display import Markdown, display
 
         display(Markdown(self.to_markdown(show_children, indent)))
-
-    def _build_dataset_graph(self) -> Iterable[Dataset]:
-        """Build a dependency graph of all related datasets and return in topological order.
-
-        This method is used when incrementing dataset versions. Because datasets can be
-        nested (parent-child relationships), changing the version of one dataset may
-        require updating related datasets.
-
-        The topological sort ensures that children are processed before parents,
-        so version updates propagate correctly through the hierarchy.
-
-        Returns:
-            Iterable[Dataset]: Datasets in topological order (children before parents).
-
-        Example:
-            If dataset A contains nested dataset B, which contains C:
-            A -> B -> C
-            The returned order would be [C, B, A], ensuring C's version is
-            updated before B's, and B's before A's.
-        """
-        ts: TopologicalSorter = TopologicalSorter()
-        self._build_dataset_graph_1(ts, set())
-        return ts.static_order()
-
-    def _build_dataset_graph_1(self, ts: TopologicalSorter, visited: set[str]) -> None:
-        """Recursively build the dataset dependency graph.
-
-        Uses topological sort where parents depend on their children, ensuring
-        children are processed before parents in the resulting order.
-
-        Args:
-            ts: TopologicalSorter instance to add nodes and dependencies to.
-            visited: Set of already-visited dataset RIDs to avoid cycles.
-        """
-        if self.dataset_rid in visited:
-            return
-
-        visited.add(self.dataset_rid)
-        # Use current catalog state for graph traversal, not version snapshot.
-        # Parent/child relationships need to reflect current state for version updates.
-        children = self._list_dataset_children_current()
-        parents = self._list_dataset_parents_current()
-
-        # Add this node with its children as dependencies.
-        # This means: self depends on children, so children will be ordered before self.
-        ts.add(self, *children)
-
-        # Recursively process children
-        for child in children:
-            child._build_dataset_graph_1(ts, visited)
-
-        # Recursively process parents (they will depend on this node)
-        for parent in parents:
-            parent._build_dataset_graph_1(ts, visited)
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def _increment_dataset_version(
-        self,
-        component: VersionPart,
-        description: str | None = "",
-        execution_rid: RID | None = None,
-    ) -> DatasetVersion:
-        """Force a release-version bump on this dataset and its related datasets.
-
-        Internal helper preserved from the pre-dev-versioning model.
-        Walks the dataset graph (parents/children) and inserts a new
-        released ``Dataset_Version`` row for each, with the supplied
-        component bumped and a stamped catalog snapshot. Bypasses the
-        dev-versioning model entirely — there's no precondition that
-        the dataset be in a dev period.
-
-        Used internally by the catalog-clone path, where dataset
-        versions need to be reinitialised after a catalog snapshot is
-        copied. Not for user-facing release work; use :meth:`release`
-        for that.
-
-        Args:
-            component: Which release-segment part to bump.
-            description: Optional description for the new version row.
-            execution_rid: Optional RID of the calling execution.
-
-        Returns:
-            The new ``DatasetVersion`` for this dataset (related
-            datasets are also bumped but their versions are not in the
-            return).
-
-        Raises:
-            DerivaMLException: If the catalog write fails.
-        """
-
-        # Find all the datasets that are reachable from this dataset and determine their new version numbers.
-        related_datasets = list(self._build_dataset_graph())
-        version_update_list = [
-            DatasetSpec(
-                rid=ds.dataset_rid,
-                version=ds.current_version.next_release(component),
-            )
-            for ds in related_datasets
-        ]
-        Dataset._insert_dataset_versions(
-            self._ml_instance, version_update_list, description=description, execution_rid=execution_rid
-        )
-        return next((d.version for d in version_update_list if d.rid == self.dataset_rid))
 
     def release(
         self,
@@ -2241,33 +2137,6 @@ class Dataset:
 
         return [version_snapshot_catalog.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
-    def _list_dataset_parents_current(self) -> list[Self]:
-        """Return parent datasets using current catalog state (not version snapshot).
-
-        Used by _build_dataset_graph_1 to find all related datasets for version updates.
-        """
-        pb = self._ml_instance.pathBuilder()
-        atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
-        return [
-            self._ml_instance.lookup_dataset(p["Dataset"])
-            for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
-        ]
-
-    def _list_dataset_children_current(self) -> list[Self]:
-        """Return child datasets using current catalog state (not version snapshot).
-
-        Used by _build_dataset_graph_1 to find all related datasets for version updates.
-        """
-        dataset_dataset_path = (
-            self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
-        )
-        nested_datasets = list(dataset_dataset_path.entities().fetch())
-
-        def find_children(rid: RID) -> list[RID]:
-            return [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
-
-        return [self._ml_instance.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
-
     def list_executions(self) -> list["Execution"]:
         """List all executions associated with this dataset.
 
@@ -3348,6 +3217,28 @@ class Dataset:
         snapshot = version_record.snapshot
         minid_url = version_record.minid
 
+        # Dev versions resolve to live catalog state (per ADR-0003 / Q20):
+        # the dev row's Snapshot is NULL, so there's no point-in-time
+        # reference to pin against. Concretely:
+        #
+        #   - The DatasetMinid.RID has no `@<snaptime>` suffix (the bare
+        #     dataset RID is valid per the RID regex). Downstream callers
+        #     read DatasetMinid.dataset_snapshot, which now returns None
+        #     for the dev case.
+        #   - Local caching is disabled for dev — the catalog can drift
+        #     between calls, so a "cache hit" for a dev version would
+        #     return stale bag content. Always do a fresh download.
+        #   - MINID (use_minid=True) is rejected for dev versions: MINID
+        #     is for citable references, and dev labels are explicitly
+        #     not citable.
+        is_dev = version.is_devrelease
+        if is_dev and use_minid:
+            raise DerivaMLException(
+                f"Cannot create a MINID for the dev version {version_str} of "
+                f"dataset {self.dataset_rid}: dev versions are not citable. "
+                "Call dataset.release(...) to mint a released version first."
+            )
+
         # =====================================================================
         # Compute spec_hash upfront (required for all tiers).
         #
@@ -3370,38 +3261,48 @@ class Dataset:
         spec = downloader.generate_dataset_download_spec(self)
         spec_hash = _hash_spec(spec)
 
-        # The deterministic cache key: {spec_hash[:16]}_{snapshot}
-        # - spec_hash[:16] captures the FK traversal plan (schema-dependent)
-        # - snapshot captures the catalog data state (immutable point-in-time)
-        # Together they uniquely identify the bag contents.
-        cache_suffix = f"{spec_hash[:16]}_{snapshot}"
+        # Cache key: {spec_hash[:16]}_{snapshot-or-live}.
+        # - spec_hash[:16] captures the FK traversal plan (schema-dependent).
+        # - snapshot captures the catalog data state for released versions;
+        #   `live` for dev versions (caching is disabled in that case, but
+        #   the suffix still appears in the dev-version DatasetMinid for
+        #   diagnostic readability).
+        snapshot_token = snapshot if snapshot is not None else "live"
+        cache_suffix = f"{spec_hash[:16]}_{snapshot_token}"
+
+        # The DatasetMinid.RID encodes the catalog reference. For released
+        # versions it's `{rid}@{snaptime}` (snapshot-pinned). For dev
+        # versions it's the bare `{rid}` (live state — no snapshot pin).
+        rid_for_minid = f"{self.dataset_rid}@{snapshot}" if snapshot else self.dataset_rid
 
         # =====================================================================
         # Tier 1: Local deterministic cache (filesystem lookup, no network).
         #
-        # Look for a cached bag with BOTH the same spec_hash and snapshot.
-        # A snapshot-only match would return stale bags created before schema
-        # changes (e.g., new tables added to the FK traversal).
+        # Skipped for dev versions — the catalog drifts under us, so a
+        # cached bag would go stale silently.
         # =====================================================================
-        cache_dir_name = f"{self.dataset_rid}_{cache_suffix}"
-        cached_dir = self._ml_instance.cache_dir / cache_dir_name
-        cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
-        if cached_bag_path.exists():
-            self._logger.info(
-                "Local cache hit for %s version %s (spec+snapshot match: %s)",
-                self.dataset_rid,
-                version,
-                cache_dir_name,
-            )
-            return DatasetMinid(
-                dataset_version=version,
-                RID=f"{self.dataset_rid}@{snapshot}",
-                location=cached_bag_path.parent.as_uri(),
-                checksums=[{"function": "sha256", "value": cache_suffix}],
-            )
+        if not is_dev:
+            cache_dir_name = f"{self.dataset_rid}_{cache_suffix}"
+            cached_dir = self._ml_instance.cache_dir / cache_dir_name
+            cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
+            if cached_bag_path.exists():
+                self._logger.info(
+                    "Local cache hit for %s version %s (spec+snapshot match: %s)",
+                    self.dataset_rid,
+                    version,
+                    cache_dir_name,
+                )
+                return DatasetMinid(
+                    dataset_version=version,
+                    RID=rid_for_minid,
+                    location=cached_bag_path.parent.as_uri(),
+                    checksums=[{"function": "sha256", "value": cache_suffix}],
+                )
 
         # =====================================================================
         # Tier 2: MINID / S3 download (use_minid=True only).
+        #
+        # Already gated above — dev versions reject use_minid up front.
         #
         # Compare spec_hash to the stored Minid_Spec_Hash. If they match,
         # the S3 bag is still current. If not, regenerate.
@@ -3435,8 +3336,9 @@ class Dataset:
         # =====================================================================
         # Tier 3: Client-side bag generation (use_minid=False).
         #
-        # Build the bag locally. Store under the deterministic cache key
-        # {rid}_{spec_hash[:16]}_{snapshot} so Tier 1 finds it next time.
+        # Build the bag locally. Released versions store under the
+        # deterministic cache key {rid}_{spec_hash[:16]}_{snapshot}; dev
+        # versions skip caching entirely and always generate fresh.
         # =====================================================================
         if not create and not minid_url:
             raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
@@ -3456,7 +3358,7 @@ class Dataset:
         )
         return DatasetMinid(
             dataset_version=version,
-            RID=f"{self.dataset_rid}@{snapshot}",
+            RID=rid_for_minid,
             location=minid_url,
             checksums=[{"function": "sha256", "value": cache_suffix}],
         )

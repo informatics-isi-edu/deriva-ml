@@ -1643,11 +1643,12 @@ def _reinitialize_dataset_versions(
         for dataset in ml.find_datasets():
             try:
                 # Catalog clone reinitialises versions on every dataset to
-                # stamp fresh snapshot pointers. This is structural, not a
-                # user-facing release — bypass the dev-versioning model
-                # via the internal force-bump primitive.
-                dataset._increment_dataset_version(
-                    component=VersionPart.patch,
+                # stamp fresh snapshot pointers. Goes through the standard
+                # dev-versioning lifecycle: mark_dev to declare the cloned
+                # state, then release to mint a clean released version.
+                dataset.mark_dev(description=description)
+                dataset.release(
+                    bump=VersionPart.patch,
                     description=description,
                 )
                 result.datasets_reinitialized += 1

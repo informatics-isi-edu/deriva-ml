@@ -159,11 +159,13 @@ class TestCreateMlWorkspace:
             cloned_dataset = cloned_ml.lookup_dataset(source_dataset_rid)
             assert cloned_dataset is not None, "Dataset should exist in clone"
 
-            # Create a new version in the clone via the private force-bump
-            # primitive — this test stamps a fresh snapshot, not exercises
-            # the dev → release lifecycle.
-            new_version = cloned_dataset._increment_dataset_version(
-                component=VersionPart.patch,
+            # Create a new version in the clone through the public
+            # dev → release lifecycle. (Note: catalog clone itself now
+            # also goes through this path internally — see
+            # src/deriva_ml/catalog/clone.py.)
+            cloned_dataset.mark_dev(description="Version created in cloned catalog")
+            new_version = cloned_dataset.release(
+                bump=VersionPart.patch,
                 description="Version created in cloned catalog",
             )
 
