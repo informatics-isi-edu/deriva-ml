@@ -469,6 +469,18 @@ grep -rnE "current_version == |== current_version|\.version == \"" your_project/
 grep -rn "add_dataset_members" your_project/ --include="*.py"
 ```
 
+### Known limitation: download requires released versions
+
+`download_dataset_bag()` does not yet accept a dev label. If your test fixtures or scripts call `add_dataset_members(...)` and then `download_dataset_bag(current_version)` without releasing in between, the download will raise `ValidationError` (the dev row has no snapshot). Add an explicit `release()` between the mutation and the download:
+
+```python
+dataset.add_dataset_members(...)
+dataset.release(VersionPart.minor, "Cut for download")
+bag = dataset.download_dataset_bag(dataset.current_version)
+```
+
+Tracked as [issue #89](https://github.com/informatics-isi-edu/deriva-ml/issues/89). Resolving downloads against live dev state is on the roadmap.
+
 ### Out-of-repo follow-ups
 
 The deriva-ml-mcp tool surface is updated separately. The `deriva_ml_increment_dataset_version` MCP tool will be renamed to `deriva_ml_release` in a coordinated MCP-server release; until that lands, MCP-mediated callers should use the bundle resource directly rather than the renamed tool.

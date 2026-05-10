@@ -246,7 +246,18 @@ members = dataset.list_dataset_members(version="0.2.0")
 versioned_bag = dataset.download_dataset_bag(version="0.2.0")
 ```
 
-This is the guarantee that makes dataset downloads reproducible: downloading a *released* version always returns the same rows. Downloading the *current dev* label resolves to live state and may differ between calls.
+This is the guarantee that makes dataset downloads reproducible: downloading a *released* version always returns the same rows.
+
+!!! warning
+    **Always release before downloading.** As of 2.0, `download_dataset_bag()` requires a *released* version label — passing a dev label (or letting `current_version` default to a dev label when the dataset is in a dev period) raises a Pydantic `ValidationError` because dev rows have no pinned snapshot. Call `dataset.release(...)` to mint a released version, then download:
+
+    ```python
+    dataset.add_dataset_members(...)
+    dataset.release(VersionPart.minor, "Cut for download")
+    bag = dataset.download_dataset_bag(dataset.current_version)
+    ```
+
+    Downloading at the live dev state is on the roadmap — see [issue #89](https://github.com/informatics-isi-edu/deriva-ml/issues/89). Until that lands, the dev-vs-released distinction is enforced by the download path itself.
 
 **Notes**
 
