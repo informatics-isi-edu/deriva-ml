@@ -375,15 +375,15 @@ For known downstream projects in the deriva-ml ecosystem, the sibling-repo grep 
 
 Template maintainers should update the `group_by=` to `targets=` in lockstep with upgrading.
 
-## Migrating to 2.0: dev versioning
+## Migrating to 1.34: dev versioning
 
-The 2.0 release introduces a two-state versioning model for datasets — see [ADR-0003](../adr/0003-dataset-dev-versioning-model.md) and the ["How to version a dataset"](datasets.md#how-to-version-a-dataset) chapter for the full picture. This is the largest semantic break in the 2.0 release.
+The 1.34 release introduces a two-state versioning model for datasets — see [ADR-0003](../adr/0003-dataset-dev-versioning-model.md) and the ["How to version a dataset"](datasets.md#how-to-version-a-dataset) chapter for the full picture. This is the largest semantic break in the 1.34 release.
 
 **Headline change:** `add_dataset_members`, `delete_dataset_members`, and the dataset-type mutation methods now flip the dataset to a *dev* version (a mutable label of the form `<last_release>.post1.devN`) instead of bumping to a released version. The new `Dataset.release()` method is the only operation that produces a released version.
 
 ### At-a-glance
 
-| Before (1.x) | After (2.0) |
+| Before (≤1.33) | After (1.34) |
 |---|---|
 | `dataset.increment_dataset_version(VersionPart.minor, "...")` | `dataset.release(bump=VersionPart.minor, description="...")` |
 | `add_dataset_members` → `0.4.0` → `0.5.0` (released bump) | `add_dataset_members` → `0.4.0` → `0.4.0.post1.dev1` (dev flip) |
@@ -397,14 +397,14 @@ The 2.0 release introduces a two-state versioning model for datasets — see [AD
 The most mechanical break. Every `increment_dataset_version` call site needs to switch to `release()`:
 
 ```python
-# Before (1.x)
+# Before (≤1.33)
 new_version = dataset.increment_dataset_version(
     component=VersionPart.minor,
     description="Stable for experiment 1",
     execution_rid=exe.execution_rid,
 )
 
-# After (2.0)
+# After (1.34)
 new_version = dataset.release(
     bump=VersionPart.minor,
     description="Stable for experiment 1",
@@ -427,11 +427,11 @@ A private `_increment_dataset_version` is preserved as an internal force-bump pr
 Code that calls `add_dataset_members` and assumes the result is a released version needs to call `release()` afterward to mint a stable reference:
 
 ```python
-# Before (1.x): one call, one released version
+# Before (≤1.33): one call, one released version
 dataset.add_dataset_members(members={"Image": image_rids})
 # dataset.current_version is now e.g. "0.5.0" (released)
 
-# After (2.0): one call → dev label; release explicitly
+# After (1.34): one call → dev label; release explicitly
 dataset.add_dataset_members(members={"Image": image_rids})
 # dataset.current_version is now "0.4.0.post1.dev1" (dev)
 dataset.release(bump=VersionPart.minor, description="Add training images")
@@ -449,7 +449,7 @@ Code that only consumes `current_version` for display works without changes; cod
 
 ### New methods (additive)
 
-Four methods are new in 2.0; you don't need to migrate to them but they're available:
+Four methods are new in 1.34; you don't need to migrate to them but they're available:
 
 - `Dataset.mark_dev(description, execution=None)` — explicitly flip the dataset to dev when the catalog drifted via a path that didn't go through the dataset API (a separate execution recorded a feature value, etc.).
 - `Dataset.is_dirty() -> bool` — fast predicate for "has anything reachable changed since the last release?"

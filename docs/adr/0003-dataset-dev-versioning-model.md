@@ -170,9 +170,9 @@ notational-clarity goal was supposed to avoid.
   vocabulary. The `execution` argument changes type from `RID |
   None` to `Execution | None` to match the rest of the new API
   surface (typed objects, not bare RIDs). This is a breaking
-  change for callers of the previous public API and belongs in a
-  2.0 release. No deprecated alias is provided — CLAUDE.md's "no
-  backwards-compat shims" rule applies.
+  change for callers of the previous public API and ships in
+  1.34 with the migration guide. No deprecated alias is provided —
+  CLAUDE.md's "no backwards-compat shims" rule applies.
 - A new `Dataset.is_dirty()` / `Dataset.release_diff()` /
   `Dataset.compare_versions(v_a, v_b)` trio detects catalog drift
   by walking the same FK paths used to generate the dataset bag
@@ -280,7 +280,11 @@ that the conditional-update primitive handles cleanly.
 
 ## Migration impact
 
-This work is a 2.0 breaking change. There is no DDL change (the
+This work is a breaking change shipped in 1.34 (the renamed
+`release()` method, the dev-flip behavior change for
+`add_dataset_members` / `delete_dataset_members`, and the changed
+`Dataset.current_version` / `dataset_history()` semantics). There
+is no DDL change (the
 schema's `Snapshot` column is already nullable), but the
 *semantics* of several existing public methods change. The
 behavior-change inventory:
@@ -308,7 +312,7 @@ Downstream callers must:
 
 Out-of-repo blast radius (handled in dependent PRs, not this ADR):
 `deriva-ml-mcp`'s tool that exposes `increment_dataset_version`,
-the model-template workflows, and any user notebooks. The 2.0
+the model-template workflows, and any user notebooks. The 1.34
 changelog and migration guide are written at PR-ready time and
 point users at this ADR.
 

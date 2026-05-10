@@ -1,4 +1,4 @@
-Version 2.0.0
+Version 1.34.0
 
 - **Dataset dev versioning** (breaking). Datasets now use a two-state versioning model: released versions (citable, snapshot-pinned) and dev versions (mutable, between-release labels of the form `<release>.post1.devN`). Every mutation lands on a dev version; `Dataset.release()` is the only path to a released version. See `docs/adr/0003-dataset-dev-versioning-model.md` and `docs/user-guide/migration.md` for the full migration story.
 - **`increment_dataset_version` renamed to `release`** (breaking). New signature: `Dataset.release(bump, description, execution=None)`. The old method is preserved as a private `_increment_dataset_version` for system-internal use only (e.g., catalog clone reinitialization).
