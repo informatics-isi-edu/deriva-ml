@@ -1,35 +1,35 @@
 {
   "acls": {
-    "owner": [
-      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
-      "admin"
-    ],
-    "select": [
-      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
-      "https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b",
-      "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
-      "admin"
-    ],
-    "write": [],
-    "insert": [
-      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
-      "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
-      "admin"
-    ],
-    "delete": [
-      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
-      "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
-      "admin"
-    ],
     "enumerate": [
       "*"
     ],
-    "create": [],
     "update": [
-      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
       "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
-      "admin"
-    ]
+      "admin",
+      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b"
+    ],
+    "select": [
+      "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
+      "admin",
+      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
+      "https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b"
+    ],
+    "insert": [
+      "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
+      "admin",
+      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b"
+    ],
+    "owner": [
+      "admin",
+      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b"
+    ],
+    "write": [],
+    "delete": [
+      "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
+      "admin",
+      "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b"
+    ],
+    "create": []
   },
   "annotations": {
     "tag:misd.isi.edu,2015:display": {
@@ -46,15 +46,15 @@
             "name": "public",
             "children": [
               {
-                "url": "/chaise/recordset/#3/public:ERMrest_Client",
+                "url": "/chaise/recordset/#1571/public:ERMrest_Client",
                 "name": "Users"
               },
               {
-                "url": "/chaise/recordset/#3/public:ERMrest_Group",
+                "url": "/chaise/recordset/#1571/public:ERMrest_Group",
                 "name": "Groups"
               },
               {
-                "url": "/chaise/recordset/#3/public:ERMrest_RID_Lease",
+                "url": "/chaise/recordset/#1571/public:ERMrest_RID_Lease",
                 "name": "ERMrest RID Lease"
               }
             ]
@@ -63,11 +63,11 @@
             "name": "WWW",
             "children": [
               {
-                "url": "/chaise/recordset/#3/WWW:Page",
+                "url": "/chaise/recordset/#1571/WWW:Page",
                 "name": "Page"
               },
               {
-                "url": "/chaise/recordset/#3/WWW:File",
+                "url": "/chaise/recordset/#1571/WWW:File",
                 "name": "File"
               }
             ]
@@ -95,17 +95,17 @@
         "delete": [],
         "insert": [],
         "select": [
-          "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
-          "https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b",
           "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
-          "admin"
+          "admin",
+          "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
+          "https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b"
         ],
         "update": [],
         "enumerate": [
-          "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
-          "https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b",
           "https://auth.globus.org/d38e6f4d-ac96-11ed-8ab4-7b5a369c0a53",
-          "admin"
+          "admin",
+          "https://auth.globus.org/3938e0d0-ed35-11e5-8641-22000ab4b42b",
+          "https://auth.globus.org/176baec4-ed26-11e5-8e88-22000ab4b42b"
         ]
       },
       "annotations": {},
@@ -2199,25 +2199,411 @@
             }
           ]
         },
+        "Execution_Status": {
+          "schema_name": "deriva-ml",
+          "table_name": "Execution_Status",
+          "acls": {},
+          "acl_bindings": {},
+          "annotations": {},
+          "comment": null,
+          "column_definitions": [
+            {
+              "name": "RID",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Record ID"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rid",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": false,
+              "default": "_ermrest.urlb32_encode(nextval('_ermrest.rid_seq'::regclass))"
+            },
+            {
+              "name": "RCT",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Creation Time"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rct",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "timestamptz"
+                }
+              },
+              "nullok": false,
+              "default": "now()"
+            },
+            {
+              "name": "RMT",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Modified Time"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rmt",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "timestamptz"
+                }
+              },
+              "nullok": false,
+              "default": "now()"
+            },
+            {
+              "name": "RCB",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Created By"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rcb",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": "_ermrest.current_client()"
+            },
+            {
+              "name": "RMB",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Modified By"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rmb",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": "_ermrest.current_client()"
+            },
+            {
+              "name": "ID",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "The preferred Compact URI (CURIE) for this term.",
+              "type": {
+                "typename": "ermrest_curie",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": false,
+              "default": "reference-catalog:{RID}"
+            },
+            {
+              "name": "URI",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "The preferred URI for this term.",
+              "type": {
+                "typename": "ermrest_uri",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": false,
+              "default": "/id/{RID}"
+            },
+            {
+              "name": "Name",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "The preferred human-readable name for this term.",
+              "type": {
+                "typename": "text"
+              },
+              "nullok": false,
+              "default": null
+            },
+            {
+              "name": "Description",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "A longer human-readable description of this term.",
+              "type": {
+                "typename": "markdown",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": false,
+              "default": null
+            },
+            {
+              "name": "Synonyms",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "Alternate human-readable names for this term.",
+              "type": {
+                "typename": "text[]",
+                "is_array": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": null
+            }
+          ],
+          "keys": [
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "RID"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_RID_key"
+                ]
+              ]
+            },
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "ID"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_ID_key"
+                ]
+              ]
+            },
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "URI"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_URI_key"
+                ]
+              ]
+            },
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "Name"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_Name_key"
+                ]
+              ]
+            }
+          ],
+          "foreign_keys": [
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Status",
+                  "column_name": "RCB"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "public",
+                  "table_name": "ERMrest_Client",
+                  "column_name": "ID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_RCB_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Status",
+                  "column_name": "RMB"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "public",
+                  "table_name": "ERMrest_Client",
+                  "column_name": "ID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_RMB_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            }
+          ]
+        },
         "Workflow": {
           "schema_name": "deriva-ml",
           "table_name": "Workflow",
           "acls": {},
           "acl_bindings": {},
           "annotations": {
+            "tag:isrd.isi.edu,2016:table-display": {
+              "*": {
+                "row_order": [
+                  {
+                    "column": "RCT",
+                    "descending": true
+                  }
+                ]
+              }
+            },
             "tag:isrd.isi.edu,2016:visible-columns": {
               "*": [
                 "RID",
+                "Name",
                 [
                   "deriva-ml",
                   "Workflow_RCB_fkey"
                 ],
-                [
-                  "deriva-ml",
-                  "Workflow_RMB_fkey"
-                ],
+                "RCT",
+                "Description",
+                "Version"
+              ],
+              "filter": {
+                "and": [
+                  {
+                    "source": "RID"
+                  },
+                  {
+                    "source": "Name"
+                  },
+                  {
+                    "source": "Description"
+                  },
+                  {
+                    "source": [
+                      {
+                        "inbound": [
+                          "deriva-ml",
+                          "Workflow_Workflow_Type_Workflow_fkey"
+                        ]
+                      },
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Workflow_Workflow_Type_Workflow_Type_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Workflow Types"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Workflow_RCB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Created By"
+                  }
+                ]
+              },
+              "detailed": [
+                "RID",
                 "Name",
                 "Description",
+                {
+                  "source": [
+                    {
+                      "inbound": [
+                        "deriva-ml",
+                        "Workflow_Workflow_Type_Workflow_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "Workflow_Workflow_Type_Workflow_Type_fkey"
+                      ]
+                    },
+                    "RID"
+                  ],
+                  "markdown_name": "Workflow Types"
+                },
                 {
                   "display": {
                     "markdown_pattern": "[{{{URL}}}]({{{URL}}})"
@@ -2226,17 +2612,14 @@
                 },
                 "Checksum",
                 "Version",
-                {
-                  "source": [
-                    {
-                      "outbound": [
-                        "deriva-ml",
-                        "Workflow_Workflow_Type_fkey"
-                      ]
-                    },
-                    "RID"
-                  ]
-                }
+                [
+                  "deriva-ml",
+                  "Workflow_RCB_fkey"
+                ],
+                [
+                  "deriva-ml",
+                  "Workflow_RMB_fkey"
+                ]
               ]
             }
           },
@@ -2409,18 +2792,6 @@
               },
               "nullok": true,
               "default": null
-            },
-            {
-              "name": "Workflow_Type",
-              "acls": {},
-              "acl_bindings": {},
-              "annotations": {},
-              "comment": null,
-              "type": {
-                "typename": "text"
-              },
-              "nullok": false,
-              "default": null
             }
           ],
           "keys": [
@@ -2508,41 +2879,6 @@
               ],
               "on_delete": "NO ACTION",
               "on_update": "NO ACTION"
-            },
-            {
-              "acls": {
-                "insert": [
-                  "*"
-                ],
-                "update": [
-                  "*"
-                ]
-              },
-              "acl_bindings": {},
-              "annotations": {},
-              "comment": null,
-              "foreign_key_columns": [
-                {
-                  "schema_name": "deriva-ml",
-                  "table_name": "Workflow",
-                  "column_name": "Workflow_Type"
-                }
-              ],
-              "referenced_columns": [
-                {
-                  "schema_name": "deriva-ml",
-                  "table_name": "Workflow_Type",
-                  "column_name": "Name"
-                }
-              ],
-              "names": [
-                [
-                  "deriva-ml",
-                  "Workflow_Workflow_Type_fkey"
-                ]
-              ],
-              "on_delete": "CASCADE",
-              "on_update": "CASCADE"
             }
           ]
         },
@@ -2858,12 +3194,327 @@
             }
           ]
         },
+        "Workflow_Workflow_Type": {
+          "schema_name": "deriva-ml",
+          "table_name": "Workflow_Workflow_Type",
+          "acls": {},
+          "acl_bindings": {},
+          "annotations": {},
+          "comment": null,
+          "column_definitions": [
+            {
+              "name": "RID",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Record ID"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rid",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": false,
+              "default": "_ermrest.urlb32_encode(nextval('_ermrest.rid_seq'::regclass))"
+            },
+            {
+              "name": "RCT",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Creation Time"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rct",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "timestamptz"
+                }
+              },
+              "nullok": false,
+              "default": "now()"
+            },
+            {
+              "name": "RMT",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Modified Time"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rmt",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "timestamptz"
+                }
+              },
+              "nullok": false,
+              "default": "now()"
+            },
+            {
+              "name": "RCB",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Created By"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rcb",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": "_ermrest.current_client()"
+            },
+            {
+              "name": "RMB",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Modified By"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rmb",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": "_ermrest.current_client()"
+            },
+            {
+              "name": "Workflow",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "type": {
+                "typename": "text"
+              },
+              "nullok": false,
+              "default": null
+            },
+            {
+              "name": "Workflow_Type",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "type": {
+                "typename": "text"
+              },
+              "nullok": false,
+              "default": null
+            }
+          ],
+          "keys": [
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "RID"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Workflow_Workflow_Type_RID_key"
+                ]
+              ]
+            },
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "Workflow",
+                "Workflow_Type"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Workflow_Workflow_Type_assoc_key"
+                ]
+              ]
+            }
+          ],
+          "foreign_keys": [
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Workflow_Workflow_Type",
+                  "column_name": "RCB"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "public",
+                  "table_name": "ERMrest_Client",
+                  "column_name": "ID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Workflow_Workflow_Type_RCB_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Workflow_Workflow_Type",
+                  "column_name": "RMB"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "public",
+                  "table_name": "ERMrest_Client",
+                  "column_name": "ID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Workflow_Workflow_Type_RMB_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Workflow_Workflow_Type",
+                  "column_name": "Workflow"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Workflow",
+                  "column_name": "RID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Workflow_Workflow_Type_Workflow_fkey"
+                ]
+              ],
+              "on_delete": "CASCADE",
+              "on_update": "CASCADE"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Workflow_Workflow_Type",
+                  "column_name": "Workflow_Type"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Workflow_Type",
+                  "column_name": "Name"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Workflow_Workflow_Type_Workflow_Type_fkey"
+                ]
+              ],
+              "on_delete": "CASCADE",
+              "on_update": "CASCADE"
+            }
+          ]
+        },
         "Execution": {
           "schema_name": "deriva-ml",
           "table_name": "Execution",
           "acls": {},
           "acl_bindings": {},
           "annotations": {
+            "tag:isrd.isi.edu,2016:table-display": {
+              "*": {
+                "row_order": [
+                  {
+                    "column": "RCT",
+                    "descending": true
+                  }
+                ]
+              }
+            },
             "tag:isrd.isi.edu,2016:visible-columns": {
               "*": [
                 "RID",
@@ -2895,6 +3546,42 @@
             },
             "tag:isrd.isi.edu,2016:visible-foreign-keys": {
               "detailed": [
+                {
+                  "source": [
+                    {
+                      "inbound": [
+                        "deriva-ml",
+                        "Execution_Execution_Nested_Execution_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "Execution_Execution_Execution_fkey"
+                      ]
+                    },
+                    "RID"
+                  ],
+                  "markdown_name": "Parent Executions"
+                },
+                {
+                  "source": [
+                    {
+                      "inbound": [
+                        "deriva-ml",
+                        "Execution_Execution_Execution_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "Execution_Execution_Nested_Execution_fkey"
+                      ]
+                    },
+                    "RID"
+                  ],
+                  "markdown_name": "Child Executions"
+                },
                 {
                   "source": [
                     {
@@ -2936,7 +3623,13 @@
                     {
                       "inbound": [
                         "deriva-ml",
-                        "Execution_Metadata_Execution_fkey"
+                        "Execution_Metadata_Execution_Execution_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "Execution_Metadata_Execution_Execution_Metadata_fkey"
                       ]
                     },
                     "RID"
@@ -3233,6 +3926,358 @@
               ],
               "on_delete": "NO ACTION",
               "on_update": "NO ACTION"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution",
+                  "column_name": "Status"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Status",
+                  "column_name": "Name"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Status_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            }
+          ]
+        },
+        "Execution_Execution": {
+          "schema_name": "deriva-ml",
+          "table_name": "Execution_Execution",
+          "acls": {},
+          "acl_bindings": {},
+          "annotations": {},
+          "comment": "Association table for hierarchical execution nesting (parent-child relationships)",
+          "column_definitions": [
+            {
+              "name": "RID",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Record ID"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rid",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": false,
+              "default": "_ermrest.urlb32_encode(nextval('_ermrest.rid_seq'::regclass))"
+            },
+            {
+              "name": "RCT",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Creation Time"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rct",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "timestamptz"
+                }
+              },
+              "nullok": false,
+              "default": "now()"
+            },
+            {
+              "name": "RMT",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Modified Time"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rmt",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "timestamptz"
+                }
+              },
+              "nullok": false,
+              "default": "now()"
+            },
+            {
+              "name": "RCB",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Created By"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rcb",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": "_ermrest.current_client()"
+            },
+            {
+              "name": "RMB",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {
+                "tag:misd.isi.edu,2015:display": {
+                  "name": "Modified By"
+                }
+              },
+              "comment": null,
+              "type": {
+                "typename": "ermrest_rmb",
+                "is_domain": true,
+                "base_type": {
+                  "typename": "text"
+                }
+              },
+              "nullok": true,
+              "default": "_ermrest.current_client()"
+            },
+            {
+              "name": "Execution",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "type": {
+                "typename": "text"
+              },
+              "nullok": false,
+              "default": null
+            },
+            {
+              "name": "Nested_Execution",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "type": {
+                "typename": "text"
+              },
+              "nullok": false,
+              "default": null
+            },
+            {
+              "name": "Sequence",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "Order of nested execution (null if parallel)",
+              "type": {
+                "typename": "int4"
+              },
+              "nullok": true,
+              "default": null
+            }
+          ],
+          "keys": [
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "RID"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Execution_RID_key"
+                ]
+              ]
+            },
+            {
+              "annotations": {},
+              "comment": null,
+              "unique_columns": [
+                "Execution",
+                "Nested_Execution"
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Execution_assoc_key"
+                ]
+              ]
+            }
+          ],
+          "foreign_keys": [
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Execution",
+                  "column_name": "RCB"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "public",
+                  "table_name": "ERMrest_Client",
+                  "column_name": "ID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Execution_RCB_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Execution",
+                  "column_name": "RMB"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "public",
+                  "table_name": "ERMrest_Client",
+                  "column_name": "ID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Execution_RMB_fkey"
+                ]
+              ],
+              "on_delete": "NO ACTION",
+              "on_update": "NO ACTION"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Execution",
+                  "column_name": "Execution"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution",
+                  "column_name": "RID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Execution_Execution_fkey"
+                ]
+              ],
+              "on_delete": "CASCADE",
+              "on_update": "CASCADE"
+            },
+            {
+              "acls": {
+                "insert": [
+                  "*"
+                ],
+                "update": [
+                  "*"
+                ]
+              },
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": null,
+              "foreign_key_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution_Execution",
+                  "column_name": "Nested_Execution"
+                }
+              ],
+              "referenced_columns": [
+                {
+                  "schema_name": "deriva-ml",
+                  "table_name": "Execution",
+                  "column_name": "RID"
+                }
+              ],
+              "names": [
+                [
+                  "deriva-ml",
+                  "Execution_Execution_Nested_Execution_fkey"
+                ]
+              ],
+              "on_delete": "CASCADE",
+              "on_update": "CASCADE"
             }
           ]
         },
@@ -4474,11 +5519,23 @@
               "default": null
             },
             {
+              "name": "Minid_Spec_Hash",
+              "acls": {},
+              "acl_bindings": {},
+              "annotations": {},
+              "comment": "SHA-256 hash of the download spec used to generate the MINID bag. Used to detect stale MINIDs when the schema or traversal paths change.",
+              "type": {
+                "typename": "text"
+              },
+              "nullok": true,
+              "default": null
+            },
+            {
               "name": "Snapshot",
               "acls": {},
               "acl_bindings": {},
               "annotations": {},
-              "comment": "Catalog snapshot ID this version row pins. Populated for released rows (the snapshot stamped at release time). `NULL` on dev rows, denoting that the row tracks live catalog state with no pinned snapshot — the bag this dataset would download right now is whatever the catalog has at request time.",
+              "comment": "Catalog snapshot ID this version row pins. Populated for released rows (the snapshot stamped at release time). `NULL` on dev rows, denoting that the row tracks live catalog state with no pinned snapshot \u2014 the bag this dataset would download right now is whatever the catalog has at request time.",
               "type": {
                 "typename": "text"
               },
@@ -5315,6 +6372,97 @@
                   ],
                   "markdown_name": "Asset Types"
                 }
+              ],
+              "filter": {
+                "and": [
+                  {
+                    "source": "RID"
+                  },
+                  {
+                    "source": "Filename"
+                  },
+                  {
+                    "source": "Description"
+                  },
+                  {
+                    "source": [
+                      {
+                        "inbound": [
+                          "deriva-ml",
+                          "Execution_Metadata_Asset_Type_Execution_Metadata_fkey"
+                        ]
+                      },
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Execution_Metadata_Asset_Type_Asset_Type_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Asset Types"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Execution_Metadata_RCB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Created By"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Execution_Metadata_RMB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Modified By"
+                  }
+                ]
+              },
+              "detailed": [
+                "RID",
+                "Filename",
+                "Description",
+                {
+                  "source": [
+                    {
+                      "inbound": [
+                        "deriva-ml",
+                        "Execution_Metadata_Asset_Type_Execution_Metadata_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "Execution_Metadata_Asset_Type_Asset_Type_fkey"
+                      ]
+                    },
+                    "RID"
+                  ],
+                  "markdown_name": "Asset Types"
+                },
+                "URL",
+                "Length",
+                "MD5",
+                "RCT",
+                "RMT",
+                [
+                  "deriva-ml",
+                  "Execution_Metadata_RCB_fkey"
+                ],
+                [
+                  "deriva-ml",
+                  "Execution_Metadata_RMB_fkey"
+                ]
               ]
             }
           },
@@ -5427,6 +6575,15 @@
               "annotations": {
                 "tag:isrd.isi.edu,2017:asset": {
                   "md5": "MD5",
+                  "display": {
+                    "*": {
+                      "file_preview": {
+                        "content_type_mapping": {
+                          "application/octet-stream": "text"
+                        }
+                      }
+                    }
+                  },
                   "url_pattern": "/hatrac/metadata/{{MD5}}.{{Filename}}",
                   "filename_column": "Filename",
                   "byte_count_column": "Length"
@@ -6297,6 +7454,97 @@
                   ],
                   "markdown_name": "Asset Types"
                 }
+              ],
+              "filter": {
+                "and": [
+                  {
+                    "source": "RID"
+                  },
+                  {
+                    "source": "Filename"
+                  },
+                  {
+                    "source": "Description"
+                  },
+                  {
+                    "source": [
+                      {
+                        "inbound": [
+                          "deriva-ml",
+                          "Execution_Asset_Asset_Type_Execution_Asset_fkey"
+                        ]
+                      },
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Execution_Asset_Asset_Type_Asset_Type_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Asset Types"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Execution_Asset_RCB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Created By"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "Execution_Asset_RMB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Modified By"
+                  }
+                ]
+              },
+              "detailed": [
+                "RID",
+                "Filename",
+                "Description",
+                {
+                  "source": [
+                    {
+                      "inbound": [
+                        "deriva-ml",
+                        "Execution_Asset_Asset_Type_Execution_Asset_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "Execution_Asset_Asset_Type_Asset_Type_fkey"
+                      ]
+                    },
+                    "RID"
+                  ],
+                  "markdown_name": "Asset Types"
+                },
+                "URL",
+                "Length",
+                "MD5",
+                "RCT",
+                "RMT",
+                [
+                  "deriva-ml",
+                  "Execution_Asset_RCB_fkey"
+                ],
+                [
+                  "deriva-ml",
+                  "Execution_Asset_RMB_fkey"
+                ]
               ]
             }
           },
@@ -6409,6 +7657,15 @@
               "annotations": {
                 "tag:isrd.isi.edu,2017:asset": {
                   "md5": "MD5",
+                  "display": {
+                    "*": {
+                      "file_preview": {
+                        "content_type_mapping": {
+                          "application/octet-stream": "text"
+                        }
+                      }
+                    }
+                  },
                   "url_pattern": "/hatrac/metadata/{{MD5}}.{{Filename}}",
                   "filename_column": "Filename",
                   "byte_count_column": "Length"
@@ -7279,6 +8536,97 @@
                   ],
                   "markdown_name": "Asset Types"
                 }
+              ],
+              "filter": {
+                "and": [
+                  {
+                    "source": "RID"
+                  },
+                  {
+                    "source": "Filename"
+                  },
+                  {
+                    "source": "Description"
+                  },
+                  {
+                    "source": [
+                      {
+                        "inbound": [
+                          "deriva-ml",
+                          "File_Asset_Type_File_fkey"
+                        ]
+                      },
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "File_Asset_Type_Asset_Type_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Asset Types"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "File_RCB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Created By"
+                  },
+                  {
+                    "source": [
+                      {
+                        "outbound": [
+                          "deriva-ml",
+                          "File_RMB_fkey"
+                        ]
+                      },
+                      "RID"
+                    ],
+                    "markdown_name": "Modified By"
+                  }
+                ]
+              },
+              "detailed": [
+                "RID",
+                "Filename",
+                "Description",
+                {
+                  "source": [
+                    {
+                      "inbound": [
+                        "deriva-ml",
+                        "File_Asset_Type_File_fkey"
+                      ]
+                    },
+                    {
+                      "outbound": [
+                        "deriva-ml",
+                        "File_Asset_Type_Asset_Type_fkey"
+                      ]
+                    },
+                    "RID"
+                  ],
+                  "markdown_name": "Asset Types"
+                },
+                "URL",
+                "Length",
+                "MD5",
+                "RCT",
+                "RMT",
+                [
+                  "deriva-ml",
+                  "File_RCB_fkey"
+                ],
+                [
+                  "deriva-ml",
+                  "File_RMB_fkey"
+                ]
               ]
             }
           },
@@ -7391,6 +8739,15 @@
               "annotations": {
                 "tag:isrd.isi.edu,2017:asset": {
                   "md5": "MD5",
+                  "display": {
+                    "*": {
+                      "file_preview": {
+                        "content_type_mapping": {
+                          "application/octet-stream": "text"
+                        }
+                      }
+                    }
+                  },
                   "url_pattern": "/hatrac/metadata/{{MD5}}.{{Filename}}",
                   "filename_column": "Filename",
                   "byte_count_column": "Length"
