@@ -375,6 +375,104 @@ For known downstream projects in the deriva-ml ecosystem, the sibling-repo grep 
 
 Template maintainers should update the `group_by=` to `targets=` in lockstep with upgrading.
 
+## Migrating to 2.0: dev versioning
+
+The 2.0 release introduces a two-state versioning model for datasets — see [ADR-0003](../adr/0003-dataset-dev-versioning-model.md) and the ["How to version a dataset"](datasets.md#how-to-version-a-dataset) chapter for the full picture. This is the largest semantic break in the 2.0 release.
+
+**Headline change:** `add_dataset_members`, `delete_dataset_members`, and the dataset-type mutation methods now flip the dataset to a *dev* version (a mutable label of the form `<last_release>.post1.devN`) instead of bumping to a released version. The new `Dataset.release()` method is the only operation that produces a released version.
+
+### At-a-glance
+
+| Before (1.x) | After (2.0) |
+|---|---|
+| `dataset.increment_dataset_version(VersionPart.minor, "...")` | `dataset.release(bump=VersionPart.minor, description="...")` |
+| `add_dataset_members` → `0.4.0` → `0.5.0` (released bump) | `add_dataset_members` → `0.4.0` → `0.4.0.post1.dev1` (dev flip) |
+| Multiple `add_dataset_members` calls = multiple released versions | Multiple `add_dataset_members` calls = one mutable dev row, advancing `.devN` |
+| No way to record indirect drift | `dataset.mark_dev(description)` records drift explicitly |
+| No drift detection | `dataset.is_dirty()`, `dataset.release_diff()`, `dataset.compare_versions(a, b)` |
+| `DatasetVersion` extends `semver.Version` | `DatasetVersion` extends `packaging.Version` (PEP 440) |
+
+### `increment_dataset_version` → `release()`
+
+The most mechanical break. Every `increment_dataset_version` call site needs to switch to `release()`:
+
+```python
+# Before (1.x)
+new_version = dataset.increment_dataset_version(
+    component=VersionPart.minor,
+    description="Stable for experiment 1",
+    execution_rid=exe.execution_rid,
+)
+
+# After (2.0)
+new_version = dataset.release(
+    bump=VersionPart.minor,
+    description="Stable for experiment 1",
+    execution=exe,            # the Execution object, not the RID
+)
+```
+
+Three changes in the signature:
+
+- Method name: `increment_dataset_version` → `release`.
+- Argument name: `component` → `bump`.
+- Argument type: `execution_rid: RID | None` → `execution: Execution | None` (pass the object, not the RID).
+
+**`release()` errors if the dataset has no dev period to promote.** This is intentional — every release must come from a real working state. If you want to mint a release without any actual change (for example, to attach release notes), call `mark_dev(description)` first to declare a dev period, then `release()` to close it.
+
+A private `_increment_dataset_version` is preserved as an internal force-bump primitive. **Don't use it for application code** — it bypasses the dev-versioning model and exists for system-internal use cases (catalog clone version reinitialization). Public callers should always use `release()`.
+
+### Member mutations now land on dev
+
+Code that calls `add_dataset_members` and assumes the result is a released version needs to call `release()` afterward to mint a stable reference:
+
+```python
+# Before (1.x): one call, one released version
+dataset.add_dataset_members(members={"Image": image_rids})
+# dataset.current_version is now e.g. "0.5.0" (released)
+
+# After (2.0): one call → dev label; release explicitly
+dataset.add_dataset_members(members={"Image": image_rids})
+# dataset.current_version is now "0.4.0.post1.dev1" (dev)
+dataset.release(bump=VersionPart.minor, description="Add training images")
+# dataset.current_version is now "0.5.0" (released)
+```
+
+Code that only consumes `current_version` for display works without changes; code that uses `current_version` as a stable reference (passing it to `DatasetSpec`, citing it externally, etc.) needs to verify it's a released label.
+
+### Version label format change
+
+`DatasetVersion` is now a `packaging.Version` (PEP 440) rather than a `semver.Version`. The wire format for *released* versions is unchanged: `"0.4.0"` parses and serializes identically. Two corner cases to watch:
+
+- **String equality with `DatasetVersion` no longer works.** Under semver, `Version.parse("1.0.0") == "1.0.0"` was True. Under `packaging.Version`, it's False. If you have assertions like `dataset.current_version == "1.0.0"`, change them to `str(dataset.current_version) == "1.0.0"`.
+- **Dev versions** print as `"0.4.0.post1.dev3"`, not `"0.4.0-dev3"`. Choice of post-release form (vs. semver's pre-release form) was made so the dev label sorts *after* its anchor release, matching `setuptools-scm`'s convention.
+
+### New methods (additive)
+
+Four methods are new in 2.0; you don't need to migrate to them but they're available:
+
+- `Dataset.mark_dev(description, execution=None)` — explicitly flip the dataset to dev when the catalog drifted via a path that didn't go through the dataset API (a separate execution recorded a feature value, etc.).
+- `Dataset.is_dirty() -> bool` — fast predicate for "has anything reachable changed since the last release?"
+- `Dataset.release_diff() -> dict[str, int]` — per-table change counts since the last release.
+- `Dataset.compare_versions(v_a, v_b) -> dict[str, int]` — per-table change counts between two versions.
+
+### Find every callsite
+
+```bash
+# Method renames
+grep -rn "increment_dataset_version" your_project/ --include="*.py"
+
+# String-equality assertions on DatasetVersion (most common silent break)
+grep -rnE "current_version == |== current_version|\.version == \"" your_project/ --include="*.py"
+
+# Code that relies on add_dataset_members producing a released version
+grep -rn "add_dataset_members" your_project/ --include="*.py"
+```
+
+### Out-of-repo follow-ups
+
+The deriva-ml-mcp tool surface is updated separately. The `deriva_ml_increment_dataset_version` MCP tool will be renamed to `deriva_ml_release` in a coordinated MCP-server release; until that lands, MCP-mediated callers should use the bundle resource directly rather than the renamed tool.
+
 ## Version compatibility
 
 | deriva-ml version | Python | Torch | TensorFlow | Notes |
