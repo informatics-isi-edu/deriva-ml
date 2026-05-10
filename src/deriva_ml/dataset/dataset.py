@@ -42,7 +42,7 @@ from pathlib import Path
 # Local imports
 from pprint import pformat
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Self
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Iterator, Self
 from urllib.parse import urlparse
 
 # Deriva imports
@@ -318,20 +318,28 @@ class Dataset:
         pb.schemas[ml_instance.model.ml_schema].Dataset_Execution.insert(
             [{"Dataset": dataset_rid, "Execution": execution_rid}]
         )
-        Dataset._insert_dataset_versions(
-            ml_instance=ml_instance,
-            dataset_list=[DatasetSpec(rid=dataset_rid, version=version)],
-            execution_rid=execution_rid,
-            description="Initial dataset creation.",
-        )
         dataset = Dataset(
             catalog=ml_instance,
             dataset_rid=dataset_rid,
             description=description,
         )
 
-        # Skip version increment during initial creation (version already set above)
+        # Insert the dataset-type associations *before* the version row is
+        # finalised, so the version row's RMT ends up as the last write of
+        # the create-time sequence. Drift detection (PR 6) uses the
+        # released version row's RMT as the time anchor: with this
+        # ordering, a freshly-created dataset has nothing reachable with
+        # ``RMT > version_row.RMT`` and is correctly reported as not
+        # dirty. (`add_dataset_types` is told not to flip the dataset to
+        # dev — the version row doesn't exist yet anyway.)
         dataset.add_dataset_types(dataset_types, _skip_version_increment=True)
+
+        Dataset._insert_dataset_versions(
+            ml_instance=ml_instance,
+            dataset_list=[DatasetSpec(rid=dataset_rid, version=version)],
+            execution_rid=execution_rid,
+            description="Initial dataset creation.",
+        )
         return dataset
 
     def add_dataset_type(
@@ -1063,6 +1071,259 @@ class Dataset:
             )
 
         return DatasetVersion.parse(next_label)
+
+    def is_dirty(self) -> bool:
+        """Return ``True`` if catalog drift has occurred since the last released version.
+
+        A dataset's contents include not just its members but everything those
+        members reference — feature values, asset metadata, classifications,
+        and any other rows reachable from the dataset via the catalog's foreign
+        keys. When any of those rows change, the bag this dataset would
+        download today differs from the bag at the last released version, even
+        if the dataset's member list hasn't been touched.
+
+        Mechanism: walks the same foreign-key paths used to build the dataset's
+        bag, short-circuiting on the first table that has any row with
+        ``RMT`` greater than the last released version's row-modified time.
+
+        Limitations:
+            Deletions are not detected. A row that was reachable at the last
+            release but has since been deleted will not flip ``is_dirty`` to
+            ``True``. Users who delete catalog rows that affect a dataset
+            should call ``mark_dev`` manually to record the dirty state.
+
+        Returns:
+            ``True`` if any reachable row has been modified or added since
+            the last released version's snapshot. ``False`` if no drift is
+            detected.
+
+        Raises:
+            DerivaMLException: If the dataset has no released version
+                (every dataset is created with an initial release row, so
+                this indicates a catalog inconsistency).
+
+        Example:
+            >>> if dataset.is_dirty():  # doctest: +SKIP
+            ...     print("Drift since last release; consider mark_dev/release")
+        """
+        for _table_name, count in self._iter_drift_counts(
+            *self._release_diff_bounds(),
+            short_circuit=True,
+        ):
+            if count > 0:
+                return True
+        return False
+
+    def release_diff(self) -> dict[str, int]:
+        """Show which catalog changes since the last release would alter this dataset's contents.
+
+        A dataset's contents include not just its members but everything those
+        members reference — feature values, asset metadata, classifications,
+        and any other rows reachable from the dataset via the catalog's foreign
+        keys. When any of those rows change, the bag this dataset would
+        download today differs from the bag at the last released version, even
+        if the dataset's member list hasn't been touched.
+
+        This method reports those changes, grouped by the table the changed
+        rows live in. Use it as a follow-up to ``is_dirty()`` returning True,
+        to see *where* the drift is.
+
+        Mechanism: walks the same foreign-key paths used to build the dataset's
+        bag, counting rows in each reachable table whose row-modified time
+        (``RMT``) is later than the last released version's row-modified time.
+        The walk is bounded by what's reachable from this dataset — changes
+        elsewhere in the catalog that don't affect this dataset are not
+        counted.
+
+        Implemented as a thin wrapper around
+        :meth:`compare_versions` with the last released version as the
+        lower bound and the current version as the upper bound.
+
+        Limitations:
+            Deletions are not detected. A row that was reachable at the last
+            release but has since been deleted will not appear in the result.
+            Users who delete catalog rows that affect a dataset should call
+            ``mark_dev`` manually to record the dirty state.
+
+        Returns:
+            Mapping of fully-qualified table name → number of changed rows in
+            that table. Tables with zero changes are omitted; an empty dict
+            means no drift is detected.
+
+        Raises:
+            DerivaMLException: If the dataset has no released version.
+
+        Example:
+            >>> # Find out what's changed and decide whether to release
+            >>> if dataset.is_dirty():  # doctest: +SKIP
+            ...     for table, count in dataset.release_diff().items():
+            ...         print(f"{table}: {count} rows changed")
+        """
+        result: dict[str, int] = {}
+        for table_name, count in self._iter_drift_counts(
+            *self._release_diff_bounds(),
+            short_circuit=False,
+        ):
+            if count > 0:
+                # If multiple FK paths reach the same table, sum their counts.
+                result[table_name] = result.get(table_name, 0) + count
+        return result
+
+    def compare_versions(
+        self,
+        v_a: DatasetVersion | str,
+        v_b: DatasetVersion | str,
+    ) -> dict[str, int]:
+        """Show catalog rows that changed between two versions of this dataset.
+
+        Walks the same foreign-key paths used to build the dataset's bag,
+        counting rows in each reachable table whose row-modified time
+        (``RMT``) falls between the two versions' bounds. Order of *v_a*
+        and *v_b* doesn't matter — the predicate uses
+        ``min(t_a, t_b) < RMT <= max(t_a, t_b)``.
+
+        Each argument may independently be a released label (resolves to
+        that version row's ``RMT`` as the time bound) or the current dev
+        label (resolves to "now"). Stale or non-current dev labels error
+        per ADR-0003's addressability rule.
+
+        Args:
+            v_a: A version label, released or the current dev.
+            v_b: A version label, released or the current dev.
+
+        Returns:
+            Mapping of fully-qualified table name → number of changed rows
+            in that table between the two endpoints. Empty dict if both
+            endpoints resolve to the same time (e.g., both are the same
+            version).
+
+        Raises:
+            DerivaMLException: If either argument doesn't resolve to a
+                version of this dataset, or if a dev label doesn't match
+                the current dev row.
+
+        Example:
+            >>> # Diff between two historical released versions
+            >>> changes = dataset.compare_versions("0.3.0", "0.5.0")  # doctest: +SKIP
+            >>> for table, count in changes.items():  # doctest: +SKIP
+            ...     print(f"{table}: {count} rows added/changed")
+        """
+        t_a = self._resolve_version_to_rmt(v_a)
+        t_b = self._resolve_version_to_rmt(v_b)
+        # Symmetric in argument order: lower bound is min, upper is max.
+        # `None` means "live" — when present, it's always the upper bound.
+        if t_a is None and t_b is None:
+            # Both are the current dev row → no time window, no drift.
+            return {}
+        if t_a is None:
+            t_lower, t_upper = t_b, None
+        elif t_b is None:
+            t_lower, t_upper = t_a, None
+        else:
+            t_lower, t_upper = (t_a, t_b) if t_a <= t_b else (t_b, t_a)
+
+        if t_lower == t_upper:
+            return {}
+
+        result: dict[str, int] = {}
+        for table_name, count in self._iter_drift_counts(t_lower, t_upper, short_circuit=False):
+            if count > 0:
+                result[table_name] = result.get(table_name, 0) + count
+        return result
+
+    def _release_diff_bounds(self) -> tuple[str, str | None]:
+        """Return ``(lower_rmt, upper_rmt)`` bounds for ``release_diff`` / ``is_dirty``.
+
+        Lower bound is the last released version's ``RMT``. Upper bound
+        is ``None`` (live — no upper bound). Whether or not a dev row
+        exists doesn't affect these bounds: drift is "everything
+        changed since the last release," and the dev row itself is one
+        of those changes.
+        """
+        history = self.dataset_history()
+        released = [h for h in history if not h.dataset_version.is_devrelease]
+        if not released:
+            raise DerivaMLException(
+                f"Dataset {self.dataset_rid} has no released version to anchor drift detection against."
+            )
+        last_released = max(released, key=lambda h: h.dataset_version)
+        return self._fetch_version_row_rmt(last_released.version_rid), None
+
+    def _resolve_version_to_rmt(self, version: DatasetVersion | str) -> str | None:
+        """Resolve a version label to a ``Dataset_Version.RMT`` time anchor.
+
+        Returns the version row's ``RMT`` for a released label, or
+        ``None`` for the current dev label (meaning "live"). Stale or
+        non-current dev labels raise.
+        """
+        version_str = str(version)
+        history = self.dataset_history()
+        try:
+            entry = next(h for h in history if str(h.dataset_version) == version_str)
+        except StopIteration:
+            available = [str(h.dataset_version) for h in history]
+            raise DerivaMLException(
+                f"Version {version_str!r} does not exist for dataset {self.dataset_rid}. Available: {available}"
+            )
+        if entry.dataset_version.is_devrelease:
+            # Dev versions resolve only when they match the current dev
+            # row. By construction `dataset_history` only returns one dev
+            # row (the current one), so this is the matching case.
+            return None
+        return self._fetch_version_row_rmt(entry.version_rid)
+
+    def _fetch_version_row_rmt(self, version_rid: RID) -> str:
+        """Fetch the ``RMT`` for a ``Dataset_Version`` row by RID."""
+        version_table = self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
+        rows = list(version_table.filter(version_table.RID == version_rid).entities().fetch())
+        if not rows:
+            raise DerivaMLException(f"Dataset_Version row {version_rid} not found while resolving time anchor.")
+        return rows[0]["RMT"]
+
+    def _iter_drift_counts(
+        self,
+        t_lower: str,
+        t_upper: str | None,
+        short_circuit: bool,
+    ) -> "Iterator[tuple[str, int]]":
+        """Yield ``(table_name, count)`` for rows reachable from this dataset with ``t_lower < RMT <= t_upper``.
+
+        Walks ``CatalogGraph._aggregate_queries`` paths and counts rows
+        in each terminal table that fall within the given RMT window.
+        ``t_upper=None`` means "no upper bound" — i.e., live state.
+
+        If *short_circuit* is True, yields the first non-zero count and
+        stops. Otherwise yields one ``(table_name, count)`` per (table,
+        path) reached.
+        """
+        from deriva.core.datapath import Cnt
+
+        from deriva_ml.dataset.catalog_graph import CatalogGraph
+
+        graph = CatalogGraph(self._ml_instance)
+        table_queries = graph._aggregate_queries(self)
+
+        for table_name, path_entries in table_queries.items():
+            for dp, target_pb_table, _is_asset in path_entries:
+                # Build the RMT filter: t_lower < RMT <= t_upper
+                rmt_col = target_pb_table.RMT
+                rmt_filter = rmt_col > t_lower
+                if t_upper is not None:
+                    rmt_filter = rmt_filter & (rmt_col <= t_upper)
+                filtered = dp.filter(rmt_filter)
+                try:
+                    rows = list(filtered.aggregates(Cnt(target_pb_table.RID).alias("n")).fetch())
+                    count = rows[0]["n"] if rows else 0
+                except Exception as exc:
+                    self._logger.debug(
+                        "drift count query failed for table %s: %s",
+                        table_name,
+                        exc,
+                    )
+                    count = 0
+                yield table_name, count
+                if short_circuit and count > 0:
+                    return
 
     def _create_or_advance_dev_row(
         self,
@@ -2078,6 +2339,16 @@ class Dataset:
         )
         version_records = list(version_records)
 
+        # Update each dataset's current version pointer to the new version
+        # record before stamping the snapshot. The Dataset.Version UPDATE
+        # bumps Dataset.RMT; doing it first means the *Dataset_Version*
+        # row ends up with the latest RMT after the Snapshot update below.
+        # Drift detection (PR 6) uses the version row's RMT as the time
+        # anchor for ``is_dirty`` / ``release_diff``; this ordering ensures
+        # that anchor is later than every other create- or release-time
+        # write, so a freshly-finalised dataset reads as not dirty.
+        schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
+
         # ERMrest does not return system-generated columns (including snaptime)
         # in the INSERT response — it only echoes back the columns you sent.
         # We need the snaptime to record the version's catalog snapshot for
@@ -2085,13 +2356,12 @@ class Dataset:
         # INSERT to retrieve the server-assigned snaptime for this row.
         snap = ml_instance.catalog.get("/").json()["snaptime"]
 
-        # Update version records with the snapshot timestamp
+        # Update version records with the snapshot timestamp.  This UPDATE
+        # is the last write of the version-insertion sequence, so the
+        # version row's RMT becomes the time anchor for drift detection.
         schema_path.tables["Dataset_Version"].update(
             [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
         )
-
-        # Update each dataset's current version pointer to the new version record
-        schema_path.tables["Dataset"].update([{"Version": v["RID"], "RID": v["Dataset"]} for v in version_records])
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_dataset_bag(
