@@ -193,7 +193,9 @@ class TestDatasetDownload:
                 columns=[],
             )
         )
-        new_version = dataset_description.dataset.increment_dataset_version(component=VersionPart.minor)
+        # Use the private force-bump primitive: this test stamps a new
+        # snapshot to capture a schema change, not to release a dev period.
+        new_version = dataset_description.dataset._increment_dataset_version(component=VersionPart.minor)
 
         current_bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
         new_bag = dataset_description.dataset.download_dataset_bag(new_version, use_minid=False)
@@ -431,8 +433,10 @@ class TestDatabasePathCaching:
         bag1 = dataset.download_dataset_bag(version=current_version, use_minid=False)
         dbase_path1 = bag1.model.database_dir
 
-        # Increment version (this creates a new version in the catalog)
-        new_version = dataset.increment_dataset_version(
+        # Force-bump to a new released version to test downloading two
+        # distinct snapshots. The private primitive is appropriate here —
+        # the test isn't exercising the dev → release lifecycle.
+        new_version = dataset._increment_dataset_version(
             component=VersionPart.minor, description="Test version increment"
         )
 

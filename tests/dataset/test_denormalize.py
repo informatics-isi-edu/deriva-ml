@@ -1358,9 +1358,7 @@ class TestNewFKPatterns:
         # Row count lower bound: one row per Image at minimum.
         members = bag.list_dataset_members(recurse=True)
         image_count = len(members.get("Image", []))
-        assert len(df) >= image_count, (
-            f"Row count ({len(df)}) should be at least Image member count ({image_count})."
-        )
+        assert len(df) >= image_count, f"Row count ({len(df)}) should be at least Image member count ({image_count})."
 
     # -------------------------------------------------------------------------
     # Association table as mandatory intermediate
@@ -1593,7 +1591,10 @@ class TestVersionPinnedDenormalize:
         v0_rids = set(df_v0["Subject.RID"].dropna())
 
         # Bump to v1 (creates a new snapshot) without changing members.
-        v1 = str(dataset.increment_dataset_version(component=VersionPart.patch))
+        # Uses the private force-bump primitive; this test stamps a fresh
+        # snapshot to test denormalization at multiple versions, not to
+        # exercise the dev → release lifecycle.
+        v1 = str(dataset._increment_dataset_version(component=VersionPart.patch))
         assert v0 != v1, "Version increment should produce a distinct version string"
 
         df_v1 = dataset.get_denormalized_as_dataframe(
@@ -1629,17 +1630,15 @@ class TestVersionPinnedDenormalize:
 
         v0 = str(dataset.current_version)
         bag_v0 = dataset.download_dataset_bag(v0, use_minid=False)
-        bag_v0_rids = {
-            m["RID"] for m in bag_v0.list_dataset_members(recurse=True).get("Subject", [])
-        }
+        bag_v0_rids = {m["RID"] for m in bag_v0.list_dataset_members(recurse=True).get("Subject", [])}
 
-        # Bump the live catalog to v1.
-        dataset.increment_dataset_version(component=VersionPart.patch)
+        # Bump the live catalog to v1 via the private force-bump primitive
+        # (this test stamps a snapshot, not exercises dev → release).
+        dataset._increment_dataset_version(component=VersionPart.patch)
 
         # The bag remains at v0 — bag's own SQLite is unchanged.
         df = bag_v0.get_denormalized_as_dataframe(include_tables=["Subject"])
         bag_denorm_rids = set(df["Subject.RID"].dropna())
         assert bag_denorm_rids == bag_v0_rids, (
-            "Bag denormalize should return exactly the Subjects in the bag "
-            "regardless of later live-catalog changes."
+            "Bag denormalize should return exactly the Subjects in the bag regardless of later live-catalog changes."
         )

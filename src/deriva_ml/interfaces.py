@@ -86,6 +86,7 @@ from deriva_ml.model.catalog import DerivaModel
 if TYPE_CHECKING:
     from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetSpec, DatasetVersion, VersionPart
     from deriva_ml.dataset.dataset import Dataset
+    from deriva_ml.execution.execution import Execution
     from deriva_ml.execution.execution_record import ExecutionRecord
     from deriva_ml.execution.state_store import ExecutionStatus
     from deriva_ml.execution.workflow import Workflow
@@ -497,7 +498,7 @@ class WritableDataset(DatasetLike, Protocol):
     Example:
         >>> def add_samples(dataset: WritableDataset, sample_rids: list[str]):
         ...     dataset.add_dataset_members(sample_rids)
-        ...     dataset.increment_dataset_version(VersionPart.minor)
+        ...     dataset.release(VersionPart.minor, "Added samples")
     """
 
     def add_dataset_members(
@@ -537,21 +538,27 @@ class WritableDataset(DatasetLike, Protocol):
         """
         ...
 
-    def increment_dataset_version(
+    def release(
         self,
-        component: "VersionPart",
-        description: str | None = "",
-        execution_rid: RID | None = None,
+        bump: "VersionPart",
+        description: str,
+        execution: "Execution | None" = None,
     ) -> DatasetVersion:
-        """Increment the dataset version.
+        """Promote this dataset's dev period to a released version.
+
+        Per ADR-0003: ``release`` is the only operation that produces
+        a released ``Dataset_Version`` row. Errors if the dataset has
+        no dev period to release.
 
         Args:
-            component: Which version component to increment (VersionPart.major, .minor, or .patch).
-            description: Optional description of the changes in this version.
-            execution_rid: Optional execution RID to associate with this version.
+            bump: Which release-segment part to advance (``major``,
+                ``minor``, or ``patch``).
+            description: Release notes. Replaces the dev row's
+                accumulated description.
+            execution: Optional ``Execution`` that called release.
 
         Returns:
-            The new version after incrementing.
+            The new released version.
         """
         ...
 

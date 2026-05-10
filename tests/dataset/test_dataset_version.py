@@ -33,7 +33,10 @@ class TestDatasetVersion:
         )
         v0 = dataset.current_version
         assert "1.0.0" == str(v0)
-        v1 = dataset.increment_dataset_version(component=VersionPart.minor)
+        # Use the private force-bump primitive: this test verifies the
+        # release-segment arithmetic and graph propagation without
+        # going through the dev → release lifecycle.
+        v1 = dataset._increment_dataset_version(component=VersionPart.minor)
         assert "1.1.0" == str(v1)
         assert "1.1.0" == str(dataset.current_version)
 
@@ -58,7 +61,7 @@ class TestDatasetVersion:
             version=DatasetVersion(1, 0, 0),
         )
         assert 1 == len(dataset.dataset_history())
-        v1 = dataset.increment_dataset_version(component=VersionPart.minor)
+        v1 = dataset._increment_dataset_version(component=VersionPart.minor)
         assert 2 == len(dataset.dataset_history())
 
     def test_dataset_version(self, dataset_test, tmp_path):
@@ -76,7 +79,10 @@ class TestDatasetVersion:
             "d1": [ds.current_version for ds in nested_datasets],
             "d2": [ds.current_version for ds in datasets],
         }
-        nested_datasets[0].increment_dataset_version(VersionPart.major)
+        # Use the private force-bump primitive: this test verifies graph
+        # propagation, which is _increment_dataset_version's specialty.
+        # The public release() path operates on a single dataset only.
+        nested_datasets[0]._increment_dataset_version(VersionPart.major)
         new_versions = {
             "d0": dataset_description.dataset.current_version,
             "d1": [ds.current_version for ds in nested_datasets],
@@ -177,8 +183,8 @@ class TestMarkDev:
     def test_history_is_sorted_ascending(self, test_ml):
         dataset, _execution = self._setup_dataset(test_ml)
         # Make a few releases plus a dev row.
-        dataset.increment_dataset_version(VersionPart.minor, "first bump")
-        dataset.increment_dataset_version(VersionPart.minor, "second bump")
+        dataset._increment_dataset_version(VersionPart.minor, "first bump")
+        dataset._increment_dataset_version(VersionPart.minor, "second bump")
         dataset.mark_dev("then dev")
 
         history = dataset.dataset_history()
@@ -326,13 +332,187 @@ class TestMutationsLandOnDev:
         assert version_after == version_before
         assert not version_after.is_devrelease
 
-    def test_existing_release_path_still_works(self, test_ml):
-        """``increment_dataset_version`` (renamed in PR 5) still produces released rows."""
+    def test_force_bump_via_internal_helper(self, test_ml):
+        """``_increment_dataset_version`` (private, force-bump) still produces released rows.
+
+        After PR 5, the public release path is :meth:`Dataset.release`,
+        which requires a dev row. ``_increment_dataset_version`` is
+        kept as a private internal primitive for callers that need to
+        force-bump without a dev period (e.g., catalog clone).
+        """
         dataset, _test_rids = self._setup_dataset_with_table(test_ml)
 
-        # Direct release — bypasses the dev-versioning model entirely.
-        # Will be renamed to release() in PR 5.
-        new_version = dataset.increment_dataset_version(VersionPart.minor)
+        new_version = dataset._increment_dataset_version(VersionPart.minor)
 
         assert not new_version.is_devrelease
         assert str(new_version) == "0.5.0"
+
+
+class TestRelease:
+    """Integration tests for ``Dataset.release`` per ADR-0003 / PR 5.
+
+    Verifies:
+    - release() promotes the dev row in place (released label, stamped Snapshot,
+      replaced Description, overwritten Execution).
+    - release() errors when no dev row exists.
+    - release() honors the ``bump`` argument (major / minor / patch).
+    - release() returns the new released ``DatasetVersion``.
+    """
+
+    def _setup_dataset_with_dev(self, ml_instance):
+        """Helper: create a fresh dataset and flip it to dev via mark_dev.
+
+        Returns (dataset, execution, dev_row_rid).
+        """
+        ml_instance.add_term("Dataset_Type", "ReleaseTest", description="A test type")
+        ml_instance.add_term("Workflow_Type", "Manual Workflow", description="Manual workflow")
+        workflow = ml_instance.create_workflow(
+            name="Release Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for release tests",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Release Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(
+            dataset_types="ReleaseTest",
+            description="Dataset for release tests",
+            version=DatasetVersion(0, 4, 0),
+        )
+        dataset.mark_dev("initial drift")
+        # Find the dev row's RID for in-place promotion verification.
+        dev_row = next(h for h in dataset.dataset_history() if h.dataset_version.is_devrelease)
+        return dataset, execution, dev_row.version_rid
+
+    def test_release_minor_bump(self, test_ml):
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+        assert str(dataset.current_version) == "0.4.0.post1.dev1"
+
+        v = dataset.release(bump=VersionPart.minor, description="release notes")
+
+        assert str(v) == "0.5.0"
+        assert not v.is_devrelease
+        assert str(dataset.current_version) == "0.5.0"
+
+    def test_release_major_bump(self, test_ml):
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+
+        v = dataset.release(bump=VersionPart.major, description="major change")
+
+        assert str(v) == "1.0.0"
+
+    def test_release_patch_bump(self, test_ml):
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+
+        v = dataset.release(bump=VersionPart.patch, description="patch change")
+
+        assert str(v) == "0.4.1"
+
+    def test_release_promotes_in_place(self, test_ml):
+        """Per ADR-0003 / Q12: the dev row's RID is preserved across promotion."""
+        dataset, _execution, dev_rid = self._setup_dataset_with_dev(test_ml)
+
+        dataset.release(bump=VersionPart.minor, description="promoted")
+
+        # The released row should have the same RID as the dev row
+        # (UPDATE in place, not INSERT a new row + DELETE the old).
+        history = dataset.dataset_history()
+        released_at_05 = [h for h in history if str(h.dataset_version) == "0.5.0"]
+        assert len(released_at_05) == 1
+        assert released_at_05[0].version_rid == dev_rid
+
+    def test_release_stamps_snapshot(self, test_ml):
+        """Released rows have a non-NULL Snapshot; dev rows had NULL."""
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+
+        dataset.release(bump=VersionPart.minor, description="snap test")
+
+        released = next(h for h in dataset.dataset_history() if str(h.dataset_version) == "0.5.0")
+        assert released.snapshot is not None
+        assert released.snapshot != ""
+
+    def test_release_replaces_description(self, test_ml):
+        """Per Q12: release replaces the dev row's accumulated description."""
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+        # Add another mark_dev to accumulate description.
+        dataset.mark_dev("more drift")
+
+        dataset.release(bump=VersionPart.minor, description="release notes only")
+
+        released = next(h for h in dataset.dataset_history() if str(h.dataset_version) == "0.5.0")
+        assert released.description == "release notes only"
+        assert "drift" not in (released.description or "")
+
+    def test_release_overwrites_execution(self, test_ml):
+        """release()'s execution arg overwrites whatever the dev row had."""
+        dataset, original_execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+        # Create a different execution to attach at release time.
+        ml_instance = dataset._ml_instance
+        workflow = ml_instance.create_workflow(
+            name="Release Workflow 2",
+            workflow_type="Manual Workflow",
+            description="A second workflow",
+        )
+        release_execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Release-time execution", workflow=workflow)
+        )
+
+        dataset.release(
+            bump=VersionPart.minor,
+            description="with release execution",
+            execution=release_execution,
+        )
+
+        released = next(h for h in dataset.dataset_history() if str(h.dataset_version) == "0.5.0")
+        assert released.execution_rid == release_execution.execution_rid
+        # Not the original mark_dev execution.
+        assert released.execution_rid != original_execution.execution_rid
+
+    def test_release_without_execution_leaves_null(self, test_ml):
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+
+        dataset.release(bump=VersionPart.minor, description="no execution")
+
+        released = next(h for h in dataset.dataset_history() if str(h.dataset_version) == "0.5.0")
+        # DatasetHistory normalises empty/missing execution_rid to None.
+        assert released.execution_rid is None
+
+    def test_release_errors_on_no_dev_row(self, test_ml):
+        """release() with no dev period to promote raises a clear error."""
+        import pytest
+
+        # Use the mark_dev helper *without* mark_dev — fresh released-only dataset.
+        ml_instance = test_ml
+        ml_instance.add_term("Dataset_Type", "ReleaseTest", description="A test type")
+        ml_instance.add_term("Workflow_Type", "Manual Workflow", description="Manual workflow")
+        workflow = ml_instance.create_workflow(
+            name="Release Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for release tests",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Release Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(
+            dataset_types="ReleaseTest",
+            description="Dataset with no dev period",
+            version=DatasetVersion(0, 4, 0),
+        )
+        # Sanity: dataset is at a released version, no dev row.
+        assert not dataset.current_version.is_devrelease
+
+        with pytest.raises(Exception) as exc_info:
+            dataset.release(bump=VersionPart.minor, description="should fail")
+        # Error message points the user at mark_dev as the resolution.
+        assert "mark_dev" in str(exc_info.value)
+
+    def test_release_then_mark_dev_creates_new_dev_period(self, test_ml):
+        """After release, the next mark_dev creates a fresh .dev1 anchored at the new release."""
+        dataset, _execution, _dev_rid = self._setup_dataset_with_dev(test_ml)
+        dataset.release(bump=VersionPart.minor, description="0.5.0 release")
+        assert str(dataset.current_version) == "0.5.0"
+
+        dataset.mark_dev("new drift")
+
+        # Anchored at 0.5.0 (the new last-released), not 0.4.0.
+        assert str(dataset.current_version) == "0.5.0.post1.dev1"
