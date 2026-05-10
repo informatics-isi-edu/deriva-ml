@@ -34,7 +34,7 @@ class TestDatasetVersion:
         assert "1.0.0" == str(v0)
         v1 = dataset.increment_dataset_version(component=VersionPart.minor)
         assert "1.1.0" == str(v1)
-        assert "1.1.0" == dataset.current_version
+        assert "1.1.0" == str(dataset.current_version)
 
     def test_dataset_version_history(self, test_ml):
         ml_instance = test_ml

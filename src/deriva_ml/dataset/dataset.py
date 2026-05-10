@@ -891,7 +891,7 @@ class Dataset:
         version_update_list = [
             DatasetSpec(
                 rid=ds.dataset_rid,
-                version=ds.current_version.increment_version(component),
+                version=ds.current_version.next_release(component),
             )
             for ds in related_datasets
         ]
@@ -2205,7 +2205,7 @@ class Dataset:
         version = str(version)
         history = self.dataset_history()
         try:
-            version_record = next(h for h in history if h.dataset_version == version)
+            version_record = next(h for h in history if str(h.dataset_version) == version)
         except StopIteration:
             available = [(str(h.dataset_version), h.snapshot) for h in history]
             raise DerivaMLException(
@@ -2396,7 +2396,9 @@ class Dataset:
                 version_path = (
                     self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
                 )
-                version_rid = [h for h in self.dataset_history() if h.dataset_version == version][0].version_rid
+                version_rid = [h for h in self.dataset_history() if str(h.dataset_version) == str(version)][
+                    0
+                ].version_rid
                 version_path.update([{"RID": version_rid, "Minid": minid_page_url, "Minid_Spec_Hash": spec_hash}])
                 return minid_page_url
             else:
@@ -2705,7 +2707,7 @@ class Dataset:
         version_str = str(version)
         history = self.dataset_history()
         try:
-            version_record = next(v for v in history if v.dataset_version == version_str)
+            version_record = next(v for v in history if str(v.dataset_version) == version_str)
         except StopIteration:
             raise DerivaMLException(f"Version {version_str} does not exist for RID {self.dataset_rid}")
 
