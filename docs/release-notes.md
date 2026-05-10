@@ -1,3 +1,12 @@
+Version 2.0.0
+
+- **Dataset dev versioning** (breaking). Datasets now use a two-state versioning model: released versions (citable, snapshot-pinned) and dev versions (mutable, between-release labels of the form `<release>.post1.devN`). Every mutation lands on a dev version; `Dataset.release()` is the only path to a released version. See `docs/adr/0003-dataset-dev-versioning-model.md` and `docs/user-guide/migration.md` for the full migration story.
+- **`increment_dataset_version` renamed to `release`** (breaking). New signature: `Dataset.release(bump, description, execution=None)`. The old method is preserved as a private `_increment_dataset_version` for system-internal use only (e.g., catalog clone reinitialization).
+- **`add_dataset_members`, `delete_dataset_members`, `add_dataset_type`, `add_dataset_types`, `remove_dataset_type` now land on dev** (breaking). Each call advances `.devN` rather than producing a released version. To mint a release after mutations, call `dataset.release(...)`.
+- **`DatasetVersion` rebased on PEP 440** (breaking for some equality assertions). The wire format for released versions is unchanged (`"0.4.0"`); dev labels use PEP 440 post-release form (`"0.4.0.post1.dev1"`). String equality (`current_version == "1.0.0"`) no longer works — coerce explicitly: `str(current_version) == "1.0.0"`.
+- **New: `Dataset.mark_dev`, `is_dirty`, `release_diff`, `compare_versions`.** Mark drift explicitly, detect whether the catalog has drifted since the last release, and compare any two versions.
+- Documentation: new ADRs (0003 dev-versioning model, 0004 PEP 440 vocabulary, 0005 delivery sequence) and a CONTEXT.md vocabulary file.
+
 Version 1.2.0
 
 - Dataset versioning with semantic versioning. Note that the current dataset version does *NOT* have the current catalog values, but rather the values at the time the dataset was created. 

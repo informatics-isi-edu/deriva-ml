@@ -54,14 +54,18 @@ with ml.create_execution(config) as exe:
     # bag contains exactly the rows present at version 2.1.0
 ```
 
-Under the hood, each dataset version stores a catalog snapshot timestamp. When deriva-ml downloads a versioned dataset bag, it appends the snapshot timestamp to every query, so it reads the catalog as of that moment. The same RID at version `2.1.0` returns the same rows on every run, regardless of subsequent additions or deletions.
+Under the hood, each released dataset version stores a catalog snapshot timestamp. When deriva-ml downloads a versioned dataset bag, it appends the snapshot timestamp to every query, so it reads the catalog as of that moment. The same RID at version `2.1.0` returns the same rows on every run, regardless of subsequent additions or deletions.
+
+!!! warning
+    **Dev versions are not reproducible references.** A version label of the form `<release>.post1.devN` resolves to *live catalog state*, not a pinned snapshot. Two runs that consume `1.0.0.post1.dev3` may see different content. Executions should consume **released** versions only — pass a clean `MAJOR.MINOR.PATCH` label to `DatasetSpec`. To convert a dev period into a stable reference, call `dataset.release(...)` to mint a released version.
 
 **Notes:**
 
 - The `version` argument accepts a string (`"2.1.0"`), a three-element list, or a `DatasetVersion` object.
-- Omitting `version` uses the dataset's current version, which changes as members are added.
+- Omitting `version` uses the dataset's current version. If the dataset is in a dev period, that's a dev label — not a stable reference. Make sure you're pinning a released version for executions you want to reproduce.
 - `materialize=False` downloads table metadata only, without fetching asset files. Use this for large datasets when you only need row counts or identifiers.
 - Snapshot timestamps can age out if your catalog has a retention policy. Verify that the snapshot still exists before depending on a version in long-running production code.
+- Use `dataset.is_dirty()` before kicking off a long training run to confirm the dataset hasn't drifted since its last release. If it has, decide whether to release first or proceed with the existing released version.
 
 ## How to capture workflow checksums and git commits
 
