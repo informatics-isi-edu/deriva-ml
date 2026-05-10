@@ -1,7 +1,18 @@
 # ADR-0005: Dev-versioning delivery — seven sequenced PRs
 
 Date: 2026-05-09
-Status: Accepted
+Status: Accepted (with one deviation at delivery — see "Delivery outcome" below)
+
+## Delivery outcome (added 2026-05-10)
+
+The plan below described a **2.0 major-version bump**. At delivery
+time, the maintainer chose to ship the work as a **1.34.0 minor bump**
+instead. The breaking changes (renamed `release()` method, dev-flip
+behavior for member mutations, changed `current_version` semantics,
+etc.) are unchanged — what changed is the package version label
+attached to them. References to "2.0" in the ADR body below describe
+the plan at the time it was written. The release-notes and migration
+guide use the actual shipped version (1.34.0).
 
 ## Context
 
