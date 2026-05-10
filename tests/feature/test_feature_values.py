@@ -4,6 +4,7 @@ This task (Task 4) covers DerivaML online reads. The parametrized symmetry
 suite across DerivaML / Dataset / DatasetBag is added in Task 8 once all
 three containers have the method.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -108,9 +109,12 @@ def test_ml_with_feature_multi(populated_catalog):
 
 def test_feature_values_yields_feature_records(test_ml_with_feature) -> None:
     """feature_values yields FeatureRecord instances with the expected attrs."""
-    records = list(test_ml_with_feature.ml.feature_values(
-        "Image", test_ml_with_feature.feature_name,
-    ))
+    records = list(
+        test_ml_with_feature.ml.feature_values(
+            "Image",
+            test_ml_with_feature.feature_name,
+        )
+    )
     assert len(records) > 0
     rec = records[0]
     assert isinstance(rec, FeatureRecord)
@@ -128,19 +132,23 @@ def test_feature_values_unknown_feature_raises(test_ml) -> None:
 def test_feature_values_is_iterable_not_list(test_ml_with_feature) -> None:
     """Return type is an iterator (streaming), not a materialized list."""
     import collections.abc
+
     result = test_ml_with_feature.ml.feature_values(
-        "Image", test_ml_with_feature.feature_name,
+        "Image",
+        test_ml_with_feature.feature_name,
     )
     assert isinstance(result, collections.abc.Iterator)
 
 
 def test_feature_values_with_select_newest(test_ml_with_feature_multi) -> None:
     """Selector reduces multi-value groups to one record per target RID."""
-    records = list(test_ml_with_feature_multi.ml.feature_values(
-        "Image",
-        test_ml_with_feature_multi.feature_name,
-        selector=FeatureRecord.select_newest,
-    ))
+    records = list(
+        test_ml_with_feature_multi.ml.feature_values(
+            "Image",
+            test_ml_with_feature_multi.feature_name,
+            selector=FeatureRecord.select_newest,
+        )
+    )
     # After selector: one record per target Image
     rids = [r.Image for r in records]
     assert len(rids) == len(set(rids))
@@ -148,11 +156,17 @@ def test_feature_values_with_select_newest(test_ml_with_feature_multi) -> None:
 
 def test_feature_values_selector_returning_none_omits_target(test_ml_with_feature) -> None:
     """Selector returning None removes that target from the iterator."""
+
     def reject_all(records):
         return None
-    records = list(test_ml_with_feature.ml.feature_values(
-        "Image", test_ml_with_feature.feature_name, selector=reject_all,
-    ))
+
+    records = list(
+        test_ml_with_feature.ml.feature_values(
+            "Image",
+            test_ml_with_feature.feature_name,
+            selector=reject_all,
+        )
+    )
     assert records == []
 
 
@@ -227,7 +241,9 @@ def catalog_with_feature_and_dataset(populated_catalog):
             description="Dataset for Task 5 test",
         )
         dataset.add_dataset_members(members={"Image": member_rids})
-    dataset.increment_dataset_version(component=VersionPart.minor, description="v1")
+    # add_dataset_members lands on dev (PR 4); release the dev period
+    # to mint v1 as a stable reference for the test fixture.
+    dataset.release(bump=VersionPart.minor, description="v1")
 
     member_set = set(member_rids)
     non_member_set = set(all_image_rids) - member_set
@@ -250,17 +266,13 @@ def test_dataset_feature_values_filters_to_members(catalog_with_feature_and_data
     exclude them.
     """
     fx = catalog_with_feature_and_dataset
-    assert fx.non_member_rids, (
-        "fixture must have at least one image with a feature value that is NOT a dataset member"
-    )
+    assert fx.non_member_rids, "fixture must have at least one image with a feature value that is NOT a dataset member"
 
     records = list(fx.dataset.feature_values(fx.target_table, fx.feature_name))
     yielded_rids = {getattr(r, fx.target_table) for r in records}
 
     # Every yielded RID is a member
-    assert yielded_rids.issubset(fx.member_rids), (
-        f"non-member RIDs leaked through: {yielded_rids - fx.member_rids}"
-    )
+    assert yielded_rids.issubset(fx.member_rids), f"non-member RIDs leaked through: {yielded_rids - fx.member_rids}"
     # No non-member RID was yielded — filter actually applied
     assert not (yielded_rids & fx.non_member_rids), (
         f"non-member RIDs should have been excluded: {yielded_rids & fx.non_member_rids}"
@@ -421,9 +433,7 @@ class TestFeatureValuesSymmetry:
         if isinstance(feature_container.container, DatasetBag):
             # Verify the method is callable; skip if execution data not in bag.
             try:
-                rids = feature_container.container.list_workflow_executions(
-                    feature_container.workflow
-                )
+                rids = feature_container.container.list_workflow_executions(feature_container.workflow)
             except DerivaMLException:
                 pytest.skip(
                     "DatasetBag.list_workflow_executions requires Execution rows "
@@ -432,13 +442,9 @@ class TestFeatureValuesSymmetry:
                 )
 
             if not rids:
-                pytest.skip(
-                    "DatasetBag returned empty execution list — pre-existing bag-export limitation."
-                )
+                pytest.skip("DatasetBag returned empty execution list — pre-existing bag-export limitation.")
         else:
-            rids = feature_container.container.list_workflow_executions(
-                feature_container.workflow
-            )
+            rids = feature_container.container.list_workflow_executions(feature_container.workflow)
         # Order-independent comparison against the catalog-computed baseline
         assert set(rids) == feature_container.expected_workflow_executions
 
@@ -478,10 +484,7 @@ def test_offline_construct_records_online_stage(
     # Build records entirely offline — ImageQuality is the vocab column name (from
     # create_feature("Image", "Quality", terms=["ImageQuality"])).
     # "Good" is a valid ImageQuality term per demo_catalog.py.
-    records = [
-        RecordClass(**{fx.target_table: rid, "ImageQuality": "Good"})
-        for rid in target_rids
-    ]
+    records = [RecordClass(**{fx.target_table: rid, "ImageQuality": "Good"}) for rid in target_rids]
     # Confirm Execution is not set — exe.add_features must auto-fill it
     assert all(r.Execution is None for r in records), "Execution should be None before staging"
 
@@ -497,8 +500,7 @@ def test_offline_construct_records_online_stage(
     with execution.execute() as exe:
         count = exe.add_features(records)
         assert count == len(target_rids), (
-            f"add_features should return the number of staged records; "
-            f"got {count}, expected {len(target_rids)}"
+            f"add_features should return the number of staged records; got {count}, expected {len(target_rids)}"
         )
     # __exit__ does NOT auto-upload (Task 7 review) — explicit call required
     execution.upload_execution_outputs()
@@ -509,9 +511,6 @@ def test_offline_construct_records_online_stage(
     written = list(fx.ml.feature_values(fx.target_table, fx.feature_name))
     ours = [r for r in written if r.Execution == execution.execution_rid]
     assert len(ours) == len(target_rids), (
-        f"Expected {len(target_rids)} new records from execution "
-        f"{execution.execution_rid}; found {len(ours)}"
+        f"Expected {len(target_rids)} new records from execution {execution.execution_rid}; found {len(ours)}"
     )
-    assert all(r.ImageQuality == "Good" for r in ours), (
-        "All written records should have ImageQuality='Good'"
-    )
+    assert all(r.ImageQuality == "Good" for r in ours), "All written records should have ImageQuality='Good'"

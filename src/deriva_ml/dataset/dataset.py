@@ -20,8 +20,8 @@ Typical usage example:
     ...         description='Experimental data'
     ...     )
     ...     dataset.add_dataset_members(members=['1-abc123', '1-def456'])
-    ...     dataset.increment_dataset_version(
-    ...         component=VersionPart.minor,
+    ...     dataset.release(
+    ...         bump=VersionPart.minor,
     ...         description='Added new samples'
     ...     )
 """
@@ -152,10 +152,10 @@ class Dataset:
         ...         dataset_types=["training_data"],
         ...         description="Image classification training set"
         ...     )
-        ...     # Add members to the dataset
+        ...     # Add members to the dataset (lands on a dev version)
         ...     dataset.add_dataset_members(members=["1-abc", "1-def"])
-        ...     # Increment version after changes
-        ...     new_version = dataset.increment_dataset_version(VersionPart.minor, "Added samples")
+        ...     # Promote the dev period to a released version
+        ...     new_version = dataset.release(VersionPart.minor, "Added samples")
         >>> # Download for offline use
         >>> bag = dataset.download_dataset_bag(version=new_version)  # doctest: +SKIP
     """
@@ -891,36 +891,38 @@ class Dataset:
             parent._build_dataset_graph_1(ts, visited)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
-    def increment_dataset_version(
+    def _increment_dataset_version(
         self,
         component: VersionPart,
         description: str | None = "",
         execution_rid: RID | None = None,
     ) -> DatasetVersion:
-        """Increments a dataset's version number.
+        """Force a release-version bump on this dataset and its related datasets.
 
-        Creates a new version of the dataset by incrementing the specified version component
-        (major, minor, or patch). The new version is recorded with an optional description
-        and execution reference.
+        Internal helper preserved from the pre-dev-versioning model.
+        Walks the dataset graph (parents/children) and inserts a new
+        released ``Dataset_Version`` row for each, with the supplied
+        component bumped and a stamped catalog snapshot. Bypasses the
+        dev-versioning model entirely — there's no precondition that
+        the dataset be in a dev period.
+
+        Used internally by the catalog-clone path, where dataset
+        versions need to be reinitialised after a catalog snapshot is
+        copied. Not for user-facing release work; use :meth:`release`
+        for that.
 
         Args:
-            component: Which version component to increment ('major', 'minor', or 'patch').
-            description: Optional description of the changes in this version.
-            execution_rid: Optional execution RID to associate with this version.
+            component: Which release-segment part to bump.
+            description: Optional description for the new version row.
+            execution_rid: Optional RID of the calling execution.
 
         Returns:
-            DatasetVersion: The new version number.
+            The new ``DatasetVersion`` for this dataset (related
+            datasets are also bumped but their versions are not in the
+            return).
 
         Raises:
-            DerivaMLException: If dataset_rid is invalid or version increment fails.
-
-        Example:
-            >>> new_version = ml.increment_dataset_version(  # doctest: +SKIP
-            ...     dataset_rid="1-abc123",
-            ...     component="minor",
-            ...     description="Added new samples"
-            ... )
-            >>> print(f"New version: {new_version}")  # e.g., "1.2.0"  # doctest: +SKIP
+            DerivaMLException: If the catalog write fails.
         """
 
         # Find all the datasets that are reachable from this dataset and determine their new version numbers.
@@ -936,6 +938,131 @@ class Dataset:
             self._ml_instance, version_update_list, description=description, execution_rid=execution_rid
         )
         return next((d.version for d in version_update_list if d.rid == self.dataset_rid))
+
+    def release(
+        self,
+        bump: VersionPart,
+        description: str,
+        execution: "Execution | None" = None,
+    ) -> DatasetVersion:
+        """Promote this dataset's dev period to a released version.
+
+        Per ADR-0003, ``release`` is the only operation that produces
+        a released ``Dataset_Version`` row. It promotes the existing
+        dev row in place: rewrites ``Version`` to the released label,
+        stamps ``Snapshot`` with the catalog snapshot at release time,
+        replaces ``Description`` with release notes, and overwrites
+        the row's ``Execution`` link with the supplied execution (or
+        ``NULL`` if none).
+
+        Concurrency: the promotion uses a conditional update on the
+        dev row's observed ``RMT``. If a competing writer landed
+        between this method's read and write — another mutation, or
+        another concurrent ``release`` — the call raises
+        :class:`DerivaMLException` with a clear retry message rather
+        than silently overwriting the other writer's work.
+
+        Args:
+            bump: Which release-segment part to advance from the
+                last released version. ``VersionPart.minor`` is the
+                common case; ``VersionPart.major`` for
+                schema-breaking changes; ``VersionPart.patch`` for
+                small clean-ups.
+            description: Release notes. **Replaces** the dev row's
+                accumulated description, not appended.
+            execution: Optional ``Execution`` that called release.
+                Stored on the released row's ``Execution`` link.
+                Mutator authorship during the dev period is not
+                captured here — it's recoverable from the catalog's
+                audit trail (``RMT`` on changed rows + per-row
+                provenance).
+
+        Returns:
+            The new released ``DatasetVersion``.
+
+        Raises:
+            DerivaMLException: If this dataset has no dev row to
+                promote, or if a concurrent writer modified the dev
+                row between this call's read and write.
+
+        Example:
+            >>> dataset.add_dataset_members(["1-abc", "1-def"])  # doctest: +SKIP
+            >>> dataset.add_dataset_members(["1-ghi"])  # doctest: +SKIP
+            >>> # Now at e.g. 0.4.0.post1.dev2; cut a real release:
+            >>> v = dataset.release(  # doctest: +SKIP
+            ...     bump=VersionPart.minor,
+            ...     description="Added 3 new samples for v0.5.0",
+            ... )
+            >>> print(v)  # doctest: +SKIP
+            0.5.0
+        """
+        history = self.dataset_history()
+        dev_entries = [h for h in history if h.dataset_version.is_devrelease]
+        if not dev_entries:
+            raise DerivaMLException(
+                f"Dataset {self.dataset_rid} has no dev period to release "
+                f"(current_version={self.current_version}). To release a "
+                "no-op change, call mark_dev() first to declare a dev "
+                "period, then release() to promote it."
+            )
+        if len(dev_entries) > 1:
+            raise DerivaMLException(
+                f"Dataset {self.dataset_rid} has {len(dev_entries)} dev rows; expected at most one."
+            )
+        dev_row = dev_entries[0]
+
+        # Find the last released version to anchor the next-release bump.
+        released_entries = [h for h in history if not h.dataset_version.is_devrelease]
+        if not released_entries:
+            # Defensive: every dataset has at least one released row at
+            # creation time. If this fires, the catalog is in an
+            # inconsistent state.
+            raise DerivaMLException(
+                f"Dataset {self.dataset_rid} is in a dev period but has "
+                "no released version to anchor the next release against."
+            )
+        last_released = max(h.dataset_version for h in released_entries)
+        next_label = str(last_released.next_release(bump))
+
+        # Re-fetch the dev row to get its current RMT for the conditional update.
+        schema_path = self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema]
+        version_table = schema_path.tables["Dataset_Version"]
+        current_rows = list(version_table.filter(version_table.RID == dev_row.version_rid).entities().fetch())
+        if not current_rows:
+            raise DerivaMLException(
+                f"Dev version row {dev_row.version_rid} disappeared between read and update — concurrent deletion?"
+            )
+        observed_rmt = current_rows[0]["RMT"]
+
+        # Stamp the catalog snapshot at release time.
+        snapshot = self._ml_instance.catalog.get("/").json()["snaptime"]
+
+        execution_rid = execution.execution_rid if execution is not None else None
+        updated = list(
+            version_table.update(
+                [
+                    {
+                        "RID": dev_row.version_rid,
+                        "RMT": observed_rmt,
+                        "Version": next_label,
+                        "Snapshot": snapshot,
+                        "Description": description,
+                        "Execution": execution_rid,
+                    }
+                ],
+                correlation={"RID", "RMT"},
+            )
+        )
+        if not updated:
+            raise DerivaMLException(
+                f"Concurrent modification of dev row {dev_row.version_rid} "
+                f"for dataset {self.dataset_rid}: another writer advanced "
+                "the row between this call's read and write. Re-read the "
+                "dataset and retry if the new state is still what you "
+                "intended."
+            )
+
+        return DatasetVersion.parse(next_label)
 
     def _create_or_advance_dev_row(
         self,
@@ -1097,10 +1224,11 @@ class Dataset:
                 row between this call's read and write.
 
         Example:
-            >>> # A separate execution recorded labels for some images  # doctest: +SKIP
+            >>> # A separate execution recorded labels for some images
             >>> # that are members of this dataset. Flag the drift:
-            >>> dataset.mark_dev("Picked up classifier output for the test split")
-            >>> str(dataset.current_version)  # e.g. "0.4.0.post1.dev1"
+            >>> dataset.mark_dev("Picked up classifier output for the test split")  # doctest: +SKIP
+            >>> str(dataset.current_version)  # doctest: +SKIP
+            '0.4.0.post1.dev1'
         """
         execution_rid = execution.execution_rid if execution is not None else None
         self._create_or_advance_dev_row(

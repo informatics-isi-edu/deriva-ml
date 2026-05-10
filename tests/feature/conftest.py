@@ -3,6 +3,7 @@
 Provides fixtures that combine an online DerivaML instance with a downloaded
 + materialized bag so that online/offline symmetry can be tested.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -174,9 +175,7 @@ def feature_symmetry_fixture(catalog_manager, tmp_path_factory):
     target_table = "Image"
 
     # All Image RIDs (feature values exist for all of them from demo catalog seeding)
-    all_image_rids = [
-        r["RID"] for r in ml._domain_path().tables[target_table].entities().fetch()
-    ]
+    all_image_rids = [r["RID"] for r in ml._domain_path().tables[target_table].entities().fetch()]
     assert all_image_rids, "Demo catalog must have Image rows"
 
     # Find a workflow that has executions for the Quality feature.
@@ -218,25 +217,22 @@ def feature_symmetry_fixture(catalog_manager, tmp_path_factory):
         )
         symmetry_dataset.add_dataset_members(members={target_table: all_image_rids})
 
-    symmetry_dataset.increment_dataset_version(
-        component=VersionPart.minor,
+    # add_dataset_members above lands on dev (PR 4); release the dev
+    # period to mint v1 as a stable reference for the test fixture.
+    symmetry_dataset.release(
+        bump=VersionPart.minor,
         description="v1 for symmetry test",
     )
 
     # Download and materialize a bag from the all-image dataset.
-    bag = symmetry_dataset.download_dataset_bag(
-        version=symmetry_dataset.current_version, use_minid=False
-    )
+    bag = symmetry_dataset.download_dataset_bag(version=symmetry_dataset.current_version, use_minid=False)
 
     # Compute expected records and workflow executions AFTER all catalog setup
     # (including the symmetry execution) so the baseline is complete.
     # The symmetry execution uses the same deduplicated workflow as the feature
     # creation execution, so expected_executions reflects the full catalog state.
     all_quality_records = sorted(
-        [
-            r.model_dump(exclude={"RCT", "RMT"})
-            for r in ml.feature_values(target_table, feature_name)
-        ],
+        [r.model_dump(exclude={"RCT", "RMT"}) for r in ml.feature_values(target_table, feature_name)],
         key=lambda d: d[target_table],
     )
     assert all_quality_records, "Must have at least one Quality feature record"
