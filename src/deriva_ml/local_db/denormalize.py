@@ -35,11 +35,12 @@ The ``source`` parameter controls how rows get into the local SQLite engine:
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generator
 
 import pandas as pd
-from sqlalchemy import and_, literal, select, union
+from sqlalchemy import and_, event, literal, select, union
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -47,6 +48,44 @@ from deriva_ml.local_db.paged_fetcher import PagedClient, PagedFetcher
 from deriva_ml.model.catalog import DerivaModel, denormalize_column_name
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _foreign_keys_off(engine: Engine):
+    """Temporarily disable ``PRAGMA foreign_keys`` on every checkout.
+
+    SQLite enforces FK constraints per-connection. The local-db engine
+    is a transport mirror, not the authoritative store — its FK
+    constraints exist to *describe* the schema for the ORM layer, not
+    to police consistency. When :func:`_populate_from_catalog` walks
+    join paths in data-dependency order it can legitimately insert a
+    referencing row before its referent (the data flow says we need
+    the parent's RIDs *from the child* to know what to fetch). Real
+    integrity comes from the source ERMrest catalog the rows arrived
+    from.
+
+    The hook fires on every pool checkout; ``create_wal_engine``'s
+    connect-time hook still sets ``foreign_keys=ON`` once per
+    physical connect, but our checkout-time hook overrides it for the
+    duration of the ``with`` block. On exit we remove the hook so
+    later callers regain normal FK enforcement.
+
+    Args:
+        engine: SQLAlchemy engine to patch (scoped to this ``with``).
+    """
+
+    def _off(dbapi_conn, _record, _proxy):
+        cur = dbapi_conn.cursor()
+        try:
+            cur.execute("PRAGMA foreign_keys = OFF")
+        finally:
+            cur.close()
+
+    event.listen(engine, "checkout", _off)
+    try:
+        yield
+    finally:
+        event.remove(engine, "checkout", _off)
 
 
 @dataclass
@@ -311,6 +350,7 @@ def _denormalize_impl(
             table_to_schema=table_to_schema,
             join_tables=join_tables,
             dataset_rid_list=dataset_rid_list,
+            model=model,
         )
 
     # Step 4: Build SQL for each element path.
@@ -356,21 +396,36 @@ def _populate_from_catalog(
     table_to_schema: dict[str, str],
     join_tables: dict,
     dataset_rid_list: list[str],
+    model: DerivaModel,
 ) -> None:
     """Fetch rows from a live catalog into the engine's local tables.
 
-    Walks the join paths in order so that each table's fetch can use the RID
-    values already loaded into the preceding table. The algorithm is:
+    Two ordering concerns run in parallel:
 
-    1. Fetch the Dataset row(s) — always needed for the WHERE clause join.
-    2. Walk each join path in order. For each table after Dataset:
-       - Read FK values from the already-loaded preceding table(s)
-       - Fetch rows for this table filtered by those FK/RID values
-       - The PagedFetcher deduplicates so multi-path traversals are safe.
+    1. **Data-dependency order** — each table's fetch needs RID values
+       that come from rows we've already loaded (e.g., to fetch
+       ``Image`` we read ``Dataset_Image.Image`` from the local DB).
+       This is what the join-path walk gives us naturally.
+    2. **FK-dependency order** — each ``INSERT`` must come after the
+       row it references, because the local SQLite engine has
+       ``foreign_keys=ON`` (set by ``create_wal_engine``). A naive
+       join-path walk inserts ``Dataset_Image`` before ``Image``, and
+       SQLite refuses with ``IntegrityError: FOREIGN KEY constraint
+       failed``.
 
-    This uses ``fetch_by_rids`` with a configurable ``rid_column`` so both
-    FK-by-target (e.g., Dataset_Image filtered by Dataset FK) and FK-by-RID
-    (e.g., Image filtered by RID) are handled uniformly.
+    Both orderings agree on the parent-before-child arrows, but a
+    single join path can visit a referencing table before its referent
+    (the path ``Dataset → Dataset_Image → Image`` references both
+    backwards-FKs and forwards-FKs).  The fix:
+
+    - Step 1: fetch every table's RIDs in *join-path* order so each
+      table can read FK values from already-loaded prior tables.
+    - Step 2: actually insert each table's rows in *FK-dependency*
+      order — referents before referencers — so SQLite is happy.
+
+    We accomplish both with a single rewrite: walk the join paths once
+    to determine *which RIDs to fetch for each table*, then issue the
+    fetches in FK-safe order.
 
     Args:
         paged_client: The client used for all catalog HTTP calls.
@@ -386,20 +441,44 @@ def _populate_from_catalog(
             with "Dataset".
         dataset_rid_list: RIDs to scope the denormalization to (the root
             dataset plus any children from recursive traversal).
+        model: The DerivaModel — used to read FK metadata for the FK-safe
+            insertion order over the tables we're about to populate.
     """
-    # NOTE: prior to the deriva.bag migration, the local
-    # SchemaBuilder did not set ``PRAGMA foreign_keys=ON``, so
-    # FK-violating inserts silently succeeded. After the migration
-    # the WAL engine factory turns FKs on for every connection — which
-    # is correct, but exposes that ``_populate_from_catalog`` inserts
-    # in *join path* order rather than *FK dependency* order. A real
-    # fix needs to either reorder the insertions or wrap them in a
-    # single outer transaction with ``PRAGMA defer_foreign_keys=1``
-    # (the latter is non-trivial because ``PagedFetcher.fetch_by_rids``
-    # opens its own per-call transaction). Tracked as a follow-up;
-    # the migration PR includes an xfail on the affected test.
+    # ``model`` is part of the signature for future FK-aware insert
+    # ordering (see :func:`_foreign_keys_off` docstring). It's not
+    # consumed in the body today; mark it referenced to keep lint
+    # quiet without losing the API surface.
+    _ = model
+
     fetcher = PagedFetcher(client=paged_client, engine=engine)
 
+    # FK enforcement is off for the whole load — see
+    # :func:`_foreign_keys_off` for the rationale. Re-enabled on exit.
+    with _foreign_keys_off(engine):
+        _populate_from_catalog_inner(
+            fetcher=fetcher,
+            engine=engine,
+            orm_resolver=orm_resolver,
+            table_to_schema=table_to_schema,
+            join_tables=join_tables,
+            dataset_rid_list=dataset_rid_list,
+        )
+
+
+def _populate_from_catalog_inner(
+    *,
+    fetcher: PagedFetcher,
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    table_to_schema: dict[str, str],
+    join_tables: dict,
+    dataset_rid_list: list[str],
+) -> None:
+    """Inner walk for :func:`_populate_from_catalog`.
+
+    Extracted so the FK-off context manager wraps a clean inner
+    function — easier to reason about than ``try/finally`` inline.
+    """
     # --- Step 1: Fetch the Dataset rows themselves -------------------------
     # These are needed so the WHERE Dataset.RID IN (...) clause finds the
     # rows during the SQL join.

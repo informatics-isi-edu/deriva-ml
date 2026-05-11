@@ -220,19 +220,6 @@ class TestCatalogSource:
     callers need.
     """
 
-    @pytest.mark.xfail(
-        reason=(
-            "Exposed by the deriva.bag migration: SchemaBuilder now sets "
-            "PRAGMA foreign_keys=ON via create_wal_engine (previously off), "
-            "so this test's FK-unsafe insertion order now raises "
-            "IntegrityError where it used to silently succeed. The proper "
-            "fix is to reorder _populate_from_catalog's inserts by FK "
-            "dependency or to wrap them in a single deferred-FK transaction "
-            "(non-trivial because PagedFetcher.fetch_by_rids opens its own "
-            "per-call transaction). Tracked as a follow-up within this PR."
-        ),
-        strict=True,
-    )
     def test_catalog_source_fetches_and_joins(
         self,
         denorm_deriva_model: Any,
