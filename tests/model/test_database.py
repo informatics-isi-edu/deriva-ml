@@ -4,7 +4,7 @@ from deriva.core.datapath import Any
 
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution import ExecutionConfiguration
-from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
 
 try:
@@ -36,7 +36,7 @@ class TestDataBaseModel:
         reference_datasets = self.list_datasets(dataset.dataset_description)
         snapshot_catalog = dataset.dataset_description.dataset._version_snapshot_catalog(dataset_spec.version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
-        db_catalog = DerivaMLDatabase(bag.model)
+        db_catalog = DerivaMLBagView(bag.model)
 
         pb = snapshot_catalog.pathBuilder()
         ds = pb.schemas[snapshot_catalog.ml_schema].tables["Dataset"]
@@ -129,8 +129,8 @@ class TestDataBaseModel:
         new_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=new_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
         new_bag = ml_instance.download_dataset_bag(new_spec)
-        current_db_catalog = DerivaMLDatabase(current_bag.model)
-        new_db_catalog = DerivaMLDatabase(new_bag.model)
+        current_db_catalog = DerivaMLBagView(current_bag.model)
+        new_db_catalog = DerivaMLBagView(new_bag.model)
         subjects_current = list(current_db_catalog.get_table_as_dict("Subject"))
         subjects_new = list(new_db_catalog.get_table_as_dict("Subject"))
 
@@ -205,7 +205,7 @@ class TestDataBaseModel:
         version = str(dataset.current_version)
         bag_spec = DatasetSpec(rid=dataset.dataset_rid, version=version)
         bag = ml_instance.download_dataset_bag(bag_spec)
-        db = DerivaMLDatabase(bag.model)
+        db = DerivaMLBagView(bag.model)
 
         # Verify subjects in bag
         bag_subjects = list(db.get_table_as_dict("Subject"))

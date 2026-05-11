@@ -1,0 +1,240 @@
+"""Bag-pipeline clone path (catalog → bag → catalog).
+
+:func:`clone_via_bag` is the bag-oriented replacement for the
+bespoke :func:`~deriva_ml.catalog.clone.create_ml_workspace` flow.
+Per ADR-0006, catalog cloning becomes a two-step pipeline:
+
+1. :class:`~deriva.bag.catalog_builder.CatalogBagBuilder` walks
+   the source catalog and writes a deriva-bag profile bag.
+2. :class:`~deriva.bag.catalog_loader.BagCatalogLoader` walks the
+   bag's SQLAlchemy mirror and inserts rows into the destination
+   catalog in FK-safe order, with assets handled per the
+   :class:`~deriva.bag.traversal.AssetMode` policy.
+
+The bag in the middle is a real on-disk artifact: debuggable,
+inspectable, citable via MINID, and re-loadable if the destination
+push fails mid-way.
+
+This function is the **new** clone path. The legacy
+:func:`create_ml_workspace` stays in place during the transition
+because it carries production-tested behavior the new path
+doesn't yet replicate (oversized-value truncation, async per-table
+concurrency, index rebuild on size-limit failure). Use
+``clone_via_bag`` for new code and for catalogs where the legacy
+path's features aren't needed; use ``create_ml_workspace`` when
+the legacy parameters matter.
+
+Feature parity tracking:
+
+==========================  =================  ====================
+Legacy parameter            Bag-path mapping   Notes
+==========================  =================  ====================
+``root_rid``                ``RIDAnchor``      Mapped: builds an
+                                               anchor list with
+                                               the root RID.
+``include_tables``          ``policy.schemas`` Mapped via schema
+                                               allow-list when
+                                               specified.
+``exclude_objects``         ``exclude_tables`` Mapped.
+``exclude_schemas``         ``exclude_schemas``Mapped.
+``asset_mode``              ``AssetMode``      Mapped: REFERENCES
+                                               → ROWS_ONLY,
+                                               FULL → UPLOAD_IF_MISSING.
+``orphan_strategy``         ``dangling_fk_strategy`` Mapped 1:1.
+``prune_hidden_fkeys``      n/a                Legacy-only.
+``truncate_oversized``      n/a                Legacy-only.
+``table_concurrency``       n/a                Engine-internal.
+``copy_annotations``        n/a                Bag profile carries
+                                               them implicitly via
+                                               schema.json.
+==========================  =================  ====================
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from deriva.bag.anchors import Anchor, RIDAnchor, TableAnchor
+from deriva.bag.catalog_builder import CatalogBagBuilder
+from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
+from deriva.bag.traversal import (
+    AssetMode,
+    DanglingFKStrategy,
+    FKTraversalPolicy,
+)
+from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CloneViaBagResult:
+    """Outcome of a :func:`clone_via_bag` invocation.
+
+    Attributes:
+        source_catalog_id: ID of the source catalog the bag was
+            built from.
+        dest_catalog_id: ID of the destination catalog the bag was
+            loaded into.
+        bag_path: Path to the bag directory that bridged the two.
+            Left on disk after the clone so the artifact is
+            inspectable / re-usable.
+        load_report: Per-table load statistics from
+            :class:`BagCatalogLoader`.
+    """
+
+    source_catalog_id: str
+    dest_catalog_id: str
+    bag_path: Path
+    load_report: LoadReport
+
+
+def clone_via_bag(
+    *,
+    source_hostname: str,
+    source_catalog_id: str,
+    dest_hostname: str,
+    dest_catalog_id: str,
+    anchors: list[Anchor] | None = None,
+    root_rid: str | None = None,
+    output_dir: Path | None = None,
+    policy: FKTraversalPolicy | None = None,
+    source_credential: dict | None = None,
+    dest_credential: dict | None = None,
+) -> CloneViaBagResult:
+    """Clone catalog content from source → bag → destination.
+
+    Two-step pipeline:
+
+    1. :class:`CatalogBagBuilder` writes a bag from the source.
+    2. :class:`BagCatalogLoader` loads the bag into the destination.
+
+    Args:
+        source_hostname: Hostname of the source ERMrest server.
+        source_catalog_id: ID of the catalog to read from.
+        dest_hostname: Hostname of the destination ERMrest server.
+        dest_catalog_id: ID of the catalog to write to. Must
+            already exist with a compatible schema.
+        anchors: Starting points for the catalog walk. When
+            ``None``, ``root_rid`` is converted into a single
+            :class:`RIDAnchor` on the ``Dataset`` table for
+            convenience with the legacy use case. At least one of
+            ``anchors`` / ``root_rid`` must be provided.
+        root_rid: Convenience parameter — equivalent to passing
+            ``anchors=[RIDAnchor(table="Dataset", rids=[root_rid])]``.
+        output_dir: Directory the intermediate bag lives in. When
+            ``None``, defaults to ``./clone-{source_catalog_id}-to-{dest_catalog_id}/``
+            under the current working directory.
+        policy: :class:`FKTraversalPolicy` controlling the walk
+            and load. Defaults are sensible for the common case;
+            override ``asset_mode`` / ``dangling_fk_strategy`` /
+            ``exclude_tables`` for production scenarios.
+        source_credential: Optional credential dict for the source
+            catalog. When ``None``, looked up via
+            :func:`deriva.core.get_credential`.
+        dest_credential: Same as ``source_credential`` but for the
+            destination.
+
+    Returns:
+        :class:`CloneViaBagResult` carrying the resulting bag path
+        and the loader's per-table stats.
+
+    Raises:
+        ValueError: If neither ``anchors`` nor ``root_rid`` is
+            provided.
+
+    Example:
+        Clone a slice rooted at a Dataset RID, using the default
+        policy (UPLOAD_IF_MISSING for assets, FAIL on orphans)::
+
+            >>> from deriva_ml.catalog.clone_via_bag import clone_via_bag
+            >>> result = clone_via_bag(  # doctest: +SKIP
+            ...     source_hostname="src.example.org",
+            ...     source_catalog_id="1",
+            ...     dest_hostname="dst.example.org",
+            ...     dest_catalog_id="42",
+            ...     root_rid="1-ABCD",
+            ... )
+            >>> result.load_report.total_rows_inserted  # doctest: +SKIP
+            12345
+    """
+    if anchors is None and root_rid is None:
+        raise ValueError(
+            "clone_via_bag requires either ``anchors`` or ``root_rid``"
+        )
+
+    if anchors is None:
+        # Convenience path: caller provided a single Dataset RID.
+        # The bag walker resolves the schema for the table name
+        # via the source catalog's model.
+        assert root_rid is not None  # narrowed by the check above
+        anchors = [RIDAnchor(table="Dataset", rids=[root_rid])]
+
+    policy = policy or FKTraversalPolicy()
+
+    if output_dir is None:
+        output_dir = (
+            Path.cwd()
+            / f"clone-{source_catalog_id}-to-{dest_catalog_id}"
+        )
+    output_dir = Path(output_dir)
+
+    # Connect to the source catalog.
+    source_creds = source_credential or get_credential(source_hostname)
+    source_server = DerivaServer(
+        "https", source_hostname, credentials=source_creds
+    )
+    source_catalog = source_server.connect_ermrest(source_catalog_id)
+
+    # Build the bag. CatalogBagBuilder drives deriva-py's export
+    # engine, which already handles paged ERMrest queries, MD5
+    # manifest generation, and BDBag finalization.
+    builder = CatalogBagBuilder(
+        catalog=source_catalog,
+        anchors=anchors,
+        output_dir=output_dir,
+        policy=policy,
+        producer="deriva_ml.catalog.clone_via_bag",
+    )
+    logger.info(
+        "clone_via_bag: building bag at %s from source %s/%s",
+        output_dir,
+        source_hostname,
+        source_catalog_id,
+    )
+    bag_path = builder.build()
+
+    # Connect to the destination catalog.
+    dest_creds = dest_credential or get_credential(dest_hostname)
+    dest_server = DerivaServer(
+        "https", dest_hostname, credentials=dest_creds
+    )
+    dest_catalog = dest_server.connect_ermrest(dest_catalog_id)
+
+    # Load the bag into the destination. BagCatalogLoader walks
+    # the bag's SQLAlchemy mirror in FK-safe order and applies
+    # the policy's dangling_fk_strategy + asset_mode.
+    logger.info(
+        "clone_via_bag: loading bag into dest %s/%s",
+        dest_hostname,
+        dest_catalog_id,
+    )
+    with BagCatalogLoader(
+        catalog=dest_catalog,
+        bag=bag_path,
+        policy=policy,
+    ) as loader:
+        report = loader.run()
+
+    return CloneViaBagResult(
+        source_catalog_id=source_catalog_id,
+        dest_catalog_id=dest_catalog_id,
+        bag_path=bag_path,
+        load_report=report,
+    )
+
+
+__all__ = ["CloneViaBagResult", "clone_via_bag"]

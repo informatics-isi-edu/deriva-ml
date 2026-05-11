@@ -2442,10 +2442,10 @@ class Dataset:
             if materialize
             else self._download_dataset_minid(minid, use_minid)
         )
-        from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+        from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
         db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
-        return DerivaMLDatabase(db_model).lookup_dataset(self.dataset_rid)
+        return DerivaMLBagView(db_model).lookup_dataset(self.dataset_rid)
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def estimate_bag_size(

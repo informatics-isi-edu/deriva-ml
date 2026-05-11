@@ -387,6 +387,17 @@ def _populate_from_catalog(
         dataset_rid_list: RIDs to scope the denormalization to (the root
             dataset plus any children from recursive traversal).
     """
+    # NOTE: prior to the deriva.bag migration, the local
+    # SchemaBuilder did not set ``PRAGMA foreign_keys=ON``, so
+    # FK-violating inserts silently succeeded. After the migration
+    # the WAL engine factory turns FKs on for every connection — which
+    # is correct, but exposes that ``_populate_from_catalog`` inserts
+    # in *join path* order rather than *FK dependency* order. A real
+    # fix needs to either reorder the insertions or wrap them in a
+    # single outer transaction with ``PRAGMA defer_foreign_keys=1``
+    # (the latter is non-trivial because ``PagedFetcher.fetch_by_rids``
+    # opens its own per-call transaction). Tracked as a follow-up;
+    # the migration PR includes an xfail on the affected test.
     fetcher = PagedFetcher(client=paged_client, engine=engine)
 
     # --- Step 1: Fetch the Dataset rows themselves -------------------------
