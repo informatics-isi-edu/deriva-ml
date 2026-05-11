@@ -1945,6 +1945,17 @@ def create_ml_workspace(
 ) -> CloneCatalogResult:
     """Create an ML workspace by cloning data reachable from a root RID.
 
+    .. note::
+
+       This is the **legacy** clone path. For new clone work prefer
+       :func:`~deriva_ml.catalog.clone_via_bag.clone_via_bag`, which
+       follows the ADR-0006 pipeline (catalog → bag → catalog) and
+       leaves a durable bag artifact between the two catalogs.
+       ``create_ml_workspace`` stays in place because it carries
+       production-tested behavior the bag path doesn't yet
+       replicate (oversized-value truncation, async per-table
+       concurrency, index rebuild on size-limit failure).
+
     This is the primary function for creating partial catalog clones. It uses the
     root table's export annotation (if available) to determine which tables and
     paths to follow, then fills in any uncovered tables (vocabularies, associations).
