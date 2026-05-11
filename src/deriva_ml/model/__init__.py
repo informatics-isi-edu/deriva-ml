@@ -11,8 +11,9 @@ Key components:
 - DataSource: Protocol for data sources (BagDataSource, CatalogDataSource)
 - ForeignKeyOrderer: Compute FK-safe insertion order
 
-Lazy imports are used for DatabaseModel and DerivaMLDatabase to avoid
-circular imports with the dataset module.
+Lazy imports are used for DatabaseModel and DerivaMLBagView (formerly
+DerivaMLDatabase) to avoid circular imports with the dataset module.
+The legacy ``DerivaMLDatabase`` name is preserved as an alias.
 """
 
 # Annotation builders - import the most common ones for convenience
@@ -62,7 +63,8 @@ __all__ = [
     # Core classes
     "DerivaModel",
     "DatabaseModel",
-    "DerivaMLDatabase",
+    "DerivaMLBagView",
+    "DerivaMLDatabase",  # legacy alias for DerivaMLBagView
     "TableHandle",
     "ColumnHandle",
     # Two-phase ORM creation
@@ -108,13 +110,17 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Lazy import for DatabaseModel and DerivaMLDatabase."""
+    """Lazy import for DatabaseModel and DerivaMLBagView.
+
+    ``DerivaMLDatabase`` is the legacy name for ``DerivaMLBagView``
+    and resolves to the same class.
+    """
     if name == "DatabaseModel":
         from deriva_ml.model.database import DatabaseModel
 
         return DatabaseModel
-    if name == "DerivaMLDatabase":
-        from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+    if name in ("DerivaMLBagView", "DerivaMLDatabase"):
+        from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
-        return DerivaMLDatabase
+        return DerivaMLBagView
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -23,7 +23,7 @@ from deriva_ml.catalog import create_ml_workspace, CloneCatalogResult, AssetCopy
 from deriva_ml.dataset.aux_classes import DatasetSpec, VersionPart
 from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.execution import ExecutionConfiguration
-from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 from tests.catalog_manager import CatalogManager
 
 

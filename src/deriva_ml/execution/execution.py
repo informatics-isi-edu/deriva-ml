@@ -85,7 +85,7 @@ from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
-from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
@@ -848,18 +848,18 @@ class Execution:
         return asset_root(self._working_dir, self.execution_rid)
 
     @property
-    def database_catalog(self) -> DerivaMLDatabase | None:
+    def database_catalog(self) -> DerivaMLBagView | None:
         """Get a catalog-like interface for downloaded datasets.
 
-        Returns a DerivaMLDatabase that implements the DerivaMLCatalog
+        Returns a DerivaMLBagView that implements the DerivaMLCatalog
         protocol, allowing the same code to work with both live catalogs
         and downloaded bags.
 
         This is useful for writing code that can operate on either a live
-        catalog (via DerivaML) or on downloaded bags (via DerivaMLDatabase).
+        catalog (via DerivaML) or on downloaded bags (via DerivaMLBagView).
 
         Returns:
-            DerivaMLDatabase wrapping the primary downloaded dataset's model,
+            DerivaMLBagView wrapping the primary downloaded dataset's model,
             or None if no datasets have been downloaded.
 
         Example:
@@ -876,7 +876,7 @@ class Execution:
         if not self._datasets_list:
             return None
         # Use the first dataset's model as the primary
-        return DerivaMLDatabase(self._datasets_list[0].model)
+        return DerivaMLBagView(self._datasets_list[0].model)
 
     @property
     def catalog(self) -> "DerivaML":

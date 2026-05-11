@@ -11,7 +11,7 @@ from deriva_ml import DerivaML, MLVocab, TableDefinition
 from deriva_ml.dataset.aux_classes import DatasetSpec, VersionPart
 from deriva_ml.dataset.dataset import Dataset, DatasetBag
 from deriva_ml.demo_catalog import DatasetDescription
-from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 from tests.test_utils import MLDatasetCatalog
 
 
@@ -41,7 +41,7 @@ class TestDatasetDownload:
 
         # Now look at each dataset to see if they line up.
         ic("checking elements")
-        db_catalog = DerivaMLDatabase(bag.model)
+        db_catalog = DerivaMLBagView(bag.model)
         # Sort reference_datasets by RID to ensure deterministic iteration order
         for ds in sorted(reference_datasets, key=lambda d: d.dataset_rid):
             dataset_bag = db_catalog.lookup_dataset(ds.dataset_rid)  # Get nested bag from the dataset.
@@ -83,8 +83,8 @@ class TestDatasetDownload:
         bag = dataset.download_dataset_bag(current_version, use_minid=False)
         reference_datasets = {ds.dataset.dataset_rid for ds in dataset_test.list_datasets(dataset_description)}
 
-        # Use DerivaMLDatabase for catalog-level operations
-        db_catalog = DerivaMLDatabase(bag.model)
+        # Use DerivaMLBagView for catalog-level operations
+        db_catalog = DerivaMLBagView(bag.model)
         bag_datasets = {ds.dataset_rid for ds in db_catalog.find_datasets()}
         assert reference_datasets == bag_datasets
 
@@ -134,7 +134,7 @@ class TestDatasetDownload:
         current_version = dataset_description.dataset.current_version
         dataset_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         bag = ml_instance.download_dataset_bag(dataset_spec)
-        db_catalog = DerivaMLDatabase(bag.model)
+        db_catalog = DerivaMLBagView(bag.model)
 
         for dataset in reference_datasets:
             reference_members = dataset_test.collect_rids(dataset)
@@ -231,8 +231,8 @@ class TestDatasetDownload:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        # Use DerivaMLDatabase to access datasets in the bag
-        db_catalog = DerivaMLDatabase(bag.model)
+        # Use DerivaMLBagView to access datasets in the bag
+        db_catalog = DerivaMLBagView(bag.model)
 
         # Check that dataset types match for all datasets in the hierarchy
         datasets_checked = 0

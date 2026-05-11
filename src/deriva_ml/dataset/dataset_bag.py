@@ -18,7 +18,7 @@ Key concepts:
 - A bag may contain multiple datasets (nested/hierarchical)
 - All operations are read-only (bags are immutable snapshots)
 - Queries use SQLite via SQLAlchemy ORM
-- Table-level access (get_table_as_dict, lookup_term) is on the catalog (DerivaMLDatabase)
+- Table-level access (get_table_as_dict, lookup_term) is on the catalog (DerivaMLBagView)
 
 Typical usage:
     >>> # Download a dataset from a catalog
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     import torch.utils.data
 
     from deriva_ml.dataset.target_resolution import FeatureSelector
-    from deriva_ml.model.deriva_ml_database import DerivaMLDatabase
+    from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
 try:
     from icecream import ic
@@ -141,7 +141,7 @@ class DatasetBag:
     list_dataset_children() to navigate to nested datasets.
 
     For catalog-level operations like querying arbitrary tables or looking up
-    vocabulary terms, use the DerivaMLDatabase class instead.
+    vocabulary terms, use the DerivaMLBagView class instead.
 
     The class implements the DatasetLike protocol, providing the same read interface
     as the Dataset class. This allows code to work with both live catalogs and
@@ -170,7 +170,7 @@ class DatasetBag:
 
     def __init__(
         self,
-        catalog: "DerivaMLDatabase",
+        catalog: "DerivaMLBagView",
         dataset_rid: RID | None = None,
         dataset_types: str | list[str] | None = None,
         description: str = "",
@@ -182,7 +182,7 @@ class DatasetBag:
         take a catalog-like object as their first argument for consistency.
 
         Args:
-            catalog: The DerivaMLDatabase instance providing access to the bag's data.
+            catalog: The DerivaMLBagView instance providing access to the bag's data.
                 This implements the DerivaMLCatalog protocol.
             dataset_rid: The RID of the dataset to wrap. If None, uses the primary
                 dataset RID from the bag.
@@ -818,7 +818,7 @@ class DatasetBag:
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the ERMrest Table objects that can be members of a dataset.
 
-        Delegates to the underlying ``DerivaMLDatabase`` to return all tables
+        Delegates to the underlying ``DerivaMLBagView`` to return all tables
         that are linked to the Dataset table via association tables in the bag.
 
         Returns:

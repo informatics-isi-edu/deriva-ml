@@ -54,7 +54,7 @@ Implementation Notes
 - DatasetBag: Downloaded bag access via SQLAlchemy/SQLite (read-only only)
 - Asset: Live catalog access for file-based records (implements WritableAsset)
 - DerivaML: Full catalog operations (implements DerivaMLCatalog)
-- DerivaMLDatabase: Bag-backed catalog (implements DerivaMLCatalogReader only)
+- DerivaMLBagView: Bag-backed catalog (implements DerivaMLCatalogReader only)
 """
 
 from __future__ import annotations
@@ -688,7 +688,7 @@ class DerivaMLCatalogReader(Protocol):
     """Protocol for read-only catalog operations.
 
     This protocol defines the minimal interface for reading from a catalog,
-    implemented by both DerivaML (live catalog) and DerivaMLDatabase (downloaded bags).
+    implemented by both DerivaML (live catalog) and DerivaMLBagView (downloaded bags).
 
     Use this protocol when code only needs to read data and should work with
     both live catalogs and downloaded bags.
