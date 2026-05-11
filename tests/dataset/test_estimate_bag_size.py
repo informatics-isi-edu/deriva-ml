@@ -120,7 +120,7 @@ def _run_estimate(
     """Run estimate_bag_size with mocked internals.
 
     Args:
-        aggregate_queries: Return value for CatalogGraph._aggregate_queries.
+        aggregate_queries: Return value for DatasetBagBuilder.aggregate_queries.
             Maps table name to list of (mock_datapath, target_table, is_asset) tuples.
         catalog_responses: Mapping from query path substring to response JSON.
             For csv queries, responses should be RID arrays: [{"RID": "X"}, ...].
@@ -143,13 +143,13 @@ def _run_estimate(
     mock_catalog = _make_mock_async_catalog(catalog_responses)
 
     with (
-        patch("deriva_ml.dataset.dataset.CatalogGraph") as mock_graph_cls,
+        patch("deriva_ml.dataset.dataset.DatasetBagBuilder") as mock_builder_cls,
         patch("deriva.core.get_credential", return_value={}),
         patch("deriva_ml.dataset.dataset.AsyncErmrestSnapshot", return_value=mock_catalog),
     ):
-        mock_graph = MagicMock()
-        mock_graph._aggregate_queries.return_value = aggregate_queries
-        mock_graph_cls.return_value = mock_graph
+        mock_builder = MagicMock()
+        mock_builder.aggregate_queries.return_value = aggregate_queries
+        mock_builder_cls.return_value = mock_builder
 
         return Dataset.estimate_bag_size(dataset, "1.0.0")
 
@@ -187,13 +187,13 @@ def _run_estimate_counting(
     mock_catalog.close = AsyncMock()
 
     with (
-        patch("deriva_ml.dataset.dataset.CatalogGraph") as mock_graph_cls,
+        patch("deriva_ml.dataset.dataset.DatasetBagBuilder") as mock_builder_cls,
         patch("deriva.core.get_credential", return_value={}),
         patch("deriva_ml.dataset.dataset.AsyncErmrestSnapshot", return_value=mock_catalog),
     ):
-        mock_graph = MagicMock()
-        mock_graph._aggregate_queries.return_value = aggregate_queries
-        mock_graph_cls.return_value = mock_graph
+        mock_builder = MagicMock()
+        mock_builder.aggregate_queries.return_value = aggregate_queries
+        mock_builder_cls.return_value = mock_builder
 
         Dataset.estimate_bag_size(dataset, "1.0.0")
 
