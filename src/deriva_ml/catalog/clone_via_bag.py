@@ -53,21 +53,89 @@ Legacy parameter            Bag-path mapping   Notes
 from __future__ import annotations
 
 import logging
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from deriva.bag.anchors import Anchor, RIDAnchor, TableAnchor
+from deriva.bag.anchors import Anchor, RIDAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
 from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
 from deriva.bag.traversal import (
     AssetMode,
-    DanglingFKStrategy,
     FKTraversalPolicy,
 )
-from deriva.core import DerivaServer, ErmrestCatalog, get_credential
+from deriva.core import DerivaServer, get_credential
 
 logger = logging.getLogger(__name__)
+
+
+def _materialize_bag_dir(bag_path: Path) -> Path:
+    """Return an on-disk unpacked bag directory, extracting a zip if needed.
+
+    Upstream ``CatalogBagBuilder._run_export`` hard-codes
+    ``bag_archiver=zip`` and removes the unpacked directory after
+    archiving, but returns the unpacked path as if it still existed.
+    Recover the bag by extracting ``{bag_path}.zip`` into
+    ``bag_path.parent`` when the directory is missing.
+
+    Args:
+        bag_path: Path the builder claimed it produced.
+
+    Returns:
+        Path to an extracted bag directory. ``bag_path`` itself when
+        the builder already left it on disk; otherwise the directory
+        produced by unzipping ``{bag_path}.zip``.
+
+    Raises:
+        FileNotFoundError: When neither the directory nor the zip is
+            present — the build genuinely failed.
+    """
+    if bag_path.is_dir():
+        return bag_path
+    zip_candidate = bag_path.with_suffix(".zip")
+    if not zip_candidate.exists():
+        raise FileNotFoundError(f"Bag missing at {bag_path}; no {zip_candidate} fallback")
+    extract_root = bag_path.parent
+    with zipfile.ZipFile(zip_candidate) as zf:
+        zf.extractall(extract_root)
+    # bdbag produces a single top-level directory inside the zip;
+    # use the builder's expected name when it landed, otherwise
+    # take the lone extracted directory.
+    if bag_path.is_dir():
+        return bag_path
+    extracted = [p for p in extract_root.iterdir() if p.is_dir() and p.name != ".bag-db"]
+    if len(extracted) != 1:
+        raise FileNotFoundError(
+            f"Could not locate bag directory after unzipping {zip_candidate}; candidates: {[p.name for p in extracted]}"
+        )
+    return extracted[0]
+
+
+def _materialize_bag_assets(bag_path: Path) -> None:
+    """Fetch any unresolved ``fetch.txt`` entries into the bag.
+
+    Asset uploads (``AssetMode.UPLOAD_IF_MISSING`` /
+    ``UPLOAD_FORCE``) require the bytes to be present locally —
+    the loader pushes them to the destination Hatrac. When the
+    source bag was produced with the deriva-bag profile, asset
+    payloads live as URL references in ``fetch.txt`` until a
+    materialize step copies them in. Skipping this step would
+    surface as ``ValueError: asset_mode=... is incompatible with
+    a holey bag`` from
+    :meth:`FKTraversalPolicy.validate_with_bag_state`.
+
+    Args:
+        bag_path: Path to the bag directory to materialize.
+    """
+    fetch_file = bag_path / "fetch.txt"
+    if not fetch_file.exists() or fetch_file.stat().st_size == 0:
+        return
+    # Local import — bdbag drags in heavy network deps; keep it
+    # lazy so callers who never hit an asset-upload path don't pay.
+    from bdbag import bdbag_api as bdb
+
+    logger.info("clone_via_bag: materializing bag assets at %s", bag_path)
+    bdb.materialize(str(bag_path))
 
 
 @dataclass
@@ -162,9 +230,7 @@ def clone_via_bag(
             12345
     """
     if anchors is None and root_rid is None:
-        raise ValueError(
-            "clone_via_bag requires either ``anchors`` or ``root_rid``"
-        )
+        raise ValueError("clone_via_bag requires either ``anchors`` or ``root_rid``")
 
     if anchors is None:
         # Convenience path: caller provided a single Dataset RID.
@@ -176,17 +242,12 @@ def clone_via_bag(
     policy = policy or FKTraversalPolicy()
 
     if output_dir is None:
-        output_dir = (
-            Path.cwd()
-            / f"clone-{source_catalog_id}-to-{dest_catalog_id}"
-        )
+        output_dir = Path.cwd() / f"clone-{source_catalog_id}-to-{dest_catalog_id}"
     output_dir = Path(output_dir)
 
     # Connect to the source catalog.
     source_creds = source_credential or get_credential(source_hostname)
-    source_server = DerivaServer(
-        "https", source_hostname, credentials=source_creds
-    )
+    source_server = DerivaServer("https", source_hostname, credentials=source_creds)
     source_catalog = source_server.connect_ermrest(source_catalog_id)
 
     # Build the bag. CatalogBagBuilder drives deriva-py's export
@@ -206,12 +267,25 @@ def clone_via_bag(
         source_catalog_id,
     )
     bag_path = builder.build()
+    # CatalogBagBuilder archives the bag as ``{bag_path}.zip`` and
+    # leaves only the zip on disk; materialize back into a directory
+    # the loader can open.
+    bag_path = _materialize_bag_dir(bag_path)
+
+    # Materialize asset payloads when the policy will upload them.
+    # An asset-uploading mode (``UPLOAD_IF_MISSING`` / ``UPLOAD_FORCE``)
+    # requires the bytes to already be local; the loader's
+    # ``validate_with_bag_state`` rejects the combination up front.
+    # ``ROWS_ONLY`` skips this — the bag's row data alone is enough.
+    if policy.asset_mode in (
+        AssetMode.UPLOAD_IF_MISSING,
+        AssetMode.UPLOAD_FORCE,
+    ):
+        _materialize_bag_assets(bag_path)
 
     # Connect to the destination catalog.
     dest_creds = dest_credential or get_credential(dest_hostname)
-    dest_server = DerivaServer(
-        "https", dest_hostname, credentials=dest_creds
-    )
+    dest_server = DerivaServer("https", dest_hostname, credentials=dest_creds)
     dest_catalog = dest_server.connect_ermrest(dest_catalog_id)
 
     # Load the bag into the destination. BagCatalogLoader walks
