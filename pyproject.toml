@@ -10,7 +10,9 @@ requires-python = ">=3.12"
 dependencies = [
     "bump-my-version",
     "bdbag @ git+https://github.com/fair-research/bdbag@1.9.0-dev",
-    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml",
+    # TEMPORARY: pinned to the deriva.bag submodule branch (deriva-py#212).
+    # Revert to ``@deriva-ml`` once that PR merges.
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@carl/deriva-bag-submodule",
     "deepdiff",
     "nbconvert",
     "pandas",
@@ -58,7 +60,9 @@ build-backend = "setuptools.build_meta"
 python-preference = "only-managed"
 
 [tool.uv.sources]
-deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", branch = "deriva-ml" }
+# TEMPORARY: pinned to the deriva.bag submodule branch (deriva-py#212).
+# Revert to ``branch = "deriva-ml"`` once that PR merges.
+deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", branch = "carl/deriva-bag-submodule" }
 
 
 [tool.setuptools.package-data]
