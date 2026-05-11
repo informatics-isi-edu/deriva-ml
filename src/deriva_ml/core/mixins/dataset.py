@@ -253,8 +253,8 @@ class DatasetMixin:
         Example:
             >>> ml.add_dataset_element_type("Image")  # doctest: +SKIP
         """
-        # Import here to avoid circular imports
-        from deriva_ml.dataset.catalog_graph import CatalogGraph
+        # Import here to avoid circular imports.
+        from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 
         # Add table to map.
         element_table = self.model.name_to_table(element)
@@ -287,8 +287,10 @@ class DatasetMixin:
                 )
 
         # self.model = self.catalog.getCatalogModel()
-        annotations = CatalogGraph(
-            self, s3_bucket=self.s3_bucket, use_minid=self.use_minid
+        annotations = DatasetBagBuilder(
+            ml_instance=self,
+            s3_bucket=self.s3_bucket,
+            use_minid=self.use_minid,
         ).generate_dataset_download_annotations()  # type: ignore[arg-type]
         self._dataset_table.annotations.update(annotations)
         self.model.model.apply()

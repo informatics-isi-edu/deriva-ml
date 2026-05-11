@@ -97,7 +97,7 @@ from deriva_ml.dataset.aux_classes import (
     DatasetVersion,
     VersionPart,
 )
-from deriva_ml.dataset.catalog_graph import CatalogGraph
+from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
@@ -115,7 +115,7 @@ def _hash_spec(spec: Any) -> str:
     Args:
         spec: The download spec (any JSON-serializable Python object,
             typically the dict returned by
-            ``CatalogGraph.generate_dataset_download_spec``).
+            ``DatasetBagBuilder.generate_dataset_download_spec``).
 
     Returns:
         Lowercase hex-digest string (64 chars).
@@ -1288,7 +1288,8 @@ class Dataset:
     ) -> "Iterator[tuple[str, int]]":
         """Yield ``(table_name, count)`` for rows reachable from this dataset with ``t_lower < RMT <= t_upper``.
 
-        Walks ``CatalogGraph._aggregate_queries`` paths and counts rows
+        Walks the dataset's FK paths via
+        :meth:`DatasetBagBuilder.aggregate_queries` and counts rows
         in each terminal table that fall within the given RMT window.
         ``t_upper=None`` means "no upper bound" — i.e., live state.
 
@@ -1298,10 +1299,8 @@ class Dataset:
         """
         from deriva.core.datapath import Cnt
 
-        from deriva_ml.dataset.catalog_graph import CatalogGraph
-
-        graph = CatalogGraph(self._ml_instance)
-        table_queries = graph._aggregate_queries(self)
+        builder = DatasetBagBuilder(ml_instance=self._ml_instance)
+        table_queries = builder.aggregate_queries(self)
 
         for table_name, path_entries in table_queries.items():
             for dp, target_pb_table, _is_asset in path_entries:
@@ -2455,9 +2454,10 @@ class Dataset:
     ) -> dict[str, Any]:
         """Estimate the size of a dataset bag before downloading.
 
-        Uses ``CatalogGraph._aggregate_queries`` to build datapath objects for
-        every FK path that reaches each table, then fetches RID lists from the
-        snapshot catalog and computes the exact union across all paths.
+        Uses :meth:`DatasetBagBuilder.aggregate_queries` to build datapath
+        objects for every FK path that reaches each table, then fetches RID
+        lists from the snapshot catalog and computes the exact union across
+        all paths.
 
         When the same table is reachable via multiple FK paths, **all** paths
         are queried and the RID sets are unioned to get the exact row count.
@@ -2489,14 +2489,14 @@ class Dataset:
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
-        # Build a CatalogGraph on the version snapshot and collect aggregate
-        # datapath objects grouped by target table.
+        # Build a DatasetBagBuilder on the version snapshot and collect
+        # aggregate datapath objects grouped by target table.
         version_snapshot_catalog = self._version_snapshot_catalog(version)
-        graph = CatalogGraph(
-            version_snapshot_catalog,
+        builder = DatasetBagBuilder(
+            ml_instance=version_snapshot_catalog,
             exclude_tables=exclude_tables,
         )
-        table_queries = graph._aggregate_queries(self)
+        table_queries = builder.aggregate_queries(self)
 
         # Connect to the snapshot catalog for queries using the async catalog,
         # which uses httpx.AsyncClient with connection pooling and is safe for
@@ -2982,8 +2982,8 @@ class Dataset:
             # Generate spec if not supplied (allows callers to reuse a spec they already computed).
             if spec is None:
                 version_snapshot_catalog = self._version_snapshot_catalog(version)
-                downloader = CatalogGraph(
-                    version_snapshot_catalog,
+                downloader = DatasetBagBuilder(
+                    ml_instance=version_snapshot_catalog,
                     s3_bucket=self._ml_instance.s3_bucket,
                     use_minid=use_minid,
                     exclude_tables=exclude_tables,
@@ -3361,8 +3361,8 @@ class Dataset:
         # cheap and necessary for correctness.
         # =====================================================================
         version_snapshot_catalog = self._version_snapshot_catalog(version)
-        downloader = CatalogGraph(
-            version_snapshot_catalog,
+        downloader = DatasetBagBuilder(
+            ml_instance=version_snapshot_catalog,
             s3_bucket=self._ml_instance.s3_bucket,
             use_minid=use_minid,
             exclude_tables=exclude_tables,

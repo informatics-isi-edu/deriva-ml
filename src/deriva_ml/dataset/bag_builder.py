@@ -157,6 +157,40 @@ class DatasetBagBuilder:
         """
         return self._catalog_graph.generate_dataset_download_annotations()
 
+    def aggregate_queries(
+        self,
+        dataset: DatasetLike | None = None,
+    ) -> dict[str, list[Any]]:
+        """Return per-target-table datapaths for size estimation.
+
+        Byte-equivalent to
+        :meth:`CatalogGraph._aggregate_queries`. Returns a dict
+        keyed by terminal table name; each value is a list of
+        ``(datapath, target_pb_table, is_asset)`` tuples — one
+        per FK path that reaches the target table from the
+        dataset. Used by :meth:`Dataset.estimate_bag_size` to
+        compute row counts via RID-union semantics before
+        deciding whether to materialize.
+
+        Args:
+            dataset: Optional dataset to filter paths to. ``None``
+                aggregates across every dataset reachable in the
+                catalog.
+
+        Returns:
+            ``{target_table_name: [(datapath, pb_table, is_asset),
+            ...]}``.
+        """
+        # ``_aggregate_queries`` is a private CatalogGraph method;
+        # using it through the wrapper preserves byte equivalence
+        # while moving callers off the CatalogGraph import. When
+        # CatalogGraph is eventually retired in favor of a fully
+        # CatalogBagBuilder-backed implementation, this method
+        # will route through the same downstream as today's
+        # CatalogGraph (the export engine has the same datapath
+        # surface).
+        return self._catalog_graph._aggregate_queries(dataset)
+
     # ------------------------------------------------------------------
     # ADR-0006 bag-pipeline-shaped helpers
     # ------------------------------------------------------------------
