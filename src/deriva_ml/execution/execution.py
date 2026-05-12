@@ -1473,6 +1473,26 @@ class Execution:
         except Exception as e:
             error = format_exception(e)
             self._logger.error("BagCatalogLoader failed: %s", error)
+            # Mark every pending feature record as failed with the
+            # loader's error so the user can retry from a known
+            # state. The legacy ``_flush_staged_features`` path
+            # marked per-group failures; the bag path is atomic at
+            # load time, so all pending records share the same
+            # failure mode (the bag's load transaction either
+            # committed or didn't). Preserving the loader error
+            # message in each record's ``error`` column is the
+            # equivalent observability.
+            try:
+                pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
+                if pending_features:
+                    self._manifest_store.mark_feature_records_failed(
+                        [(r.stage_id, f"bag-load failed: {error}") for r in pending_features]
+                    )
+            except Exception as mark_err:  # noqa: BLE001 — never mask the original failure
+                self._logger.warning(
+                    "Could not mark pending features as failed: %s",
+                    mark_err,
+                )
             raise DerivaMLException(f"Failed to upload execution outputs via bag pipeline: {error}")
 
         # Mark every leased manifest entry as uploaded — its RID
