@@ -2,10 +2,14 @@
 
 Parallel to :func:`~deriva_ml.execution.lease_orchestrator.acquire_leases_for_execution`
 (which operates on SQLite pending rows), this helper operates on
-:class:`~deriva_ml.asset.manifest.AssetManifest` entries. It's used by
-the manifest-driven upload path (``Execution._upload_execution_dirs``)
-to ensure every pending asset has a pre-allocated RID before staging.
+:class:`~deriva_ml.asset.manifest.AssetManifest` entries. The
+bag-based commit path
+(:func:`deriva_ml.execution.bag_commit.build_execution_bag`) calls
+this to ensure every pending asset has a pre-allocated RID before
+the bag staging step writes asset rows whose ``RID`` column already
+carries the leased value.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -38,9 +42,7 @@ def lease_manifest_pending_assets(
         manifest: AssetManifest whose pending entries may need RIDs.
     """
     pending = manifest.pending_assets()
-    needs_lease = [
-        (key, entry) for key, entry in pending.items() if entry.rid is None
-    ]
+    needs_lease = [(key, entry) for key, entry in pending.items() if entry.rid is None]
     if not needs_lease:
         return
 

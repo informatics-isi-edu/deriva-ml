@@ -69,7 +69,6 @@ from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.dataset.upload import (
-    NULL_SENTINEL,
     asset_root,
     asset_type_path,
     execution_root,
@@ -351,13 +350,15 @@ class Execution:
                 # lookup_execution, but workspace-based resume is
                 # impaired until the row is re-registered manually.
                 import logging
+
                 logger = logging.getLogger("deriva_ml.execution")
                 logger.error(
                     "create_execution %s: catalog POST succeeded but "
                     "SQLite registry write FAILED (%s). Execution can "
                     "be recovered via ml.lookup_execution(rid) + manual "
                     "adoption.",
-                    self.execution_rid, exc,
+                    self.execution_rid,
+                    exc,
                 )
                 raise
 
@@ -627,7 +628,7 @@ class Execution:
             self._save_runtime_environment()
 
             # Now upload the files so we have the info in case the execution fails.
-            self.uploaded_assets = self._upload_execution_dirs()
+            self.uploaded_assets = self._bag_commit_upload()
             self._set_asset_descriptions(self.uploaded_assets)
         # NOTE(E3): `start_time` is no longer an instance attribute —
         # the authoritative value is written to SQLite by __enter__ via
@@ -813,6 +814,7 @@ class Execution:
             ``exe.datasets[rid]``.
         """
         from deriva_ml.execution.dataset_collection import DatasetCollection
+
         return DatasetCollection(self._datasets_list)
 
     @property
@@ -1043,9 +1045,7 @@ class Execution:
         store = self._ml_object.workspace.execution_state_store()
         row = store.get_execution(self.execution_rid)
         if row is None:
-            raise DerivaMLException(
-                f"Execution {self.execution_rid} not in workspace registry"
-            )
+            raise DerivaMLException(f"Execution {self.execution_rid} not in workspace registry")
         current = ExecutionStatus(row["status"])
 
         extra_fields: dict = {}
@@ -1055,9 +1055,11 @@ class Execution:
                 extra_fields["error"] = error
         elif error is not None:
             import logging
+
             logging.getLogger(__name__).warning(
                 "error= ignored on non-terminal transition to %s: %s",
-                target.value, error,
+                target.value,
+                error,
             )
 
         transition(
@@ -1114,11 +1116,7 @@ class Execution:
         current = self.status
         transition(
             store=self._ml_object.workspace.execution_state_store(),
-            catalog=(
-                self._ml_object.catalog
-                if self._ml_object._mode is ConnectionMode.online
-                else None
-            ),
+            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
             execution_rid=self.execution_rid,
             current=current,
             target=ExecutionStatus.Running,
@@ -1170,197 +1168,6 @@ class Execution:
             self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
                 [{"RID": self.execution_rid, "Duration": duration_str}]
             )
-
-    def _build_upload_staging(self) -> Path:
-        """Build ephemeral symlink tree from manifest for GenericUploader.
-
-        Reads the manifest and creates symlinks from the flat assets/ directory
-        into the regex-expected tree structure under asset/ that the
-        GenericUploader needs for pattern matching.
-
-        Returns:
-            Path to the asset root (with staged symlinks) for upload.
-        """
-        manifest = self._get_manifest()
-        pending = manifest.pending_assets()
-
-        if not pending:
-            # No manifest entries — fall back to old asset/ tree if it exists
-            return self._asset_root
-
-        staging_root = asset_root(self._working_dir, self.execution_rid)
-
-        for key, entry in pending.items():
-            # key is "{AssetTable}/{filename}"
-            parts = key.split("/", 1)
-            if len(parts) != 2:
-                continue
-            asset_table_name, filename = parts
-
-            # Source file in flat storage
-            flat_dir = flat_asset_dir(self._working_dir, self.execution_rid, asset_table_name)
-            source = flat_dir / filename
-            if not source.exists():
-                self._logger.warning(f"Asset file not found: {source}")
-                continue
-
-            # Build metadata subdirectory path using ALL metadata columns
-            # from the asset table (not just those in the manifest entry).
-            # This must match the regex group order in asset_table_upload_spec()
-            # which uses sorted(model.asset_metadata(asset_table)).
-            # Missing metadata values get NULL_SENTINEL which
-            # NullSentinelProcessor translates to SQL NULL at insert time.
-            # Only nullable columns reach here — the validator (Task 6)
-            # guards NOT-NULL columns upstream.
-            all_metadata_cols = sorted(self._model.asset_metadata(asset_table_name))
-            metadata_parts = (
-                [str(entry.metadata.get(k, NULL_SENTINEL)) for k in all_metadata_cols] if all_metadata_cols else []
-            )
-            target_dir = staging_root / entry.schema / asset_table_name
-            for part in metadata_parts:
-                target_dir = target_dir / part
-            # Bug E.2: append pre-leased RID as the final path segment.
-            # asset_table_upload_spec's file_pattern expects to capture
-            # this as (?P<RID>[-A-Z0-9]+).
-            target_dir = target_dir / entry.rid
-            target_dir.mkdir(parents=True, exist_ok=True)
-
-            target = target_dir / filename
-            if not target.exists():
-                try:
-                    target.symlink_to(source.resolve())
-                except (OSError, PermissionError):
-                    import shutil
-
-                    shutil.copy2(source, target)
-
-        return staging_root
-
-    def _cleanup_upload_staging(self) -> None:
-        """Remove ephemeral symlinks created by _build_upload_staging."""
-        staging_root = asset_root(self._working_dir, self.execution_rid)
-        if staging_root.exists():
-            import shutil
-
-            shutil.rmtree(staging_root, ignore_errors=True)
-
-    def _upload_execution_dirs(
-        self,
-        progress_callback: Callable[[UploadProgress], None] | None = None,
-        max_retries: int = 3,
-        retry_delay: float = 5.0,
-        timeout: tuple[int, int] | None = None,
-        chunk_size: int | None = None,
-    ) -> dict[str, list[AssetFilePath]]:
-        """Upload execution assets using manifest-driven staging.
-
-        Builds an ephemeral symlink tree from the manifest, uploads via
-        GenericUploader, then updates the manifest with RIDs for uploaded assets.
-
-        Args:
-            progress_callback: Optional callback for upload progress updates.
-            max_retries: Maximum retry attempts for failed uploads (default: 3).
-            retry_delay: Initial delay between retries in seconds (default: 5.0).
-            timeout: (connect_timeout, read_timeout) in seconds. Default (600, 600).
-            chunk_size: Optional chunk size in bytes for hatrac uploads.
-
-        Returns:
-            dict mapping "{schema}/{table}" to list of AssetFilePath with RIDs.
-
-        Raises:
-            DerivaMLException: If upload fails.
-        """
-        # Bug E.2: lease pre-allocated RIDs for any pending manifest
-        # entries that don't have one yet. Required because
-        # asset_table_upload_spec emits use_pre_allocated_rid=True and
-        # _build_upload_staging appends entry.rid as a path segment.
-        # The engine-driven path leases RIDs in SQLite separately;
-        # this covers the manifest-driven init-time path.
-        from deriva_ml.execution.manifest_lease import lease_manifest_pending_assets
-        manifest = self._get_manifest()
-        lease_manifest_pending_assets(self._ml_object.catalog, manifest)
-
-        # Bug C: refuse to upload if any pending asset is missing a
-        # required (NOT-NULL) metadata column. This raises a single
-        # DerivaMLValidationError that lists all failures at once.
-        from deriva_ml.asset.manifest import _validate_pending_asset_metadata
-        _validate_pending_asset_metadata(self._model, manifest)
-
-        # Build staging symlinks from manifest into the regex-expected tree
-        upload_root = self._build_upload_staging()
-
-        try:
-            self._logger.info("Uploading execution files...")
-            results = upload_directory(
-                self._model,
-                upload_root,
-                progress_callback=progress_callback,
-                max_retries=max_retries,
-                retry_delay=retry_delay,
-                timeout=timeout,
-                chunk_size=chunk_size,
-            )
-        except (RuntimeError, DerivaMLException) as e:
-            error = format_exception(e)
-            self._logger.error(error)
-            raise DerivaMLException(f"Failed to upload execution_assets: {error}")
-
-        # Update manifest with upload results
-        manifest = self._get_manifest()
-
-        # Build the asset_map and the manifest-update batch in a single
-        # walk over results. Collect (key, rid) pairs here and flush
-        # them in one batched transaction below — see
-        # ManifestStore.mark_assets_uploaded for the perf rationale
-        # (replaces a per-file SQLite transaction with one bulk UPDATE).
-        # The presence check uses ``manifest.assets`` once, outside the
-        # loop, because that property runs a SQL SELECT on every access.
-        asset_map = {}
-        manifest_updates: list[tuple[str, str]] = []
-        manifest_keys = manifest.assets.keys() if hasattr(manifest, "assets") else None
-        for path, status in results.items():
-            asset_table, file_name = normalize_asset_dir(path)
-
-            table_name = asset_table.split("/")[1] if "/" in asset_table else asset_table
-            manifest_key = f"{table_name}/{file_name}"
-            rid = status.result["RID"]
-
-            # Stage the manifest update for the batch flush. The legacy
-            # per-file path tolerated KeyError silently for files not
-            # in the manifest; preserve that semantic by checking
-            # presence up-front (a dict lookup, not a SQL round-trip).
-            if manifest_keys is None or manifest_key in manifest_keys:
-                manifest_updates.append((manifest_key, rid))
-
-            asset_map.setdefault(asset_table, []).append(
-                AssetFilePath(
-                    asset_path=path,
-                    asset_table=asset_table,
-                    file_name=file_name,
-                    asset_metadata={
-                        k: v for k, v in status.result.items() if k in self._model.asset_metadata(table_name)
-                    },
-                    asset_types=[],
-                    asset_rid=rid,
-                )
-            )
-
-        # Single-transaction batched UPDATE of every just-uploaded
-        # manifest entry. See ManifestStore.mark_assets_uploaded for
-        # the perf rationale.
-        manifest.mark_uploaded_batch(manifest_updates)
-
-        self._update_asset_execution_table(asset_map)
-
-        # Flush SQLite-staged feature records (Task 7 staged-feature path).
-        # Must run AFTER asset upload so asset-column remapping has uploaded-asset RIDs
-        # available in asset_map. This is the only feature-write path since S2 — the
-        # older file-based .jsonl path was retired in Task 10 alongside ml.add_features.
-        self._logger.info("Flushing staged feature records...")
-        self._flush_staged_features(uploaded_files=asset_map)
-
-        self._logger.info("Upload assets complete")
-        return asset_map
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def download_asset(
@@ -1581,7 +1388,7 @@ class Execution:
             self.update_status(ExecutionStatus.Pending_Upload)
 
         # Transition to Pending_Upload BEFORE starting the upload work. This
-        # ensures that an exception during _upload_execution_dirs can legally
+        # ensures that an exception during _bag_commit_upload can legally
         # transition to Failed (Stopped → Failed is not a legal transition,
         # but Pending_Upload → Failed is; see state_machine.ALLOWED_TRANSITIONS).
         if self.status is ExecutionStatus.Stopped:
@@ -1628,8 +1435,7 @@ class Execution:
 
         Returns:
             ``{"{schema}/{table}": [AssetFilePath, ...]}`` for the
-            asset rows that landed at the destination. Same shape
-            as the legacy ``_upload_execution_dirs`` return.
+            asset rows that landed at the destination.
         """
         from deriva_ml.execution.bag_commit import (
             build_execution_bag,
@@ -1650,7 +1456,9 @@ class Execution:
         # the build so ``entry.rid`` reflects the leased value (the
         # destination catalog now knows about these RIDs).
         bag_dir = build_execution_bag(
-            self, bag_dir, progress_callback=progress_callback,
+            self,
+            bag_dir,
+            progress_callback=progress_callback,
         )
         manifest = self._get_manifest()
         pending = manifest.pending_assets()
@@ -1658,16 +1466,34 @@ class Execution:
         self._logger.info("Loading commit bag into destination catalog")
         try:
             report = load_execution_bag(
-                self, bag_dir, progress_callback=progress_callback,
+                self,
+                bag_dir,
+                progress_callback=progress_callback,
             )
         except Exception as e:
             error = format_exception(e)
-            self._logger.error(
-                "BagCatalogLoader failed: %s", error
-            )
-            raise DerivaMLException(
-                f"Failed to upload execution outputs via bag pipeline: {error}"
-            )
+            self._logger.error("BagCatalogLoader failed: %s", error)
+            # Mark every pending feature record as failed with the
+            # loader's error so the user can retry from a known
+            # state. The legacy ``_flush_staged_features`` path
+            # marked per-group failures; the bag path is atomic at
+            # load time, so all pending records share the same
+            # failure mode (the bag's load transaction either
+            # committed or didn't). Preserving the loader error
+            # message in each record's ``error`` column is the
+            # equivalent observability.
+            try:
+                pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
+                if pending_features:
+                    self._manifest_store.mark_feature_records_failed(
+                        [(r.stage_id, f"bag-load failed: {error}") for r in pending_features]
+                    )
+            except Exception as mark_err:  # noqa: BLE001 — never mask the original failure
+                self._logger.warning(
+                    "Could not mark pending features as failed: %s",
+                    mark_err,
+                )
+            raise DerivaMLException(f"Failed to upload execution outputs via bag pipeline: {error}")
 
         # Mark every leased manifest entry as uploaded — its RID
         # was set during the bag build step's lease. Batch the
@@ -1679,13 +1505,9 @@ class Execution:
         # Mark staged feature records as uploaded too. The bag
         # carried them; if the load succeeded, they're at the
         # destination.
-        pending_features = self._manifest_store.list_pending_feature_records(
-            self.execution_rid
-        )
+        pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
         if pending_features:
-            self._manifest_store.mark_feature_records_uploaded(
-                [r.stage_id for r in pending_features]
-            )
+            self._manifest_store.mark_feature_records_uploaded([r.stage_id for r in pending_features])
 
         manifest = self._get_manifest()  # re-read with post-mark statuses
         # Restrict the return to assets that went through *this*
@@ -1753,11 +1575,13 @@ class Execution:
     def _flush_staged_features(self, uploaded_files: dict[str, list[AssetFilePath]] | None = None) -> None:
         """Flush all Pending staged-feature rows to ermrest.
 
-        Called from ``_upload_execution_dirs()`` **after** staged-asset
-        upload so feature rows referencing assets see their uploaded RIDs
-        in ermrest. Groups rows by ``feature_table`` and batch-inserts each
-        group via the datapath. Per-group failures mark those rows ``Failed``
-        without aborting the other groups; an overall ``DerivaMLUploadError``
+        Historically called from ``_upload_execution_dirs()`` after
+        staged-asset upload. The bag-based commit path
+        (:func:`bag_commit._add_staged_feature_rows_to_bag`) carries
+        feature rows inside the bag alongside assets, so this method
+        is retained only for the few remaining direct-flush callers
+        (tests). Per-group failures mark those rows ``Failed`` without
+        aborting the other groups; an overall ``DerivaMLUploadError``
         is raised at the end if any failure occurred.
 
         Args:
@@ -1819,9 +1643,7 @@ class Execution:
                     error_msg = f"lookup_feature failed for {qualified}: {e}"
                     self._logger.error(error_msg)
                     # Mark all rows failed in a single bulk transaction.
-                    self._manifest_store.mark_feature_records_failed(
-                        [(r.stage_id, error_msg) for r in rows]
-                    )
+                    self._manifest_store.mark_feature_records_failed([(r.stage_id, error_msg) for r in rows])
                     failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
                     continue  # skip to next group — do not attempt insert
 
@@ -1850,21 +1672,16 @@ class Execution:
                 # Success — mark all rows uploaded in a single
                 # batched UPDATE … WHERE stage_id IN (…). Replaces
                 # one engine.begin() per row.
-                self._manifest_store.mark_feature_records_uploaded(
-                    [r.stage_id for r in rows]
-                )
+                self._manifest_store.mark_feature_records_uploaded([r.stage_id for r in rows])
             except Exception as e:  # noqa: BLE001 — capture broad, propagate summary
                 error_msg = f"{type(e).__name__}: {e}"
                 # Mark all rows failed in a single bulk transaction.
-                self._manifest_store.mark_feature_records_failed(
-                    [(r.stage_id, error_msg) for r in rows]
-                )
+                self._manifest_store.mark_feature_records_failed([(r.stage_id, error_msg) for r in rows])
                 failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
 
         if failures:
             raise DerivaMLUploadError(
-                f"Feature flush failed for {len(failures)} feature table(s): "
-                + "; ".join(failures)
+                f"Feature flush failed for {len(failures)} feature table(s): " + "; ".join(failures)
             )
 
     def _update_asset_execution_table(
@@ -2404,8 +2221,7 @@ class Execution:
         """
         if self._execution_record is None:
             raise DerivaMLException(
-                "is_nested requires a bound ExecutionRecord. "
-                "Hierarchy queries are not available in dry-run mode."
+                "is_nested requires a bound ExecutionRecord. Hierarchy queries are not available in dry-run mode."
             )
         return self._execution_record.is_nested()
 
@@ -2425,8 +2241,7 @@ class Execution:
         """
         if self._execution_record is None:
             raise DerivaMLException(
-                "is_parent requires a bound ExecutionRecord. "
-                "Hierarchy queries are not available in dry-run mode."
+                "is_parent requires a bound ExecutionRecord. Hierarchy queries are not available in dry-run mode."
             )
         return self._execution_record.is_parent()
 
@@ -2464,14 +2279,8 @@ class Execution:
             counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
             pending_part = ""
             if counts["pending_rows"] or counts["pending_files"]:
-                pending_part = (
-                    f" pending={counts['pending_rows']}rows/"
-                    f"{counts['pending_files']}files"
-                )
-            return (
-                f"<Execution {self.execution_rid} "
-                f"status={row['status']}{pending_part}>"
-            )
+                pending_part = f" pending={counts['pending_rows']}rows/{counts['pending_files']}files"
+            return f"<Execution {self.execution_rid} status={row['status']}{pending_part}>"
         except Exception:  # repr must not raise
             return f"<Execution {self.execution_rid}>"
 
@@ -2512,11 +2321,7 @@ class Execution:
         current = self.status  # read-through from SQLite
         transition(
             store=self._ml_object.workspace.execution_state_store(),
-            catalog=(
-                self._ml_object.catalog
-                if self._ml_object._mode is ConnectionMode.online
-                else None
-            ),
+            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
             execution_rid=self.execution_rid,
             current=current,
             target=ExecutionStatus.Running,
@@ -2553,7 +2358,8 @@ class Execution:
             if exc_value is not None:
                 logging.error(
                     "Dry-run execution failed: %s: %s",
-                    exc_type.__name__, exc_value,
+                    exc_type.__name__,
+                    exc_value,
                 )
             return False
 
@@ -2588,11 +2394,7 @@ class Execution:
 
         transition(
             store=self._ml_object.workspace.execution_state_store(),
-            catalog=(
-                self._ml_object.catalog
-                if self._ml_object._mode is ConnectionMode.online
-                else None
-            ),
+            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
             execution_rid=self.execution_rid,
             current=current,
             target=target,
@@ -2606,16 +2408,18 @@ class Execution:
         counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
         if counts["pending_rows"] or counts["pending_files"]:
             logging.getLogger("deriva_ml.execution").info(
-                "[Execution %s] exited with pending: "
-                "%d rows, %d files. Call exe.upload_outputs() to flush.",
+                "[Execution %s] exited with pending: %d rows, %d files. Call exe.upload_outputs() to flush.",
                 self.execution_rid,
-                counts["pending_rows"], counts["pending_files"],
+                counts["pending_rows"],
+                counts["pending_files"],
             )
 
         if exc_value is not None:
             logging.error(
                 "Execution %s failed: %s: %s",
-                self.execution_rid, exc_type.__name__, exc_value,
+                self.execution_rid,
+                exc_type.__name__,
+                exc_value,
             )
 
         # Propagate any exception.
@@ -2647,11 +2451,7 @@ class Execution:
 
         transition(
             store=self._ml_object.workspace.execution_state_store(),
-            catalog=(
-                self._ml_object.catalog
-                if self._ml_object._mode is ConnectionMode.online
-                else None
-            ),
+            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
             execution_rid=self.execution_rid,
             current=self.status,
             target=ExecutionStatus.Aborted,
