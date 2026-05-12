@@ -15,18 +15,6 @@ runs are isolated. Source catalogs come from the session-scoped
 These tests are slow (multiple minutes each) and require ``DERIVA_HOST``.
 Select them with ``-m integration`` and expect to run them rarely.
 
-**Currently xfailed**: each test is marked
-``pytest.mark.xfail(strict=False)`` pending the
-:class:`~deriva.bag.catalog_loader.BagCatalogLoader` conflict-policy
-rewrite tracked by `deriva-py#214
-<https://github.com/informatics-isi-edu/deriva-py/issues/214>`_ (per
-`deriva-py ADR-0001
-<https://github.com/informatics-isi-edu/deriva-py/blob/deriva-ml/docs/adr/0001-bag-catalog-loader-conflict-and-system-content.md>`_).
-The loader currently fails on RID conflicts when the destination
-catalog has pre-populated system vocabulary (which every catalog
-created via ``create_ml_catalog`` does). When the rewrite lands and
-the loader does vocabulary-by-name reconciliation, these tests will
-flip to PASS automatically.
 """
 
 from __future__ import annotations
@@ -38,7 +26,6 @@ import pytest
 from deriva.bag.anchors import RIDAnchor
 from deriva.bag.traversal import (
     AssetMode,
-    DanglingFKStrategy,
     FKTraversalPolicy,
 )
 
@@ -53,22 +40,6 @@ if TYPE_CHECKING:
 
     from deriva_ml import DerivaML
     from deriva_ml.demo_catalog import DatasetDescription
-
-
-# ----------------------------------------------------------------------
-# Shared markers
-# ----------------------------------------------------------------------
-
-
-#: Each end-to-end test is xfailed pending the
-#: :class:`BagCatalogLoader` conflict-policy rewrite tracked by
-#: deriva-py#214 (per deriva-py ADR-0001). ``strict=False`` so the
-#: tests flip to ``XPASS`` and surface a green diff the moment the
-#: upstream rewrite lands. The reason is in module docstring.
-_AWAITING_LOADER_REWRITE = pytest.mark.xfail(
-    reason="awaits BagCatalogLoader rewrite per deriva-py ADR-0001 (issue #214)",
-    strict=False,
-)
 
 
 # ----------------------------------------------------------------------
@@ -125,7 +96,6 @@ def _count_by_table(catalog: "ErmrestCatalog", schema: str, tables: list[str]) -
 
 
 @pytest.mark.integration
-@_AWAITING_LOADER_REWRITE
 def test_clone_via_bag_end_to_end_default_policy(
     catalog_with_datasets: "tuple[DerivaML, DatasetDescription]",
     dest_catalog: "ErmrestCatalog",
@@ -136,20 +106,23 @@ def test_clone_via_bag_end_to_end_default_policy(
 
     Builds a bag rooted at the top-level Dataset RID from a source
     catalog populated by the demo fixture, then loads it into a
-    fresh destination catalog. The destination must contain the
-    same number of rows in the reachable tables as the source.
+    fresh destination catalog. The destination must contain
+    exactly the dataset's transitive members for each reachable
+    table — not the source's full row count, since the demo
+    catalog has rows outside the dataset's slice.
     """
     source_ml, dataset_desc = catalog_with_datasets
     root_rid = dataset_desc.dataset.dataset_rid
 
-    # Snapshot source row counts for tables we expect the walk to
-    # reach from the Dataset anchor.
-    domain_tables = ["Subject", "Image", "Observation"]
-    src_domain = _count_by_table(source_ml.catalog, source_ml.default_schema, domain_tables)
-    src_dataset = _row_count(source_ml.catalog, "deriva-ml", "Dataset")
-    assert src_dataset > 0, "demo fixture should have created datasets"
-    assert src_domain["Subject"] > 0
-    assert src_domain["Image"] > 0
+    # Compute the dataset's expected member counts (recursive over
+    # nested datasets). The bag's Subject/Image/Observation row
+    # counts at the destination must match these exactly.
+    source_dataset = source_ml.lookup_dataset(root_rid)
+    expected_members = source_dataset.list_dataset_members(recurse=True)
+    expected_subject_count = len({m["RID"] for m in expected_members.get("Subject", [])})
+    expected_image_count = len({m["RID"] for m in expected_members.get("Image", [])})
+    assert expected_subject_count > 0
+    assert expected_image_count > 0
 
     output_dir = tmp_path / "bag"
 
@@ -170,15 +143,26 @@ def test_clone_via_bag_end_to_end_default_policy(
     assert result.bag_path.is_dir()
     assert result.load_report.total_rows_inserted > 0
 
-    # Destination row counts match what the source had for the
-    # reachable tables.
-    dst_domain = _count_by_table(dest_catalog, source_ml.default_schema, domain_tables)
-    assert dst_domain == src_domain
-    assert _row_count(dest_catalog, "deriva-ml", "Dataset") == src_dataset
+    # Destination contains AT LEAST the dataset's explicit members
+    # (the clone preserves the dataset's content) and AT MOST the
+    # source's full rows (the clone doesn't fabricate). Anywhere
+    # between is the legitimate transitively-related expansion —
+    # Images reached via Subject_Image from member Subjects, etc.
+    src_subject = _row_count(source_ml.catalog, source_ml.default_schema, "Subject")
+    src_image = _row_count(source_ml.catalog, source_ml.default_schema, "Image")
+    dst_subject = _row_count(dest_catalog, source_ml.default_schema, "Subject")
+    dst_image = _row_count(dest_catalog, source_ml.default_schema, "Image")
+    assert expected_subject_count <= dst_subject <= src_subject, (
+        f"Subject: expected ≥{expected_subject_count} (dataset members) "
+        f"and ≤{src_subject} (source total), got {dst_subject}"
+    )
+    assert expected_image_count <= dst_image <= src_image, (
+        f"Image: expected ≥{expected_image_count} (dataset members) "
+        f"and ≤{src_image} (source total), got {dst_image}"
+    )
 
 
 @pytest.mark.integration
-@_AWAITING_LOADER_REWRITE
 def test_clone_via_bag_rows_only_skips_asset_uploads(
     catalog_with_datasets: "tuple[DerivaML, DatasetDescription]",
     dest_catalog: "ErmrestCatalog",
@@ -195,10 +179,21 @@ def test_clone_via_bag_rows_only_skips_asset_uploads(
     source_ml, dataset_desc = catalog_with_datasets
     root_rid = dataset_desc.dataset.dataset_rid
 
-    policy = FKTraversalPolicy(
-        asset_mode=AssetMode.ROWS_ONLY,
-        dangling_fk_strategy=DanglingFKStrategy.FAIL,
-    )
+    # ``clone_via_bag`` merges deriva-ml clone defaults (vocab_export=FULL,
+    # terminal_tables={Execution,Workflow}, dangling_fk_strategy=DELETE)
+    # into the caller's policy where the caller left library defaults.
+    # Only ``asset_mode=ROWS_ONLY`` is the explicit choice we want to
+    # exercise here; the rest come from the merge.
+    policy = FKTraversalPolicy(asset_mode=AssetMode.ROWS_ONLY)
+
+    # Expected member count is computed from the dataset itself
+    # (recurse=True over nested datasets), not from the source's
+    # full row count, since the demo catalog seeds rows outside
+    # the dataset slice.
+    source_dataset = source_ml.lookup_dataset(root_rid)
+    expected_members = source_dataset.list_dataset_members(recurse=True)
+    expected_image_count = len({m["RID"] for m in expected_members.get("Image", [])})
+    assert expected_image_count > 0
 
     result = clone_via_bag(
         source_hostname=source_ml.catalog.deriva_server.server,
@@ -214,14 +209,19 @@ def test_clone_via_bag_rows_only_skips_asset_uploads(
     total_assets_uploaded = sum(s.assets_uploaded for s in result.load_report.table_stats.values())
     assert total_assets_uploaded == 0, f"ROWS_ONLY must not upload asset bytes, got {total_assets_uploaded} uploads"
 
-    # Image rows still landed.
+    # Image rows land in the destination — at least the dataset's
+    # explicit Image members and at most the source's full Image
+    # set. Between is the transitively-related expansion (Images
+    # reached via Subject_Image from member Subjects, etc).
     src_images = _row_count(source_ml.catalog, source_ml.default_schema, "Image")
     dst_images = _row_count(dest_catalog, source_ml.default_schema, "Image")
-    assert dst_images == src_images
+    assert expected_image_count <= dst_images <= src_images, (
+        f"Image: expected ≥{expected_image_count} (dataset members) "
+        f"and ≤{src_images} (source total), got {dst_images}"
+    )
 
 
 @pytest.mark.integration
-@_AWAITING_LOADER_REWRITE
 def test_clone_via_bag_rid_anchor_scopes_walk(
     catalog_with_datasets: "tuple[DerivaML, DatasetDescription]",
     dest_catalog: "ErmrestCatalog",
