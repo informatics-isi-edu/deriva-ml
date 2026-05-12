@@ -77,11 +77,13 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 
 NULL_SENTINEL = "__NULL__"
 """Directory-segment marker for nullable asset-metadata columns with
-no value. Written into the staging tree by the three path-builders
-(``Execution._build_upload_staging``, ``_invoke_deriva_py_uploader``,
-``asset_file_path``) and translated back to Python ``None`` by
+no value. Written into the staging tree by ``_invoke_deriva_py_uploader``
+(in ``upload_engine.py``) and translated back to Python ``None`` by
 :class:`deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor`
-before deriva-py builds the catalog insert. See Bug C design doc."""
+before deriva-py builds the catalog insert. The bag-based commit path
+(see :mod:`deriva_ml.execution.bag_commit`) skips this dance entirely —
+it builds row dicts with real ``None`` values and hands them to
+:class:`deriva.bag.BagBuilder`. See Bug C design doc."""
 
 # Use os.path.sep for OS-agnostic paths in regex patterns
 SEP = re.escape(os.path.sep)
@@ -243,10 +245,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
     # after metadata columns and before the filename.
     rid_path = r"(?P<RID>[-A-Z0-9]+)"
     parts = [metadata_path, rid_path] if metadata_path else [rid_path]
-    asset_path = (
-        f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/"
-        f"{'/'.join(parts)}/{asset_file_regex}"
-    )
+    asset_path = f"{exec_dir_regex}/asset/{schema}/{asset_table.name}/{'/'.join(parts)}/{asset_file_regex}"
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
 
@@ -285,10 +284,7 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
         spec["pre_processors"] = [
             {
                 "processor": "NullSentinelProcessor",
-                "processor_type": (
-                    "deriva_ml.asset.null_sentinel_processor."
-                    "NullSentinelProcessor"
-                ),
+                "processor_type": ("deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor"),
             }
         ]
     return spec
@@ -310,8 +306,7 @@ def bulk_upload_configuration(model: DerivaModel, chunk_size: int | None = None)
     # other zero-metadata tables) went through a fallback mapping that
     # did not include the RID segment.
     all_asset_mappings = [
-        asset_table_upload_spec(model=model, asset_table=t, chunk_size=chunk_size)
-        for t in model.find_assets()
+        asset_table_upload_spec(model=model, asset_table=t, chunk_size=chunk_size) for t in model.find_assets()
     ]
 
     return {
