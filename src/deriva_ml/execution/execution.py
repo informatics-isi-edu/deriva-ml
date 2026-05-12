@@ -1588,13 +1588,7 @@ class Execution:
             self.update_status(ExecutionStatus.Pending_Upload)
 
         try:
-            self.uploaded_assets = self._upload_execution_dirs(
-                progress_callback=progress_callback,
-                max_retries=max_retries,
-                retry_delay=retry_delay,
-                timeout=timeout,
-                chunk_size=chunk_size,
-            )
+            self.uploaded_assets = self._bag_commit_upload()
             self._set_asset_descriptions(self.uploaded_assets)
             # Successful end of upload: Pending_Upload → Uploaded.
             if self.status is ExecutionStatus.Pending_Upload:
@@ -1606,6 +1600,95 @@ class Execution:
             error = format_exception(e)
             self.update_status(ExecutionStatus.Failed, error=error)
             raise e
+
+    def _bag_commit_upload(self) -> dict[str, list[AssetFilePath]]:
+        """Upload pending execution outputs via the bag pipeline.
+
+        Builds a transient bag from the execution's pending
+        manifest entries and staged feature records, then loads
+        it into the destination catalog. The bag's asset bytes
+        are hardlinked from flat storage (zero disk copies); rows
+        are inserted by :class:`BagCatalogLoader` in FK-safe
+        order; bytes get PUT to Hatrac.
+
+        After a successful load, marks every pending manifest
+        entry as ``uploaded`` (matches the legacy contract that
+        the manifest reflects the destination's state after a
+        commit). The transient bag dir is left in place so
+        post-mortem inspection is possible if needed; the caller's
+        ``clean_folder`` flag determines whether the surrounding
+        ``execution_root`` (which contains the bag dir) is also
+        removed.
+
+        Returns:
+            ``{"{schema}/{table}": [AssetFilePath, ...]}`` for the
+            asset rows that landed at the destination. Same shape
+            as the legacy ``_upload_execution_dirs`` return.
+        """
+        from deriva_ml.execution.bag_commit import (
+            build_execution_bag,
+            load_execution_bag,
+            report_to_asset_map,
+        )
+
+        bag_dir = Path(self._working_dir) / f"commit-bag-{self.execution_rid}"
+        if bag_dir.exists():
+            # An earlier (failed) attempt may have left a partial
+            # bag on disk. Wipe it so the build starts clean —
+            # bdbag's update path expects scaffolding it controls.
+            shutil.rmtree(bag_dir)
+
+        self._logger.info("Building commit bag at %s", bag_dir)
+        # ``build_execution_bag`` leases pending RIDs as its first
+        # step. Capture the post-lease ``pending`` snapshot *after*
+        # the build so ``entry.rid`` reflects the leased value (the
+        # destination catalog now knows about these RIDs).
+        bag_dir = build_execution_bag(self, bag_dir)
+        manifest = self._get_manifest()
+        pending = manifest.pending_assets()
+
+        self._logger.info("Loading commit bag into destination catalog")
+        try:
+            report = load_execution_bag(self, bag_dir)
+        except Exception as e:
+            error = format_exception(e)
+            self._logger.error(
+                "BagCatalogLoader failed: %s", error
+            )
+            raise DerivaMLException(
+                f"Failed to upload execution outputs via bag pipeline: {error}"
+            )
+
+        # Mark every leased manifest entry as uploaded — its RID
+        # was set during the bag build step's lease. Batch the
+        # SQLite update; one transaction beats N for a typical
+        # execution.
+        manifest_updates = [(key, entry.rid) for key, entry in pending.items()]
+        manifest.mark_uploaded_batch(manifest_updates)
+
+        # Mark staged feature records as uploaded too. The bag
+        # carried them; if the load succeeded, they're at the
+        # destination.
+        pending_features = self._manifest_store.list_pending_feature_records(
+            self.execution_rid
+        )
+        if pending_features:
+            self._manifest_store.mark_feature_records_uploaded(
+                [r.stage_id for r in pending_features]
+            )
+
+        manifest = self._get_manifest()  # re-read with post-mark statuses
+        asset_map = report_to_asset_map(
+            execution=self,
+            report=report,
+            manifest=manifest,
+        )
+        self._logger.info(
+            "Commit bag loaded: %d rows inserted, %d asset bytes uploaded",
+            report.total_rows_inserted,
+            sum(s.assets_uploaded for s in report.table_stats.values()),
+        )
+        return asset_map
 
     def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
         """Clean up folder contents and optionally the folder itself.
