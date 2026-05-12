@@ -196,8 +196,9 @@ bag-commit follow-ups; estimated 1–2 weeks once started.
 - `bag-based-commit-execution.md` — sibling design for the
   per-execution path.
 - ADR-0006: bag-oriented data movement.
-- `column-construction-dedup.md` — related smaller cleanup,
-  upstream-only.
+- deriva-py's `docs/design/column-construction-dedup.md` — related
+  upstream cleanup (lives in the deriva-py repo because the
+  implementation work is there; deriva-ml is a pure consumer).
 - PR #103 (deriva-ml#103): per-execution bag-commit landed.
-- PR #104 (deriva-ml#104, open): URL-dedup + legacy `_upload_execution_dirs`
-  removal.
+- PR #104 (deriva-ml#104): URL-dedup + legacy `_upload_execution_dirs`
+  removal — merged.
