@@ -3382,9 +3382,19 @@ class Dataset:
                 version,
                 cache_dir_name,
             )
+            # ``DatasetVersion.snapshot`` is ``str | None`` — a
+            # version without an associated snapshot is legitimate
+            # (e.g. an in-progress dataset that hasn't been
+            # snapshotted yet). The ``DatasetMinid.RID`` pattern
+            # accepts both ``{rid}`` and ``{rid}@{snap}``; only
+            # append the snapshot segment when there's a real
+            # snapshot to point at. Without this guard the
+            # f-string produces ``{rid}@None`` which fails the
+            # pattern validator with a cryptic regex error.
+            version_rid = f"{self.dataset_rid}@{snapshot}" if snapshot is not None else self.dataset_rid
             return DatasetMinid(
                 dataset_version=version,
-                RID=f"{self.dataset_rid}@{snapshot}",
+                RID=version_rid,
                 location=cached_bag_path.parent.as_uri(),
                 checksums=[{"function": "sha256", "value": cache_suffix}],
             )
@@ -3443,9 +3453,14 @@ class Dataset:
             spec_hash=spec_hash,
             timeout=timeout,
         )
+        # See the cache-hit branch above for why this guard is
+        # needed — ``snapshot`` is ``str | None`` and the
+        # ``DatasetMinid.RID`` pattern requires either ``{rid}`` or
+        # ``{rid}@{snap}``, not ``{rid}@None``.
+        version_rid = f"{self.dataset_rid}@{snapshot}" if snapshot is not None else self.dataset_rid
         return DatasetMinid(
             dataset_version=version,
-            RID=f"{self.dataset_rid}@{snapshot}",
+            RID=version_rid,
             location=minid_url,
             checksums=[{"function": "sha256", "value": cache_suffix}],
         )

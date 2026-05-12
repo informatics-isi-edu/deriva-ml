@@ -271,8 +271,13 @@ class DatasetMinid(BaseModel):
 
     @computed_field
     @property
-    def dataset_snapshot(self) -> str:
-        return self.version_rid.split("@")[1]
+    def dataset_snapshot(self) -> str | None:
+        # ``version_rid`` is ``{rid}`` or ``{rid}@{snapshot}`` per
+        # the validation pattern. The unsnapped form has no
+        # ``@`` segment; surface that as ``None`` rather than
+        # IndexError-ing on the missing split component.
+        parts = self.version_rid.split("@", 1)
+        return parts[1] if len(parts) == 2 else None
 
     @model_validator(mode="before")
     @classmethod
