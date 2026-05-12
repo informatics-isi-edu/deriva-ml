@@ -56,12 +56,14 @@ import logging
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from deriva.bag.anchors import Anchor, RIDAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
 from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
 from deriva.bag.traversal import (
     AssetMode,
+    DanglingFKStrategy,
     FKTraversalPolicy,
     VocabExport,
 )
@@ -333,7 +335,62 @@ def clone_via_bag(
     # BFS-shortest path happens to walk. Default to
     # ``VocabExport.FULL`` here so the bag carries the complete
     # vocabulary regardless of which path was discovered.
-    policy = policy or FKTraversalPolicy(vocab_export=VocabExport.FULL)
+    #
+    # ``terminal_tables`` for provenance tables: ``Execution`` and
+    # ``Workflow`` rows describe *how* other rows came to be, not
+    # *what they are*. One Execution typically aggregates state
+    # across multiple anchor scopes (every Subject, Image, Dataset
+    # the workflow run touched). The walker enters these tables —
+    # so the slice carries the provenance rows referenced by its
+    # ``*_Execution`` / ``*_Workflow`` associations — but does not
+    # follow their outbound or inbound FKs. Same semantics the
+    # walker already applies to controlled-vocabulary tables; see
+    # :attr:`FKTraversalPolicy.terminal_tables`.
+    default_terminal_tables: set[tuple[str, str]] = {
+        ("deriva-ml", "Execution"),
+        ("deriva-ml", "Workflow"),
+    }
+    if policy is None:
+        policy = FKTraversalPolicy(
+            vocab_export=VocabExport.FULL,
+            terminal_tables=default_terminal_tables,
+            # Anchor-scoped slices can legitimately fetch
+            # association rows whose other-side FKs land outside
+            # the slice. Example: a Subject-anchored clone reaches
+            # the Dataset the Subject belongs to (call it D), then
+            # the Dataset_Dataset row recording that D is *nested
+            # in* some parent Dataset P. P isn't in the slice
+            # (we didn't anchor on it), so the Dataset_Dataset
+            # row's ``Dataset=P`` FK dangles. ``DELETE`` prunes
+            # such rows at load time rather than aborting the
+            # whole clone — the slice converges on a self-coherent
+            # subgraph.
+            dangling_fk_strategy=DanglingFKStrategy.DELETE,
+        )
+    else:
+        # Merge deriva-ml clone-required settings into the caller's
+        # policy without surprising the caller's explicit choices.
+        # The merge rule: clone-required fields (vocab_export=FULL,
+        # terminal_tables ⊇ {Execution, Workflow},
+        # dangling_fk_strategy=DELETE) are applied when the caller
+        # left them at their library defaults. A caller who
+        # explicitly set vocab_export=REFERENCED_ONLY or supplied
+        # their own terminal_tables or chose a different
+        # dangling-FK strategy keeps their choice — the merge only
+        # fills in defaults that weren't customized.
+        merge_kwargs: dict[str, Any] = {}
+        if policy.vocab_export == VocabExport.REFERENCED_ONLY:
+            merge_kwargs["vocab_export"] = VocabExport.FULL
+        if not policy.terminal_tables:
+            merge_kwargs["terminal_tables"] = default_terminal_tables
+        if policy.dangling_fk_strategy == DanglingFKStrategy.FAIL:
+            # The library default. Caller almost certainly didn't
+            # think about it; replace with the clone default.
+            merge_kwargs["dangling_fk_strategy"] = (
+                DanglingFKStrategy.DELETE
+            )
+        if merge_kwargs:
+            policy = policy.model_copy(update=merge_kwargs)
 
     if output_dir is None:
         output_dir = Path.cwd() / f"clone-{source_catalog_id}-to-{dest_catalog_id}"

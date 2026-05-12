@@ -21,6 +21,7 @@ from deriva.bag.traversal import (
     AssetMode,
     DanglingFKStrategy,
     FKTraversalPolicy,
+    VocabExport,
 )
 from deriva_ml.catalog.clone_via_bag import (
     CloneViaBagResult,
@@ -186,10 +187,21 @@ def test_clone_via_bag_default_output_dir(tmp_path: Path) -> None:
 
 
 def test_clone_via_bag_passes_policy_through(tmp_path: Path) -> None:
-    """Caller-supplied FKTraversalPolicy reaches the builder + loader."""
+    """Caller-supplied FKTraversalPolicy reaches the builder + loader.
+
+    ``clone_via_bag`` may merge deriva-ml clone defaults
+    (``vocab_export=FULL``, ``terminal_tables={Execution,
+    Workflow}``, ``dangling_fk_strategy=DELETE``) into a policy
+    that left those fields at library defaults. To verify the
+    caller's explicit choices pass through, this test supplies a
+    policy that customizes every merge-eligible field — the
+    merge is a no-op and the same instance reaches both endpoints.
+    """
     policy = FKTraversalPolicy(
         asset_mode=AssetMode.ROWS_ONLY,
         dangling_fk_strategy=DanglingFKStrategy.NULLIFY,
+        vocab_export=VocabExport.FULL,
+        terminal_tables={("deriva-ml", "Execution")},
     )
     fake_bag_path = tmp_path / "fake-bag"
     fake_bag_path.mkdir()
@@ -227,6 +239,66 @@ def test_clone_via_bag_passes_policy_through(tmp_path: Path) -> None:
         assert b_kwargs["policy"] is policy
         _, l_kwargs = MockLoader.call_args
         assert l_kwargs["policy"] is policy
+
+
+def test_clone_via_bag_merges_defaults_into_partial_policy(
+    tmp_path: Path,
+) -> None:
+    """A caller's policy missing clone-required fields gets them merged in.
+
+    Caller-supplied policies that left ``vocab_export``,
+    ``terminal_tables``, or ``dangling_fk_strategy`` at the
+    library defaults pick up deriva-ml's clone defaults
+    (``VocabExport.FULL``, ``{Execution, Workflow}``,
+    ``DanglingFKStrategy.DELETE``). The caller's explicit
+    choices for other fields (``asset_mode`` here) survive.
+    """
+    fake_bag_path = tmp_path / "fake-bag"
+    fake_bag_path.mkdir()
+
+    # Caller explicitly sets asset_mode only. Everything else is
+    # left at library defaults — the merge replaces them with
+    # clone defaults.
+    user_policy = FKTraversalPolicy(asset_mode=AssetMode.ROWS_ONLY)
+
+    with (
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.get_credential",
+            return_value={},
+        ),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
+        ) as MockBuilder,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
+        ) as MockLoader,
+    ):
+        MockBuilder.return_value.build.return_value = fake_bag_path
+        loader = MagicMock()
+        loader.run.return_value = MagicMock()
+        MockLoader.return_value.__enter__.return_value = loader
+
+        clone_via_bag(
+            source_hostname="src.example.org",
+            source_catalog_id="1",
+            dest_hostname="dst.example.org",
+            dest_catalog_id="42",
+            root_rid="ABC",
+            policy=user_policy,
+            output_dir=tmp_path,
+        )
+
+        _, b_kwargs = MockBuilder.call_args
+        merged = b_kwargs["policy"]
+
+        # User's explicit choice survives.
+        assert merged.asset_mode == AssetMode.ROWS_ONLY
+        # Clone defaults fill in for what user left at library default.
+        assert merged.vocab_export == VocabExport.FULL
+        assert merged.dangling_fk_strategy == DanglingFKStrategy.DELETE
+        assert ("deriva-ml", "Execution") in merged.terminal_tables
+        assert ("deriva-ml", "Workflow") in merged.terminal_tables
 
 
 def test_clone_via_bag_uses_get_credential_when_creds_absent(
