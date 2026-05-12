@@ -722,18 +722,6 @@ class TestExecutionAssets:
             downloaded = check_execution.download_asset(asset_rid, Path(tmpdir), update_catalog=False)
             assert "Model_File" in downloaded.asset_types
 
-    @pytest.mark.skip(
-        reason=(
-            "The bag-based commit_execution path (deriva_ml/execution/"
-            "bag_commit.py) doesn't currently emit per-file progress "
-            "callbacks — BagCatalogLoader doesn't expose the same hook "
-            "GenericUploader did. The progress_callback parameter is "
-            "accepted on the public API but is currently a no-op. "
-            "Follow-up: wire BagCatalogLoader's report stream into the "
-            "callback (likely needs a small deriva-py PR for a "
-            "per-row / per-asset progress hook)."
-        )
-    )
     def test_upload_progress_callback(self, basic_execution):
         """Test that upload progress callback is invoked during upload."""
         from deriva_ml import UploadProgress

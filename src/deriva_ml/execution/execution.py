@@ -1588,7 +1588,9 @@ class Execution:
             self.update_status(ExecutionStatus.Pending_Upload)
 
         try:
-            self.uploaded_assets = self._bag_commit_upload()
+            self.uploaded_assets = self._bag_commit_upload(
+                progress_callback=progress_callback,
+            )
             self._set_asset_descriptions(self.uploaded_assets)
             # Successful end of upload: Pending_Upload → Uploaded.
             if self.status is ExecutionStatus.Pending_Upload:
@@ -1601,7 +1603,11 @@ class Execution:
             self.update_status(ExecutionStatus.Failed, error=error)
             raise e
 
-    def _bag_commit_upload(self) -> dict[str, list[AssetFilePath]]:
+    def _bag_commit_upload(
+        self,
+        *,
+        progress_callback: Callable[[UploadProgress], None] | None = None,
+    ) -> dict[str, list[AssetFilePath]]:
         """Upload pending execution outputs via the bag pipeline.
 
         Builds a transient bag from the execution's pending
@@ -1643,13 +1649,17 @@ class Execution:
         # step. Capture the post-lease ``pending`` snapshot *after*
         # the build so ``entry.rid`` reflects the leased value (the
         # destination catalog now knows about these RIDs).
-        bag_dir = build_execution_bag(self, bag_dir)
+        bag_dir = build_execution_bag(
+            self, bag_dir, progress_callback=progress_callback,
+        )
         manifest = self._get_manifest()
         pending = manifest.pending_assets()
 
         self._logger.info("Loading commit bag into destination catalog")
         try:
-            report = load_execution_bag(self, bag_dir)
+            report = load_execution_bag(
+                self, bag_dir, progress_callback=progress_callback,
+            )
         except Exception as e:
             error = format_exception(e)
             self._logger.error(

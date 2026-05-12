@@ -30,6 +30,17 @@ The pipeline:
 
 The bag is discarded after a successful load. The destination
 catalog is the durable artifact.
+
+Progress reporting:
+    Both :func:`build_execution_bag` and :func:`load_execution_bag`
+    accept an optional ``progress_callback``. The callback fires
+    at known boundaries — once per asset during bag-build (with
+    ``phase="Staging"``), once for the load start (``phase="Uploading"``),
+    and once per asset upload completion (``phase="Uploaded"``).
+    Byte-level streaming progress would require a new hook on
+    :class:`BagCatalogLoader` (tracked as deriva-py follow-up);
+    per-file event granularity is enough for the public callers
+    that exist today.
 """
 
 from __future__ import annotations
@@ -54,19 +65,29 @@ from deriva.bag.traversal import (
 
 from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.core.definitions import MLVocab
+from deriva_ml.core.ermrest import UploadProgress
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.upload import asset_type_path, flat_asset_dir
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from deriva_ml.asset.manifest import AssetManifest
     from deriva_ml.execution.execution import Execution
     from deriva_ml.local_db.manifest_store import ManifestStore
+
+    ProgressCallback = Callable[[UploadProgress], None]
 
 
 logger = logging.getLogger(__name__)
 
 
-def build_execution_bag(execution: "Execution", bag_dir: Path) -> Path:
+def build_execution_bag(
+    execution: "Execution",
+    bag_dir: Path,
+    *,
+    progress_callback: "ProgressCallback | None" = None,
+) -> Path:
     """Construct a transient bag containing the execution's pending output.
 
     Reads pending asset entries and staged feature records from
@@ -81,6 +102,11 @@ def build_execution_bag(execution: "Execution", bag_dir: Path) -> Path:
             location of the flat asset storage.
         bag_dir: Where to write the bag. Must not already exist
             as a populated bag. Caller is responsible for cleanup.
+        progress_callback: Optional callback fired once per asset
+            as it gets hardlinked into the bag. Phase=``Staging``.
+            Per-asset MD5 + length are populated; ``percent_complete``
+            tracks bag-staging progress (0-100 across all pending
+            assets in this commit).
 
     Returns:
         Absolute path to the bag directory ready to hand to
@@ -150,12 +176,20 @@ def build_execution_bag(execution: "Execution", bag_dir: Path) -> Path:
             asset_table_name, filename = parts
             by_table[asset_table_name].append((filename, entry))
 
+        # ``total_assets`` is the denominator for the staging
+        # progress percentage. Computed up front so per-asset
+        # callbacks can report a coherent 0-100 progression.
+        total_assets = sum(len(es) for es in by_table.values())
+        staged_so_far = 0
         for asset_table_name, entries in by_table.items():
-            _add_asset_rows_to_bag(
+            staged_so_far = _add_asset_rows_to_bag(
                 bb=bb,
                 execution=execution,
                 asset_table_name=asset_table_name,
                 entries=entries,
+                progress_callback=progress_callback,
+                staged_so_far=staged_so_far,
+                total_assets=total_assets,
             )
 
         _add_staged_feature_rows_to_bag(
@@ -174,7 +208,10 @@ def _add_asset_rows_to_bag(
     execution: "Execution",
     asset_table_name: str,
     entries: list[tuple[str, "AssetEntry"]],
-) -> None:
+    progress_callback: "ProgressCallback | None" = None,
+    staged_so_far: int = 0,
+    total_assets: int = 0,
+) -> int:
     """Add asset rows + ``*_Execution`` + ``*_Asset_Type`` rows for one table.
 
     For each pending entry:
@@ -190,6 +227,12 @@ def _add_asset_rows_to_bag(
       the manifest entry carries. Asset-types come from the
       per-execution ``asset_type_path`` JSONL file the legacy
       path writes at ``asset_file_path()`` time.
+
+    Returns:
+        Updated ``staged_so_far`` counter (caller-supplied + the
+        number of assets staged in this call), so the next
+        ``_add_asset_rows_to_bag`` invocation can resume the
+        global counter. Always non-negative.
     """
     model = execution._model
     ml = execution._ml_object
@@ -238,6 +281,27 @@ def _add_asset_rows_to_bag(
         # ``data/asset/{table}/{rid}/{filename}`` slot. Loader's
         # ``_upload_assets`` PUTs them to hatrac at load time.
         bb.add_asset(asset_table_name, entry.rid, src, link=True)
+
+        # Fire a per-asset progress event. Hardlinks are
+        # effectively free so ``bytes_completed == length``
+        # immediately; ``percent_complete`` tracks the running
+        # total across all pending assets in this commit.
+        staged_so_far += 1
+        if progress_callback is not None and total_assets > 0:
+            progress_callback(
+                UploadProgress(
+                    file_path=str(src),
+                    file_name=filename,
+                    bytes_completed=length,
+                    bytes_total=length,
+                    percent_complete=100.0 * staged_so_far / total_assets,
+                    phase="Staging",
+                    message=(
+                        f"Staged {asset_table_name}/{filename} into bag "
+                        f"({staged_so_far}/{total_assets})"
+                    ),
+                )
+            )
 
     if asset_rows:
         bb.add_rows(asset_table_name, asset_rows)
@@ -309,6 +373,8 @@ def _add_asset_rows_to_bag(
             )
     if type_rows:
         bb.add_rows(type_assoc.name, type_rows)
+
+    return staged_so_far
 
 
 def _add_staged_feature_rows_to_bag(
@@ -430,6 +496,7 @@ def load_execution_bag(
     bag_dir: Path,
     *,
     database_dir: Path | None = None,
+    progress_callback: "ProgressCallback | None" = None,
 ) -> LoadReport:
     """Hand the bag to :class:`BagCatalogLoader` with commit-mode policy.
 
@@ -444,6 +511,13 @@ def load_execution_bag(
         database_dir: Where the bag's SQLite mirror should live.
             Defaults to ``bag_dir / ".bag-db"``; callers that want
             inspection-friendly placement can override.
+        progress_callback: Optional callback. Fired once with
+            phase=``Uploading`` before the loader runs and once
+            per asset table afterward summarising uploaded /
+            deduped counts (phase=``Uploaded``). Byte-level
+            streaming would require a hook on
+            :class:`BagCatalogLoader` itself; tracked as a
+            deriva-py follow-up.
 
     Returns:
         The :class:`LoadReport` from the loader. Caller marshals
@@ -452,6 +526,13 @@ def load_execution_bag(
     """
     if database_dir is None:
         database_dir = bag_dir / ".bag-db"
+    if progress_callback is not None:
+        progress_callback(
+            UploadProgress(
+                phase="Uploading",
+                message="Loading bag into destination catalog",
+            )
+        )
     policy = FKTraversalPolicy(
         # Output rows reference Subject / Observation / Workflow
         # parents that already exist at the destination but were
@@ -489,8 +570,35 @@ def load_execution_bag(
         import nest_asyncio
 
         nest_asyncio.apply()
-        return loop.run_until_complete(loader.arun())
-    return asyncio.run(loader.arun())
+        report = loop.run_until_complete(loader.arun())
+    else:
+        report = asyncio.run(loader.arun())
+
+    # Per-table completion summaries. The loader's ``LoadReport``
+    # carries ``assets_uploaded`` and ``assets_deduped`` per
+    # table; surface those as one progress event per asset
+    # table, so callers see the load's per-table effect even
+    # without byte-streaming.
+    if progress_callback is not None:
+        for table_name, stats in report.table_stats.items():
+            if stats.assets_uploaded == 0 and stats.assets_deduped == 0:
+                continue
+            progress_callback(
+                UploadProgress(
+                    file_name=table_name,
+                    bytes_completed=0,
+                    bytes_total=0,
+                    percent_complete=100.0,
+                    phase="Uploaded",
+                    message=(
+                        f"{table_name}: "
+                        f"{stats.assets_uploaded} uploaded, "
+                        f"{stats.assets_deduped} deduped"
+                    ),
+                )
+            )
+
+    return report
 
 
 def report_to_asset_map(
