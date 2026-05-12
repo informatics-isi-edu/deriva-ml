@@ -398,7 +398,27 @@ def _add_staged_feature_rows_to_bag(
 
         groups[qualified].append(payload)
 
+    # Feature rows need leased RIDs for the same reason
+    # association rows do: the loader inserts under
+    # ``nondefaults=RID`` (commit semantics), so missing/empty
+    # RID lands as NULL and the table's unique constraint fires.
+    # Lease one RID per row, write it into the payload, then
+    # ``add_rows``.
+    from deriva_ml.execution.rid_lease import (
+        generate_lease_token,
+        post_lease_batch,
+    )
+
     for qualified, payloads in groups.items():
+        # Strip any pre-existing RID values (the staged JSON may
+        # carry empty strings from CSV → SQLite round-trip). We
+        # supply the leased RID afresh.
+        for p in payloads:
+            p.pop("RID", None)
+        tokens = [generate_lease_token() for _ in payloads]
+        lease_map = post_lease_batch(catalog=ml.catalog, tokens=tokens)
+        for i, p in enumerate(payloads):
+            p["RID"] = lease_map[tokens[i]]
         # ``qualified`` is "schema.Table"; BagBuilder accepts the
         # qualified form natively, but the bag's per-schema CSV
         # layout uses the bare table name. ``add_rows`` resolves.
@@ -457,6 +477,19 @@ def load_execution_bag(
         database_dir=database_dir,
         policy=policy,
     )
+    # ``asyncio.run`` would raise when called from inside a
+    # running event loop (e.g. a Jupyter notebook kernel). Detect
+    # the case and use the existing loop via ``nest_asyncio``.
+    # Same pattern as ``dataset.dataset.Dataset._aggregate_sizes``.
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        import nest_asyncio
+
+        nest_asyncio.apply()
+        return loop.run_until_complete(loader.arun())
     return asyncio.run(loader.arun())
 
 
@@ -465,14 +498,16 @@ def report_to_asset_map(
     execution: "Execution",
     report: LoadReport,
     manifest: "AssetManifest",
+    keys: list[str] | None = None,
 ) -> dict[str, list[AssetFilePath]]:
     """Translate a :class:`LoadReport` back to the legacy return shape.
 
     Existing callers of ``upload_execution_outputs`` expect a
     ``dict[str, list[AssetFilePath]]`` keyed by
-    ``"{schema}/{table}"``. Build it from the manifest (which has
-    the post-lease RID for every asset) and the report (which
-    confirms which tables had rows inserted).
+    ``"{schema}/{table}"`` containing **only the assets uploaded
+    on this call**. Additive uploads (kernel completes, then
+    runner registers more) need to distinguish the per-call set
+    from the full manifest history.
 
     Args:
         execution: For schema-prefix construction.
@@ -481,7 +516,15 @@ def report_to_asset_map(
             rebuild the asset list from it (the manifest is
             authoritative).
         manifest: Reads the leased RID + asset-type list for each
-            entry. Walked once.
+            entry.
+        keys: If supplied, restrict the result to manifest entries
+            with these keys. The bag-commit caller passes the
+            ``pending`` snapshot's keys (the rows that went into
+            *this* bag), preserving the legacy contract that the
+            return value covers only the just-uploaded subset.
+            When ``None``, every uploaded entry in the manifest is
+            included (rarely useful in production but convenient
+            for inspection).
 
     Returns:
         ``{"{schema}/{table}": [AssetFilePath, ...]}`` with one
@@ -489,7 +532,13 @@ def report_to_asset_map(
     """
     model = execution._model
     asset_map: dict[str, list[AssetFilePath]] = defaultdict(list)
+    if keys is not None:
+        key_set: set[str] | None = set(keys)
+    else:
+        key_set = None
     for key, entry in manifest.assets.items():
+        if key_set is not None and key not in key_set:
+            continue
         if entry.status != "uploaded":
             continue
         parts = key.split("/", 1)

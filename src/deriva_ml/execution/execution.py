@@ -1678,10 +1678,15 @@ class Execution:
             )
 
         manifest = self._get_manifest()  # re-read with post-mark statuses
+        # Restrict the return to assets that went through *this*
+        # commit call — additive uploads (kernel commits, then
+        # runner registers more) need the call-scoped subset, not
+        # the full manifest history.
         asset_map = report_to_asset_map(
             execution=self,
             report=report,
             manifest=manifest,
+            keys=list(pending.keys()),
         )
         self._logger.info(
             "Commit bag loaded: %d rows inserted, %d asset bytes uploaded",
