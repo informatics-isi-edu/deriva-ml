@@ -46,8 +46,6 @@ Progress reporting:
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
 import json
 import logging
 from collections import defaultdict
@@ -63,8 +61,10 @@ from deriva.bag.traversal import (
     FKTraversalPolicy,
     VocabExport,
 )
+from deriva.core.utils.hash_utils import compute_file_hashes
 
 from deriva_ml.asset.aux_classes import AssetFilePath
+from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.definitions import MLVocab
 from deriva_ml.core.ermrest import UploadProgress
 from deriva_ml.core.exceptions import DerivaMLException
@@ -303,7 +303,7 @@ def _dedup_assets_by_url(
                 # entry itself. Don't enqueue a URL query for a
                 # row we can't build.
                 continue
-            md5 = _file_md5(src)
+            md5 = compute_file_hashes(src, hashes=frozenset(["md5"]))["md5"][0]
             length = src.stat().st_size
             url = f"/hatrac/{asset_table_name}/{md5}.{filename}"
             url_cache[f"{asset_table_name}/{filename}"] = (
@@ -469,7 +469,7 @@ def _add_asset_rows_to_bag(
         if cached is not None:
             hatrac_url, length, md5 = cached
         else:
-            md5 = _file_md5(src)
+            md5 = compute_file_hashes(src, hashes=frozenset(["md5"]))["md5"][0]
             length = src.stat().st_size
             hatrac_url = f"/hatrac/{asset_table_name}/{md5}.{filename}"
 
@@ -860,21 +860,11 @@ def load_execution_bag(
         database_dir=database_dir,
         policy=policy,
     )
-    # ``asyncio.run`` would raise when called from inside a
-    # running event loop (e.g. a Jupyter notebook kernel). Detect
-    # the case and use the existing loop via ``nest_asyncio``.
-    # Same pattern as ``dataset.dataset.Dataset._aggregate_sizes``.
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    if loop and loop.is_running():
-        import nest_asyncio
-
-        nest_asyncio.apply()
-        report = loop.run_until_complete(loader.arun())
-    else:
-        report = asyncio.run(loader.arun())
+    # Centralised loop-detection fallback. ``BagCatalogLoader.arun``
+    # is async; the public ``run`` would call ``asyncio.run`` and
+    # raise in a notebook context. See
+    # :func:`deriva_ml.core.async_helpers.run_async`.
+    report = run_async(loader.arun())
 
     # Per-table completion summaries. The loader's ``LoadReport``
     # carries ``assets_uploaded`` and ``assets_deduped`` per
@@ -977,24 +967,6 @@ def report_to_asset_map(
             )
         )
     return dict(asset_map)
-
-
-def _file_md5(path: Path, chunk_size: int = 1024 * 1024) -> str:
-    """Stream the file at ``path`` and return its lowercase hex MD5.
-
-    Matches deriva-py's :func:`deriva.bag.builder._file_md5`; not
-    imported because that function is private. 1 MB chunks keep
-    memory bounded for big assets without per-read syscall
-    overhead on small ones.
-    """
-    md5 = hashlib.md5()
-    with path.open("rb") as f:
-        while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                break
-            md5.update(chunk)
-    return md5.hexdigest()
 
 
 def _read_asset_type_map(execution: "Execution", asset_table: Any) -> dict[str, list[str]]:

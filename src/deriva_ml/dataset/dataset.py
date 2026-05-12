@@ -82,9 +82,9 @@ try:
 except ImportError:  # Graceful fallback if IceCream isn't installed.
     ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
+from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.constants import RID
 from deriva_ml.core.definitions import (
-    DRY_RUN_RID,
     MLVocab,
     VocabularyTerm,
 )
@@ -2572,20 +2572,11 @@ class Dataset:
             await catalog.close()
             return results
 
-        # Run the async queries from the sync context
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            # Already inside an event loop (e.g., Jupyter) -- use nest_asyncio
-            import nest_asyncio
-
-            nest_asyncio.apply()
-            all_results = loop.run_until_complete(_run_all_queries())
-        else:
-            all_results = asyncio.run(_run_all_queries())
+        # Run the async queries from the sync context. See
+        # :func:`deriva_ml.core.async_helpers.run_async` — same
+        # notebook-loop-fallback dance that the bag-commit path
+        # uses for ``BagCatalogLoader.arun``.
+        all_results = run_async(_run_all_queries())
 
         # Compute exact union of RIDs across all paths for each table.
         rids_by_table: dict[str, set[str]] = defaultdict(set)
@@ -3063,11 +3054,9 @@ class Dataset:
         Raises:
             DerivaMLException: If any data query fails during export.
         """
-        import csv
-        import codecs
         import uuid
 
-        from deriva.core import DerivaServer, get_credential, DEFAULT_SESSION_CONFIG
+        from deriva.core import DEFAULT_SESSION_CONFIG, DerivaServer, get_credential
 
         snapshot_catalog_id = self._version_snapshot_catalog_id(version)
         hostname = self._ml_instance.catalog.deriva_server.server
