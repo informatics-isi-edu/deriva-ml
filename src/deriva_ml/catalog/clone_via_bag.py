@@ -63,6 +63,7 @@ from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
 from deriva.bag.traversal import (
     AssetMode,
     FKTraversalPolicy,
+    VocabExport,
 )
 from deriva.core import DerivaServer, get_credential
 
@@ -109,6 +110,93 @@ def _materialize_bag_dir(bag_path: Path) -> Path:
             f"Could not locate bag directory after unzipping {zip_candidate}; candidates: {[p.name for p in extracted]}"
         )
     return extracted[0]
+
+
+def _expand_nested_dataset_anchors(
+    anchors: list[Anchor], source_catalog: "ErmrestCatalog"
+) -> list[Anchor]:
+    """Expand ``Dataset`` ``RIDAnchor``s to include transitively-nested datasets.
+
+    deriva-ml's nested-dataset feature lets a parent Dataset
+    contain child Datasets via the ``Dataset_Dataset`` association
+    table (``Dataset → Nested_Dataset``). A bag rooted at the
+    parent is expected to carry every nested dataset's content as
+    if each child were anchored separately — that's the semantic
+    the legacy ``Dataset.download_dataset_bag`` path provided.
+
+    Without this expansion, the bag walker would include
+    ``Dataset_Dataset`` rows whose ``Nested_Dataset`` value points
+    at a Dataset RID outside the slice, producing dangling FKs at
+    load time.
+
+    The expansion walks the source catalog's ``Dataset_Dataset``
+    table transitively, starting from each ``RIDAnchor`` whose
+    table is ``Dataset``. Non-``Dataset`` anchors and non-``RIDAnchor``
+    types are returned unchanged.
+
+    Args:
+        anchors: The caller's anchor list.
+        source_catalog: Live catalog to query for nested children.
+
+    Returns:
+        A new anchor list with each ``Dataset`` ``RIDAnchor``'s
+        RID set expanded to include all transitively-nested RIDs.
+    """
+    expanded: list[Anchor] = []
+    for anchor in anchors:
+        if isinstance(anchor, RIDAnchor) and anchor.table == "Dataset":
+            full_rids = _collect_nested_dataset_rids(
+                anchor.rids, source_catalog
+            )
+            expanded.append(
+                RIDAnchor(table=anchor.table, rids=sorted(full_rids))
+            )
+        else:
+            expanded.append(anchor)
+    return expanded
+
+
+def _collect_nested_dataset_rids(
+    seed_rids: list[str], source_catalog: "ErmrestCatalog"
+) -> set[str]:
+    """BFS the ``Dataset_Dataset`` association from a seed RID set.
+
+    One GET per BFS frontier (each level fans out by the
+    frontier's RID list). Stops when no new children are found.
+    For the typical 1-3 levels of nesting in deriva-ml datasets
+    this is at most a handful of round trips.
+    """
+    from urllib.parse import quote as urlquote
+
+    collected: set[str] = set(seed_rids)
+    frontier: set[str] = set(seed_rids)
+    while frontier:
+        rid_list = ",".join(urlquote(r) for r in sorted(frontier))
+        path = (
+            f"/entity/deriva-ml:Dataset_Dataset"
+            f"/Dataset=any({rid_list})"
+        )
+        try:
+            response = source_catalog.get(path)
+            response.raise_for_status()
+            rows = response.json()
+        except Exception as e:
+            logger.warning(
+                "Could not expand nested datasets from %s: %s; "
+                "proceeding with the seed RID set only",
+                sorted(frontier), e,
+            )
+            return collected
+        new_children: set[str] = set()
+        for row in rows:
+            child = row.get("Nested_Dataset")
+            if child and child not in collected:
+                new_children.add(child)
+        if not new_children:
+            break
+        collected.update(new_children)
+        frontier = new_children
+    return collected
 
 
 def _materialize_bag_assets(bag_path: Path) -> None:
@@ -239,7 +327,13 @@ def clone_via_bag(
         assert root_rid is not None  # narrowed by the check above
         anchors = [RIDAnchor(table="Dataset", rids=[root_rid])]
 
-    policy = policy or FKTraversalPolicy()
+    # Clone semantics require every controlled-vocabulary term to
+    # exist on the destination — FK references from content tables
+    # may resolve through any term, not just the ones the
+    # BFS-shortest path happens to walk. Default to
+    # ``VocabExport.FULL`` here so the bag carries the complete
+    # vocabulary regardless of which path was discovered.
+    policy = policy or FKTraversalPolicy(vocab_export=VocabExport.FULL)
 
     if output_dir is None:
         output_dir = Path.cwd() / f"clone-{source_catalog_id}-to-{dest_catalog_id}"
@@ -249,6 +343,14 @@ def clone_via_bag(
     source_creds = source_credential or get_credential(source_hostname)
     source_server = DerivaServer("https", source_hostname, credentials=source_creds)
     source_catalog = source_server.connect_ermrest(source_catalog_id)
+
+    # Expand any ``Dataset`` RIDAnchors to include transitively
+    # nested datasets. A bag rooted at a parent dataset is expected
+    # to carry every nested dataset's content too — without this
+    # expansion the walker would include ``Dataset_Dataset`` rows
+    # whose ``Nested_Dataset`` value points outside the slice,
+    # producing dangling FKs at load time.
+    anchors = _expand_nested_dataset_anchors(anchors, source_catalog)
 
     # Build the bag. CatalogBagBuilder drives deriva-py's export
     # engine, which already handles paged ERMrest queries, MD5

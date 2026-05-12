@@ -77,22 +77,30 @@ _AWAITING_LOADER_REWRITE = pytest.mark.xfail(
 
 
 @pytest.fixture
-def dest_catalog(catalog_host: str) -> "ErmrestCatalog":
-    """A freshly-created destination catalog, deleted at test end.
+def dest_catalog(
+    catalog_with_datasets: "tuple[DerivaML, DatasetDescription]",
+    catalog_host: str,
+) -> "ErmrestCatalog":
+    """Freshly-created destination catalog with the source's schema cloned in.
 
-    The destination is created with the deriva-ml schema already
-    populated (via :func:`create_ml_catalog`), matching what the bag
-    loader expects: schema-compatible catalog with no domain rows.
-
-    Yields:
-        ErmrestCatalog: empty destination catalog ready for the
-        loader to insert into.
+    Matches :class:`BagCatalogLoader`'s ADR-0001 precondition: the
+    destination is schema-ready. Uses ``clone_catalog(copy_data=False)``
+    so every dynamically-built table (feature association tables,
+    SubjectHealth/ImageQuality vocabs, etc.) lands at the destination.
     """
-    catalog = create_ml_catalog(catalog_host, project_name="clone-via-bag-dest")
+    source_ml, _ = catalog_with_datasets
+    dest = create_ml_catalog(catalog_host, project_name="clone-via-bag-dest")
     try:
-        yield catalog
+        source_ml.catalog.clone_catalog(
+            dst_catalog=dest,
+            copy_data=False,
+            copy_annotations=True,
+            copy_policy=False,
+            truncate_after=False,
+        )
+        yield dest
     finally:
-        catalog.delete_ermrest_catalog(really=True)
+        dest.delete_ermrest_catalog(really=True)
 
 
 # ----------------------------------------------------------------------
