@@ -144,7 +144,7 @@ Tests require a running Deriva catalog. Set `DERIVA_HOST` environment variable t
 - `catalog_with_datasets`: Provides a catalog with populated demo data (datasets, splits)
 - `deriva_catalog`: Legacy session-scoped fixture (uses `catalog_manager` internally)
 
-**Gotcha**: `CatalogManager.ensure_populated()` validates data actually exists before trusting its state flag. Other test modules (function-scoped fixtures) may empty tables during teardown, making the state flag stale.
+**Gotcha**: All three `CatalogManager.ensure_*` methods (`ensure_populated`, `ensure_features`, `ensure_datasets`) validate data actually exists before trusting their state flag. Function-scoped fixtures may empty tables during teardown without resetting the manager's state, leaving the flag stale; the existence guards catch that and re-populate the necessary level.
 
 ### Docstring Examples (Doctest)
 

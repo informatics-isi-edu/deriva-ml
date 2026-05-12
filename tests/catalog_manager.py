@@ -387,7 +387,21 @@ class CatalogManager:
         ml = self.ensure_populated(working_dir)
 
         if self.state.value >= CatalogState.WITH_FEATURES.value:
-            return ml
+            # Verify data actually exists — state flag can be stale if
+            # a previous fixture's teardown emptied feature tables
+            # without resetting the manager's state. Same guard
+            # pattern as ``ensure_populated``.
+            pb = self.catalog.getPathBuilder()
+            try:
+                feature_names = list(
+                    pb.schemas["deriva-ml"].tables["Feature_Name"].path.entities().fetch()
+                )
+                if len(feature_names) > 0:
+                    return ml
+                self._logger.info("State is WITH_FEATURES but Feature_Name is empty — recreating features")
+                self.state = CatalogState.POPULATED
+            except Exception:
+                self.state = CatalogState.POPULATED
 
         workflow = ml.create_workflow(name="Feature Creation", workflow_type="Test Workflow")
         execution = ml.create_execution(workflow=workflow, configuration=ExecutionConfiguration())
@@ -410,7 +424,24 @@ class CatalogManager:
         ml = self.ensure_features(working_dir)
 
         if self.state == CatalogState.WITH_DATASETS and self._dataset_description:
-            return ml, self._dataset_description
+            # Verify the cached DatasetDescription still maps to a
+            # live Dataset row — state flag and cached description
+            # can both be stale if a previous fixture's teardown
+            # deleted dataset rows. Same guard pattern as
+            # ``ensure_populated``.
+            pb = self.catalog.getPathBuilder()
+            try:
+                datasets = list(
+                    pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch()
+                )
+                if len(datasets) > 0:
+                    return ml, self._dataset_description
+                self._logger.info("State is WITH_DATASETS but Dataset table is empty — recreating datasets")
+                self.state = CatalogState.WITH_FEATURES
+                self._dataset_description = None
+            except Exception:
+                self.state = CatalogState.WITH_FEATURES
+                self._dataset_description = None
 
         workflow = ml.create_workflow(name="Dataset Creation", workflow_type="Test Workflow")
         execution = ml.create_execution(workflow=workflow, configuration=ExecutionConfiguration())
