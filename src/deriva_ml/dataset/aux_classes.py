@@ -246,7 +246,7 @@ class DatasetMinid(BaseModel):
 
     dataset_version: DatasetVersion
     metadata: dict[str, str | int] = {}
-    minid: str = Field(alias="compact_uri", default=None)
+    minid: str | None = Field(alias="compact_uri", default=None)
     bag_url: str = Field(alias="location")
     identifier: Optional[str] = None
     landing_page: Optional[str] = None
