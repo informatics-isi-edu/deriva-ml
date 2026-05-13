@@ -121,12 +121,16 @@ def _validate_pending_asset_leases(
     all_rids = list(rid_to_keys.keys())
     found_rids: set[str] = set()
 
+    pb = catalog.getPathBuilder()
+    lease_table = pb.schemas["public"].tables["ERMrest_RID_Lease"]
     for i in range(0, len(all_rids), PENDING_ROWS_LEASE_CHUNK):
         chunk = all_rids[i : i + PENDING_ROWS_LEASE_CHUNK]
-        filter_clause = ";".join(f"RID={rid}" for rid in chunk)
-        path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
-        response = catalog.get(path)
-        for row in response.json():
+        rows = (
+            lease_table.filter(lease_table.RID.in_(chunk))
+            .attributes(lease_table.RID)
+            .fetch()
+        )
+        for row in rows:
             found_rids.add(row["RID"])
 
     missing: list[tuple[str, str]] = []

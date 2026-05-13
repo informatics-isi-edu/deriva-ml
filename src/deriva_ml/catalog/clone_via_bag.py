@@ -163,25 +163,23 @@ def _collect_nested_dataset_rids(
 ) -> set[str]:
     """BFS the ``Dataset_Dataset`` association from a seed RID set.
 
-    One GET per BFS frontier (each level fans out by the
-    frontier's RID list). Stops when no new children are found.
-    For the typical 1-3 levels of nesting in deriva-ml datasets
-    this is at most a handful of round trips.
+    One fetch per BFS frontier (each level fans out by the frontier's
+    RID list) via ``pathBuilder.filter(col.in_(...))``. Stops when no
+    new children are found. For the typical 1-3 levels of nesting in
+    deriva-ml datasets this is at most a handful of round trips.
     """
-    from urllib.parse import quote as urlquote
+    pb = source_catalog.getPathBuilder()
+    dd = pb.schemas["deriva-ml"].tables["Dataset_Dataset"]
 
     collected: set[str] = set(seed_rids)
     frontier: set[str] = set(seed_rids)
     while frontier:
-        rid_list = ",".join(urlquote(r) for r in sorted(frontier))
-        path = (
-            f"/entity/deriva-ml:Dataset_Dataset"
-            f"/Dataset=any({rid_list})"
-        )
         try:
-            response = source_catalog.get(path)
-            response.raise_for_status()
-            rows = response.json()
+            rows = list(
+                dd.filter(dd.Dataset.in_(sorted(frontier)))
+                .entities()
+                .fetch()
+            )
         except Exception as e:
             logger.warning(
                 "Could not expand nested datasets from %s: %s; "

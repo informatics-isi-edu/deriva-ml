@@ -404,31 +404,20 @@ def _fetch_asset_records(table_path, rids: list[str]) -> list[dict]:
     if not rids:
         return []
 
-    # Use datapath to fetch all records with RIDs in the list
-    # Build a filter for RID in (rid1, rid2, ...)
+    # Fetch the requested rows via the datapath ``column.in_(values)``
+    # operator (added in deriva-py #242). The bulk-fetch path issues
+    # one ``RID=any(...)`` request; on failure, fall back to one
+    # fetch per RID.
     from deriva.core.datapath import DataPathException
 
     try:
-        # Fetch records where RID is in our list
-        # Use multiple OR conditions since datapath doesn't have an "in" operator
-        path = table_path.path
-
-        # Build filter: RID == rid1 OR RID == rid2 OR ...
-        filter_expr = None
-        for rid in rids:
-            condition = table_path.RID == rid
-            if filter_expr is None:
-                filter_expr = condition
-            else:
-                filter_expr = filter_expr | condition
-
-        if filter_expr is not None:
-            path = path.filter(filter_expr)
-
-        return list(path.entities().fetch())
+        return list(
+            table_path.path.filter(table_path.RID.in_(list(rids)))
+            .entities()
+            .fetch()
+        )
     except DataPathException as e:
         logger.warning(f"Bulk fetch failed: {e}, falling back to individual fetches")
-        # Fallback: fetch records individually
         records = []
         for rid in rids:
             try:
