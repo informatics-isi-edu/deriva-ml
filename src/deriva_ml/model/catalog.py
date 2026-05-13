@@ -13,7 +13,7 @@ import importlib
 # Standard library imports
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, NewType, TypeAlias
+from typing import Any, Iterable, TypeAlias
 
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
@@ -113,17 +113,9 @@ def denormalize_column_name(schema_name: str, table_name: str, column_name: str,
 
 
 logger = get_logger(__name__)
+
 # Define common types:
 TableInput: TypeAlias = str | Table
-SchemaDict: TypeAlias = dict[str, Schema]
-FeatureList: TypeAlias = Iterable[Feature]
-SchemaName = NewType("SchemaName", str)
-ColumnSet: TypeAlias = set[Column]
-AssociationResult: TypeAlias = FindAssociationResult
-TableSet: TypeAlias = set[Table]
-PathList: TypeAlias = list[list[Table]]
-
-FilterPredicate = Callable[[Table], bool]
 
 
 class DerivaModel:
@@ -163,7 +155,6 @@ class DerivaModel:
                 If there are multiple domain schemas, default_schema must be specified.
         """
         self.model = model
-        self.configuration = None
         self.catalog: ErmrestCatalog = self.model.catalog
         self.hostname = self.catalog.deriva_server.server if isinstance(self.catalog, ErmrestCatalog) else "localhost"
 
@@ -238,8 +229,6 @@ class DerivaModel:
             A ``DerivaModel`` wrapping a deriva-py ``Model``
             reconstructed from the dict.
         """
-        from deriva.core.ermrest_model import Model
-
         # Model.__init__(catalog, model_doc) stores catalog as
         # self._catalog and exposes it via the .catalog property;
         # DerivaModel.__init__ then reads self.model.catalog.
@@ -547,8 +536,8 @@ class DerivaModel:
         table = self.name_to_table(table_name)
         return table.is_asset()
 
-    def find_assets(self, with_metadata: bool = False) -> list[Table]:
-        """Return the list of asset tables in the current model"""
+    def find_assets(self) -> list[Table]:
+        """Return the list of asset tables in the current model."""
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
     def find_vocabularies(self) -> list[Table]:
@@ -684,18 +673,17 @@ class DerivaModel:
             return not list(rid_info.datapath.entities().fetch())[0]["Deleted"]
 
     def list_dataset_element_types(self) -> list[Table]:
-        """
-        Lists the data types of elements contained within a dataset.
+        """List the deriva-py ``Table`` types that can be dataset members.
 
-        This method analyzes the dataset and identifies the data types for all
-        elements within it. It is useful for understanding the structure and
-        content of the dataset and allows for better manipulation and usage of its
-        data.
+        Walks ``Dataset.find_associations()`` and returns the
+        ``other_fkey.pk_table`` for each association whose target is a
+        domain-schema table or the Dataset table itself. Used by
+        ``DerivaML.add_dataset_members`` to validate the kind of row
+        a caller is trying to add to a dataset.
 
         Returns:
-            list[str]: A list of strings where each string represents a data type
-            of an element found in the dataset.
-
+            A list of :class:`~deriva.core.ermrest_model.Table`
+            objects — one per valid member type.
         """
 
         dataset_table = self.name_to_table("Dataset")
