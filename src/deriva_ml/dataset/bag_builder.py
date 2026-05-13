@@ -5,48 +5,64 @@
 ``CatalogBagBuilder`` is deriva-ml-agnostic — it walks any
 ERMrest catalog from a list of :class:`Anchor`\\s following an
 :class:`FKTraversalPolicy`. ``DatasetBagBuilder`` adds the four
-dataset-specific concerns that today's
-:class:`~deriva_ml.dataset.catalog_graph.CatalogGraph` baked in:
+dataset-specific concerns to the generic builder:
 
 1. **Association filtering by member element types.** Only
    include ``Dataset_X`` association tables whose target element
    type ``X`` actually has members in this dataset. Skips empty
-   associations and prunes paths that would otherwise traverse
-   them. (See ``CatalogGraph._collect_paths`` for the original.)
-2. **Feature tables per element type.** For each member element
-   type, the dataset's feature tables are added to the walk's
-   path set even though the generic walk wouldn't reach them.
-3. **Nested datasets recursively.** Each dataset member's child
-   dataset gets its own walk, up to a computed nesting depth.
-4. **Vocabulary export as standalone queries.** Vocabulary
-   tables are exported as full-table queries (every term), not
-   joined through the element-type graph. Paths ending in vocab
-   tables are pruned from the main walk.
+   associations; pruning paths that traverse them falls out of
+   the policy's ``exclude_tables``.
+2. **Feature tables per element type.** Reached naturally by
+   inbound-FK walking from member element rows; no special
+   handling in the wrapper (the generic walker covers it).
+3. **Nested datasets recursively.** Each member's child dataset
+   becomes its own :class:`RIDAnchor` in :meth:`anchors_for`.
+4. **Vocabulary export in full.** Set via
+   :attr:`FKTraversalPolicy.vocab_export` =
+   :attr:`VocabExport.FULL`. The walker emits one full-table CSV
+   processor per reached vocab.
 
-The result of :meth:`generate_dataset_download_spec` is byte-
-compatible with :meth:`CatalogGraph.generate_dataset_download_spec`
-so the existing :meth:`Dataset.download_dataset_bag` machinery
-(three-tier caching, MINID minting, materialization) works
-unchanged when (eventually) wired up.
+Three public surfaces:
 
-Scope note: this commit **adds the class**; it does **not yet
-rewire** ``Dataset.download_dataset_bag`` to use it. The cutover
-from ``CatalogGraph`` to ``DatasetBagBuilder`` is a follow-up
-once live-catalog tests confirm byte-for-byte spec equivalence
-against today's behavior.
+* :meth:`generate_dataset_download_spec(dataset)` — the runtime
+  export-engine spec for downloading this dataset. Drives a
+  :class:`CatalogBagBuilder` scoped to the dataset's RID and
+  overlays the dataset-specific top-level keys (``env``,
+  ``bag.bag_name = "Dataset_{RID}"``, the preamble query
+  processors that parameterize the template, optional MINID
+  post-processors).
+* :meth:`generate_dataset_download_annotations()` — the static
+  Chaise export annotation written to the Dataset table at
+  catalog setup. Drives a :class:`CatalogBagBuilder` scoped to
+  the whole ``Dataset`` table (no specific RID) and consumes its
+  symbolic path set (via :meth:`CatalogBagBuilder.iter_reached_paths`)
+  through a deriva-ml-side annotation writer.
+* :meth:`aggregate_queries(dataset=None)` — live-catalog
+  datapaths per FK route for size estimation / drift detection.
+  Drives a :class:`CatalogBagBuilder` (per-dataset or
+  catalog-wide) and returns its
+  :meth:`~CatalogBagBuilder.iter_table_datapaths` output.
+
+All three share the same walker — ``CatalogBagBuilder._compute_reached_tables``
+— so the "the drift walk is the bag walk" invariant from
+CONTEXT.md is preserved by construction.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable
+from collections import defaultdict
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Callable, Iterable
 
-from deriva.bag.anchors import Anchor, RIDAnchor
+from deriva.bag.anchors import Anchor, RIDAnchor, TableAnchor
+from deriva.bag.catalog_builder import CatalogBagBuilder
 from deriva.bag.traversal import FKTraversalPolicy, VocabExport
 from deriva.core.ermrest_model import Table
+from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import RID
-from deriva_ml.dataset.catalog_graph import CatalogGraph
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
 logger = logging.getLogger(__name__)
@@ -89,53 +105,39 @@ class DatasetBagBuilder:
     ):
         self._ml_instance = ml_instance
         self._s3_bucket = s3_bucket
-        self._use_minid = use_minid
+        # MINID only works when an S3 bucket is configured.
+        self._use_minid = use_minid and s3_bucket is not None
         self._exclude_tables = exclude_tables or set()
 
-        # Today's CatalogGraph already encodes every dataset-
-        # specific decision we need (association filtering,
-        # feature-table inclusion, nested-dataset recursion,
-        # vocabulary handling). Re-implementing them on top of
-        # CatalogBagBuilder would risk subtle divergences in the
-        # generated spec; instead this wrapper *uses* CatalogGraph
-        # to compute the spec and exposes the same surface
-        # (generate_dataset_download_spec / generate_dataset_download_annotations).
-        # The semantic intent of DatasetBagBuilder per ADR-0006 is
-        # captured by the public API + the build_policy / anchors_for
-        # helpers below, which are what future deriva.bag-aware
-        # callers would use. The cutover to a fully CatalogBagBuilder-
-        # backed implementation is a follow-up once live-catalog
-        # tests confirm spec equivalence.
-        self._catalog_graph = CatalogGraph(
-            ml_instance=ml_instance,
-            s3_bucket=s3_bucket,
-            use_minid=use_minid,
-            exclude_tables=exclude_tables,
-        )
-
     # ------------------------------------------------------------------
-    # Public surface (spec equivalent to CatalogGraph)
+    # Public surface — drives :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
     def generate_dataset_download_spec(
         self, dataset: DatasetLike
     ) -> dict[str, Any]:
-        """Return the download spec for a specific dataset.
+        """Return the runtime download spec for a specific dataset.
 
-        Byte-equivalent to
-        :meth:`CatalogGraph.generate_dataset_download_spec`. The
-        spec is consumed by the deriva-py export engine
-        (``GenericDownloader``) and includes:
+        Drives a :class:`CatalogBagBuilder` scoped to the dataset's
+        RID (plus its nested descendants), takes its export spec,
+        and overlays the dataset-specific top-level keys:
 
-        - Top-level ``env``, ``bag``, and ``catalog`` keys.
-        - Optional ``post_processors`` for S3 upload + MINID
+        - Top-level ``env: {"RID": "{RID}"}`` — populates the
+          template that downstream Chaise uses.
+        - Top-level ``post_processors`` for S3 upload + MINID
           minting when ``s3_bucket`` is configured.
-        - One ``csv`` processor per reached FK path, plus one
-          ``fetch`` processor per asset table (for byte
-          downloads).
-        - Full-table queries for vocabulary tables (per ADR-0006
-          ``vocab_export=FULL`` semantics — vocabs are exported
-          as standalone queries, not joined through the FK graph).
+        - ``bag.bag_name = "Dataset_{RID}"`` — the templated
+          bag-archive filename Chaise expects.
+        - Preamble :class:`env` query processors that parameterize
+          ``{RID}``/``{snaptime}``/``{Description}`` for the
+          template.
+
+        The body of the spec — per-table CSV processors, asset
+        fetches, vocab full-export — comes from
+        :meth:`CatalogBagBuilder.get_export_spec` unchanged. So
+        the "the spec is the bag walk" invariant from ADR-0006
+        holds: any future change to the bag pipeline's walker is
+        immediately reflected here.
 
         Args:
             dataset: The dataset to generate the spec for. Must
@@ -144,52 +146,463 @@ class DatasetBagBuilder:
         Returns:
             The export-engine spec dict.
         """
-        return self._catalog_graph.generate_dataset_download_spec(dataset)
+        builder = self._catalog_bag_builder(dataset=dataset)
+        spec = builder.get_export_spec()
+
+        # Pull the bag-pipeline catalog block — we keep its
+        # ``query_processors`` as the walk's contribution, then
+        # prepend the deriva-ml-specific env preamble.
+        catalog_block = spec["catalog"]
+        preamble = [
+            {
+                "processor": "env",
+                "processor_params": {
+                    "output_path": "Dataset",
+                    "query_keys": ["snaptime"],
+                    "query_path": "/",
+                },
+            },
+            {
+                "processor": "env",
+                "processor_params": {
+                    "query_path": f"/entity/M:={self._ml_schema}:Dataset/RID={{RID}}",
+                    "output_path": "Dataset",
+                    "query_keys": ["RID", "Description"],
+                },
+            },
+        ]
+        catalog_block["query_processors"] = (
+            preamble + catalog_block["query_processors"]
+        )
+
+        out: dict[str, Any] = {
+            "env": {"RID": "{RID}"},
+            "bag": {
+                "bag_name": "Dataset_{RID}",
+                "bag_algorithms": ["md5"],
+                "bag_archiver": "zip",
+                "bag_metadata": {},
+                "bag_idempotent": True,
+            },
+            "catalog": catalog_block,
+        }
+        if self._use_minid:
+            out["post_processors"] = self._minid_post_processors()
+        return out
 
     def generate_dataset_download_annotations(self) -> dict[str, Any]:
-        """Return the Chaise export annotations for the Dataset table.
+        """Return the static Chaise export annotations for the Dataset table.
 
-        Byte-equivalent to
-        :meth:`CatalogGraph.generate_dataset_download_annotations`.
-        Used to write the export configuration into the catalog so
-        browser-based downloads from Chaise produce the same bags
-        the Python API does.
+        Drives a :class:`CatalogBagBuilder` scoped to the whole
+        ``Dataset`` table (a :class:`TableAnchor`, not a specific
+        RID) and consumes its :meth:`~CatalogBagBuilder.iter_reached_paths`
+        — the symbolic ``(schema, table)`` path tuples — through a
+        deriva-ml-side annotation writer.
+
+        The annotation has to work for *any* future Dataset row,
+        so the underlying walk is symbolic. Nesting depth is
+        enumerated up to :meth:`_dataset_nesting_depth` so the
+        annotation covers however deep any real dataset reaches.
+
+        Returns:
+            A dict suitable for writing as the Dataset table's
+            annotation set (``deriva-export-fragment-definitions``,
+            ``visible-foreign-keys``, ``export-2019``).
         """
-        return self._catalog_graph.generate_dataset_download_annotations()
+        post_processors: dict[str, Any] = {}
+        if self._use_minid:
+            # Trailing slash for the S3 bucket URL on the annotation.
+            s3_url = (
+                self._s3_bucket
+                if self._s3_bucket.endswith("/")
+                else f"{self._s3_bucket}/"
+            )
+            post_processors = {
+                "type": "BAG",
+                "outputs": [{"fragment_key": "dataset_export_outputs"}],
+                "displayname": "BDBag to Cloud",
+                "bag_idempotent": True,
+                "postprocessors": [
+                    {
+                        "processor": "cloud_upload",
+                        "processor_params": {
+                            "acl": "public-read",
+                            "target_url": s3_url,
+                        },
+                    },
+                    {
+                        "processor": "identifier",
+                        "processor_params": {
+                            "test": False,
+                            "env_column_map": {
+                                "RID": "{RID}@{snaptime}",
+                                "Description": "{Description}",
+                            },
+                        },
+                    },
+                ],
+            }
+        return {
+            deriva_tags.export_fragment_definitions: {
+                "dataset_export_outputs": self._export_annotation()
+            },
+            deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
+            deriva_tags.export_2019: {
+                "detailed": {
+                    "templates": [
+                        {
+                            "type": "BAG",
+                            "outputs": [
+                                {"fragment_key": "dataset_export_outputs"}
+                            ],
+                            "displayname": "BDBag Download",
+                            "bag_idempotent": True,
+                        }
+                        | post_processors
+                    ]
+                }
+            },
+        }
 
     def aggregate_queries(
         self,
         dataset: DatasetLike | None = None,
     ) -> dict[str, list[Any]]:
-        """Return per-target-table datapaths for size estimation.
+        """Return live-catalog datapaths grouped by target table name.
 
-        Byte-equivalent to
-        :meth:`CatalogGraph._aggregate_queries`. Returns a dict
-        keyed by terminal table name; each value is a list of
-        ``(datapath, target_pb_table, is_asset)`` tuples — one
-        per FK path that reaches the target table from the
-        dataset. Used by :meth:`Dataset.estimate_bag_size` to
-        compute row counts via RID-union semantics before
-        deciding whether to materialize.
+        Drives a :class:`CatalogBagBuilder` (per-dataset when
+        ``dataset`` is given, catalog-wide otherwise) and returns
+        its :meth:`~CatalogBagBuilder.iter_table_datapaths` output
+        rekeyed by terminal table name — the shape callers like
+        :meth:`Dataset.estimate_bag_size` and :meth:`Dataset.is_dirty`
+        expect.
+
+        Per CONTEXT.md ("Dirty"), the drift walk *is* the bag
+        walk. Sharing the walker (via ``CatalogBagBuilder``) makes
+        that invariant load-bearing rather than aspirational.
 
         Args:
             dataset: Optional dataset to filter paths to. ``None``
-                aggregates across every dataset reachable in the
-                catalog.
+                aggregates across every dataset in the catalog.
 
         Returns:
             ``{target_table_name: [(datapath, pb_table, is_asset),
             ...]}``.
         """
-        # ``_aggregate_queries`` is a private CatalogGraph method;
-        # using it through the wrapper preserves byte equivalence
-        # while moving callers off the CatalogGraph import. When
-        # CatalogGraph is eventually retired in favor of a fully
-        # CatalogBagBuilder-backed implementation, this method
-        # will route through the same downstream as today's
-        # CatalogGraph (the export engine has the same datapath
-        # surface).
-        return self._catalog_graph._aggregate_queries(dataset)
+        builder = self._catalog_bag_builder(dataset=dataset)
+        keyed_by_pair = builder.iter_table_datapaths()
+        # Caller-facing shape is keyed by terminal table *name*
+        # only (not by ``(schema, name)``); preserve that.
+        out: dict[str, list[Any]] = defaultdict(list)
+        for (_schema, table_name), entries in keyed_by_pair.items():
+            out[table_name].extend(entries)
+        return dict(out)
+
+
+    # ------------------------------------------------------------------
+    # Internal driver — constructs a :class:`CatalogBagBuilder`
+    # ------------------------------------------------------------------
+
+    def _catalog_bag_builder(
+        self, dataset: DatasetLike | None
+    ) -> CatalogBagBuilder:
+        """Construct a :class:`CatalogBagBuilder` for this dataset.
+
+        Three callers (:meth:`generate_dataset_download_spec`,
+        :meth:`generate_dataset_download_annotations`,
+        :meth:`aggregate_queries`) share this construction so all
+        three drive off the same walker.
+
+        Args:
+            dataset: Per-dataset scoping. When non-``None``, the
+                walk anchors at the dataset's RID and its nested
+                children's RIDs (via :meth:`anchors_for`). When
+                ``None``, the walk anchors at the whole
+                ``deriva-ml:Dataset`` table — the catalog-wide
+                view used by annotation generation and by
+                :meth:`aggregate_queries` with no dataset filter.
+        """
+        if dataset is not None:
+            anchors = self.anchors_for(dataset)
+        else:
+            anchors = [TableAnchor(table="Dataset")]
+        policy = self.build_policy(dataset)
+        # CatalogBagBuilder requires an ``output_dir`` even when
+        # nothing will be written; aggregate_queries and the
+        # annotation path don't run :meth:`build`. Use a temp
+        # directory that goes away when this method returns.
+        tmp = TemporaryDirectory()
+        output_dir = Path(tmp.name)
+        builder = CatalogBagBuilder(
+            catalog=self._ml_instance.catalog,
+            anchors=anchors,
+            output_dir=output_dir,
+            policy=policy,
+        )
+        # Stash the tmp on the builder so it lives until the
+        # builder is garbage-collected. The annotation/aggregate
+        # paths don't write to disk; the spec path uses the
+        # returned dict directly and never invokes
+        # :meth:`CatalogBagBuilder.build`.
+        builder._datasetbag_output_tmp = tmp  # type: ignore[attr-defined]
+        return builder
+
+    @property
+    def _ml_schema(self) -> str:
+        """Convenience accessor — the deriva-ml schema name."""
+        return self._ml_instance.ml_schema
+
+    def _minid_post_processors(self) -> list[dict[str, Any]]:
+        """Return the spec-side ``post_processors`` list for MINID.
+
+        Used by :meth:`generate_dataset_download_spec` when
+        ``s3_bucket`` is configured and ``use_minid`` is True.
+        """
+        return [
+            {
+                "processor": "cloud_upload",
+                "processor_params": {
+                    "acl": "public-read",
+                    "target_url": self._s3_bucket,
+                },
+            },
+            {
+                "processor": "identifier",
+                "processor_params": {
+                    "test": False,
+                    "env_column_map": {
+                        "RID": "{RID}@{snaptime}",
+                        "Description": "{Description}",
+                    },
+                },
+            },
+        ]
+
+    # ------------------------------------------------------------------
+    # Annotation writers — consume CatalogBagBuilder.iter_reached_paths
+    # ------------------------------------------------------------------
+    #
+    # These methods produce Chaise export annotation fragments. They
+    # operate symbolically (no specific RID) and consume the path
+    # set the bag pipeline's walker computes for a TableAnchor over
+    # the Dataset table.
+
+    def _export_annotation(self) -> list[dict[str, Any]]:
+        """Return Chaise export-annotation fragments for the Dataset.
+
+        Pre-fixed with three environment/schema fragments that
+        Chaise needs, then one ``source`` fragment per FK route
+        the bag walk discovers from the ``Dataset`` table. Vocab
+        tables are emitted as standalone full-table queries; the
+        bag pipeline's ``vocab_export=FULL`` walker rule handles
+        that classification.
+        """
+        # Catalog-wide walk over a TableAnchor("Dataset") gives us
+        # the symbolic paths for any future dataset row.
+        builder = self._catalog_bag_builder(dataset=None)
+        reached = builder.iter_reached_paths()
+
+        # Three preamble fragments: snaptime, entity-level
+        # (Dataset's own row), schema dump.
+        out: list[dict[str, Any]] = [
+            {
+                "source": {"api": False, "skip_root_path": True},
+                "destination": {"type": "env", "params": {"query_keys": ["snaptime"]}},
+            },
+            {
+                "source": {"api": "entity"},
+                "destination": {
+                    "type": "env",
+                    "params": {"query_keys": ["RID", "Description"]},
+                },
+            },
+            {
+                "source": {"api": "schema", "skip_root_path": True},
+                "destination": {"type": "json", "name": "schema"},
+            },
+        ]
+
+        # One fragment per (table, FK route).
+        model = self._ml_instance.model
+        for (schema_name, table_name), fk_paths in reached.items():
+            try:
+                table = model.schemas[schema_name].tables[table_name]
+            except KeyError:
+                continue
+            for fk_path in fk_paths:
+                out.extend(
+                    self._export_annotation_dataset_element(fk_path, table)
+                )
+        return out
+
+    def _export_annotation_dataset_element(
+        self,
+        fk_path: tuple[tuple[str, str], ...],
+        table: Table,
+    ) -> list[dict[str, Any]]:
+        """Emit Chaise source fragments for one FK route.
+
+        Args:
+            fk_path: The bag walker's symbolic FK route from the
+                anchor (``Dataset``) to the target table.
+            table: The deriva-py :class:`Table` for the target —
+                needed to detect asset tables.
+
+        Returns:
+            A list with one ``source``/``destination`` fragment
+            for the row data, plus a ``fetch`` fragment for asset
+            files when ``table.is_asset()``.
+        """
+        # Build the ERMrest path string from the segments.
+        spath_segments = [f"{s}:{t}" for s, t in fk_path]
+        spath = "/".join(spath_segments)
+
+        # Skip the path that's just the Dataset table itself
+        # (Chaise handles that case implicitly).
+        skip_root_path = False
+        if spath.startswith(f"{self._ml_schema}:Dataset/"):
+            # Chaise will prepend table name and RID filter; strip
+            # the redundant prefix.
+            spath = "/".join(spath.split("/")[2:])
+            if spath == "":
+                return []
+        else:
+            # Vocab tables and non-Dataset roots: keep the path
+            # but tell Chaise not to prepend its root.
+            skip_root_path = True
+
+        # Destination path under data/: just the table names.
+        dpath = "/".join(t for _s, t in fk_path)
+
+        exports: list[dict[str, Any]] = [
+            {
+                "source": {
+                    "api": "entity",
+                    "path": spath,
+                    "skip_root_path": skip_root_path,
+                },
+                "destination": {"name": dpath, "type": "csv"},
+            }
+        ]
+        if table.is_asset():
+            exports.append(
+                {
+                    "source": {
+                        "skip_root_path": False,
+                        "api": "attribute",
+                        "path": (
+                            f"{spath}/url:=URL,length:=Length,"
+                            f"filename:=Filename,md5:=MD5,asset_rid:=RID"
+                        ),
+                    },
+                    "destination": {
+                        "name": "asset/{asset_rid}/" + table.name,
+                        "type": "fetch",
+                    },
+                }
+            )
+        return exports
+
+    def _dataset_visible_fkeys(self) -> dict[str, Any]:
+        """Build the ``visible-foreign-keys`` annotation for the Dataset table.
+
+        Emits the Chaise annotation that controls which related
+        tables show up in the detailed view of a Dataset record:
+        previous versions, parent/child datasets, and one entry
+        per Dataset-element-type association.
+        """
+
+        def fkey_name(fk: Any) -> list[str]:
+            return [fk.name[0].name, fk.name[1]]
+
+        dataset_table = self._ml_instance.model.schemas[
+            self._ml_schema
+        ].tables["Dataset"]
+
+        source_list: list[dict[str, Any]] = [
+            {
+                "source": [
+                    {"inbound": [self._ml_schema, "Dataset_Version_Dataset_fkey"]},
+                    "RID",
+                ],
+                "markdown_name": "Previous Versions",
+                "entity": True,
+            },
+            {
+                "source": [
+                    {"inbound": [self._ml_schema, "Dataset_Dataset_Nested_Dataset_fkey"]},
+                    {"outbound": [self._ml_schema, "Dataset_Dataset_Dataset_fkey"]},
+                    "RID",
+                ],
+                "markdown_name": "Parent Datasets",
+            },
+            {
+                "source": [
+                    {"inbound": [self._ml_schema, "Dataset_Dataset_Dataset_fkey"]},
+                    {"outbound": [self._ml_schema, "Dataset_Dataset_Nested_Dataset_fkey"]},
+                    "RID",
+                ],
+                "markdown_name": "Child Datasets",
+            },
+        ]
+        source_list.extend(
+            {
+                "source": [
+                    {"inbound": fkey_name(fkey.self_fkey)},
+                    {"outbound": fkey_name(other_fkey := fkey.other_fkeys.pop())},
+                    "RID",
+                ],
+                "markdown_name": other_fkey.pk_table.name,
+            }
+            for fkey in dataset_table.find_associations(max_arity=3, pure=False)
+        )
+        return {"detailed": source_list}
+
+    def _dataset_nesting_depth(
+        self, dataset: DatasetLike | None = None
+    ) -> int:
+        """Return the maximum dataset-nesting depth in the catalog.
+
+        When ``dataset`` is provided, computes the depth for that
+        dataset's subtree only. When ``None``, computes the
+        deepest nesting that exists anywhere in the catalog (the
+        bound the static annotation needs to cover).
+
+        Used by callers that want to know how many levels of
+        ``Dataset → Dataset_Dataset → Dataset`` chains the
+        annotation pipeline must enumerate.
+        """
+
+        def children_depth(rid: RID, graph: dict[str, list[str]]) -> int:
+            try:
+                children = graph[rid]
+            except KeyError:
+                return 0
+            return (
+                max(children_depth(c, graph) for c in children) + 1
+                if children
+                else 1
+            )
+
+        pb = (
+            self._ml_instance.catalog.getPathBuilder()
+            .schemas[self._ml_schema]
+            .tables["Dataset_Dataset"]
+        )
+        if dataset is not None:
+            rows = [
+                {"Dataset": dataset.dataset_rid, "Nested_Dataset": c}
+                for c in dataset.list_dataset_children()
+            ]
+        else:
+            rows = list(pb.entities().fetch())
+
+        graph: dict[str, list[str]] = defaultdict(list)
+        for r in rows:
+            graph[r["Dataset"]].append(r["Nested_Dataset"])
+        if not graph:
+            return 0
+        return max(children_depth(d, dict(graph)) for d in graph)
 
     # ------------------------------------------------------------------
     # ADR-0006 bag-pipeline-shaped helpers
