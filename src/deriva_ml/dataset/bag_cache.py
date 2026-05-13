@@ -121,20 +121,12 @@ class BagCache:
                 - ``status``: :class:`CacheStatus` value (as string).
                 - ``cache_path``: Path to the cached bag directory
                   (if cached), else ``None``.
-                - ``versions_cached``: List of cache-key directory
-                  names found for this RID — supplied for
-                  back-compat with the pre-migration API.
+                - ``versions_cached``: List of cache-key checksum
+                  strings found for this RID.
         """
         checksums = self._index.find_bags_for_rid(table="Dataset", rid=dataset_rid)
 
-        # Pre-migration callers also picked up *legacy* directories
-        # (``{cache_dir}/{rid}_{checksum}/``) that this BagCache had
-        # written. Those directories live alongside the new
-        # ``bags/{checksum}/`` layout. Surface them too so callers
-        # don't lose visibility during the transition.
-        legacy_dirs = sorted(self._cache_dir.glob(f"{dataset_rid}_*"))
-
-        if not checksums and not legacy_dirs:
+        if not checksums:
             return {
                 "status": CacheStatus.not_cached.value,
                 "cache_path": None,
@@ -143,31 +135,17 @@ class BagCache:
 
         # Prefer the most-recently-recorded index entry. ``find_bags_for_rid``
         # already orders by built_at DESC, so the first checksum is the
-        # newest.
-        if checksums:
-            checksum = checksums[0]
-            bag_dir = self._index.bag_dir_for(checksum) / "bag"
-            status = self._determine_index_status(checksum, bag_dir)
-            cache_path = str(bag_dir) if bag_dir.exists() else None
-            versions = list(checksums) + [d.name for d in legacy_dirs]
-            return {
-                "status": status.value,
-                "cache_path": cache_path,
-                "versions_cached": versions,
-            }
-
-        # Index-empty but legacy directories present — fall back to
-        # the pre-migration detection so users with an unmigrated
-        # cache still get useful answers.
-        legacy_dir = max(legacy_dirs, key=lambda p: p.stat().st_mtime)
-        bag_path = legacy_dir / f"Dataset_{dataset_rid}"
-        validated_check = legacy_dir / "validated_check.txt"
-        status = self._determine_legacy_status(bag_path, validated_check)
-        cache_path = str(bag_path) if bag_path.exists() else None
+        # newest. Bags written by ``Dataset._download_dataset_minid`` land at
+        # ``bag_dir_for(checksum) / "Dataset_{rid}"`` (the canonical
+        # deriva-ml bag name) so we look for the dataset bag at that path.
+        checksum = checksums[0]
+        bag_dir = self._index.bag_dir_for(checksum) / f"Dataset_{dataset_rid}"
+        status = self._determine_index_status(checksum, bag_dir)
+        cache_path = str(bag_dir) if bag_dir.exists() else None
         return {
             "status": status.value,
             "cache_path": cache_path,
-            "versions_cached": [d.name for d in legacy_dirs],
+            "versions_cached": list(checksums),
         }
 
     # ------------------------------------------------------------------
@@ -192,25 +170,6 @@ class BagCache:
         # Directory exists but at least one fetch.txt entry is
         # missing.
         return CacheStatus.cached_holey
-
-    def _determine_legacy_status(self, bag_path: Path, validated_check: Path) -> CacheStatus:
-        """Pre-migration status detection.
-
-        Matches the behavior of the original
-        ``BagCache._determine_status`` so legacy caches still
-        report sensibly. The ``validated_check.txt`` marker was
-        written by older download paths to signal "metadata-only"
-        vs. "materialized"; new paths don't emit it.
-        """
-        if not bag_path.exists():
-            return CacheStatus.not_cached
-        if validated_check.exists():
-            if self._is_fully_materialized(bag_path):
-                return CacheStatus.cached_materialized
-            return CacheStatus.cached_holey
-        # Bag exists but no validated_check marker — pre-migration
-        # convention for "metadata only".
-        return CacheStatus.cached_metadata_only
 
     @staticmethod
     def _is_fully_materialized(bag_path: Path) -> bool:
