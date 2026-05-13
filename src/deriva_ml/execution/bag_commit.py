@@ -52,7 +52,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from deriva.bag.builder import BagBuilder
+from deriva.bag.builder import BagBuilder, hatrac_url_for
 from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
 from deriva.bag.schema_io import ermrest_json_to_metadata
 from deriva.bag.traversal import (
@@ -64,7 +64,6 @@ from deriva.bag.traversal import (
 from deriva.core.utils.hash_utils import compute_file_hashes
 
 from deriva_ml.asset.aux_classes import AssetFilePath
-from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.definitions import MLVocab
 from deriva_ml.core.ermrest import UploadProgress
 from deriva_ml.core.exceptions import DerivaMLException
@@ -173,43 +172,13 @@ def build_execution_bag(
             asset_table_name, filename = parts
             by_table[asset_table_name].append((filename, entry))
 
-        # URL-based row dedup. Asset tables have a unique constraint
-        # on ``URL`` (which is content-hashed:
-        # ``/hatrac/{table}/{md5}.{filename}``). When the same file
-        # content is uploaded twice — e.g. ``uv.lock`` is identical
-        # across executions of the same project — the second commit
-        # would 409 on a fresh INSERT. The legacy
-        # ``GenericUploader`` path dedups by URL transparently
-        # (server's ``URL`` unique key returns the existing row).
-        # The bag pipeline doesn't get that for free; do a
-        # pre-flight catalog query per table and redirect the
-        # manifest's leased RID to the existing row's RID for any
-        # URL hits. Asset row + ``add_asset`` are then skipped for
-        # those entries (the row already exists in the catalog and
-        # ``UPLOAD_IF_MISSING`` would no-op the bytes anyway).
-        # Association rows (``{Asset}_Execution`` /
-        # ``{Asset}_Asset_Type``) still go through with the
-        # now-canonical RID — that's what links the existing asset
-        # to *this* execution.
-        url_cache, existing_urls = _dedup_assets_by_url(
-            execution=execution,
-            manifest=manifest,
-            by_table=by_table,
-        )
-        # Re-read pending: ``_dedup_assets_by_url`` may have
-        # rewritten leased RIDs for entries whose URL already
-        # exists in the catalog.
-        pending = manifest.pending_assets()
-        # Rebuild ``by_table`` view with refreshed entries so
-        # downstream code (association rows in particular) sees
-        # the canonical RIDs.
-        by_table = defaultdict(list)
-        for key, entry in pending.items():
-            parts = key.split("/", 1)
-            if len(parts) != 2:
-                continue
-            asset_table_name, filename = parts
-            by_table[asset_table_name].append((filename, entry))
+        # URL-based row dedup happens at load time via the
+        # ``match_by_columns`` policy that :func:`load_execution_bag`
+        # configures (deriva-py PR #245). The bag-build side adds
+        # every pending row as if it were new; the loader does the
+        # pre-flight catalog query, remaps source RIDs to existing
+        # RIDs, and rewrites child FK references through
+        # ``_rewrite_fks``. No pre-flight needed here.
 
         # ``total_assets`` is the denominator for the staging
         # progress percentage. Computed up front so per-asset
@@ -225,8 +194,6 @@ def build_execution_bag(
                 progress_callback=progress_callback,
                 staged_so_far=staged_so_far,
                 total_assets=total_assets,
-                url_cache=url_cache,
-                existing_urls=existing_urls,
             )
 
         _add_staged_feature_rows_to_bag(
@@ -239,151 +206,6 @@ def build_execution_bag(
         return bb.finalize(make_bdbag=True)
 
 
-def _dedup_assets_by_url(
-    *,
-    execution: "Execution",
-    manifest: "AssetManifest",
-    by_table: dict[str, list[tuple[str, "AssetEntry"]]],
-) -> tuple[dict[str, tuple[str, int, str]], set[str]]:
-    """Pre-flight URL-dedup for pending asset rows.
-
-    Walks every pending entry, computes its content-hashed
-    ``URL`` (``/hatrac/{table}/{md5}.{filename}``), and queries
-    the catalog per asset table for any rows whose ``URL`` matches.
-    For hits, rewrites the manifest entry's RID to the existing
-    catalog row's RID so association rows (``{Asset}_Execution``,
-    ``{Asset}_Asset_Type``) target the canonical row rather than a
-    just-leased duplicate that would fail the table's ``URL``
-    unique key on insert.
-
-    Asset MD5/length are expensive to compute (one pass over each
-    file) and the caller needs the same values again when building
-    the asset row, so cache them in the returned ``url_cache``
-    keyed by ``"{table}/{filename}"`` — the same shape the
-    manifest uses.
-
-    Args:
-        execution: For pathBuilder access + working-dir lookup.
-        manifest: Mutated in place — leased RIDs for URL-hit
-            entries are overwritten with the existing row's RID
-            via :meth:`AssetManifest.set_asset_rids_batch`.
-        by_table: Pending entries grouped by asset table. Built
-            once by the caller from ``manifest.pending_assets()``.
-
-    Returns:
-        ``(url_cache, existing_urls)`` where:
-        - ``url_cache[manifest_key]`` is ``(url, length, md5)``
-          cached so ``_add_asset_rows_to_bag`` doesn't re-read the
-          file.
-        - ``existing_urls`` is the set of URLs whose row already
-          exists in the catalog. ``_add_asset_rows_to_bag`` uses
-          this to skip ``add_row`` + ``add_asset`` (the row is
-          already there, ``UPLOAD_IF_MISSING`` would no-op the
-          bytes anyway). Always non-empty only when at least one
-          pending asset's content has been uploaded before.
-    """
-    ml = execution._ml_object
-
-    # Compute URLs for every pending entry. ``url_cache`` is keyed
-    # by manifest key so the per-table loop below can build the
-    # query input + the caller can re-use the same values when
-    # building the asset row.
-    url_cache: dict[str, tuple[str, int, str]] = {}
-    table_urls: dict[str, list[str]] = defaultdict(list)
-    for asset_table_name, entries in by_table.items():
-        for filename, _entry in entries:
-            flat_dir = flat_asset_dir(
-                execution._working_dir,
-                execution.execution_rid,
-                asset_table_name,
-            )
-            src = flat_dir / filename
-            if not src.exists():
-                # ``_add_asset_rows_to_bag`` will log + skip this
-                # entry itself. Don't enqueue a URL query for a
-                # row we can't build.
-                continue
-            md5 = compute_file_hashes(src, hashes=frozenset(["md5"]))["md5"][0]
-            length = src.stat().st_size
-            url = f"/hatrac/{asset_table_name}/{md5}.{filename}"
-            url_cache[f"{asset_table_name}/{filename}"] = (
-                url,
-                length,
-                md5,
-            )
-            table_urls[asset_table_name].append(url)
-
-    existing_urls: set[str] = set()
-    rid_overrides: list[tuple[str, str]] = []
-
-    pb = ml.pathBuilder()
-    for asset_table_name, urls in table_urls.items():
-        if not urls:
-            continue
-        # ``pathBuilder()`` indexes tables by name across all
-        # schemas, but the API exposes them on the schema object.
-        # Asset tables live in either ``deriva-ml`` or the domain
-        # schema; resolve via the model so we don't have to
-        # hard-code that here.
-        try:
-            asset_table = execution._model.name_to_table(asset_table_name)
-        except Exception as e:
-            logger.warning(
-                "dedup: unknown asset table %r, skipping (%s)",
-                asset_table_name,
-                e,
-            )
-            continue
-        schema_name = asset_table.schema.name
-        table_path = pb.schemas[schema_name].tables[asset_table_name]
-        # ERMrest ``IN`` filter. Even a few hundred URLs in a
-        # single GET is well under typical URL-length limits.
-        try:
-            url_col = table_path.column_definitions["URL"]
-            # datapath's filter expression doesn't have a native
-            # ``in_`` operator, so OR-chain per-URL equality
-            # predicates. Falls back to a fetch-and-filter loop if
-            # the chain construction itself fails (defensive).
-            import operator
-            from functools import reduce
-
-            predicate = reduce(operator.or_, (url_col == u for u in urls))
-            results = list(table_path.filter(predicate).attributes(table_path.RID, table_path.URL).fetch())
-        except Exception as e:
-            logger.warning(
-                "dedup: URL lookup failed for %s, falling back to no-dedup (%r)",
-                asset_table_name,
-                e,
-            )
-            continue
-        url_to_rid = {r["URL"]: r["RID"] for r in results}
-        if not url_to_rid:
-            continue
-        existing_urls.update(url_to_rid)
-        # For each entry whose URL already exists, override its
-        # leased RID with the existing one. The leased RID is
-        # discarded (cheap — ``ERMrest_RID_Lease`` rows TTL out).
-        for filename, entry in by_table[asset_table_name]:
-            cache_key = f"{asset_table_name}/{filename}"
-            cached = url_cache.get(cache_key)
-            if cached is None:
-                continue
-            url = cached[0]
-            existing_rid = url_to_rid.get(url)
-            if existing_rid is None or existing_rid == entry.rid:
-                continue
-            rid_overrides.append((cache_key, existing_rid))
-
-    if rid_overrides:
-        logger.info(
-            "dedup: redirecting %d pending asset(s) to existing catalog RIDs (URL already present)",
-            len(rid_overrides),
-        )
-        manifest.set_asset_rids_batch(rid_overrides)
-
-    return url_cache, existing_urls
-
-
 def _add_asset_rows_to_bag(
     *,
     bb: BagBuilder,
@@ -393,46 +215,32 @@ def _add_asset_rows_to_bag(
     progress_callback: "ProgressCallback | None" = None,
     staged_so_far: int = 0,
     total_assets: int = 0,
-    url_cache: dict[str, tuple[str, int, str]] | None = None,
-    existing_urls: set[str] | None = None,
 ) -> int:
     """Add asset rows + ``*_Execution`` + ``*_Asset_Type`` rows for one table.
 
     For each pending entry:
 
     - Synthesize the asset row (RID, URL, Filename, Length, MD5,
-      Description, metadata columns) and call ``bb.add_row`` —
-      **unless** the row's URL is already in ``existing_urls``,
-      in which case the asset row + the ``bb.add_asset`` byte
-      hardlink are skipped (catalog row exists, hatrac bytes
-      exist; ``manifest.set_asset_rid`` has already redirected
-      the manifest entry to the existing RID via
-      :func:`_dedup_assets_by_url`).
+      Description, metadata columns) and call ``bb.add_row``.
     - Hardlink the on-disk asset file into the bag via
       ``bb.add_asset(..., link=True)``. Hardlink mode keeps disk
       usage flat (one inode, two directory entries).
     - Add one ``{Asset}_Execution`` association row linking the
       asset to the execution with the ``Output`` role.
-      Association rows go through **whether or not** the asset
-      row was deduped — the link from *this* execution to a
-      pre-existing asset row is itself new.
     - Add one ``{Asset}_Asset_Type`` association row per type
       the manifest entry carries. Asset-types come from the
       per-execution ``asset_type_path`` JSONL file the legacy
       path writes at ``asset_file_path()`` time.
 
-    Args:
-        url_cache: ``"{table}/{filename}" -> (url, length, md5)``
-            map populated by :func:`_dedup_assets_by_url`. When
-            present, this function reads MD5/length/URL from the
-            cache instead of re-hashing the file. ``None`` means
-            no pre-flight ran (callers outside the normal
-            pipeline); the function falls back to per-call
-            hashing.
-        existing_urls: URLs whose row already exists in the
-            destination catalog. Entries with a matching URL get
-            their asset row + ``add_asset`` step skipped. ``None``
-            or empty disables dedup (every row is inserted).
+    No URL-based or asset-type-pair dedup is done here. The
+    bag is built as if every row is new; the loader handles
+    dedup at load time via :attr:`FKTraversalPolicy.match_by_columns`,
+    configured in :func:`load_execution_bag` based on the bag's
+    asset tables. When a URL or ``(asset_rid, Asset_Type)``
+    composite already exists at the destination, the loader
+    remaps the source RID to the existing destination RID and
+    rewrites any child FK references through ``_rewrite_fks``.
+    See deriva-py PR #245.
 
     Returns:
         Updated ``staged_so_far`` counter (caller-supplied + the
@@ -443,19 +251,9 @@ def _add_asset_rows_to_bag(
     model = execution._model
     ml = execution._ml_object
     asset_table = model.name_to_table(asset_table_name)
-    schema_name = asset_table.schema.name
 
     metadata_cols = sorted(model.asset_metadata(asset_table_name))
 
-    if url_cache is None:
-        url_cache = {}
-    if existing_urls is None:
-        existing_urls = set()
-
-    # ``hatrac_uri`` template the legacy path uses:
-    # ``/hatrac/{table}/{md5}.{filename}``. Replicate here so
-    # the bag's URL column matches what the loader will PUT to
-    # at load time.
     asset_rows: list[dict[str, Any]] = []
     for filename, entry in entries:
         flat_dir = flat_asset_dir(execution._working_dir, execution.execution_rid, asset_table_name)
@@ -464,35 +262,11 @@ def _add_asset_rows_to_bag(
             logger.warning("Asset file not found, skipping: %s", src)
             continue
 
-        cache_key = f"{asset_table_name}/{filename}"
-        cached = url_cache.get(cache_key)
-        if cached is not None:
-            hatrac_url, length, md5 = cached
-        else:
-            md5 = compute_file_hashes(src, hashes=frozenset(["md5"]))["md5"][0]
-            length = src.stat().st_size
-            hatrac_url = f"/hatrac/{asset_table_name}/{md5}.{filename}"
-
-        # URL-dedup: catalog already has a row with this URL.
-        # Skip the asset row + the byte hardlink — the loader
-        # would 409 on a duplicate URL and ``UPLOAD_IF_MISSING``
-        # would no-op the hatrac PUT anyway. Association rows
-        # still go through with the (now-redirected) RID below.
-        if hatrac_url in existing_urls:
-            staged_so_far += 1
-            if progress_callback is not None and total_assets > 0:
-                progress_callback(
-                    UploadProgress(
-                        file_path=str(src),
-                        file_name=filename,
-                        bytes_completed=length,
-                        bytes_total=length,
-                        percent_complete=100.0 * staged_so_far / total_assets,
-                        phase="Staging",
-                        message=(f"Deduped {asset_table_name}/{filename} ({staged_so_far}/{total_assets})"),
-                    )
-                )
-            continue
+        md5 = compute_file_hashes(src, hashes=frozenset(["md5"]))["md5"][0]
+        length = src.stat().st_size
+        # Canonical hatrac URL convention — deriva-py PR #243's
+        # ``hatrac_url_for`` keeps the format in one place.
+        hatrac_url = hatrac_url_for(asset_table_name, md5, filename)
 
         row: dict[str, Any] = {
             "RID": entry.rid,
@@ -568,7 +342,11 @@ def _add_asset_rows_to_bag(
 
     # {Asset}_Asset_Type association rows. Asset types live in a
     # per-execution JSONL file populated by ``asset_file_path``;
-    # read it once and emit one row per (asset, type) pair.
+    # read it once and emit one row per (asset, type) pair. The
+    # loader's ``match_by_columns`` policy (configured in
+    # :func:`load_execution_bag`) handles ``(asset_rid,
+    # Asset_Type)`` dedup at load time — no pre-flight needed
+    # here.
     type_assoc, _, _ = model.find_association(asset_table_name, "Asset_Type")
     type_map = _read_asset_type_map(execution, asset_table)
 
@@ -578,27 +356,6 @@ def _add_asset_rows_to_bag(
     for _filename, entry in entries:
         for asset_type in type_map.get(_filename, []):
             type_pairs.append((entry, asset_type))
-
-    # Dedup against existing ``(asset_rid, Asset_Type)`` pairs in
-    # the destination catalog. Required when an asset row was
-    # itself deduped (URL collision): the previous execution that
-    # registered the same asset bytes likely also registered the
-    # same asset_type, and the unique key on the association
-    # table would 409 on a fresh INSERT. Legacy path used
-    # ``on_conflict_skip=True``; we replicate the semantic by
-    # filtering pairs that already exist.
-    if type_pairs:
-        existing_type_pairs = _existing_asset_type_pairs(
-            execution=execution,
-            type_assoc=type_assoc,
-            asset_table_name=asset_table_name,
-            asset_rids=list({entry.rid for entry, _ in type_pairs}),
-        )
-        type_pairs = [
-            (entry, asset_type)
-            for (entry, asset_type) in type_pairs
-            if (entry.rid, asset_type) not in existing_type_pairs
-        ]
 
     type_rows: list[dict[str, Any]] = []
     if type_pairs:
@@ -616,67 +373,6 @@ def _add_asset_rows_to_bag(
         bb.add_rows(type_assoc.name, type_rows)
 
     return staged_so_far
-
-
-def _existing_asset_type_pairs(
-    *,
-    execution: "Execution",
-    type_assoc: Any,
-    asset_table_name: str,
-    asset_rids: list[str],
-) -> set[tuple[str, str]]:
-    """Query the catalog for existing ``(asset_rid, Asset_Type)`` pairs.
-
-    The association table's unique key is on
-    ``({asset_fk_column}, Asset_Type)`` — re-inserting an existing
-    pair would 409. This helper batches one query per
-    bag-commit-call so the caller can drop conflicting pairs
-    before the bag is built.
-
-    Args:
-        execution: For pathBuilder access.
-        type_assoc: The association table object (returned by
-            ``model.find_association(asset_table_name, "Asset_Type")``).
-        asset_table_name: Name of the asset table — also the name
-            of the FK column on the association table.
-        asset_rids: Asset RIDs to check. The FK column equals one
-            of these for every row that could conflict.
-
-    Returns:
-        Set of ``(asset_rid, asset_type_term)`` pairs that are
-        already present in the catalog. Empty set on query
-        failure (caller falls back to no-dedup, which means the
-        loader will raise on the conflict — acceptable as a
-        loud-failure mode, but the production code path always
-        succeeds here).
-    """
-    if not asset_rids:
-        return set()
-    ml = execution._ml_object
-    pb = ml.pathBuilder()
-    try:
-        table_path = pb.schemas[type_assoc.schema.name].tables[type_assoc.name]
-        fk_col = table_path.column_definitions[asset_table_name]
-        import operator
-        from functools import reduce
-
-        predicate = reduce(operator.or_, (fk_col == rid for rid in asset_rids))
-        rows = list(
-            table_path.filter(predicate)
-            .attributes(
-                table_path.column_definitions[asset_table_name],
-                table_path.Asset_Type,
-            )
-            .fetch()
-        )
-    except Exception as e:
-        logger.warning(
-            "dedup: asset-type-pair lookup failed for %s, falling back to no-dedup (%r)",
-            type_assoc.name,
-            e,
-        )
-        return set()
-    return {(r[asset_table_name], r["Asset_Type"]) for r in rows}
 
 
 def _add_staged_feature_rows_to_bag(
@@ -835,6 +531,41 @@ def load_execution_bag(
                 message="Loading bag into destination catalog",
             )
         )
+
+    # Build the ``match_by_columns`` map (deriva-py PR #245). Two
+    # kinds of tables need caller-supplied unique-key reconcile:
+    #
+    # 1. Each **asset table** dedups by ``URL``. Asset table URLs
+    #    are content-hashed (``/hatrac/{table}/{md5}.{filename}``);
+    #    re-uploading the same file content (typically across
+    #    executions of the same project, e.g. ``uv.lock``) would
+    #    otherwise 409 on the table's ``URL`` unique key.
+    # 2. Each **``{Asset}_Asset_Type``** association table dedups
+    #    by its composite ``(asset_fk_column, Asset_Type)`` key.
+    #    When an asset row was itself deduped to an existing
+    #    destination row, the previous execution that registered
+    #    that asset likely also registered the same asset-type;
+    #    inserting the pair again would fail the association
+    #    table's unique key. The loader's ``match_by_columns``
+    #    redirect handles both: source RIDs in the bag get remapped
+    #    to the destination's existing RIDs and child FK references
+    #    are rewritten via ``_rewrite_fks``.
+    match_by_columns: dict[tuple[str, str], list[str]] = {}
+    model = execution._model
+    for schema in model.schemas:
+        for table in model.schemas[schema].tables.values():
+            if not model.is_asset(table):
+                continue
+            match_by_columns[(schema, table.name)] = ["URL"]
+            try:
+                type_assoc, _, _ = model.find_association(table.name, "Asset_Type")
+            except Exception:  # noqa: BLE001 — defensive; no asset-type table
+                continue
+            match_by_columns[(type_assoc.schema.name, type_assoc.name)] = [
+                table.name,
+                "Asset_Type",
+            ]
+
     policy = FKTraversalPolicy(
         # Output rows reference Subject / Observation / Workflow
         # parents that already exist at the destination but were
@@ -853,6 +584,10 @@ def load_execution_bag(
         # vocab terms it references already exist at the
         # destination. No vocab-export pressure here.
         vocab_export=VocabExport.REFERENCED_ONLY,
+        # See the ``match_by_columns`` construction above — handles
+        # URL-key dedup on asset tables and ``(asset, type)`` dedup
+        # on the ``{Asset}_Asset_Type`` association tables.
+        match_by_columns=match_by_columns,
     )
     loader = BagCatalogLoader(
         catalog=execution._ml_object.catalog,
@@ -860,11 +595,12 @@ def load_execution_bag(
         database_dir=database_dir,
         policy=policy,
     )
-    # Centralised loop-detection fallback. ``BagCatalogLoader.arun``
-    # is async; the public ``run`` would call ``asyncio.run`` and
-    # raise in a notebook context. See
-    # :func:`deriva_ml.core.async_helpers.run_async`.
-    report = run_async(loader.arun())
+    # ``BagCatalogLoader.run`` now handles the notebook-loop
+    # fallback itself (deriva-py #241): outside a running loop it
+    # uses ``asyncio.run``, inside one it falls back to
+    # ``nest_asyncio`` + ``loop.run_until_complete``. No
+    # deriva-ml-side helper needed.
+    report = loader.run()
 
     # Per-table completion summaries. The loader's ``LoadReport``
     # carries ``assets_uploaded`` and ``assets_deduped`` per
