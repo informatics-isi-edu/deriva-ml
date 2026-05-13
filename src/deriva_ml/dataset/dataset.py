@@ -479,6 +479,24 @@ class Dataset:
         """
         return self._ml_instance.model.schemas[self._ml_instance.ml_schema].tables["Dataset"]
 
+    def _element_to_association_map(self) -> dict[str, str]:
+        """Return ``{member_table_name: association_table_name}`` for the Dataset.
+
+        For each ``Dataset_X`` association on the Dataset table,
+        record the *other* (non-Dataset) endpoint's table name as the
+        key and the association table name as the value. Used by
+        :meth:`add_dataset_members` and :meth:`delete_dataset_members`
+        to route a member RID to the correct ``Dataset_X`` row to
+        insert / delete.
+
+        Returns:
+            ``{element_type_name -> Dataset_ElementType_name}`` map.
+        """
+        return {
+            a.other_fkeys.pop().pk_table.name: a.table.name
+            for a in self._dataset_table.find_associations()
+        }
+
     # ==================== Read Interface Methods ====================
     # These methods implement the DatasetLike protocol for read operations.
     # They delegate to the catalog instance for actual data retrieval.
@@ -1955,9 +1973,8 @@ class Dataset:
         # need to be made.
         dataset_elements: dict[str, list[RID]] = {}
 
-        # Build map of valid element tables to their association tables
-        associations = list(self._dataset_table.find_associations())
-        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in associations}
+        # Map of valid element tables to their association tables.
+        association_map = self._element_to_association_map()
 
         # Get a list of all the object types that can be linked to a dataset_table.
         if type(members) is list:
@@ -2053,8 +2070,7 @@ class Dataset:
         # Go through every rid to be deleted and sort them based on what association table entries
         # need to be removed.
         dataset_elements: dict[str, list[RID]] = {}
-        associations = list(self._dataset_table.find_associations())
-        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in associations}
+        association_map = self._element_to_association_map()
 
         # Batch resolve all RIDs in one query per candidate table instead
         # of one network round-trip per RID. Mirrors the optimization in
