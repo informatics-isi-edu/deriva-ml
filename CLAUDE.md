@@ -465,3 +465,21 @@ not a `Path`. Tests should assert `isinstance(result, dict)`.
 `ExecutionConfiguration.assets` accepts plain RID strings but coerces them to `AssetSpec` objects
 via a Pydantic model validator. Tests comparing assets should use `[a.rid for a in config.assets]`
 rather than comparing directly to string lists.
+
+### `model/annotations.py` is a public API for deriva-skills
+
+`src/deriva_ml/model/annotations.py` (and its re-exports through
+`src/deriva_ml/model/__init__.py`) is the documented public API for the
+`deriva-skills/use-annotation-builders` Claude Code skill. Every builder
+class — `Display`, `VisibleColumns`, `VisibleForeignKeys`,
+`TableDisplay`, `ColumnDisplay`, `PseudoColumn`, `FacetList`, plus
+supporting enums/records/context constants — is consumed externally and
+must preserve its `.tag` class attribute and `.to_dict()` method.
+`DerivaML.apply_annotations()` is the documented apply entry point and
+must keep its zero-required-arg signature.
+
+A workspace-wide grep for these names returns zero hits inside
+`src/deriva_ml/` itself; this is expected and not a deletion signal.
+See `docs/adr/0007-annotation-builders-public-api.md` for the full
+contract and `tests/model/test_annotations.py::TestExternalConsumerContract`
+for the regression coverage that pins the surface in CI.

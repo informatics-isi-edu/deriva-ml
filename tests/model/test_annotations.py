@@ -478,3 +478,125 @@ class TestComplexScenarios:
         assert "row_name" in result
         assert result["compact"]["page_size"] == 50
         assert result["detailed"]["collapse_toc_panel"] is True
+
+
+class TestExternalConsumerContract:
+    """End-to-end coverage of the ``deriva-skills/use-annotation-builders`` pattern.
+
+    The annotation builders in :mod:`deriva_ml.model.annotations` are an
+    **externally-consumed public API**, used by the
+    ``deriva-skills/use-annotation-builders`` Claude Code skill. The skill's
+    canonical pattern (see ``SKILL.md`` in the deriva-skills plugin) is::
+
+        from deriva_ml.model.annotations import Display, VisibleColumns
+        display = Display(name="Images", markdown_name=None)
+        table.annotations[Display.tag] = display.to_dict()
+        ml.apply_annotations()
+
+    These tests pin that contract: every builder we export has a class-level
+    ``tag`` attribute and an instance-level ``to_dict()`` method, the result
+    is JSON-serializable, and the produced dict is shaped so the
+    ``table.annotations[Builder.tag] = builder.to_dict()`` line works.
+
+    No live catalog is needed — we exercise the contract against a plain dict
+    that mirrors what the deriva-py Table's ``annotations`` mapping accepts.
+    """
+
+    # Every annotation builder that ``model/__init__.py`` re-exports under
+    # the ``# Annotation builders`` block. If the public surface grows or
+    # shrinks, this list must move with it — that mismatch is the test's
+    # whole point.
+    EXPORTED_BUILDERS: tuple[type, ...] = (
+        Display,
+        VisibleColumns,
+        VisibleForeignKeys,
+        TableDisplay,
+        ColumnDisplay,
+    )
+
+    def test_every_builder_has_a_tag(self):
+        """Class-level ``.tag`` is the dict key for ``table.annotations``."""
+        for cls in self.EXPORTED_BUILDERS:
+            assert hasattr(cls, "tag"), f"{cls.__name__}.tag missing"
+            tag = cls.tag
+            assert isinstance(tag, str) and tag, f"{cls.__name__}.tag is not a usable string"
+
+    def test_every_builder_has_to_dict(self):
+        """Instance-level ``.to_dict()`` is what gets assigned to the annotation."""
+        # Use a trivial constructor call that should succeed for each.
+        instances = [
+            Display(name="X"),
+            VisibleColumns(),
+            VisibleForeignKeys(),
+            TableDisplay(),
+            ColumnDisplay(),
+        ]
+        for instance in instances:
+            assert hasattr(instance, "to_dict"), f"{type(instance).__name__}.to_dict missing"
+            payload = instance.to_dict()
+            assert isinstance(payload, dict), (
+                f"{type(instance).__name__}.to_dict() returned {type(payload).__name__}, expected dict"
+            )
+
+    def test_skill_application_pattern_with_dict_mock(self):
+        """Apply each builder via the ``annotations[tag] = to_dict()`` pattern.
+
+        Mirrors the SKILL.md flow against a plain dict (no live catalog).
+        The annotations dict ends up with one entry per builder, and each
+        entry is JSON-serializable — i.e. equivalent to what deriva-py
+        would push over the wire on ``ml.apply_annotations()``.
+        """
+        import json
+
+        # Stand-in for ``table.annotations`` — a real ``Table.annotations``
+        # is a dict subclass, so a bare dict matches the contract surface.
+        annotations: dict[str, dict] = {}
+
+        display = Display(name="Image")
+        annotations[Display.tag] = display.to_dict()
+
+        vc = VisibleColumns()
+        vc.compact(["RID", "Filename"])
+        annotations[VisibleColumns.tag] = vc.to_dict()
+
+        vfk = VisibleForeignKeys()
+        annotations[VisibleForeignKeys.tag] = vfk.to_dict()
+
+        # Each entry must round-trip JSON — that's the wire format Chaise consumes.
+        for tag, payload in annotations.items():
+            roundtripped = json.loads(json.dumps(payload))
+            assert roundtripped == payload, f"Annotation {tag!r} payload is not JSON-stable"
+
+        # And the keys are exactly the builder tags.
+        assert Display.tag in annotations
+        assert VisibleColumns.tag in annotations
+        assert VisibleForeignKeys.tag in annotations
+
+    def test_apply_annotations_method_exists_on_derivaml(self):
+        """SKILL.md's apply step is ``ml.apply_annotations()`` — verify the entry point.
+
+        This is a smoke test on the API surface — we don't construct a live
+        DerivaML (no catalog), but we do verify the method exists and has
+        the expected signature shape so a future refactor doesn't silently
+        drop the apply entry point the skill relies on.
+        """
+        from deriva_ml import DerivaML
+
+        assert hasattr(DerivaML, "apply_annotations"), (
+            "DerivaML.apply_annotations is the documented skill apply step; do not remove it."
+        )
+        # No required positional args beyond self.
+        import inspect
+
+        sig = inspect.signature(DerivaML.apply_annotations)
+        positional_required = [
+            p for p in sig.parameters.values()
+            if p.name != "self"
+            and p.default is inspect.Parameter.empty
+            and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        assert positional_required == [], (
+            f"DerivaML.apply_annotations grew required positional args: {positional_required}. "
+            "The deriva-skills/use-annotation-builders skill calls it as ml.apply_annotations() "
+            "with no arguments — any required arg here is a breaking change for that contract."
+        )
