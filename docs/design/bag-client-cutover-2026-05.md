@@ -235,20 +235,30 @@ builder is unchanged.
 
 ### Migration story for users with existing caches
 
-`BagCache.cache_status` keeps the glob-fallback **only until the next
-patch release after this PR lands**. During the transition (one
-release window), users with legacy directories still get cache hits
-through the BagCache surface — but the *download* path doesn't write
-legacy directories anymore. On the second release, the glob fallback
-is removed.
+**None.** Existing cache directories are not honored after this PR. On
+the first run after upgrade, the index lookup finds nothing for any
+dataset RID and the download path rebuilds the bag from scratch into
+the new content-addressed layout (`{cache_root}/bags/{checksum}/`).
+Stale `{rid}_{checksum}_{snapshot}/` directories at the cache root
+are left untouched and become disk-space cruft until the user clears
+them.
 
-Alternative considered: write to both layouts during transition.
-Rejected — doubles disk usage per bag for no real win.
+This is acceptable because:
 
-A separate `deriva-ml migrate-cache` command would walk legacy
-directories and `BagCacheIndex.record(...)` them into the new layout.
-Not in scope for this PR — handled in a follow-up if user demand
-emerges.
+- The dataset-download pipeline is the only producer of cached bags;
+  there are no out-of-tree callers writing into the legacy layout.
+- A "cache miss → rebuild" is a slow first run, not a correctness
+  problem. Subsequent runs hit the new layout normally.
+- Migrating legacy directories into the index would require parsing
+  the legacy `{rid}_{spec_hash[:16]}_{snapshot}` directory name back
+  into its constituent fields, re-deriving the `spec_hash`, and
+  trusting that the legacy bag is still byte-identical to what the
+  current code would produce. Not worth the carry — the bags are
+  cheap to rebuild.
+
+Consequently the glob-fallback in `BagCache.cache_status` and the
+`validated_check.txt`-marker logic go away in **this same PR**
+(no two-release transition).
 
 ## Tests
 
@@ -262,16 +272,17 @@ emerges.
 | FK-join timeout error message | New test in `test_download.py` covering the wrapper |
 | Non-default `cache_dir` honored | `test_dataset_caching.py::test_non_default_cache_directory` |
 
-A new test case `test_legacy_layout_no_longer_written` asserts that a
-fresh download does NOT create a `{rid}_{checksum}_{snapshot}/`
-directory at the cache root, only `bags/{checksum}/...`. This guards
-the Step-12 transition during the one-release deprecation window.
+A new test case `test_cache_uses_index_layout_only` asserts that a
+fresh download produces only the `bags/{checksum}/` layout under the
+cache root, never the legacy `{rid}_{spec_hash}_{snapshot}/` directory.
+Guards against accidental reintroduction of the old layout.
 
 ## Scope and risk
 
 - **LoC change**: −231 (delete `_create_dataset_bag_client`),
-  +60 (`build_bag` + Tier-1 rewrite), −80 (legacy-glob fallback
-  removal). Net ≈ **−250 LoC**.
+  +60 (`build_bag` + Tier-1 rewrite), −80 (legacy-glob fallback +
+  `validated_check.txt` handling, removed in this same PR — see
+  "Migration story"). Net ≈ **−250 LoC**.
 - **Risk: medium**. Touches the load-bearing download path. Mitigated
   by the eight-invariant table and a comprehensive run of
   `tests/dataset/` against a live catalog before merge.
@@ -281,10 +292,12 @@ the Step-12 transition during the one-release deprecation window.
 
 ## Rollout
 
-1. PR #111: implements Steps 11 + 12 as described here. Drops
-   `_create_dataset_bag_client`, rewires Tier 1, writes to the
-   index layout, keeps the glob fallback for one release.
-2. Patch release (`v1.36.0`): users get the new layout. Caches built
-   pre-release still load via the fallback.
-3. PR #112: removes the glob fallback. Released as `v1.37.0` minimum
-   one release after PR #111.
+1. PR #111: implements Steps 11 + 12 in one PR. Drops
+   `_create_dataset_bag_client`, rewires Tier 1 onto `BagCacheIndex`,
+   writes to the index layout on download, and **deletes the
+   glob-based legacy fallback** in `BagCache.cache_status` and
+   `_determine_legacy_status` along with the
+   `validated_check.txt`-marker handling. Existing caches are not
+   migrated — see the "Migration story" section above for the
+   rationale.
+2. Minor release (`v1.36.0`).
