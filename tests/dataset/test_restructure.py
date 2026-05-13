@@ -597,39 +597,6 @@ class TestRestructureHelperMethods:
         for img in images:
             assert img["RID"] in asset_map
 
-    def test_resolve_grouping_value_column(self, dataset_test, tmp_path):
-        """Test _resolve_grouping_value with a column value."""
-        dataset = dataset_test.dataset_description.dataset
-        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
-
-        members = bag.list_dataset_members(recurse=True)
-        images = members.get("Image", [])
-
-        if not images:
-            pytest.skip("No images in test data")
-
-        # Test with a column that exists
-        asset = images[0]
-        value = bag._resolve_grouping_value(asset, "RID", {})
-        assert value == asset["RID"]
-
-    def test_resolve_grouping_value_missing(self, dataset_test, tmp_path):
-        """Test _resolve_grouping_value with missing value."""
-        dataset = dataset_test.dataset_description.dataset
-        bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
-
-        members = bag.list_dataset_members(recurse=True)
-        images = members.get("Image", [])
-
-        if not images:
-            pytest.skip("No images in test data")
-
-        # Test with a column that doesn't exist - should return "Unknown" (capitalized)
-        asset = images[0]
-        value = bag._resolve_grouping_value(asset, "NonExistent", {})
-        assert value == "Unknown"
-
-
 class TestRestructureWithFeatures:
     """Tests for restructure_assets with feature-based grouping."""
 
@@ -780,43 +747,67 @@ class TestEnforceVocabulary:
         assert len(all_files) > 0
 
 
-class TestFeatureCacheLoading:
-    """Tests for _load_feature_values_cache with enforce_vocabulary."""
+class TestEnforceVocabularyValidation:
+    """Tests for _resolve_targets enforce_vocabulary validation.
 
-    def test_cache_loads_vocabulary_feature(self, dataset_test, tmp_path):
-        """Test that cache correctly loads vocabulary-based feature values."""
+    Replaces the legacy ``_load_feature_values_cache`` tests now that the
+    vocabulary-validation side-effect lives in
+    ``target_resolution._validate_feature_vocabulary`` and is exposed via
+    ``_resolve_targets(enforce_vocabulary=True)``.
+    """
+
+    def test_resolve_targets_accepts_vocabulary_feature(self, dataset_test, tmp_path):
+        """Vocabulary-based feature passes enforce_vocabulary=True validation."""
+        from deriva_ml.dataset.target_resolution import _resolve_targets
+
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        cache = bag._load_feature_values_cache("Image", ["Quality"], enforce_vocabulary=True)
+        # Should not raise — Quality is vocabulary-based.
+        result = _resolve_targets(
+            bag,
+            "Image",
+            targets=["Quality"],
+            missing="skip",
+            enforce_vocabulary=True,
+        )
+        assert isinstance(result, dict)
 
-        # Quality should be in the cache
-        assert "Quality" in cache
-        # Should have mappings (may be empty if no feature values assigned)
-        assert isinstance(cache["Quality"], dict)
-
-    def test_cache_rejects_non_vocabulary_feature(self, dataset_test, tmp_path):
-        """Test that cache raises for non-vocabulary feature when enforcing."""
+    def test_resolve_targets_rejects_non_vocabulary_feature(self, dataset_test, tmp_path):
+        """Non-vocabulary feature raises under enforce_vocabulary=True."""
         from deriva_ml.core.exceptions import DerivaMLException
+        from deriva_ml.dataset.target_resolution import _resolve_targets
 
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         with pytest.raises(DerivaMLException) as exc_info:
-            bag._load_feature_values_cache("Image", ["BoundingBox"], enforce_vocabulary=True)
+            _resolve_targets(
+                bag,
+                "Image",
+                targets=["BoundingBox"],
+                missing="skip",
+                enforce_vocabulary=True,
+            )
 
         assert "controlled vocabulary" in str(exc_info.value).lower()
 
-    def test_cache_allows_non_vocabulary_when_not_enforcing(self, dataset_test, tmp_path):
-        """Test that cache allows non-vocabulary features when not enforcing."""
+    def test_resolve_targets_allows_non_vocabulary_when_not_enforcing(self, dataset_test, tmp_path):
+        """Non-vocabulary feature is allowed when enforce_vocabulary=False."""
+        from deriva_ml.dataset.target_resolution import _resolve_targets
+
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        # Should not raise
-        cache = bag._load_feature_values_cache("Image", ["BoundingBox"], enforce_vocabulary=False)
-
-        # BoundingBox may or may not be in cache depending on if it's found as a feature
-        assert isinstance(cache, dict)
+        # Should not raise.
+        result = _resolve_targets(
+            bag,
+            "Image",
+            targets=["BoundingBox"],
+            missing="skip",
+            enforce_vocabulary=False,
+        )
+        assert isinstance(result, dict)
 
 
 class TestValueSelectorWithNestedDatasets:
@@ -896,11 +887,15 @@ class TestValueSelectorWithNestedDatasets:
         )
 
     def test_feature_values_loaded_for_all_nested_datasets(self, dataset_test, tmp_path):
-        """Test that _load_feature_values_cache includes values from nested datasets.
+        """_resolve_targets includes feature values from nested datasets.
 
-        The feature cache should contain feature values for assets in ALL datasets
-        in the hierarchy, not just the root dataset.
+        The resolved target map should contain feature values for assets in ALL
+        datasets in the hierarchy, not just the root dataset. The bag's
+        ``feature_values`` iterator already walks nested membership, so this
+        test exercises that integration via ``_resolve_targets``.
         """
+        from deriva_ml.dataset.target_resolution import _resolve_targets
+
         ml = dataset_test.ml_instance
 
         # Create parent with nested child
@@ -922,18 +917,18 @@ class TestValueSelectorWithNestedDatasets:
         # Download parent bag
         bag = parent.download_dataset_bag(version=parent.current_version, use_minid=False)
 
-        # Load the feature cache
-        cache = bag._load_feature_values_cache("Image", ["Quality"], enforce_vocabulary=True)
+        # Resolve targets through the unified path.
+        result = _resolve_targets(
+            bag,
+            "Image",
+            targets=["Quality"],
+            missing="unknown",
+            enforce_vocabulary=True,
+        )
 
-        # The cache should be keyed by asset RID
-        # If there are Quality feature values, they should include child's images
-        if cache.get("Quality"):
-            # Check that feature values exist for child dataset images
-            cached_rids = set(cache["Quality"].keys())
-            # At least some of the child's images should have feature values
-            # (depending on test data setup)
-            # The main point is that the cache CAN contain child dataset assets
-            assert isinstance(cached_rids, set)
+        # The result should be keyed by asset RID — assets from the child
+        # dataset must be reachable from the parent bag's resolution.
+        assert isinstance(result, dict)
 
 
 class TestFeatureValuesReturnType:

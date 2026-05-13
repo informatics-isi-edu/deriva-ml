@@ -29,12 +29,55 @@ if TYPE_CHECKING:
 _MISSING_ERROR_RID_LIST_LIMIT = 20
 
 
+def _validate_feature_vocabulary(
+    bag: "DatasetBag",
+    element_type: str,
+    feature_names: list[str],
+) -> None:
+    """Validate that each named feature on ``element_type`` is vocabulary-based.
+
+    A feature is vocabulary-based when it has at least one controlled-vocabulary
+    term column. ``restructure_assets`` and other class-folder style export
+    flows require this so that the resolved value is a stable directory name.
+
+    Looks up each feature via ``bag.lookup_feature(element_type, name)`` and
+    raises ``DerivaMLException`` if any feature exists but has no term columns.
+    Missing features (where ``lookup_feature`` raises) are silently ignored
+    here — ``_resolve_targets``'s feature_values walk handles that case via the
+    ``missing`` policy.
+
+    Args:
+        bag: Source ``DatasetBag``.
+        element_type: Table name to look features up on.
+        feature_names: Feature names to validate.
+
+    Raises:
+        DerivaMLException: If a feature exists on ``element_type`` and has no
+            controlled-vocabulary term columns.
+    """
+    for feature_name in feature_names:
+        try:
+            feat = bag.lookup_feature(element_type, feature_name)
+        except Exception:
+            # Not a feature on this table; nothing to validate here.
+            continue
+        if not list(feat.term_columns):
+            raise DerivaMLException(
+                f"Feature {feature_name!r} on table {element_type!r} has no "
+                f"controlled vocabulary term columns. Only vocabulary-based "
+                f"features can be used for class-folder grouping when "
+                f"enforce_vocabulary=True. Set enforce_vocabulary=False to "
+                f"allow non-vocabulary features."
+            )
+
+
 def _resolve_targets(
     bag: "DatasetBag",
     element_type: str,
     *,
     targets: "list[str] | dict[str, FeatureSelector] | None",
     missing: Literal["error", "skip", "unknown"],
+    enforce_vocabulary: bool = False,
 ) -> "dict[str, Any]":
     """Resolve feature values into per-element target records.
 
@@ -54,6 +97,13 @@ def _resolve_targets(
             ``dict[str, FeatureSelector]`` passes per-feature selectors
             through to ``bag.feature_values``.
         missing: Policy for elements with no feature value.
+        enforce_vocabulary: If True, every named feature on
+            ``element_type`` must have at least one controlled-vocabulary
+            term column. Required by class-folder style exporters
+            (``restructure_assets``) where the resolved value must be a
+            stable directory name. Defaults to False for adapter callers
+            (``as_torch_dataset``, ``as_tf_dataset``) that consume the
+            FeatureRecord directly.
 
     Returns:
         Dict keyed by element RID. Value shape:
@@ -66,7 +116,9 @@ def _resolve_targets(
 
     Raises:
         DerivaMLException: If ``missing="error"`` and any element lacks a
-            feature value (message lists up to 20 unlabeled RIDs).
+            feature value (message lists up to 20 unlabeled RIDs), or if
+            ``enforce_vocabulary=True`` and a named feature has no term
+            columns.
     """
     if not targets:
         return {}
@@ -77,6 +129,9 @@ def _resolve_targets(
         feature_specs: list[tuple[str, Any]] = [(name, None) for name in targets]
     else:
         feature_specs = list(targets.items())
+
+    if enforce_vocabulary:
+        _validate_feature_vocabulary(bag, element_type, [name for name, _ in feature_specs])
 
     # Walk features and collect records keyed by target-element RID.
     # The target column is the element_type's name (e.g., "Image" on an
