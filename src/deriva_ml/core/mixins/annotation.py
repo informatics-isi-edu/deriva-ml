@@ -25,6 +25,7 @@ Table = _ermrest_model.Table
 from pydantic import ConfigDict, validate_call
 
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -76,7 +77,7 @@ class AnnotationMixin:
     # Core Annotation Operations
     # =========================================================================
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def get_table_annotations(self, table: str | Table) -> dict[str, Any]:
         """Get all Chaise display-related annotations for a table.
 
@@ -110,7 +111,7 @@ class AnnotationMixin:
             "table_display": table_obj.annotations.get(TABLE_DISPLAY_TAG),
         }
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def get_column_annotations(self, table: str | Table, column_name: str) -> dict[str, Any]:
         """Get all Chaise display-related annotations for a column.
 
@@ -143,7 +144,7 @@ class AnnotationMixin:
             "column_display": column.annotations.get(COLUMN_DISPLAY_TAG),
         }
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def set_display_annotation(
         self,
         table: str | Table,
@@ -192,7 +193,7 @@ class AnnotationMixin:
                 table_obj.annotations[DISPLAY_TAG] = annotation
             return table_obj.name
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def set_visible_columns(
         self,
         table: str | Table,
@@ -235,7 +236,7 @@ class AnnotationMixin:
 
         return table_obj.name
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def set_visible_foreign_keys(
         self,
         table: str | Table,
@@ -279,7 +280,7 @@ class AnnotationMixin:
 
         return table_obj.name
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def set_table_display(
         self,
         table: str | Table,
@@ -321,7 +322,7 @@ class AnnotationMixin:
 
         return table_obj.name
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def set_column_display(
         self,
         table: str | Table,
@@ -365,7 +366,7 @@ class AnnotationMixin:
 
         return f"{table_obj.name}.{column_name}"
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def set_strict_preallocated_rid(
         self,
         table: str | Table,
@@ -409,7 +410,7 @@ class AnnotationMixin:
             table_obj.annotations.pop(STRICT_PREALLOCATED_RID_TAG, None)
         return table_obj.name
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def is_strict_preallocated_rid(self, table: str | Table) -> bool:
         """Return True if the asset table has the strict-preallocated-RID annotation set.
 
@@ -450,7 +451,7 @@ class AnnotationMixin:
     # Visible Columns Convenience Methods
     # =========================================================================
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_visible_column(
         self,
         table: str | Table,
@@ -518,7 +519,7 @@ class AnnotationMixin:
 
         return context_list
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def remove_visible_column(
         self,
         table: str | Table,
@@ -604,7 +605,7 @@ class AnnotationMixin:
 
         return context_list
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def reorder_visible_columns(
         self,
         table: str | Table,
@@ -683,7 +684,7 @@ class AnnotationMixin:
     # Visible Foreign Keys Convenience Methods
     # =========================================================================
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_visible_foreign_key(
         self,
         table: str | Table,
@@ -749,7 +750,7 @@ class AnnotationMixin:
 
         return context_list
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def remove_visible_foreign_key(
         self,
         table: str | Table,
@@ -833,7 +834,7 @@ class AnnotationMixin:
 
         return context_list
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def reorder_visible_foreign_keys(
         self,
         table: str | Table,
@@ -914,7 +915,7 @@ class AnnotationMixin:
     # Template Helpers
     # =========================================================================
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def get_handlebars_template_variables(self, table: str | Table) -> dict[str, Any]:
         """Get all available template variables for a table.
 

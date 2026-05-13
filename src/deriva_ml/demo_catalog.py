@@ -32,6 +32,7 @@ from deriva_ml.execution.execution import Execution, ExecutionConfiguration
 from deriva_ml.schema import (
     create_ml_catalog,
 )
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 TEST_DATASET_SIZE = 12
@@ -123,9 +124,9 @@ class DatasetDescription(BaseModel):
     ]  # Either a list of nested dataset, or then number of elements to add
     member_rids: dict[str, list[RID]] = {}  # The rids of the members of the dataset.
     version: DatasetVersion = DatasetVersion(1, 0, 0)  # The initial version.
-    dataset: Dataset = None  # RID of dataset that was created.
+    dataset: Dataset | None = None  # RID of dataset that was created.
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
 
 def create_datasets(

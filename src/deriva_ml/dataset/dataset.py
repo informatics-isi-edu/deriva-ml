@@ -90,6 +90,7 @@ from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 def _hash_spec(spec: Any) -> str:
@@ -148,7 +149,7 @@ class Dataset:
         >>> bag = dataset.download_dataset_bag(version=new_version)  # doctest: +SKIP
     """
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def __init__(
         self,
         catalog: DerivaMLCatalog,
@@ -250,7 +251,7 @@ class Dataset:
         return [ds[MLVocab.dataset_type] for ds in ds_types]
 
     @staticmethod
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def create_dataset(
         ml_instance: DerivaMLCatalog,
         execution_rid: RID,
@@ -724,7 +725,7 @@ class Dataset:
         return entries
 
     @property
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def current_version(self) -> DatasetVersion:
         """Return the dataset's current version label.
 
@@ -886,7 +887,7 @@ class Dataset:
         for parent in parents:
             parent._build_dataset_graph_1(ts, visited)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def _increment_dataset_version(
         self,
         component: VersionPart,
@@ -1484,7 +1485,7 @@ class Dataset:
             execution_rid=execution_rid,
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_dataset_members(
         self,
         recurse: bool = False,
@@ -1859,7 +1860,7 @@ class Dataset:
         )
         return result.to_dataframe()
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_dataset_members(
         self,
         members: list[RID] | dict[str, list[RID]],
@@ -2007,7 +2008,7 @@ class Dataset:
                 execution_rid=execution_rid,
             )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def delete_dataset_members(
         self,
         members: list[RID],
@@ -2104,7 +2105,7 @@ class Dataset:
             execution_rid=execution_rid,
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_dataset_parents(
         self,
         recurse: bool = False,
@@ -2169,7 +2170,7 @@ class Dataset:
                 parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited, version=None))
         return parents
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_dataset_children(
         self,
         recurse: bool = False,
@@ -2350,7 +2351,7 @@ class Dataset:
             [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def download_dataset_bag(
         self,
         version: DatasetVersion | str,
@@ -2434,7 +2435,7 @@ class Dataset:
         db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
         return DerivaMLBagView(db_model).lookup_dataset(self.dataset_rid)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def estimate_bag_size(
         self,
         version: DatasetVersion | str,
@@ -2643,7 +2644,7 @@ class Dataset:
             "total_estimated_size": self._human_readable_size(total_size),
         }
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def bag_info(
         self,
         version: DatasetVersion | str,

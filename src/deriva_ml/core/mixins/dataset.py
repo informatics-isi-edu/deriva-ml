@@ -29,6 +29,7 @@ from deriva_ml.dataset.validation import (
     ExecutionConfigurationValidationReport,
     WorkflowSpecResult,
 )
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset import Dataset
@@ -218,7 +219,7 @@ class DatasetMixin:
         """
         return self.model.list_dataset_element_types()
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """Make it possible to add objects from ``element`` table to a dataset.
 

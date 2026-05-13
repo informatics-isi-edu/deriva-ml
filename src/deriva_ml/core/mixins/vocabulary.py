@@ -24,6 +24,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLInvalidTerm,
     DerivaMLTableTypeError,
 )
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -101,7 +102,7 @@ class VocabularyMixin:
         cache[cache_key] = term_lookup
         return term_lookup
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_term(
         self,
         table: str | Table,
@@ -191,7 +192,7 @@ class VocabularyMixin:
                 raise DerivaMLInvalidTerm(vocab_table.name, term_name, msg="term already exists")
             return existing_term
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def lookup_term(self, table: str | Table, term_name: str) -> VocabularyTermHandle:
         """Finds a term in a vocabulary table.
 
@@ -384,7 +385,7 @@ class VocabularyMixin:
         """
         self._update_term_field(table, term_name, "Description", description)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def delete_term(self, table: str | Table, term_name: str) -> None:
         """Delete a term from a vocabulary table.
 

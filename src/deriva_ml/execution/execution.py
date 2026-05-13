@@ -85,6 +85,7 @@ from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
@@ -157,7 +158,7 @@ class Execution:
             >>> execution.upload_execution_outputs()  # doctest: +SKIP
     """
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def __init__(
         self,
         configuration: ExecutionConfiguration,
@@ -982,7 +983,7 @@ class Execution:
         )
         return len(features)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
         """Downloads and materializes a dataset for use in the execution.
 
@@ -1164,7 +1165,7 @@ class Execution:
                 [{"RID": self.execution_rid, "Duration": duration_str}]
             )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def download_asset(
         self,
         asset_rid: RID,
@@ -1262,7 +1263,7 @@ class Execution:
             )
         return asset_path
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def upload_assets(
         self,
         assets_dir: str | Path,
@@ -1744,7 +1745,7 @@ class Execution:
                 on_conflict_skip=True,
             )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def asset_file_path(
         self,
         asset_name: str,
@@ -2059,7 +2060,7 @@ class Execution:
                 pass  # Skip assets that can't be looked up
         return assets
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def create_dataset(
         self,
         dataset_types: str | list[str] | None = None,
@@ -2103,7 +2104,7 @@ class Execution:
             description=description,
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_files(
         self,
         files: Iterable[FileSpec],

@@ -34,6 +34,7 @@ from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.workflow import Workflow
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 class ExecutionConfiguration(BaseModel):
@@ -82,7 +83,7 @@ class ExecutionConfiguration(BaseModel):
     argv: list[str] = Field(default_factory=lambda: sys.argv)
     config_choices: dict[str, str] = Field(default_factory=dict)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @field_validator("assets", mode="before")
     @classmethod

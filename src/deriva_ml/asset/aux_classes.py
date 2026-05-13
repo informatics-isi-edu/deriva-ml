@@ -16,6 +16,7 @@ from hydra_zen import hydrated_dataclass
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from deriva_ml.core.definitions import RID
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset_record import AssetRecord
@@ -174,7 +175,7 @@ class AssetSpec(BaseModel):
     asset_role: str = "Input"
     cache: bool = False
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @model_validator(mode="before")
     @classmethod

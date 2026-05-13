@@ -69,6 +69,7 @@ from deriva_ml.core.definitions import (
 )
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.model.catalog import DerivaModel
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 NULL_SENTINEL = "__NULL__"
 """Directory-segment marker for nullable asset-metadata columns with
@@ -331,7 +332,7 @@ def bulk_upload_configuration(model: DerivaModel, chunk_size: int | None = None)
 DEFAULT_UPLOAD_TIMEOUT = (600, 600)
 
 
-@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+@validate_call(config=VALIDATION_CONFIG)
 def upload_directory(
     model: DerivaModel,
     directory: Path | str,
@@ -524,7 +525,7 @@ def upload_directory(
         return all_results
 
 
-@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+@validate_call(config=VALIDATION_CONFIG)
 def upload_asset(model: DerivaModel, file: Path | str, table: Table, **kwargs: Any) -> dict:
     """Upload the specified file into Hatrac and update the associated asset table.
 

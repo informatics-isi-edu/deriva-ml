@@ -27,6 +27,7 @@ from requests import RequestException
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError, DerivaMLException
 from deriva_ml.execution.find_caller import _get_calling_module
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.interfaces import DerivaMLCatalog
@@ -138,7 +139,7 @@ class Workflow(BaseModel):
             >>> workflow.description = "New description"  # Raises DerivaMLException
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     name: str
     workflow_type: str | list[str]

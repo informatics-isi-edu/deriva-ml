@@ -36,6 +36,7 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 logger = logging.getLogger("deriva_ml")
 
@@ -112,7 +113,7 @@ class ExecutionRecord(BaseModel):
             >>> record.status = ExecutionStatus.Uploaded  # Raises DerivaMLException
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     execution_rid: RID
     _workflow: "Workflow | None" = PrivateAttr(default=None)

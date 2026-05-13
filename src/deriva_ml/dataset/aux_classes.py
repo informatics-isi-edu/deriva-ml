@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from deriva_ml.core.definitions import RID
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 class VersionPart(Enum):
@@ -216,7 +217,7 @@ class DatasetHistory(BaseModel):
     spec_hash: str | None = None
     snapshot: str | None = None
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @field_validator("execution_rid", mode="before")
     @classmethod
@@ -291,7 +292,7 @@ class DatasetMinid(BaseModel):
                 break
         return checksum_value
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
 
 class DatasetSpec(BaseModel):
@@ -317,7 +318,7 @@ class DatasetSpec(BaseModel):
     timeout: tuple[int, int] | None = None
     fetch_concurrency: int = 8
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @field_validator("version", mode="before")
     @classmethod

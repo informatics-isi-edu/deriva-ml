@@ -44,6 +44,7 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
 # Local imports
 from deriva_ml.feature import Feature
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 @dataclass
@@ -561,7 +562,7 @@ class DerivaModel:
                 tables.extend(t for t in schema.tables.values() if self.is_vocabulary(t))
         return tables
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def find_features(self, table: TableInput | None = None) -> Iterable[Feature]:
         """List features in the catalog.
 

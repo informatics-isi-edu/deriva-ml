@@ -25,6 +25,7 @@ from pydantic import ConfigDict, validate_call
 from deriva_ml.core.definitions import ColumnDefinition, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLMaterializeLimitExceeded
 from deriva_ml.feature import Feature, FeatureRecord
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -364,7 +365,7 @@ class FeatureMixin:
             "``with ml.create_execution(config).execute() as exe: exe.add_features(records)``"
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def feature_values(
         self,
         table: Table | str,
@@ -551,7 +552,7 @@ class FeatureMixin:
             "Use feature_values(table, feature_name, selector=...) instead."
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_workflow_executions(self, workflow: str) -> list[str]:
         """Return execution RIDs that ran the given workflow.
 
