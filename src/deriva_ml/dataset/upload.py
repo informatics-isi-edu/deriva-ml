@@ -70,11 +70,6 @@ from deriva_ml.core.definitions import (
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.model.catalog import DerivaModel
 
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
 NULL_SENTINEL = "__NULL__"
 """Directory-segment marker for nullable asset-metadata columns with
 no value. Written into the staging tree by ``_invoke_deriva_py_uploader``

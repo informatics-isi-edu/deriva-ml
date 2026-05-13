@@ -63,11 +63,6 @@ if TYPE_CHECKING:
     from deriva_ml.dataset.target_resolution import FeatureSelector
     from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
 
 def _default_dir_name_from_target(
     target: "FeatureRecord | dict[str, FeatureRecord] | str | None",

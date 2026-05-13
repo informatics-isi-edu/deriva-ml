@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from pprint import pformat
 from typing import Any, Callable, Iterator
 
 from deriva.core.ermrest_model import Table
@@ -27,16 +26,6 @@ from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
 logger = logging.getLogger(__name__)
-
-try:
-    from icecream import ic
-
-    ic.configureOutput(
-        includeContext=True,
-        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
-    )
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 class CatalogGraph:

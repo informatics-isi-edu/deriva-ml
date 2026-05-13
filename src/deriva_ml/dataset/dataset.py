@@ -40,7 +40,6 @@ from graphlib import TopologicalSorter
 from pathlib import Path
 
 # Local imports
-from pprint import pformat
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Iterator, Self
 from urllib.parse import urlparse
@@ -70,17 +69,6 @@ from deriva.transfer.download import (
 )
 from deriva.transfer.download.deriva_export import DerivaExport
 from pydantic import ConfigDict, validate_call
-
-try:
-    from icecream import ic
-
-    ic.configureOutput(
-        includeContext=True,
-        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
-    )
-
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.constants import RID

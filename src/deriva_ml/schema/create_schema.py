@@ -37,11 +37,6 @@ from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 logger = logging.getLogger("deriva_ml")
 
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
-
 
 def create_dataset_table(
     schema: Schema,
