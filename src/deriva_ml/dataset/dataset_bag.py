@@ -200,7 +200,7 @@ class DatasetBag:
         # Use provided RID or fall back to the bag's primary dataset
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.description = description
-        self.execution_rid = execution_rid or (self.model._get_dataset_execution(self.dataset_rid) or {}).get(
+        self.execution_rid = execution_rid or (self._catalog._get_dataset_execution(self.dataset_rid) or {}).get(
             "Execution"
         )
 

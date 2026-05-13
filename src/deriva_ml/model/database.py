@@ -14,8 +14,10 @@ class adds:
   RID in the bag to its :class:`DatasetVersion`.
 - :meth:`dataset_version` / :meth:`rid_lookup` lookups for callers
   that need to resolve a dataset RID to its version.
-- :meth:`_get_dataset_execution` helper for the dataset-history
-  surface.
+
+(The Dataset_Version row → Execution lookup lives on
+:class:`DerivaMLBagView` because it joins through deriva-ml
+domain knowledge, not the generic bag layer.)
 
 Before the deriva.bag migration this class duplicated ~400 lines
 of bag-opening / ORM-building / table-lookup logic that's now
@@ -26,12 +28,10 @@ inherited from :class:`BagDatabase`. After the migration it's
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from deriva.bag.database import BagDatabase
 from deriva.core.ermrest_model import Model
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from deriva_ml.core.definitions import ML_SCHEMA, RID, _get_domain_schemas
 from deriva_ml.core.exceptions import DerivaMLException
@@ -215,36 +215,5 @@ class DatabaseModel(BagDatabase, DerivaModel):
         if dataset_rid in self.bag_rids:
             return self.bag_rids[dataset_rid]
         raise DerivaMLException(f"Dataset {dataset_rid} not found in this bag")
-
-    def _get_dataset_execution(self, dataset_rid: str) -> dict[str, Any] | None:
-        """Return the Dataset_Version row for ``(dataset_rid, current_version)``.
-
-        Used by the dataset-history surface to surface the
-        :class:`Execution` that produced a particular dataset
-        version. The result is a plain dict matching the
-        ``Dataset_Version`` row columns (notably ``Execution``,
-        ``Description``, ``Snapshot``).
-
-        Args:
-            dataset_rid: Dataset RID to look up.
-
-        Returns:
-            The matching ``Dataset_Version`` row as a dict, or
-            ``None`` if either the RID isn't in this bag or no
-            row matches the version we hold for it.
-        """
-        version = self.bag_rids.get(dataset_rid)
-        if not version:
-            return None
-
-        dataset_version_table = self.find_table("Dataset_Version")
-        cmd = select(dataset_version_table).where(
-            dataset_version_table.columns.Dataset == dataset_rid,
-            dataset_version_table.columns.Version == str(version),
-        )
-        with Session(self.engine) as session:
-            result = session.execute(cmd).mappings().first()
-            return dict(result) if result else None
-
 
 __all__ = ["DatabaseModel"]
