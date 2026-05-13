@@ -1,301 +1,34 @@
 """Tests for :class:`deriva_ml.dataset.bag_builder.DatasetBagBuilder`.
 
-The headline test is the **bag-content equivalence harness**:
-the new :class:`DatasetBagBuilder` (driving
-:class:`CatalogBagBuilder`) must produce bags whose *contents*
-match the legacy :class:`CatalogGraph`-driven bags for the same
-``(catalog, dataset)`` input. Spec internals (output_path
-strings, query_processor ordering, bag metadata) are *not*
-required to match — per decision D1 in
-``docs/design/dataset-bag-cutover-2026-05.md``, we care about
-the bag's externally observable contents (rows + assets), not
-its on-disk spec representation.
+Two layers:
 
-Equivalence is checked at two layers:
+* :class:`TestSpecSmoke` — light live-catalog tests confirming the
+  three public methods (:meth:`generate_dataset_download_spec`,
+  :meth:`generate_dataset_download_annotations`,
+  :meth:`aggregate_queries`) run end-to-end against
+  ``catalog_with_datasets``. These catch construction-level
+  errors that would otherwise surface only as download failures.
 
-1. **Per-table row sets** — every CSV in the bag, joined into
-   the bag's SQLAlchemy ORM, must contain the same RID set on
-   both sides.
-2. **Asset RID + MD5 sets** — every asset table must reference
-   the same RIDs with the same MD5 checksums on both sides
-   (bytes themselves are not transferred during equivalence
-   testing; the fetch.txt manifest is sufficient).
+* :class:`TestAnchorsAndPolicy` — exercises the bag-pipeline-shaped
+  helpers (:meth:`anchors_for`, :meth:`build_policy`) without
+  driving a full export.
 
-The harness is **load-bearing for the cutover** — it gates the
-deletion of ``CatalogGraph`` — and **disposable after the
-cutover** (will be deleted in the same commit that deletes
-``CatalogGraph``).
-
-The thinner unit tests below verify the bag-pipeline-shaped
-helpers (:meth:`DatasetBagBuilder.anchors_for`,
-:meth:`DatasetBagBuilder.build_policy`) — they exercise the
-dataset-anchor + policy logic without driving a full export.
+The bag-content equivalence harness that gated the cutover from
+``CatalogGraph`` to :class:`CatalogBagBuilder` is **gone** —
+it served its purpose (verified row-set + asset (RID, MD5)
+equivalence on ``catalog_with_datasets``), then was deleted
+along with ``CatalogGraph`` itself. See
+``docs/design/dataset-bag-cutover-2026-05.md`` in deriva-ml for
+the design and the verified-equivalence record.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
-from typing import Any
 
 import pytest
 
 from deriva.bag.anchors import RIDAnchor
 from deriva.bag.traversal import FKTraversalPolicy, VocabExport
 from deriva_ml.dataset.bag_builder import DatasetBagBuilder
-
-
-# ---------------------------------------------------------------------------
-# Bag-content equivalence harness — gated on catalog_with_datasets fixture
-# ---------------------------------------------------------------------------
-
-
-def _build_bag_via_catalog_graph(
-    ml: Any,
-    dataset: Any,
-    out_dir: Path,
-) -> Path:
-    """Build a bag via the legacy ``CatalogGraph`` spec generator.
-
-    Uses :class:`deriva.transfer.download.deriva_download.GenericDownloader`
-    on the spec ``CatalogGraph.generate_dataset_download_spec`` produces.
-    Returns the path to the resulting bag directory.
-    """
-    from deriva.transfer.download.deriva_download import GenericDownloader
-
-    from deriva_ml.dataset.catalog_graph import CatalogGraph
-
-    spec = CatalogGraph(ml_instance=ml).generate_dataset_download_spec(dataset)
-    # The spec uses {RID} templates; fill them in.
-    spec = _bind_rid_template(spec, dataset.dataset_rid)
-
-    deriva_server = ml.catalog.deriva_server
-    downloader = GenericDownloader(
-        server={
-            "host": deriva_server.server,
-            "protocol": deriva_server.scheme,
-            "catalog_id": str(ml.catalog.catalog_id),
-        },
-        config=spec,
-        output_dir=str(out_dir),
-        credentials=ml.catalog._credentials,
-    )
-    downloader.download()
-    # Find the resulting bag — the spec named it Dataset_{RID}.
-    bag_name = spec["bag"]["bag_name"]
-    bag_path = out_dir / bag_name
-    if not bag_path.exists():
-        # GenericDownloader sometimes leaves bag under another name;
-        # fall back to a single-subdirectory lookup.
-        candidates = [p for p in out_dir.iterdir() if p.is_dir()]
-        if len(candidates) == 1:
-            bag_path = candidates[0]
-    return bag_path
-
-
-def _build_bag_via_dataset_bag_builder(
-    ml: Any,
-    dataset: Any,
-    out_dir: Path,
-) -> Path:
-    """Build a bag via the new ``DatasetBagBuilder`` spec generator.
-
-    Mirrors :func:`_build_bag_via_catalog_graph` but routes through
-    the new spec generator.
-    """
-    from deriva.transfer.download.deriva_download import GenericDownloader
-
-    spec = DatasetBagBuilder(
-        ml_instance=ml
-    ).generate_dataset_download_spec(dataset)
-    spec = _bind_rid_template(spec, dataset.dataset_rid)
-
-    deriva_server = ml.catalog.deriva_server
-    downloader = GenericDownloader(
-        server={
-            "host": deriva_server.server,
-            "protocol": deriva_server.scheme,
-            "catalog_id": str(ml.catalog.catalog_id),
-        },
-        config=spec,
-        output_dir=str(out_dir),
-        credentials=ml.catalog._credentials,
-    )
-    downloader.download()
-    bag_name = spec["bag"]["bag_name"]
-    bag_path = out_dir / bag_name
-    if not bag_path.exists():
-        candidates = [p for p in out_dir.iterdir() if p.is_dir()]
-        if len(candidates) == 1:
-            bag_path = candidates[0]
-    return bag_path
-
-
-def _bind_rid_template(spec: dict, rid: str) -> dict:
-    """Recursively replace ``{RID}`` placeholders with the concrete RID.
-
-    The export-engine spec uses ``{RID}`` templates that Chaise
-    fills at click-time. For programmatic test invocation, we
-    substitute the value directly.
-    """
-    import json
-    import re
-
-    text = json.dumps(spec)
-    text = re.sub(r"\{RID\}", rid, text)
-    return json.loads(text)
-
-
-def _bag_table_rid_sets(bag_path: Path) -> dict[str, set[str]]:
-    """Return ``{table_name: {rid, ...}}`` for every CSV in a bag.
-
-    Walks every ``*.csv`` under ``data/`` and reads its ``RID``
-    column. The bag may have the same table appearing under
-    multiple FK-path subdirectories; we union those into a single
-    RID set per table.
-    """
-    import csv
-
-    out: dict[str, set[str]] = {}
-    data_dir = bag_path / "data"
-    if not data_dir.exists():
-        return out
-    for csv_path in data_dir.rglob("*.csv"):
-        table_name = csv_path.stem
-        rids = out.setdefault(table_name, set())
-        with csv_path.open(newline="") as fp:
-            reader = csv.DictReader(fp)
-            for row in reader:
-                if "RID" in row and row["RID"]:
-                    rids.add(row["RID"])
-    return out
-
-
-def _bag_asset_md5_sets(bag_path: Path) -> dict[str, set[tuple[str, str]]]:
-    """Return ``{asset_table: {(rid, md5), ...}}`` for every asset in a bag.
-
-    Reads ``fetch.txt`` (and any inline asset CSVs) to enumerate
-    the asset rows the bag references. Each entry is a
-    ``(RID, MD5)`` pair; we compare these sets across the two
-    bags so the comparison is independent of byte transfer.
-    """
-    out: dict[str, set[tuple[str, str]]] = {}
-    # The asset CSVs (one per asset table, under data/) carry the
-    # RID + MD5 we need. fetch.txt has filenames, not RIDs, so
-    # the CSVs are the better source.
-    data_dir = bag_path / "data"
-    if not data_dir.exists():
-        return out
-
-    import csv
-
-    for csv_path in data_dir.rglob("*.csv"):
-        with csv_path.open(newline="") as fp:
-            reader = csv.DictReader(fp)
-            rows = list(reader)
-        if not rows:
-            continue
-        # Detect asset rows by the presence of MD5 + Filename columns.
-        if "MD5" not in rows[0] or "Filename" not in rows[0]:
-            continue
-        table_name = csv_path.stem
-        bucket = out.setdefault(table_name, set())
-        for row in rows:
-            rid = row.get("RID")
-            md5 = row.get("MD5")
-            if rid and md5:
-                bucket.add((rid, md5))
-    return out
-
-
-class TestBagEquivalence:
-    """The new bag must contain the same rows + assets as the legacy bag.
-
-    Equivalence is the **load-bearing gate** for the cutover.
-    These tests must pass before ``CatalogGraph`` is deleted. The
-    harness builds two bags side by side, opens both, and
-    compares their externally observable contents.
-
-    Per decision D1 in the cutover design doc, spec internals
-    (output_path strings, processor ordering, bag metadata) are
-    *not* checked — bag *contents* are.
-    """
-
-    def test_bag_row_sets_equivalent(
-        self, catalog_with_datasets, tmp_path: Path
-    ) -> None:
-        """Same RID set per table across both bag-construction paths."""
-        ml, _ = catalog_with_datasets
-        datasets = list(ml.find_datasets())
-        if not datasets:
-            pytest.skip("Need at least one dataset in the fixture.")
-        dataset = ml.lookup_dataset(datasets[0].dataset_rid)
-
-        legacy_dir = tmp_path / "legacy"
-        new_dir = tmp_path / "new"
-        legacy_dir.mkdir()
-        new_dir.mkdir()
-
-        legacy_bag = _build_bag_via_catalog_graph(ml, dataset, legacy_dir)
-        new_bag = _build_bag_via_dataset_bag_builder(ml, dataset, new_dir)
-
-        legacy_rids = _bag_table_rid_sets(legacy_bag)
-        new_rids = _bag_table_rid_sets(new_bag)
-
-        # Same tables present, same RIDs per table.
-        legacy_tables = set(legacy_rids.keys())
-        new_tables = set(new_rids.keys())
-
-        missing_in_new = legacy_tables - new_tables
-        extra_in_new = new_tables - legacy_tables
-        assert not missing_in_new, (
-            f"Tables present in CatalogGraph's bag but missing from "
-            f"DatasetBagBuilder's bag: {sorted(missing_in_new)}"
-        )
-        assert not extra_in_new, (
-            f"Tables present in DatasetBagBuilder's bag but absent "
-            f"from CatalogGraph's bag: {sorted(extra_in_new)}"
-        )
-
-        for table in sorted(legacy_tables):
-            assert legacy_rids[table] == new_rids[table], (
-                f"Row-set mismatch for table {table}: "
-                f"legacy has {len(legacy_rids[table])} RIDs, "
-                f"new has {len(new_rids[table])}; "
-                f"diff = {legacy_rids[table] ^ new_rids[table]}"
-            )
-
-    def test_bag_asset_md5_sets_equivalent(
-        self, catalog_with_datasets, tmp_path: Path
-    ) -> None:
-        """Same ``(RID, MD5)`` set per asset table across both paths."""
-        ml, _ = catalog_with_datasets
-        datasets = list(ml.find_datasets())
-        if not datasets:
-            pytest.skip("Need at least one dataset in the fixture.")
-        dataset = ml.lookup_dataset(datasets[0].dataset_rid)
-
-        legacy_dir = tmp_path / "legacy"
-        new_dir = tmp_path / "new"
-        legacy_dir.mkdir()
-        new_dir.mkdir()
-
-        legacy_bag = _build_bag_via_catalog_graph(ml, dataset, legacy_dir)
-        new_bag = _build_bag_via_dataset_bag_builder(ml, dataset, new_dir)
-
-        legacy_assets = _bag_asset_md5_sets(legacy_bag)
-        new_assets = _bag_asset_md5_sets(new_bag)
-
-        # Asset tables match (a table is an "asset table" when it
-        # has MD5 + Filename columns; both bags should agree).
-        assert set(legacy_assets.keys()) == set(new_assets.keys()), (
-            f"Asset-table set mismatch: legacy={sorted(legacy_assets)}, "
-            f"new={sorted(new_assets)}"
-        )
-        for table in sorted(legacy_assets):
-            assert legacy_assets[table] == new_assets[table], (
-                f"Asset (RID, MD5) mismatch for {table}: "
-                f"diff = {legacy_assets[table] ^ new_assets[table]}"
-            )
 
 
 # ---------------------------------------------------------------------------

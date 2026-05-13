@@ -1901,8 +1901,12 @@ class DerivaModel:
     ) -> list[list[Table]]:
         """Discover all FK paths through the schema graph via depth-first traversal.
 
-        This is the shared foundation for both bag export (catalog_graph._collect_paths)
-        and denormalization (_prepare_wide_table). Changes here affect both systems.
+        Used by the denormalization machinery (_prepare_wide_table)
+        to enumerate joinable paths through the schema. Bag export
+        no longer routes through this method — the bag pipeline
+        (:class:`deriva.bag.catalog_builder.CatalogBagBuilder`) has
+        its own walker, anchored at user-supplied :class:`Anchor`s
+        rather than the Dataset table.
 
         Traversal rules:
         - Follows both outbound FKs (table.foreign_keys) and inbound FKs (table.referenced_by)

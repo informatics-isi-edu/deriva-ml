@@ -635,9 +635,9 @@ class DatasetBagBuilder:
             RIDAnchor(table="Dataset", rids=[dataset.dataset_rid])
         ]
 
-        # Nested children — same recursion CatalogGraph uses for
-        # path collection. Walk one level at a time so the
-        # anchor list documents the dataset's structure.
+        # Nested children walked one level at a time so the
+        # anchor list documents the dataset's structure (one
+        # RIDAnchor per descendant Dataset row).
         for child in self._iter_descendant_rids(dataset):
             anchors.append(RIDAnchor(table="Dataset", rids=[child]))
 
@@ -705,13 +705,13 @@ class DatasetBagBuilder:
     ) -> set[tuple[str, str]]:
         """Return ``{(schema, table)}`` for associations with no members.
 
-        Mirrors the dataset-specific association filter inside
-        :meth:`CatalogGraph._collect_paths`: for each
-        ``Dataset_X`` association table, include it in the walk
-        only when the dataset has at least one member of element
-        type X (or when the association links to a vocabulary
-        table — those carry dataset metadata and must always be
-        included).
+        For each ``Dataset_X`` association table, include it in
+        the walk only when the dataset has at least one member of
+        element type X (or when the association links to a
+        vocabulary table — those carry dataset metadata and must
+        always be included). Empty associations are added to the
+        :attr:`FKTraversalPolicy.exclude_tables` set so the
+        generic walker prunes them.
 
         When ``dataset`` is ``None`` (catalog-wide annotation /
         aggregate path), the member-based filter doesn't apply —
@@ -772,10 +772,9 @@ class DatasetBagBuilder:
         """Yield every descendant Dataset RID, depth-first.
 
         Walks ``DatasetLike.list_dataset_children`` recursively.
-        Used by :meth:`anchors_for` to build the anchor list. The
-        order matches what
-        :meth:`CatalogGraph._collect_paths` traverses so anchor
-        provenance round-trips cleanly.
+        Used by :meth:`anchors_for` to build the anchor list.
+        Depth-first traversal so the anchor list reflects the
+        dataset's nesting structure as encountered.
         """
         dataset_obj = self._ml_instance.lookup_dataset(
             dataset.dataset_rid
