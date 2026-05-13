@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -34,13 +33,12 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.engine import Engine
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     pass
 
-logger = logging.getLogger(__name__)
-
-
+logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------

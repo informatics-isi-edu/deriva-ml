@@ -114,17 +114,11 @@ class Experiment:
         # fetched one record per RID — for an execution with K config
         # files (typically 2, but multirun runs can attach more) that
         # was K extra round-trips on every Experiment(rid).
-        metadata_rids = [
-            r["Execution_Metadata"] for r in records if r.get("Execution_Metadata")
-        ]
+        metadata_rids = [r["Execution_Metadata"] for r in records if r.get("Execution_Metadata")]
         metadata_files: dict[str, dict] = {}
         if metadata_rids:
             meta_records = list(
-                metadata_table.filter(
-                    metadata_table.RID == AnyQuantifier(*metadata_rids)
-                )
-                .entities()
-                .fetch()
+                metadata_table.filter(metadata_table.RID == AnyQuantifier(*metadata_rids)).entities().fetch()
             )
             for meta in meta_records:
                 filename = meta.get("Filename", "")
@@ -165,17 +159,9 @@ class Experiment:
                             with open(dest) as f:
                                 hydra_data = yaml.safe_load(f) or {}
                             # Extract choices from hydra.runtime.choices
-                            choices = (
-                                hydra_data.get("hydra", {})
-                                .get("runtime", {})
-                                .get("choices", {})
-                            )
+                            choices = hydra_data.get("hydra", {}).get("runtime", {}).get("choices", {})
                             # Filter out hydra internal choices
-                            result["config_choices"] = {
-                                k: v
-                                for k, v in choices.items()
-                                if not k.startswith("hydra/")
-                            }
+                            result["config_choices"] = {k: v for k, v in choices.items() if not k.startswith("hydra/")}
                 break
 
         return result
@@ -283,6 +269,7 @@ class Experiment:
             - metadata_assets: List of execution metadata assets (config files, etc.)
             - url: Chaise URL to view execution
         """
+
         def asset_summary(asset: "Asset") -> dict[str, Any]:
             """Create a summary dict for an asset."""
             return {
@@ -319,9 +306,7 @@ class Experiment:
             "description": self.description,
             "status": self.status,
             "config_choices": self.config_choices,
-            "model_config": {
-                k: v for k, v in self.model_config.items() if not k.startswith("_")
-            },
+            "model_config": {k: v for k, v in self.model_config.items() if not k.startswith("_")},
             "input_datasets": [
                 {
                     "dataset_rid": ds.dataset_rid,
@@ -365,15 +350,11 @@ class Experiment:
 
         # Config choices
         if self.config_choices:
-            choices_str = ", ".join(
-                f"`{k}={v}`" for k, v in sorted(self.config_choices.items())
-            )
+            choices_str = ", ".join(f"`{k}={v}`" for k, v in sorted(self.config_choices.items()))
             lines.append(f"**Configuration Choices:** {choices_str}")
 
         # Model configuration (filter internal fields)
-        model_cfg = {
-            k: v for k, v in self.model_config.items() if not k.startswith("_")
-        }
+        model_cfg = {k: v for k, v in self.model_config.items() if not k.startswith("_")}
         if model_cfg:
             lines.append("**Model Configuration:**")
             for k, v in sorted(model_cfg.items()):
@@ -389,9 +370,7 @@ class Experiment:
         if show_assets and self.input_assets:
             lines.append("**Input Assets:**")
             for asset in self.input_assets:
-                lines.append(
-                    f"- [{asset.asset_rid}]({asset.get_chaise_url()}): {asset.filename}"
-                )
+                lines.append(f"- [{asset.asset_rid}]({asset.get_chaise_url()}): {asset.filename}")
 
         return "\n".join(lines)
 

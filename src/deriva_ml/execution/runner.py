@@ -150,9 +150,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from hydra.core.hydra_config import HydraConfig
 from hydra_zen import builds
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger("deriva_ml")
-
+logger = get_logger(__name__)
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
     from deriva_ml.core.config import DerivaMLConfig
@@ -169,6 +169,7 @@ T = TypeVar("T", bound="DerivaML")
 # Multirun State Management
 # =============================================================================
 
+
 class MultirunState:
     """Manages state for multirun (sweep) executions.
 
@@ -183,6 +184,7 @@ class MultirunState:
         job_sequence: Counter for ordering child executions
         sweep_dir: Path to the sweep output directory
     """
+
     parent_execution_rid: str | None = None
     parent_execution: Any = None
     ml_instance: Any = None  # DerivaML or subclass
@@ -477,9 +479,7 @@ def run_model(
     if not validation_result.is_valid:
         from deriva_ml.core.exceptions import DerivaMLException
 
-        raise DerivaMLException(
-            f"Execution config validation failed:\n{validation_result}"
-        )
+        raise DerivaMLException(f"Execution config validation failed:\n{validation_result}")
     if validation_result.warnings:
         for warning in validation_result.warnings:
             logging.warning(warning)
@@ -546,11 +546,7 @@ def run_model(
 
     # Create the execution record in the catalog. This generates a unique
     # execution ID and sets up the working directories for this run.
-    execution = ml_instance.create_execution(
-        execution_config,
-        workflow=workflow,
-        dry_run=dry_run
-    )
+    execution = ml_instance.create_execution(execution_config, workflow=workflow, dry_run=dry_run)
 
     # ---------------------------------------------------------------------------
     # Link to parent execution in multirun mode
@@ -560,10 +556,7 @@ def run_model(
             try:
                 # Get the current job sequence from the global state
                 job_sequence = _multirun_state.job_sequence
-                _multirun_state.parent_execution.add_nested_execution(
-                    execution,
-                    sequence=job_sequence
-                )
+                _multirun_state.parent_execution.add_nested_execution(execution, sequence=job_sequence)
                 logging.info(
                     f"Linked execution {execution.execution_rid} to parent "
                     f"{_multirun_state.parent_execution_rid} (sequence={job_sequence})"

@@ -52,7 +52,6 @@ tests for the new path are tracked separately.
 
 from __future__ import annotations
 
-import logging
 import warnings
 from pathlib import Path
 from typing import Any, Callable
@@ -71,10 +70,9 @@ from deriva_ml.catalog.provenance import (  # noqa: F401  (re-export)
     get_catalog_provenance,
     set_catalog_provenance,
 )
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
-
+logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Legacy enums — aliased to deriva.bag.traversal
 # ---------------------------------------------------------------------------
@@ -228,9 +226,7 @@ def create_ml_workspace(
     # tables.
     policy_schemas: set[str] | None = None
     if include_tables:
-        policy_schemas = {
-            entry.split(":", 1)[0] for entry in include_tables if ":" in entry
-        }
+        policy_schemas = {entry.split(":", 1)[0] for entry in include_tables if ":" in entry}
 
     policy_exclude_tables: set[tuple[str, str]] = set()
     if exclude_objects:
@@ -239,12 +235,11 @@ def create_ml_workspace(
                 schema, table = entry.split(":", 1)
                 policy_exclude_tables.add((schema, table))
 
-    policy_exclude_schemas = (
-        set(exclude_schemas) if exclude_schemas else set()
-    )
+    policy_exclude_schemas = set(exclude_schemas) if exclude_schemas else set()
     # Default system-schema exclusions stay on; merge rather than
     # replace.
     from deriva.bag.traversal import DEFAULT_EXCLUDE_SCHEMAS
+
     policy_exclude_schemas |= set(DEFAULT_EXCLUDE_SCHEMAS)
 
     # Coerce legacy enum spellings to the new ones.
@@ -297,10 +292,7 @@ def _coerce_asset_mode(value: Any) -> _AssetMode:
             return _AssetMode.UPLOAD_FORCE
         if value in ("none", "NONE"):
             return _AssetMode.ROWS_ONLY
-    raise TypeError(
-        f"Unrecognized asset_mode value: {value!r}. "
-        f"Use deriva.bag.traversal.AssetMode members."
-    )
+    raise TypeError(f"Unrecognized asset_mode value: {value!r}. Use deriva.bag.traversal.AssetMode members.")
 
 
 def _coerce_orphan_strategy(value: Any) -> _DanglingFKStrategy:
@@ -315,8 +307,7 @@ def _coerce_orphan_strategy(value: Any) -> _DanglingFKStrategy:
         except ValueError:
             pass
     raise TypeError(
-        f"Unrecognized orphan_strategy value: {value!r}. "
-        f"Use deriva.bag.traversal.DanglingFKStrategy members."
+        f"Unrecognized orphan_strategy value: {value!r}. Use deriva.bag.traversal.DanglingFKStrategy members."
     )
 
 

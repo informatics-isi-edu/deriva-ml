@@ -12,7 +12,6 @@ with a WAL-mode SQLAlchemy engine.
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -24,9 +23,9 @@ from sqlalchemy.engine import Engine
 
 from deriva.bag import sqlite_helpers as sh
 from deriva.bag.schema import SchemaBuilder, SchemaORM
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 SCHEMA_VERSION = 1
 
 

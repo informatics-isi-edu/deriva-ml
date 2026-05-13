@@ -20,11 +20,12 @@ import argparse
 import logging
 import sys
 from typing import TYPE_CHECKING
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -38,30 +39,38 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--host", required=True,
+        "--host",
+        required=True,
         help="Deriva catalog hostname (e.g., example.org).",
     )
     p.add_argument(
-        "--catalog", required=True,
+        "--catalog",
+        required=True,
         help="Catalog ID (e.g., 42).",
     )
     p.add_argument(
-        "--execution", action="append", dest="execution_rids",
+        "--execution",
+        action="append",
+        dest="execution_rids",
         help=(
             "Execution RID to upload. Can be given multiple times. "
             "If omitted, drains every execution that has pending work."
         ),
     )
     p.add_argument(
-        "--retry-failed", action="store_true",
+        "--retry-failed",
+        action="store_true",
         help="Include rows currently in status='failed'.",
     )
     p.add_argument(
-        "--working-dir", default=".",
+        "--working-dir",
+        default=".",
         help="Workspace root (default: current directory).",
     )
     p.add_argument(
-        "--mode", choices=["online", "offline"], default="online",
+        "--mode",
+        choices=["online", "offline"],
+        default="online",
         help="Connection mode (default online — upload requires online).",
     )
     return p
@@ -74,6 +83,7 @@ def _construct_ml(host: str, catalog: str, mode: str) -> "DerivaML":
     connecting to a real catalog.
     """
     from deriva_ml import ConnectionMode, DerivaML
+
     return DerivaML(hostname=host, catalog_id=catalog, mode=ConnectionMode(mode))
 
 
@@ -107,13 +117,11 @@ def main(argv: "list[str] | None" = None) -> int:
         return 2
 
     print(
-        f"upload complete: {report.total_uploaded} items uploaded, "
-        f"{report.total_failed} failed.",
+        f"upload complete: {report.total_uploaded} items uploaded, {report.total_failed} failed.",
         file=sys.stderr,
     )
     for fqn, counts in report.per_table.items():
-        print(f"  {fqn}: +{counts['uploaded']} / -{counts['failed']}",
-              file=sys.stderr)
+        print(f"  {fqn}: +{counts['uploaded']} / -{counts['failed']}", file=sys.stderr)
     if report.errors:
         print("failures:", file=sys.stderr)
         for err in report.errors[:10]:

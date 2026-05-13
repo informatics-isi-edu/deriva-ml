@@ -20,7 +20,7 @@ _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Key = _ermrest_model.Key
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.definitions import ColumnDefinition, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLMaterializeLimitExceeded

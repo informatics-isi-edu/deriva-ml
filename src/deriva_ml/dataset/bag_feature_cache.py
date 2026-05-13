@@ -13,9 +13,9 @@ first-access, then always-from-cache.
 See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md
 §"Bag denormalization cache — feature read path".
 """
+
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Iterable
 
 from sqlalchemy import Column, MetaData, String, Text, Table, inspect, select
@@ -23,12 +23,12 @@ from sqlalchemy.orm import Session
 
 from deriva_ml.core.exceptions import DerivaMLDataError, DerivaMLException
 from deriva_ml.feature import FeatureRecord
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset_bag import DatasetBag
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 _CACHE_TABLE_PREFIX = "_feature_cache_"
 
 
@@ -140,9 +140,7 @@ class BagFeatureCache:
         inspector = inspect(self._engine)
         if cache_table_name in inspector.get_table_names():
             # Cache already exists — reflect it and return.
-            cache_table = Table(
-                cache_table_name, self._metadata, autoload_with=self._engine
-            )
+            cache_table = Table(cache_table_name, self._metadata, autoload_with=self._engine)
             return cache_table
 
         # Source table must exist in the bag.
@@ -178,7 +176,5 @@ class BagFeatureCache:
                 row_data["_cache_rowid"] = str(i)
                 conn.execute(cache_table.insert().values(**row_data))
 
-        logger.info(
-            "BagFeatureCache: populated '%s' with %d rows", cache_table_name, len(rows)
-        )
+        logger.info("BagFeatureCache: populated '%s' with %d rows", cache_table_name, len(rows))
         return cache_table

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.core.definitions import RID

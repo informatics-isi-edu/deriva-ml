@@ -216,7 +216,9 @@ OmegaConf.register_new_resolver("compute_workdir", DerivaMLConfig.compute_workdi
 # For multirun/sweep, outputs go to a sweep subdirectory with job number subfolders
 store(
     HydraConf(
-        run=RunDir("${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id},${deriva_ml.hostname}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"),
+        run=RunDir(
+            "${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id},${deriva_ml.hostname}}/hydra/${now:%Y-%m-%d_%H-%M-%S}"
+        ),
         sweep=SweepDir(
             dir="${compute_workdir:${deriva_ml.working_dir},${deriva_ml.catalog_id},${deriva_ml.hostname}}/hydra-sweep/${now:%Y-%m-%d_%H-%M-%S}",
             subdir="${hydra.job.num}",

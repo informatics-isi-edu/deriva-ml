@@ -9,18 +9,18 @@ wanting survive-process uploads run `deriva-ml upload` in a shell
 
 from __future__ import annotations
 
-import logging
 import threading
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 from deriva_ml.execution.upload_engine import UploadReport, run_upload_engine
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -30,6 +30,7 @@ class UploadProgress:
     Phase 1: reports only end-of-run counts. Phase 2 adds live
     byte-level progress by hooking into deriva-py's uploader callbacks.
     """
+
     total_rows: int = 0
     uploaded_rows: int = 0
     total_bytes: int = 0
@@ -59,9 +60,7 @@ class UploadJob:
         retry_failed: bool,
     ) -> None:
         self.id = f"upl_{uuid.uuid4().hex[:12]}"
-        self.status: Literal[
-            "running", "paused", "completed", "failed", "cancelled"
-        ] = "running"
+        self.status: Literal["running", "paused", "completed", "failed", "cancelled"] = "running"
         self._ml = ml
         self._execution_rids = execution_rids
         self._retry_failed = retry_failed
@@ -72,7 +71,9 @@ class UploadJob:
         self._progress = UploadProgress()
 
         self._thread = threading.Thread(
-            target=self._run, name=f"upload-{self.id}", daemon=True,
+            target=self._run,
+            name=f"upload-{self.id}",
+            daemon=True,
         )
         self._thread.start()
 
@@ -84,9 +85,7 @@ class UploadJob:
                 retry_failed=self._retry_failed,
                 cancel_event=self._cancel_event,
             )
-            self.status = (
-                "completed" if self._report.total_failed == 0 else "failed"
-            )
+            self.status = "completed" if self._report.total_failed == 0 else "failed"
         except BaseException as exc:  # noqa: BLE001 — surface via wait()
             logger.warning("upload job %s errored: %s", self.id, exc)
             self._exception = exc

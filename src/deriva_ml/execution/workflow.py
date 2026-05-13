@@ -10,6 +10,7 @@ computational workflow in a Deriva catalog. Key responsibilities:
   the workflow is bound to a live catalog instance.
 - Deduplicates workflows by checksum via ``DerivaML.add_workflow()``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,13 +22,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import requests
-from pydantic import BaseModel, ConfigDict, PrivateAttr, field_validator, model_validator
+from pydantic import BaseModel, PrivateAttr, field_validator, model_validator
 from requests import RequestException
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError, DerivaMLException
 from deriva_ml.execution.find_caller import _get_calling_module
 from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.interfaces import DerivaMLCatalog
@@ -153,7 +155,7 @@ class Workflow(BaseModel):
     allow_dirty: bool = False
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
-    _logger: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger("deriva_ml"))
+    _logger: logging.Logger = PrivateAttr(default_factory=lambda: get_logger(__name__))
 
     @field_validator("workflow_type", mode="before")
     @classmethod
@@ -216,18 +218,16 @@ class Workflow(BaseModel):
         """
         # Import here to avoid circular dependency at module load
         import importlib
+
         _deriva_core = importlib.import_module("deriva.core")
         ErmrestSnapshot = _deriva_core.ErmrestSnapshot
 
         if self.rid is None:
-            raise DerivaMLException(
-                f"Cannot {operation}: Workflow is not registered in the catalog (no RID)"
-            )
+            raise DerivaMLException(f"Cannot {operation}: Workflow is not registered in the catalog (no RID)")
 
         if isinstance(self._ml_instance.catalog, ErmrestSnapshot):
             raise DerivaMLException(
-                f"Cannot {operation} on a read-only catalog snapshot. "
-                "Use a writable catalog connection instead."
+                f"Cannot {operation} on a read-only catalog snapshot. Use a writable catalog connection instead."
             )
 
     def _update_description_in_catalog(self, new_description: str | None) -> None:
@@ -277,9 +277,7 @@ class Workflow(BaseModel):
         if self._ml_instance is not None:
             _, atable_path = self._get_workflow_type_association_table()
             wt_types = (
-                atable_path.filter(atable_path.Workflow == self.rid)
-                .attributes(atable_path.Workflow_Type)
-                .fetch()
+                atable_path.filter(atable_path.Workflow == self.rid).attributes(atable_path.Workflow_Type).fetch()
             )
             return [wt[MLVocab.workflow_type] for wt in wt_types]
         return list(self.workflow_type)
@@ -333,9 +331,7 @@ class Workflow(BaseModel):
             return
 
         _, atable_path = self._get_workflow_type_association_table()
-        atable_path.filter(
-            (atable_path.Workflow == self.rid) & (atable_path.Workflow_Type == vocab_term.name)
-        ).delete()
+        atable_path.filter((atable_path.Workflow == self.rid) & (atable_path.Workflow_Type == vocab_term.name)).delete()
 
     def add_workflow_types(self, workflow_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
         """Add one or more workflow types to this workflow.
@@ -379,10 +375,7 @@ class Workflow(BaseModel):
 
         # Insert new type associations
         if new_workflow_types:
-            atable_path.insert([
-                {MLVocab.workflow_type: wt, "Workflow": self.rid}
-                for wt in new_workflow_types
-            ])
+            atable_path.insert([{MLVocab.workflow_type: wt, "Workflow": self.rid} for wt in new_workflow_types])
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":
@@ -418,8 +411,7 @@ class Workflow(BaseModel):
             ...     description="Process sample data"
             ... )
         """
-        self._logger = logging.getLogger("deriva_ml")
-
+        self._logger = get_logger(__name__)
         # Check if running in Docker container (no git repo available)
         if os.environ.get("DERIVA_MCP_IN_DOCKER", "").lower() == "true":
             # Use Docker image metadata for provenance
@@ -428,8 +420,7 @@ class Workflow(BaseModel):
             # Use image digest as checksum (unique identifier for the container)
             # Fall back to git commit if digest not available
             self.checksum = self.checksum or (
-                os.environ.get("DERIVA_MCP_IMAGE_DIGEST", "")
-                or os.environ.get("DERIVA_MCP_GIT_COMMIT", "")
+                os.environ.get("DERIVA_MCP_IMAGE_DIGEST", "") or os.environ.get("DERIVA_MCP_GIT_COMMIT", "")
             )
 
             # Build URL pointing to the Docker image or source repo
@@ -514,9 +505,8 @@ class Workflow(BaseModel):
 
         if is_dirty:
             if allow_dirty:
-                logging.getLogger("deriva_ml").warning(
-                    f"File {executable_path} has uncommitted changes. "
-                    f"Proceeding with --allow-dirty override."
+                logger.warning(
+                    f"File {executable_path} has uncommitted changes. Proceeding with --allow-dirty override."
                 )
             else:
                 raise DerivaMLDirtyWorkflowError(str(executable_path))
@@ -576,7 +566,7 @@ class Workflow(BaseModel):
         Verifies that the nbstripout tool is available and properly installed in the
         Git repository. Issues warnings if setup is incomplete.
         """
-        logger = logging.getLogger("deriva_ml")
+        logger = get_logger(__name__)
         try:
             if subprocess.run(
                 ["nbstripout", "--is-installed"],

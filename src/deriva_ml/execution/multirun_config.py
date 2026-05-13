@@ -53,6 +53,7 @@ class MultirunSpec:
         description: Rich description for the parent execution. Supports full
             markdown formatting (headers, tables, bold, etc.).
     """
+
     name: str
     overrides: list[str] = field(default_factory=list)
     description: str = ""

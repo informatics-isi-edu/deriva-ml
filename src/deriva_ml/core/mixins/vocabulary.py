@@ -16,7 +16,7 @@ _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 DataPathException = _datapath.DataPathException
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.definitions import MLVocab, VocabularyTerm, VocabularyTermHandle
 from deriva_ml.core.exceptions import (

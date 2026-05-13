@@ -12,6 +12,7 @@ Public entry points:
   (used by ``create_ml_schema``).
 - ``main``: CLI wrapper — apply annotations to a live catalog.
 """
+
 import argparse
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
@@ -69,10 +70,7 @@ def build_navbar_menu(model: DerivaModel) -> dict:
                         "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
                     }
                     for tname in model.schemas[domain_schema].tables
-                    if not (
-                        model.is_vocabulary(tname)
-                        or model.is_association(tname, pure=False, max_arity=3)
-                    )
+                    if not (model.is_vocabulary(tname) or model.is_association(tname, pure=False, max_arity=3))
                 ],
             }
         )
@@ -124,10 +122,7 @@ def build_navbar_menu(model: DerivaModel) -> dict:
     # Features menu — one entry per (target table, feature) pair.
     feature_children = [
         {
-            "url": (
-                f"/chaise/recordset/#{catalog_id}"
-                f"/{f.feature_table.schema.name}:{f.feature_table.name}"
-            ),
+            "url": (f"/chaise/recordset/#{catalog_id}/{f.feature_table.schema.name}:{f.feature_table.name}"),
             "name": f"{f.target_table.name}:{f.feature_name}",
         }
         for f in model.find_features()

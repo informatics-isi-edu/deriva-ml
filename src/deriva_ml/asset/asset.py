@@ -27,7 +27,6 @@ Typical usage:
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +39,7 @@ if TYPE_CHECKING:
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+from deriva_ml.core.logging_config import get_logger
 
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
@@ -113,7 +113,7 @@ class Asset:
             >>> # Usually created via ml.lookup_asset()  # doctest: +SKIP
             >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
         """
-        self._logger = logging.getLogger("deriva_ml")
+        self._logger = get_logger(__name__)
         self._ml_instance = catalog
         self.asset_rid = asset_rid
         self.asset_table = asset_table
@@ -148,9 +148,7 @@ class Asset:
         # Find the asset type association table
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         try:
-            type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
-                asset_table_obj, "Asset_Type"
-            )
+            type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
         except Exception:
             # No type association for this asset table
             self._asset_types = []
@@ -160,9 +158,7 @@ class Asset:
         type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
 
         types = list(
-            type_path.filter(type_path.columns[asset_fk] == self.asset_rid)
-            .attributes(type_path.Asset_Type)
-            .fetch()
+            type_path.filter(type_path.columns[asset_fk] == self.asset_rid).attributes(type_path.Asset_Type).fetch()
         )
         self._asset_types = [t["Asset_Type"] for t in types]
 
@@ -240,8 +236,7 @@ class Asset:
         from deriva_ml.core.exceptions import DerivaMLException
 
         raise DerivaMLException(
-            "Asset.list_feature_values() has been retired. "
-            "Use ml.feature_values(asset_table, feature_name) instead."
+            "Asset.list_feature_values() has been retired. Use ml.feature_values(asset_table, feature_name) instead."
         )
 
     def add_asset_type(self, type_name: str) -> None:
@@ -254,9 +249,7 @@ class Asset:
             >>> asset.add_asset_type("Training_Data")  # doctest: +SKIP
         """
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
-        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
-            asset_table_obj, "Asset_Type"
-        )
+        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
 
         pb = self._ml_instance.pathBuilder()
         type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
@@ -278,18 +271,13 @@ class Asset:
             >>> asset.remove_asset_type("Temporary")  # doctest: +SKIP
         """
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
-        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
-            asset_table_obj, "Asset_Type"
-        )
+        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
 
         pb = self._ml_instance.pathBuilder()
         type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
 
         # Delete the association
-        type_path.filter(
-            (type_path.columns[asset_fk] == self.asset_rid) &
-            (type_path.Asset_Type == type_name)
-        ).delete()
+        type_path.filter((type_path.columns[asset_fk] == self.asset_rid) & (type_path.Asset_Type == type_name)).delete()
 
         # Update local cache
         if type_name in self._asset_types:
@@ -331,7 +319,9 @@ class Asset:
             >>> print(f"Created: {metadata.get('RCT')}")  # doctest: +SKIP
         """
         pb = self._ml_instance.pathBuilder()
-        asset_path = pb.schemas[self._ml_instance.model.name_to_table(self.asset_table).schema.name].tables[self.asset_table]
+        asset_path = pb.schemas[self._ml_instance.model.name_to_table(self.asset_table).schema.name].tables[
+            self.asset_table
+        ]
 
         records = list(asset_path.filter(asset_path.RID == self.asset_rid).entities().fetch())
         return records[0] if records else {}
@@ -351,7 +341,4 @@ class Asset:
         catalog_id = self._ml_instance.catalog_id
         hostname = self._ml_instance.host_name
 
-        return (
-            f"https://{hostname}/chaise/record/#{catalog_id}/"
-            f"{schema_name}:{self.asset_table}/RID={self.asset_rid}"
-        )
+        return f"https://{hostname}/chaise/record/#{catalog_id}/{schema_name}:{self.asset_table}/RID={self.asset_rid}"

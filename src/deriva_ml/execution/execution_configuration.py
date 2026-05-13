@@ -28,10 +28,9 @@ from pathlib import Path
 from typing import Any
 
 from omegaconf import DictConfig
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from deriva_ml.asset.aux_classes import AssetSpec
-from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.core.validation import VALIDATION_CONFIG
@@ -140,5 +139,3 @@ class ExecutionConfiguration(BaseModel):
         with Path(path).open() as fd:
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)
-
-

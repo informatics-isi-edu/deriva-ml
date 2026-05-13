@@ -7,7 +7,6 @@ execution status.
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
@@ -23,7 +22,10 @@ from deriva_ml.execution.state_machine import (
     reconcile_with_catalog,
 )
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.execution.upload_engine import run_upload_engine
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from deriva_ml.asset.aux_classes import AssetSpec
@@ -484,7 +486,7 @@ class ExecutionMixin:
                     execution_rid=execution_rid,
                 )
             except Exception as exc:
-                logging.getLogger("deriva_ml").warning(
+                logger.warning(
                     "per-execution lease reconciliation failed for %s (%s); continuing",
                     execution_rid,
                     exc,

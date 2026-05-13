@@ -16,7 +16,6 @@ assets and provides the old-to-new URL mapping for auditing.
 
 from __future__ import annotations
 
-import logging
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,11 +24,12 @@ from urllib.parse import quote as urlquote
 from urllib.parse import urlparse
 
 from deriva.core import ErmrestCatalog, HatracStore, get_credential
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
 
-logger = logging.getLogger("deriva_ml")
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -208,13 +208,15 @@ def localize_assets(
             result.assets_skipped += 1
             continue
 
-        assets_to_localize.append({
-            "rid": rid,
-            "record": record,
-            "source_hostname": asset_source_hostname,
-            "source_path": source_path,
-            "current_url": current_url,
-        })
+        assets_to_localize.append(
+            {
+                "rid": rid,
+                "record": record,
+                "source_hostname": asset_source_hostname,
+                "source_path": source_path,
+                "current_url": current_url,
+            }
+        )
 
     if not assets_to_localize:
         logger.info("No assets need to be localized")
@@ -254,7 +256,7 @@ def localize_assets(
             filename = record.get("Filename") or record.get("filename")
             md5 = record.get("MD5") or record.get("md5")
 
-            logger.info(f"[{i+1}/{len(assets_to_localize)}] Localizing {rid}: {filename} from {source_hostname}")
+            logger.info(f"[{i + 1}/{len(assets_to_localize)}] Localizing {rid}: {filename} from {source_hostname}")
 
             try:
                 # Get or create remote hatrac connection
@@ -411,11 +413,7 @@ def _fetch_asset_records(table_path, rids: list[str]) -> list[dict]:
     from deriva.core.datapath import DataPathException
 
     try:
-        return list(
-            table_path.path.filter(table_path.RID.in_(list(rids)))
-            .entities()
-            .fetch()
-        )
+        return list(table_path.path.filter(table_path.RID.in_(list(rids))).entities().fetch())
     except DataPathException as e:
         logger.warning(f"Bulk fetch failed: {e}, falling back to individual fetches")
         records = []

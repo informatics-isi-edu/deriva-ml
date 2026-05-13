@@ -21,7 +21,6 @@ from typing import Dict, cast, TYPE_CHECKING, Any
 from typing_extensions import Self
 
 # Third-party imports
-import requests
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
@@ -51,7 +50,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
 )
-from deriva_ml.core.logging_config import _apply_logger_overrides, configure_logging
+from deriva_ml.core.logging_config import _apply_logger_overrides, configure_logging, get_logger
 from deriva_ml.core.mixins import (
     AnnotationMixin,
     AssetMixin,
@@ -73,6 +72,8 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
     from deriva_ml.schema.validation import SchemaValidationReport
+
+logger = get_logger(__name__)
 
 # Stop pycharm from complaining about undefined references.
 ml: DerivaML
@@ -372,8 +373,9 @@ class DerivaML(
                 # Best-effort. If reconciliation itself fails, log and
                 # move on — the user's operation can still proceed;
                 # the next acquire_leases call will retry.
-                logging.getLogger("deriva_ml").warning(
-                    "startup lease reconciliation failed (%s); continuing", exc,
+                logger.warning(
+                    "startup lease reconciliation failed (%s); continuing",
+                    exc,
                 )
 
     def __del__(self) -> None:
@@ -447,10 +449,11 @@ class DerivaML(
         if cache.exists():
             cached = cache.load()
             if cached["snapshot_id"] != live_snapshot_id:
-                logging.getLogger("deriva_ml").warning(
+                logger.warning(
                     "schema cache is at snapshot %s; live catalog is at %s. "
                     "Using cached schema. Call ml.refresh_schema() to update.",
-                    cached["snapshot_id"], live_snapshot_id,
+                    cached["snapshot_id"],
+                    live_snapshot_id,
                 )
             self.model = DerivaModel.from_cached(
                 cached["schema"],
@@ -544,9 +547,7 @@ class DerivaML(
         from deriva_ml.model.catalog import DerivaModel
 
         if self._mode is not ConnectionMode.online:
-            raise DerivaMLReadOnlyError(
-                "refresh_schema requires online mode"
-            )
+            raise DerivaMLReadOnlyError("refresh_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         if cache.exists() and cache.pin_status().pinned:
             pin_info = cache.pin_status()
@@ -584,9 +585,10 @@ class DerivaML(
             domain_schemas=self.model.domain_schemas,
             default_schema=self.model.default_schema,
         )
-        logging.getLogger("deriva_ml").info(
+        logger.info(
             "schema cache refreshed from %s to %s",
-            old_snapshot_id, live_snapshot_id,
+            old_snapshot_id,
+            live_snapshot_id,
         )
 
     def pin_schema(self, reason: str | None = None) -> "SchemaDiff | None":
@@ -631,10 +633,10 @@ class DerivaML(
                 live_schema = self.catalog.get("/schema").json()
                 diff = _compute_diff(cached_payload["schema"], live_schema)
                 if not diff.is_empty():
-                    logging.getLogger("deriva_ml").warning(
-                        "pin_schema: cache at %s, live at %s; "
-                        "structural drift detected (see returned SchemaDiff)",
-                        cached_payload["snapshot_id"], live_snapshot_id,
+                    logger.warning(
+                        "pin_schema: cache at %s, live at %s; structural drift detected (see returned SchemaDiff)",
+                        cached_payload["snapshot_id"],
+                        live_snapshot_id,
                     )
                     drift = diff
         cache.pin(reason=reason)
@@ -825,16 +827,12 @@ class DerivaML(
             try:
                 n = self._workspace.import_legacy_manifests()
                 if n:
-                    import logging
-
-                    logging.getLogger("deriva_ml").info(
+                    logger.info(
                         "Migrated %d legacy asset manifests into workspace",
                         n,
                     )
             except Exception as exc:
-                import logging
-
-                logging.getLogger("deriva_ml").warning(
+                logger.warning(
                     "Legacy manifest migration failed: %s",
                     exc,
                 )
@@ -930,7 +928,9 @@ class DerivaML(
             if cached is not None:
                 return cached.to_dataframe()
 
-        records = [r.model_dump(mode="json") for r in self.feature_values(table_name, feature_name=feature_name, **kwargs)]
+        records = [
+            r.model_dump(mode="json") for r in self.feature_values(table_name, feature_name=feature_name, **kwargs)
+        ]
         df = pd.DataFrame(records)
         if not df.empty:
             columns = list(df.columns)

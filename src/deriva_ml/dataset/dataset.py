@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import os
 import shutil
 from collections import defaultdict
@@ -68,7 +67,7 @@ from deriva.transfer.download import (
     DerivaDownloadTimeoutError,
 )
 from deriva.transfer.download.deriva_export import DerivaExport
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.constants import RID
@@ -91,6 +90,7 @@ from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
 from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 
 def _hash_spec(spec: Any) -> str:
@@ -172,7 +172,7 @@ class Dataset:
             >>> # Wrap an existing dataset
             >>> dataset = Dataset(catalog=ml, dataset_rid="4HM")  # doctest: +SKIP
         """
-        self._logger = logging.getLogger("deriva_ml")
+        self._logger = get_logger(__name__)
         self.dataset_rid = dataset_rid
         self.execution_rid = execution_rid
         self._ml_instance = catalog
@@ -3488,7 +3488,7 @@ class Dataset:
         try:
             bdb.validate_bag_structure(bag_path.as_posix())
         except Exception as e:
-            logging.getLogger("deriva_ml").debug(f"Bag validation check failed for {bag_path}: {e}")
+            self._logger.debug(f"Bag validation check failed for {bag_path}: {e}")
             return False
         fetch_file = bag_path / "fetch.txt"
         if not fetch_file.exists():

@@ -95,6 +95,7 @@ def _get_domain_schemas(all_schemas: set[str] | list[str], ml_schema: str = ML_S
     """
     return frozenset(s for s in all_schemas if not _is_system_schema(s, ml_schema))
 
+
 # =============================================================================
 # RID Regular Expression Components
 # =============================================================================
@@ -133,9 +134,9 @@ DerivaSystemColumns = ["RID", "RCT", "RMT", "RCB", "RMB"]
 # Columns specific to asset tables (files, images, etc.)
 # Includes system columns plus asset-specific metadata
 DerivaAssetColumns = {
-    "Filename",    # Original filename
-    "URL",         # Hatrac storage URL
-    "Length",      # File size in bytes
-    "MD5",         # MD5 checksum for integrity verification
-    "Description", # Optional description of the asset
+    "Filename",  # Original filename
+    "URL",  # Hatrac storage URL
+    "Length",  # File size in bytes
+    "MD5",  # MD5 checksum for integrity verification
+    "Description",  # Optional description of the asset
 }.union(set(DerivaSystemColumns))

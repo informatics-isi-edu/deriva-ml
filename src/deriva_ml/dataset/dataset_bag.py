@@ -32,7 +32,6 @@ Typical usage:
 from __future__ import annotations
 
 # Standard library imports
-import logging
 import shutil
 from collections import defaultdict
 from copy import copy
@@ -55,6 +54,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.pd_utils import rows_to_dataframe
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature, FeatureRecord
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     import tensorflow as tf
@@ -1302,15 +1302,13 @@ class DatasetBag:
                   and no value_selector is provided.
         """
         from deriva_ml.core.exceptions import DerivaMLException
-        from deriva_ml.feature import FeatureRecord
 
         cache: dict[str, dict[RID, Any]] = {}
         # Store FeatureRecord objects directly for later selection
         records_cache: dict[str, dict[RID, list[FeatureRecord]]] = {}
         # Track which column to use for each group_key's value extraction
         column_for_group: dict[str, str] = {}
-        logger = logging.getLogger("deriva_ml")
-
+        logger = get_logger(__name__)
         # Parse group_keys to extract feature names and optional column specifications
         # Format: "FeatureName" or "FeatureName.column_name"
         feature_column_map: dict[str, str | None] = {}  # group_key -> specific column or None
@@ -2098,7 +2096,7 @@ class DatasetBag:
         from deriva_ml.core.exceptions import DerivaMLValidationError
         from deriva_ml.dataset.target_resolution import _resolve_targets
 
-        logger = logging.getLogger("deriva_ml")
+        logger = get_logger(__name__)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 

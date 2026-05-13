@@ -67,10 +67,7 @@ class DatasetCollection(Mapping):
         except KeyError:
             # More helpful than KeyError('1-XYZ') alone.
             available = ", ".join(self._by_rid) or "(none)"
-            raise KeyError(
-                f"dataset {rid!r} not in this execution's inputs. "
-                f"Available: {available}"
-            ) from None
+            raise KeyError(f"dataset {rid!r} not in this execution's inputs. Available: {available}") from None
 
     def __iter__(self) -> "Iterator[DatasetBag]":
         # Mapping's default would iterate keys; we override to iterate

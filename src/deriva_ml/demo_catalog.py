@@ -5,6 +5,7 @@ This module creates demo catalogs with sample data for testing. It uses
 dynamically created Pydantic models for features, which cannot be statically
 typed - hence the type ignore above.
 """
+
 from __future__ import annotations
 
 import atexit
@@ -21,7 +22,7 @@ from tempfile import TemporaryDirectory
 
 from deriva.core import BaseCLI, ErmrestCatalog
 from deriva.core.typed import BuiltinType, ColumnDef, ForeignKeyDef, SchemaDef, TableDef
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from requests.exceptions import HTTPError
 
 from deriva_ml import DerivaML, DerivaMLException, MLVocab
@@ -50,10 +51,12 @@ def populate_demo_catalog(execution: Execution) -> None:
     # include Observation FK in the image metadata for upload regex matching.
     observation_records = []
     for s in ss:
-        observation_records.append({
-            "Subject": s["RID"],
-            "Observation_Date": datetime.now().date().isoformat(),
-        })
+        observation_records.append(
+            {
+                "Subject": s["RID"],
+                "Observation_Date": datetime.now().date().isoformat(),
+            }
+        )
     observation_table = domain_schema.tables["Observation"]
     observations = list(observation_table.insert(observation_records))
     obs_by_subject = {obs["Subject"]: obs["RID"] for obs in observations}
@@ -78,40 +81,48 @@ def populate_demo_catalog(execution: Execution) -> None:
     # Create Report rows linked to Observations.
     report_records = []
     for obs in observations:
-        report_records.append({
-            "Observation": obs["RID"],
-            "Report_Type": "TestReport",
-        })
+        report_records.append(
+            {
+                "Observation": obs["RID"],
+                "Report_Type": "TestReport",
+            }
+        )
     report_table = domain_schema.tables["Report"]
     reports = list(report_table.insert(report_records))
 
     # Create OCR_Report rows linked to Reports.
     ocr_records = []
     for rpt in reports:
-        ocr_records.append({
-            "Report": rpt["RID"],
-            "Field_Value": round(random() * 100, 2),
-        })
+        ocr_records.append(
+            {
+                "Report": rpt["RID"],
+                "Field_Value": round(random() * 100, 2),
+            }
+        )
     ocr_table = domain_schema.tables["OCR_Report"]
     ocr_table.insert(ocr_records)
 
     # Create ClinicalRecords
     clinical_records = []
     for i, obs in enumerate(observations):
-        clinical_records.append({
-            "Diagnosis": f"Diagnosis_{i}",
-            "Notes": f"Notes for observation {obs['RID']}",
-        })
+        clinical_records.append(
+            {
+                "Diagnosis": f"Diagnosis_{i}",
+                "Notes": f"Notes for observation {obs['RID']}",
+            }
+        )
     cr_table = domain_schema.tables["ClinicalRecord"]
     crs = list(cr_table.insert(clinical_records))
 
     # Create ClinicalRecord_Observation associations
     assoc_records = []
     for cr, obs in zip(crs, observations):
-        assoc_records.append({
-            "ClinicalRecord": cr["RID"],
-            "Observation_Ref": obs["RID"],
-        })
+        assoc_records.append(
+            {
+                "ClinicalRecord": cr["RID"],
+                "Observation_Ref": obs["RID"],
+            }
+        )
     cr_obs_table = domain_schema.tables["ClinicalRecord_Observation"]
     cr_obs_table.insert(assoc_records)
 
@@ -387,12 +398,8 @@ def create_domain_schema(catalog: ErmrestCatalog, sname: str) -> None:
         else:
             raise e
 
-    domain_schema = model.create_schema(
-        SchemaDef(name=sname, annotations={"name_style": {"underline_space": True}})
-    )
-    subject_table = domain_schema.create_table(
-        TableDef(name="Subject", columns=[ColumnDef("Name", BuiltinType.text)])
-    )
+    domain_schema = model.create_schema(SchemaDef(name=sname, annotations={"name_style": {"underline_space": True}}))
+    subject_table = domain_schema.create_table(TableDef(name="Subject", columns=[ColumnDef("Name", BuiltinType.text)]))
     with TemporaryDirectory() as tmpdir:
         ml_instance = DerivaML(hostname=catalog.deriva_server.server, catalog_id=catalog.catalog_id, working_dir=tmpdir)
         # Use update_navbar=False since we call apply_catalog_annotations() explicitly at the end

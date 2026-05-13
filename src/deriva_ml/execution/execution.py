@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from deriva_ml.execution.upload_engine import UploadReport
     from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva.core.hatrac_store import HatracStore
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.asset.manifest import AssetEntry, AssetManifest
@@ -85,7 +85,10 @@ from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
+
+logger = get_logger(__name__)
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
@@ -345,9 +348,6 @@ class Execution:
                 # Log and re-raise; the user can recover via
                 # lookup_execution, but workspace-based resume is
                 # impaired until the row is re-registered manually.
-                import logging
-
-                logger = logging.getLogger("deriva_ml.execution")
                 logger.error(
                     "create_execution %s: catalog POST succeeded but "
                     "SQLite registry write FAILED (%s). Execution can "
@@ -1050,9 +1050,7 @@ class Execution:
             if error is not None:
                 extra_fields["error"] = error
         elif error is not None:
-            import logging
-
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "error= ignored on non-terminal transition to %s: %s",
                 target.value,
                 error,
@@ -2403,7 +2401,7 @@ class Execution:
         store = self._ml_object.workspace.execution_state_store()
         counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
         if counts["pending_rows"] or counts["pending_files"]:
-            logging.getLogger("deriva_ml.execution").info(
+            logger.info(
                 "[Execution %s] exited with pending: %d rows, %d files. Call exe.upload_outputs() to flush.",
                 self.execution_rid,
                 counts["pending_rows"],

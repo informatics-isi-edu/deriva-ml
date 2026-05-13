@@ -58,7 +58,7 @@ HatracStore = _hatrac_store.HatracStore
 hash_utils = _hash_utils
 mime_utils = _mime_utils
 GenericUploader = _deriva_upload.GenericUploader
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.definitions import (
     RID,
@@ -70,6 +70,7 @@ from deriva_ml.core.definitions import (
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.model.catalog import DerivaModel
 from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 NULL_SENTINEL = "__NULL__"
 """Directory-segment marker for nullable asset-metadata columns with
@@ -365,13 +366,11 @@ def upload_directory(
     Raises:
         DerivaMLException: If there is an issue with uploading the assets.
     """
-    import logging
     import time
 
     from deriva.core import DEFAULT_SESSION_CONFIG
 
-    logger = logging.getLogger("deriva_ml")
-
+    logger = get_logger(__name__)
     directory = Path(directory)
     if not directory.is_dir():
         raise DerivaMLException("Directory does not exist")

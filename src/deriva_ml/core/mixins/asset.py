@@ -225,9 +225,7 @@ class AssetMixin:
         asset_rid_col = asset_table_obj.name
         type_col = MLVocab.asset_type.value
         asset_rid_to_types: dict[str, list[str]] = {}
-        for row in type_path.attributes(
-            type_path.columns[asset_rid_col], type_path.columns[type_col]
-        ).fetch():
+        for row in type_path.attributes(type_path.columns[asset_rid_col], type_path.columns[type_col]).fetch():
             asset_rid_to_types.setdefault(row[asset_rid_col], []).append(row[type_col])
 
         # Single bulk fetch of all asset rows, then attach types from the map.
@@ -246,9 +244,7 @@ class AssetMixin:
             for asset_record in asset_path.entities().fetch()
         ]
 
-    def list_asset_executions(
-        self, asset_rid: str, asset_role: str | None = None
-    ) -> list["ExecutionRecord"]:
+    def list_asset_executions(self, asset_rid: str, asset_role: str | None = None) -> list["ExecutionRecord"]:
         """List all executions associated with an asset.
 
         Given an asset RID, returns a list of executions that created or used
@@ -344,9 +340,7 @@ class AssetMixin:
             type_assoc_table, asset_fk, _ = self.model.find_association(asset_table, "Asset_Type")
             type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
             types = list(
-                type_path.filter(type_path.columns[asset_fk] == asset_rid)
-                .attributes(type_path.Asset_Type)
-                .fetch()
+                type_path.filter(type_path.columns[asset_fk] == asset_rid).attributes(type_path.Asset_Type).fetch()
             )
             asset_types = [t["Asset_Type"] for t in types]
         except Exception:
@@ -378,15 +372,9 @@ class AssetMixin:
         # Include asset tables from all domain schemas
         for domain_schema in self.domain_schemas:
             if domain_schema in self.model.schemas:
-                tables.extend([
-                    t for t in self.model.schemas[domain_schema].tables.values()
-                    if self.model.is_asset(t)
-                ])
+                tables.extend([t for t in self.model.schemas[domain_schema].tables.values() if self.model.is_asset(t)])
         # Also include ML schema asset tables (like Execution_Asset)
-        tables.extend([
-            t for t in self.model.schemas[self.ml_schema].tables.values()
-            if self.model.is_asset(t)
-        ])
+        tables.extend([t for t in self.model.schemas[self.ml_schema].tables.values() if self.model.is_asset(t)])
         return tables
 
     def find_assets(
@@ -455,4 +443,5 @@ class AssetMixin:
             >>> path = exe.asset_file_path("Image", "scan.jpg", metadata=record)  # doctest: +SKIP
         """
         from deriva_ml.asset.asset_record import _asset_record_class
+
         return _asset_record_class(self.model, asset_table_name)

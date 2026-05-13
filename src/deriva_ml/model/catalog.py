@@ -9,12 +9,10 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
-import logging
 
 # Standard library imports
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
-from graphlib import CycleError, TopologicalSorter
 from typing import Any, Callable, Iterable, NewType, TypeAlias
 
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
@@ -29,7 +27,7 @@ Schema = _ermrest_model.Schema
 Table = _ermrest_model.Table
 
 # Third-party imports
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
@@ -45,6 +43,7 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 # Local imports
 from deriva_ml.feature import Feature
 from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 
 @dataclass
@@ -113,8 +112,7 @@ def denormalize_column_name(schema_name: str, table_name: str, column_name: str,
     return f"{table_name}.{column_name}"
 
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 # Define common types:
 TableInput: TypeAlias = str | Table
 SchemaDict: TypeAlias = dict[str, Schema]

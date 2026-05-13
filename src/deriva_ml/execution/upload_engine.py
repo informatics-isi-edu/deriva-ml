@@ -36,6 +36,7 @@ from deriva_ml.dataset.upload import DEFAULT_UPLOAD_TIMEOUT, NULL_SENTINEL, bulk
 from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
 from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus, PendingRowStatus
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva.core.ermrest_catalog import ErmrestCatalog
@@ -43,12 +44,13 @@ if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
     from deriva_ml.execution.state_store import ExecutionStateStore
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
 class _WorkItem:
     """One (execution, target_table) grouping of pending items."""
+
     execution_rid: str
     target_schema: str
     target_table: str
@@ -95,7 +97,8 @@ def _enumerate_work(
     items: list[_WorkItem] = []
     for rid in candidate_rids:
         rows = store.list_pending_rows(
-            execution_rid=rid, status=statuses_to_take,
+            execution_rid=rid,
+            status=statuses_to_take,
         )
         if not rows:
             continue
@@ -105,12 +108,15 @@ def _enumerate_work(
             by_key.setdefault(key, []).append(r)
 
         for (schema, table), group in by_key.items():
-            items.append(_WorkItem(
-                execution_rid=rid,
-                target_schema=schema, target_table=table,
-                pending_ids=[r["id"] for r in group],
-                is_asset=any(r["asset_file_path"] is not None for r in group),
-            ))
+            items.append(
+                _WorkItem(
+                    execution_rid=rid,
+                    target_schema=schema,
+                    target_table=table,
+                    pending_ids=[r["id"] for r in group],
+                    is_asset=any(r["asset_file_path"] is not None for r in group),
+                )
+            )
     return items
 
 
@@ -226,6 +232,7 @@ class UploadReport:
         per_table: Map of "schema:table" → dict {uploaded, failed}.
         errors: List of human-readable error lines from failed items.
     """
+
     execution_rids: list[str]
     total_uploaded: int
     total_failed: int
@@ -297,17 +304,20 @@ def run_upload_engine(
     validator_entries: list[tuple[str, str, str, dict]] = []
     for rid in rids_for_validation:
         for row in store.list_pending_rows(
-            execution_rid=rid, status=_statuses_to_validate,
+            execution_rid=rid,
+            status=_statuses_to_validate,
         ):
             if not row.get("asset_file_path"):
                 continue  # non-asset rows have no metadata-column dependency
             md = _json.loads(row["metadata_json"]) if row["metadata_json"] else {}
-            validator_entries.append((
-                f"{row['execution_rid']}/{row['target_table']}/{row['key']}",
-                row["target_schema"],
-                row["target_table"],
-                md,
-            ))
+            validator_entries.append(
+                (
+                    f"{row['execution_rid']}/{row['target_table']}/{row['key']}",
+                    row["target_schema"],
+                    row["target_table"],
+                    md,
+                )
+            )
     if validator_entries:
         _validate_pending_asset_metadata_iter(ml.model, validator_entries)
 
@@ -317,7 +327,9 @@ def run_upload_engine(
     items = _enumerate_work(ml=ml, execution_rids=rids, retry_failed=retry_failed)
     if not items:
         return UploadReport(
-            execution_rids=rids, total_uploaded=0, total_failed=0,
+            execution_rids=rids,
+            total_uploaded=0,
+            total_failed=0,
             per_table={},
         )
 
@@ -336,8 +348,10 @@ def run_upload_engine(
             by_exe.setdefault(item.execution_rid, []).extend(staged)
     for exe_rid, pending_ids in by_exe.items():
         acquire_leases_for_execution(
-            store=store, catalog=ml.catalog,
-            execution_rid=exe_rid, pending_ids=pending_ids,
+            store=store,
+            catalog=ml.catalog,
+            execution_rid=exe_rid,
+            pending_ids=pending_ids,
         )
 
     # Step 4: topo sort into levels.
@@ -374,13 +388,16 @@ def run_upload_engine(
             except Exception as exc:
                 logger.warning(
                     "upload: could not set pending_upload for %s: %s",
-                    item.execution_rid, exc,
+                    item.execution_rid,
+                    exc,
                 )
 
             try:
                 n = _drain_work_item(
-                    store=store, catalog=ml.catalog,
-                    work_item=item, ml=ml,
+                    store=store,
+                    catalog=ml.catalog,
+                    work_item=item,
+                    ml=ml,
                     cancel_event=cancel_event,
                 )
                 total_uploaded += n
@@ -442,7 +459,9 @@ def run_upload_engine(
             )
         except Exception as exc:
             logger.warning(
-                "upload: final status transition failed for %s: %s", exe_rid, exc,
+                "upload: final status transition failed for %s: %s",
+                exe_rid,
+                exc,
             )
 
     return UploadReport(
@@ -533,7 +552,8 @@ def _drain_work_item(
         raise RuntimeError("ml kwarg is required — pass from run_upload_engine")
 
     rows = [
-        r for r in store.list_pending_rows(execution_rid=work_item.execution_rid)
+        r
+        for r in store.list_pending_rows(execution_rid=work_item.execution_rid)
         if r["id"] in set(work_item.pending_ids)
     ]
     if not rows:
@@ -552,7 +572,8 @@ def _drain_work_item(
             for r in rows
         ]
         result = _invoke_deriva_py_uploader(
-            ml=ml, files=files,
+            ml=ml,
+            files=files,
             target_table=work_item.target_table,
             execution_rid=work_item.execution_rid,
             cancel_event=cancel_event,
@@ -562,10 +583,7 @@ def _drain_work_item(
         # count here. Rows whose status is still Pending at this point
         # fall through and will be retried on the next run.
         uploaded_paths = set(result["uploaded"])
-        return sum(
-            1 for r in rows
-            if r["asset_file_path"] in uploaded_paths
-        )
+        return sum(1 for r in rows if r["asset_file_path"] in uploaded_paths)
 
     # Plain rows: build a single catalog insert body including pre-leased RIDs.
     body = []
@@ -650,9 +668,7 @@ def _invoke_deriva_py_uploader(
         schema_name = table_obj.schema.name
         metadata_cols = sorted(ml.model.asset_metadata(target_table))
     except Exception as exc:
-        raise DerivaMLException(
-            f"Unable to resolve asset table {target_table!r}: {exc}"
-        ) from exc
+        raise DerivaMLException(f"Unable to resolve asset table {target_table!r}: {exc}") from exc
 
     # Map absolute input path → the file dict (for callback writes).
     rows_by_path: dict[str, dict] = {str(Path(f["path"]).resolve()): f for f in files}
@@ -842,10 +858,12 @@ def _invoke_deriva_py_uploader(
                 if state == UploadState.Success:
                     uploaded.append(input_path)
                 elif state == UploadState.Failed:
-                    failed.append({
-                        "path": input_path,
-                        "error": info.get("Status") or "upload failed",
-                    })
+                    failed.append(
+                        {
+                            "path": input_path,
+                            "error": info.get("Status") or "upload failed",
+                        }
+                    )
         finally:
             # On exception or early return, flush any buffered terminal
             # writes so partial progress is durable. Reconciliation on

@@ -34,7 +34,6 @@ The ``source`` parameter controls how rows get into the local SQLite engine:
 
 from __future__ import annotations
 
-import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generator
@@ -46,8 +45,9 @@ from sqlalchemy.orm import Session
 
 from deriva_ml.local_db.paged_fetcher import PagedClient, PagedFetcher
 from deriva_ml.model.catalog import DerivaModel, denormalize_column_name
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @contextmanager

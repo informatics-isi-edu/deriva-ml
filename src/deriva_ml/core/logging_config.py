@@ -80,20 +80,42 @@ def is_hydra_initialized() -> bool:
 def get_logger(name: str | None = None) -> logging.Logger:
     """Get a DerivaML logger.
 
+    Three name forms are accepted:
+
+    1. ``None`` — returns the main ``deriva_ml`` logger.
+    2. A short suffix (no dots), e.g. ``get_logger("dataset")`` —
+       returns ``deriva_ml.dataset``.
+    3. A full module ``__name__`` (with or without the
+       ``deriva_ml.`` prefix), e.g.
+       ``get_logger(__name__)`` from inside
+       ``deriva_ml/dataset/dataset.py`` — returns
+       ``deriva_ml.dataset.dataset``. Names that already start
+       with ``deriva_ml`` are used as-is; the bare string
+       ``"deriva_ml"`` is treated identically to ``None``.
+
+    Form (3) is the canonical project-wide pattern: every module
+    writes ``logger = get_logger(__name__)`` so log messages
+    carry their source module in the hierarchy.
+
     Args:
-        name: Optional sub-logger name. If provided, returns a child logger
-              under the deriva_ml namespace (e.g., 'deriva_ml.dataset').
-              If None, returns the main deriva_ml logger.
+        name: Sub-logger name. See above for accepted forms.
 
     Returns:
         The configured logger instance.
 
     Example:
-        >>> logger = get_logger()  # Main deriva_ml logger
-        >>> dataset_logger = get_logger("dataset")  # deriva_ml.dataset
+        >>> logger = get_logger()                       # deriva_ml
+        >>> get_logger("dataset").name                  # deriva_ml.dataset
+        'deriva_ml.dataset'
+        >>> get_logger("deriva_ml.dataset").name        # already-prefixed
+        'deriva_ml.dataset'
+        >>> get_logger("deriva_ml").name                # bare root
+        'deriva_ml'
     """
-    if name is None:
+    if name is None or name == LOGGER_NAME:
         return logging.getLogger(LOGGER_NAME)
+    if name.startswith(f"{LOGGER_NAME}."):
+        return logging.getLogger(name)
     return logging.getLogger(f"{LOGGER_NAME}.{name}")
 
 

@@ -176,9 +176,7 @@ def main() -> None:
         >>> main()
         Installed Jupyter kernel 'my-project' with display name 'Python (my-project)'
     """
-    parser = ArgumentParser(
-        description="Install a Jupyter kernel for the current virtual environment."
-    )
+    parser = ArgumentParser(description="Install a Jupyter kernel for the current virtual environment.")
     parser.add_argument(
         "--install-local",
         action="store_true",

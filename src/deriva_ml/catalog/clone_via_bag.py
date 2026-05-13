@@ -52,7 +52,6 @@ Legacy parameter            Bag-path mapping   Notes
 
 from __future__ import annotations
 
-import logging
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,8 +67,9 @@ from deriva.bag.traversal import (
     VocabExport,
 )
 from deriva.core import DerivaServer, get_credential
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _materialize_bag_dir(bag_path: Path) -> Path:
@@ -114,9 +114,7 @@ def _materialize_bag_dir(bag_path: Path) -> Path:
     return extracted[0]
 
 
-def _expand_nested_dataset_anchors(
-    anchors: list[Anchor], source_catalog: "ErmrestCatalog"
-) -> list[Anchor]:
+def _expand_nested_dataset_anchors(anchors: list[Anchor], source_catalog: "ErmrestCatalog") -> list[Anchor]:
     """Expand ``Dataset`` ``RIDAnchor``s to include transitively-nested datasets.
 
     deriva-ml's nested-dataset feature lets a parent Dataset
@@ -147,20 +145,14 @@ def _expand_nested_dataset_anchors(
     expanded: list[Anchor] = []
     for anchor in anchors:
         if isinstance(anchor, RIDAnchor) and anchor.table == "Dataset":
-            full_rids = _collect_nested_dataset_rids(
-                anchor.rids, source_catalog
-            )
-            expanded.append(
-                RIDAnchor(table=anchor.table, rids=sorted(full_rids))
-            )
+            full_rids = _collect_nested_dataset_rids(anchor.rids, source_catalog)
+            expanded.append(RIDAnchor(table=anchor.table, rids=sorted(full_rids)))
         else:
             expanded.append(anchor)
     return expanded
 
 
-def _collect_nested_dataset_rids(
-    seed_rids: list[str], source_catalog: "ErmrestCatalog"
-) -> set[str]:
+def _collect_nested_dataset_rids(seed_rids: list[str], source_catalog: "ErmrestCatalog") -> set[str]:
     """BFS the ``Dataset_Dataset`` association from a seed RID set.
 
     One fetch per BFS frontier (each level fans out by the frontier's
@@ -175,16 +167,12 @@ def _collect_nested_dataset_rids(
     frontier: set[str] = set(seed_rids)
     while frontier:
         try:
-            rows = list(
-                dd.filter(dd.Dataset.in_(sorted(frontier)))
-                .entities()
-                .fetch()
-            )
+            rows = list(dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch())
         except Exception as e:
             logger.warning(
-                "Could not expand nested datasets from %s: %s; "
-                "proceeding with the seed RID set only",
-                sorted(frontier), e,
+                "Could not expand nested datasets from %s: %s; proceeding with the seed RID set only",
+                sorted(frontier),
+                e,
             )
             return collected
         new_children: set[str] = set()
@@ -384,9 +372,7 @@ def clone_via_bag(
         if policy.dangling_fk_strategy == DanglingFKStrategy.FAIL:
             # The library default. Caller almost certainly didn't
             # think about it; replace with the clone default.
-            merge_kwargs["dangling_fk_strategy"] = (
-                DanglingFKStrategy.DELETE
-            )
+            merge_kwargs["dangling_fk_strategy"] = DanglingFKStrategy.DELETE
         if merge_kwargs:
             policy = policy.model_copy(update=merge_kwargs)
 

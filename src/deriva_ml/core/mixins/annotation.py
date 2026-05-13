@@ -22,7 +22,7 @@ _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Column = _ermrest_model.Column
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.core.validation import VALIDATION_CONFIG
@@ -581,9 +581,7 @@ class AnnotationMixin:
             if 0 <= column < len(context_list):
                 removed = context_list.pop(column)
             else:
-                raise DerivaMLException(
-                    f"Index {column} out of range (list has {len(context_list)} items)."
-                )
+                raise DerivaMLException(f"Index {column} out of range (list has {len(context_list)} items).")
         else:
             # Find and remove the column
             for i, item in enumerate(context_list):
@@ -664,8 +662,7 @@ class AnnotationMixin:
             # Reorder by indices
             if len(new_order) != len(original_list):
                 raise DerivaMLException(
-                    f"Index list length ({len(new_order)}) must match "
-                    f"current list length ({len(original_list)})."
+                    f"Index list length ({len(new_order)}) must match current list length ({len(original_list)})."
                 )
             if set(new_order) != set(range(len(original_list))):
                 raise DerivaMLException("Index list must contain each index exactly once.")
@@ -788,16 +785,12 @@ class AnnotationMixin:
         # Get visible_foreign_keys annotation
         visible_fkeys = table_obj.annotations.get(VISIBLE_FOREIGN_KEYS_TAG, {})
         if not visible_fkeys:
-            raise DerivaMLException(
-                f"Table '{table_obj.name}' has no visible-foreign-keys annotation."
-            )
+            raise DerivaMLException(f"Table '{table_obj.name}' has no visible-foreign-keys annotation.")
 
         # Get the context list
         context_list = visible_fkeys.get(context)
         if context_list is None:
-            raise DerivaMLException(
-                f"Context '{context}' not found in visible-foreign-keys annotation."
-            )
+            raise DerivaMLException(f"Context '{context}' not found in visible-foreign-keys annotation.")
         if isinstance(context_list, str):
             raise DerivaMLException(
                 f"Context '{context}' references another context '{context_list}'. "
@@ -813,9 +806,7 @@ class AnnotationMixin:
             if 0 <= foreign_key < len(context_list):
                 removed = context_list.pop(foreign_key)
             else:
-                raise DerivaMLException(
-                    f"Index {foreign_key} out of range (list has {len(context_list)} items)."
-                )
+                raise DerivaMLException(f"Index {foreign_key} out of range (list has {len(context_list)} items).")
         else:
             # Find and remove the foreign key
             for i, item in enumerate(context_list):
@@ -824,9 +815,7 @@ class AnnotationMixin:
                     break
 
             if removed is None:
-                raise DerivaMLException(
-                    f"Foreign key {foreign_key!r} not found in context '{context}'."
-                )
+                raise DerivaMLException(f"Foreign key {foreign_key!r} not found in context '{context}'.")
 
         # Update the annotation
         visible_fkeys[context] = context_list
@@ -872,16 +861,12 @@ class AnnotationMixin:
         # Get visible_foreign_keys annotation
         visible_fkeys = table_obj.annotations.get(VISIBLE_FOREIGN_KEYS_TAG, {})
         if not visible_fkeys:
-            raise DerivaMLException(
-                f"Table '{table_obj.name}' has no visible-foreign-keys annotation."
-            )
+            raise DerivaMLException(f"Table '{table_obj.name}' has no visible-foreign-keys annotation.")
 
         # Get the context list
         context_list = visible_fkeys.get(context)
         if context_list is None:
-            raise DerivaMLException(
-                f"Context '{context}' not found in visible-foreign-keys annotation."
-            )
+            raise DerivaMLException(f"Context '{context}' not found in visible-foreign-keys annotation.")
         if isinstance(context_list, str):
             raise DerivaMLException(
                 f"Context '{context}' references another context '{context_list}'. "
@@ -895,8 +880,7 @@ class AnnotationMixin:
             # Reorder by indices
             if len(new_order) != len(original_list):
                 raise DerivaMLException(
-                    f"Index list length ({len(new_order)}) must match "
-                    f"current list length ({len(original_list)})."
+                    f"Index list length ({len(new_order)}) must match current list length ({len(original_list)})."
                 )
             if set(new_order) != set(range(len(original_list))):
                 raise DerivaMLException("Index list must contain each index exactly once.")
@@ -939,12 +923,14 @@ class AnnotationMixin:
         # Get columns
         columns = []
         for col in table_obj.columns:
-            columns.append({
-                "name": col.name,
-                "type": str(col.type.typename),
-                "template": "{{{" + col.name + "}}}",
-                "row_template": "{{{_row." + col.name + "}}}",
-            })
+            columns.append(
+                {
+                    "name": col.name,
+                    "type": str(col.type.typename),
+                    "template": "{{{" + col.name + "}}}",
+                    "row_template": "{{{_row." + col.name + "}}}",
+                }
+            )
 
         # Get foreign keys (outbound)
         foreign_keys = []
@@ -956,46 +942,36 @@ class AnnotationMixin:
             # Get columns from referenced table
             ref_columns = [col.name for col in fkey.pk_table.columns]
 
-            foreign_keys.append({
-                "constraint": [schema_name, constraint_name],
-                "from_columns": [col.name for col in fkey.columns],
-                "to_table": fkey.pk_table.name,
-                "to_columns": ref_columns,
-                "values_template": "{{{" + fk_path + ".values.COLUMN}}}",
-                "row_name_template": "{{{" + fk_path + ".rowName}}}",
-                "example_column_templates": [
-                    "{{{" + fk_path + ".values." + c + "}}}"
-                    for c in ref_columns[:3]  # Show first 3 as examples
-                ]
-            })
+            foreign_keys.append(
+                {
+                    "constraint": [schema_name, constraint_name],
+                    "from_columns": [col.name for col in fkey.columns],
+                    "to_table": fkey.pk_table.name,
+                    "to_columns": ref_columns,
+                    "values_template": "{{{" + fk_path + ".values.COLUMN}}}",
+                    "row_name_template": "{{{" + fk_path + ".rowName}}}",
+                    "example_column_templates": [
+                        "{{{" + fk_path + ".values." + c + "}}}"
+                        for c in ref_columns[:3]  # Show first 3 as examples
+                    ],
+                }
+            )
 
         return {
             "table": table_obj.name,
             "columns": columns,
             "foreign_keys": foreign_keys,
             "special_variables": {
-                "_value": {
-                    "description": "Current column value (in column_display)",
-                    "template": "{{{_value}}}"
-                },
-                "_row": {
-                    "description": "Object with all row columns",
-                    "template": "{{{_row.column_name}}}"
-                },
-                "$catalog.id": {
-                    "description": "Catalog ID",
-                    "template": "{{{$catalog.id}}}"
-                },
-                "$catalog.snapshot": {
-                    "description": "Current snapshot ID",
-                    "template": "{{{$catalog.snapshot}}}"
-                },
+                "_value": {"description": "Current column value (in column_display)", "template": "{{{_value}}}"},
+                "_row": {"description": "Object with all row columns", "template": "{{{_row.column_name}}}"},
+                "$catalog.id": {"description": "Catalog ID", "template": "{{{$catalog.id}}}"},
+                "$catalog.snapshot": {"description": "Current snapshot ID", "template": "{{{$catalog.snapshot}}}"},
             },
             "helper_examples": {
                 "conditional": "{{#if column}}...{{else}}...{{/if}}",
                 "iteration": "{{#each array}}{{{this}}}{{/each}}",
                 "comparison": "{{#ifCond val1 '==' val2}}...{{/ifCond}}",
                 "date_format": "{{formatDate RCT 'YYYY-MM-DD'}}",
-                "json_output": "{{toJSON object}}"
-            }
+                "json_output": "{{toJSON object}}",
+            },
         }

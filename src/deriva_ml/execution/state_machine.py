@@ -18,7 +18,6 @@ wires them together without owning lifecycle of either.
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -28,6 +27,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLStateInconsistency,
 )
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog  # noqa: F401  (string-annotation only)
@@ -35,9 +35,7 @@ if TYPE_CHECKING:
     from deriva_ml.core.connection_mode import ConnectionMode  # noqa: F401  (string-annotation only)
     from deriva_ml.execution.state_store import ExecutionStateStore  # noqa: F401  (string-annotation only)
 
-logger = logging.getLogger(__name__)
-
-
+logger = get_logger(__name__)
 __all__ = [
     "ALLOWED_TRANSITIONS",
     "InvalidTransitionError",
@@ -106,41 +104,38 @@ class InvalidTransitionError(DerivaMLException):
 #     called on an already-Uploaded execution that has new pending
 #     manifest entries; if there are no pending entries it is a no-op.
 
-ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozenset({
-    # Happy path
-    (ExecutionStatus.Created, ExecutionStatus.Running),
-    (ExecutionStatus.Running, ExecutionStatus.Stopped),
-    (ExecutionStatus.Stopped, ExecutionStatus.Pending_Upload),
-    (ExecutionStatus.Pending_Upload, ExecutionStatus.Uploaded),
-
-    # Hard-crash recovery: resume path for an execution whose process
-    # died before __exit__ could run. Keeps the audit trail honest —
-    # "Failed" means the run failed, not "the process died before it
-    # could mark itself finished".
-    (ExecutionStatus.Running, ExecutionStatus.Pending_Upload),
-
-    # Failure paths
-    (ExecutionStatus.Running, ExecutionStatus.Failed),
-    (ExecutionStatus.Pending_Upload, ExecutionStatus.Failed),
-
-    # Retry from upload failure back into upload
-    (ExecutionStatus.Failed, ExecutionStatus.Pending_Upload),
-
-    # Additive upload from a different lifecycle owner. The kernel
-    # finishes its notebook and uploads its outputs (Uploaded). The
-    # runner harness then registers its own assets (e.g., the Hydra
-    # job log it is solely responsible for, since the kernel's view
-    # of that file is racy) and calls ``upload_execution_outputs()``
-    # again. Status cycles Uploaded → Pending_Upload → Uploaded.
-    (ExecutionStatus.Uploaded, ExecutionStatus.Pending_Upload),
-
-    # Abort is legal from any pre-terminal state. 'uploaded' is
-    # terminal — we don't allow abort after successful upload.
-    (ExecutionStatus.Created, ExecutionStatus.Aborted),
-    (ExecutionStatus.Running, ExecutionStatus.Aborted),
-    (ExecutionStatus.Stopped, ExecutionStatus.Aborted),
-    (ExecutionStatus.Failed, ExecutionStatus.Aborted),
-})
+ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozenset(
+    {
+        # Happy path
+        (ExecutionStatus.Created, ExecutionStatus.Running),
+        (ExecutionStatus.Running, ExecutionStatus.Stopped),
+        (ExecutionStatus.Stopped, ExecutionStatus.Pending_Upload),
+        (ExecutionStatus.Pending_Upload, ExecutionStatus.Uploaded),
+        # Hard-crash recovery: resume path for an execution whose process
+        # died before __exit__ could run. Keeps the audit trail honest —
+        # "Failed" means the run failed, not "the process died before it
+        # could mark itself finished".
+        (ExecutionStatus.Running, ExecutionStatus.Pending_Upload),
+        # Failure paths
+        (ExecutionStatus.Running, ExecutionStatus.Failed),
+        (ExecutionStatus.Pending_Upload, ExecutionStatus.Failed),
+        # Retry from upload failure back into upload
+        (ExecutionStatus.Failed, ExecutionStatus.Pending_Upload),
+        # Additive upload from a different lifecycle owner. The kernel
+        # finishes its notebook and uploads its outputs (Uploaded). The
+        # runner harness then registers its own assets (e.g., the Hydra
+        # job log it is solely responsible for, since the kernel's view
+        # of that file is racy) and calls ``upload_execution_outputs()``
+        # again. Status cycles Uploaded → Pending_Upload → Uploaded.
+        (ExecutionStatus.Uploaded, ExecutionStatus.Pending_Upload),
+        # Abort is legal from any pre-terminal state. 'uploaded' is
+        # terminal — we don't allow abort after successful upload.
+        (ExecutionStatus.Created, ExecutionStatus.Aborted),
+        (ExecutionStatus.Running, ExecutionStatus.Aborted),
+        (ExecutionStatus.Stopped, ExecutionStatus.Aborted),
+        (ExecutionStatus.Failed, ExecutionStatus.Aborted),
+    }
+)
 
 
 def validate_transition(
@@ -166,8 +161,7 @@ def validate_transition(
     """
     if (current, target) not in ALLOWED_TRANSITIONS:
         raise InvalidTransitionError(
-            f"Illegal execution transition {current} → {target}. "
-            f"See spec §2.2 for the allowed transition graph."
+            f"Illegal execution transition {current} → {target}. See spec §2.2 for the allowed transition graph."
         )
 
 
@@ -251,7 +245,9 @@ def transition(
         )
         logger.debug(
             "offline transition %s: %s → %s (sync_pending)",
-            execution_rid, current, target,
+            execution_rid,
+            current,
+            target,
         )
         return
 
@@ -290,9 +286,9 @@ def transition(
         pb.schemas["deriva-ml"].tables["Execution"].update(body)
     except Exception as exc:  # network blip, 5xx, etc.
         logger.warning(
-            "execution %s: catalog sync FAILED (%s); SQLite committed, "
-            "sync_pending stays True for later flush",
-            execution_rid, exc,
+            "execution %s: catalog sync FAILED (%s); SQLite committed, sync_pending stays True for later flush",
+            execution_rid,
+            exc,
         )
         return
 
@@ -300,7 +296,9 @@ def transition(
     store.update_execution(execution_rid, sync_pending=False)
     logger.debug(
         "online transition %s: %s → %s (synced)",
-        execution_rid, current, target,
+        execution_rid,
+        current,
+        target,
     )
 
 
@@ -334,20 +332,20 @@ def _catalog_body_for_execution(
         # Caller just updated SQLite; this would only happen on a
         # concurrent delete. Surface clearly rather than putting a
         # partial body to the catalog.
-        raise DerivaMLStateInconsistency(
-            f"executions row {execution_rid} vanished between write and PUT"
-        )
+        raise DerivaMLStateInconsistency(f"executions row {execution_rid} vanished between write and PUT")
     # Catalog Execution schema has: Workflow, Description, Duration,
     # Status, Status_Detail (see src/deriva_ml/schema/create_schema.py).
     # Start/stop times are NOT catalog columns — they live in SQLite
     # only. Duration is computed elsewhere (in execution_stop) and
     # written directly; don't echo it here.
-    return [{
-        "RID": row["rid"],
-        "Status": row["status"],
-        # Status_Detail: prefer error if present, else description.
-        "Status_Detail": row["error"] or row["description"],
-    }]
+    return [
+        {
+            "RID": row["rid"],
+            "Status": row["status"],
+            # Status_Detail: prefer error if present, else description.
+            "Status_Detail": row["error"] or row["description"],
+        }
+    ]
 
 
 def flush_pending_sync(
@@ -381,9 +379,7 @@ def flush_pending_sync(
     """
     row = store.get_execution(execution_rid)
     if row is None:
-        raise DerivaMLStateInconsistency(
-            f"flush_pending_sync: execution {execution_rid} not in SQLite"
-        )
+        raise DerivaMLStateInconsistency(f"flush_pending_sync: execution {execution_rid} not in SQLite")
     if not row["sync_pending"]:
         return
 
@@ -398,7 +394,8 @@ def flush_pending_sync(
     except Exception as exc:
         logger.warning(
             "flush_pending_sync %s: catalog sync failed (%s); will retry later",
-            execution_rid, exc,
+            execution_rid,
+            exc,
         )
         return
 
@@ -479,21 +476,18 @@ def reconcile_with_catalog(
     """
     sqlite_row = store.get_execution(execution_rid)
     if sqlite_row is None:
-        raise DerivaMLStateInconsistency(
-            f"reconcile: execution {execution_rid} not in SQLite"
-        )
+        raise DerivaMLStateInconsistency(f"reconcile: execution {execution_rid} not in SQLite")
     sqlite_status = ExecutionStatus(sqlite_row["status"])
 
     try:
         # URL filter on RID — returns a list of 0 or 1 rows.
-        response = catalog.get(
-            f"/entity/deriva-ml:Execution/RID={execution_rid}"
-        )
+        response = catalog.get(f"/entity/deriva-ml:Execution/RID={execution_rid}")
         rows = response.json()
     except Exception as exc:
         logger.warning(
             "reconcile %s: catalog GET failed (%s); leaving SQLite as-is",
-            execution_rid, exc,
+            execution_rid,
+            exc,
         )
         return
 
@@ -531,7 +525,9 @@ def reconcile_with_catalog(
         logger.debug(
             "reconcile %s: disagreement (SQLite=%s, catalog=%s) is "
             "expected because sync_pending=True; leaving for flush",
-            execution_rid, sqlite_status, catalog_status,
+            execution_rid,
+            sqlite_status,
+            catalog_status,
         )
         return
 
@@ -547,16 +543,19 @@ def reconcile_with_catalog(
         )
         logger.info(
             "reconcile %s: adopted catalog state %s (was %s in SQLite)",
-            execution_rid, catalog_status, sqlite_status,
+            execution_rid,
+            catalog_status,
+            sqlite_status,
         )
     elif rule == "push":
         # SQLite is newer; mark for flush. The resume flow will
         # invoke flush_pending_sync after reconcile.
         store.update_execution(execution_rid, sync_pending=True)
         logger.info(
-            "reconcile %s: SQLite ahead (SQLite=%s, catalog=%s); "
-            "marked sync_pending for flush",
-            execution_rid, sqlite_status, catalog_status,
+            "reconcile %s: SQLite ahead (SQLite=%s, catalog=%s); marked sync_pending for flush",
+            execution_rid,
+            sqlite_status,
+            catalog_status,
         )
     else:
         raise DerivaMLStateInconsistency(
@@ -603,15 +602,15 @@ def create_catalog_execution(
         >>> rid
         'EXE-NEW'
     """
-    body = [{
-        "Workflow": workflow_rid,
-        "Description": description,
-        "Status": str(ExecutionStatus.Created),
-    }]
+    body = [
+        {
+            "Workflow": workflow_rid,
+            "Description": description,
+            "Status": str(ExecutionStatus.Created),
+        }
+    ]
     response = catalog.post("/entity/deriva-ml:Execution", json=body)
     inserted = response.json()
     if not inserted or "RID" not in inserted[0]:
-        raise DerivaMLDataError(
-            "catalog POST to Execution returned no RID; unable to continue"
-        )
+        raise DerivaMLDataError("catalog POST to Execution returned no RID; unable to continue")
     return inserted[0]["RID"]

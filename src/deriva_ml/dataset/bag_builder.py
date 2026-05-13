@@ -50,11 +50,10 @@ CONTEXT.md is preserved by construction.
 
 from __future__ import annotations
 
-import logging
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Iterable
+from typing import Any, Iterable
 
 from deriva.bag.anchors import Anchor, RIDAnchor, TableAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
@@ -64,8 +63,9 @@ from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import RID
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DatasetBagBuilder:
@@ -113,9 +113,7 @@ class DatasetBagBuilder:
     # Public surface — drives :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
-    def generate_dataset_download_spec(
-        self, dataset: DatasetLike
-    ) -> dict[str, Any]:
+    def generate_dataset_download_spec(self, dataset: DatasetLike) -> dict[str, Any]:
         """Return the runtime download spec for a specific dataset.
 
         Drives a :class:`CatalogBagBuilder` scoped to the dataset's
@@ -171,9 +169,7 @@ class DatasetBagBuilder:
                 },
             },
         ]
-        catalog_block["query_processors"] = (
-            preamble + catalog_block["query_processors"]
-        )
+        catalog_block["query_processors"] = preamble + catalog_block["query_processors"]
 
         out: dict[str, Any] = {
             "env": {"RID": "{RID}"},
@@ -212,11 +208,7 @@ class DatasetBagBuilder:
         post_processors: dict[str, Any] = {}
         if self._use_minid:
             # Trailing slash for the S3 bucket URL on the annotation.
-            s3_url = (
-                self._s3_bucket
-                if self._s3_bucket.endswith("/")
-                else f"{self._s3_bucket}/"
-            )
+            s3_url = self._s3_bucket if self._s3_bucket.endswith("/") else f"{self._s3_bucket}/"
             post_processors = {
                 "type": "BAG",
                 "outputs": [{"fragment_key": "dataset_export_outputs"}],
@@ -243,18 +235,14 @@ class DatasetBagBuilder:
                 ],
             }
         return {
-            deriva_tags.export_fragment_definitions: {
-                "dataset_export_outputs": self._export_annotation()
-            },
+            deriva_tags.export_fragment_definitions: {"dataset_export_outputs": self._export_annotation()},
             deriva_tags.visible_foreign_keys: self._dataset_visible_fkeys(),
             deriva_tags.export_2019: {
                 "detailed": {
                     "templates": [
                         {
                             "type": "BAG",
-                            "outputs": [
-                                {"fragment_key": "dataset_export_outputs"}
-                            ],
+                            "outputs": [{"fragment_key": "dataset_export_outputs"}],
                             "displayname": "BDBag Download",
                             "bag_idempotent": True,
                         }
@@ -298,14 +286,11 @@ class DatasetBagBuilder:
             out[table_name].extend(entries)
         return dict(out)
 
-
     # ------------------------------------------------------------------
     # Internal driver — constructs a :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
-    def _catalog_bag_builder(
-        self, dataset: DatasetLike | None
-    ) -> CatalogBagBuilder:
+    def _catalog_bag_builder(self, dataset: DatasetLike | None) -> CatalogBagBuilder:
         """Construct a :class:`CatalogBagBuilder` for this dataset.
 
         Three callers (:meth:`generate_dataset_download_spec`,
@@ -430,9 +415,7 @@ class DatasetBagBuilder:
             except KeyError:
                 continue
             for fk_path in fk_paths:
-                out.extend(
-                    self._export_annotation_dataset_element(fk_path, table)
-                )
+                out.extend(self._export_annotation_dataset_element(fk_path, table))
         return out
 
     def _export_annotation_dataset_element(
@@ -490,10 +473,7 @@ class DatasetBagBuilder:
                     "source": {
                         "skip_root_path": False,
                         "api": "attribute",
-                        "path": (
-                            f"{spath}/url:=URL,length:=Length,"
-                            f"filename:=Filename,md5:=MD5,asset_rid:=RID"
-                        ),
+                        "path": (f"{spath}/url:=URL,length:=Length,filename:=Filename,md5:=MD5,asset_rid:=RID"),
                     },
                     "destination": {
                         "name": "asset/{asset_rid}/" + table.name,
@@ -515,9 +495,7 @@ class DatasetBagBuilder:
         def fkey_name(fk: Any) -> list[str]:
             return [fk.name[0].name, fk.name[1]]
 
-        dataset_table = self._ml_instance.model.schemas[
-            self._ml_schema
-        ].tables["Dataset"]
+        dataset_table = self._ml_instance.model.schemas[self._ml_schema].tables["Dataset"]
 
         source_list: list[dict[str, Any]] = [
             {
@@ -558,9 +536,7 @@ class DatasetBagBuilder:
         )
         return {"detailed": source_list}
 
-    def _dataset_nesting_depth(
-        self, dataset: DatasetLike | None = None
-    ) -> int:
+    def _dataset_nesting_depth(self, dataset: DatasetLike | None = None) -> int:
         """Return the maximum dataset-nesting depth in the catalog.
 
         When ``dataset`` is provided, computes the depth for that
@@ -578,22 +554,11 @@ class DatasetBagBuilder:
                 children = graph[rid]
             except KeyError:
                 return 0
-            return (
-                max(children_depth(c, graph) for c in children) + 1
-                if children
-                else 1
-            )
+            return max(children_depth(c, graph) for c in children) + 1 if children else 1
 
-        pb = (
-            self._ml_instance.catalog.getPathBuilder()
-            .schemas[self._ml_schema]
-            .tables["Dataset_Dataset"]
-        )
+        pb = self._ml_instance.catalog.getPathBuilder().schemas[self._ml_schema].tables["Dataset_Dataset"]
         if dataset is not None:
-            rows = [
-                {"Dataset": dataset.dataset_rid, "Nested_Dataset": c}
-                for c in dataset.list_dataset_children()
-            ]
+            rows = [{"Dataset": dataset.dataset_rid, "Nested_Dataset": c} for c in dataset.list_dataset_children()]
         else:
             rows = list(pb.entities().fetch())
 
@@ -631,9 +596,7 @@ class DatasetBagBuilder:
             nested children up to the configured nesting depth.
         """
         # Dataset row itself is the primary anchor.
-        anchors: list[Anchor] = [
-            RIDAnchor(table="Dataset", rids=[dataset.dataset_rid])
-        ]
+        anchors: list[Anchor] = [RIDAnchor(table="Dataset", rids=[dataset.dataset_rid])]
 
         # Nested children walked one level at a time so the
         # anchor list documents the dataset's structure (one
@@ -700,9 +663,7 @@ class DatasetBagBuilder:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _exclude_empty_associations(
-        self, dataset: DatasetLike | None
-    ) -> set[tuple[str, str]]:
+    def _exclude_empty_associations(self, dataset: DatasetLike | None) -> set[tuple[str, str]]:
         """Return ``{(schema, table)}`` for associations with no members.
 
         For each ``Dataset_X`` association table, include it in
@@ -727,22 +688,15 @@ class DatasetBagBuilder:
         dataset_table = model.schemas[ml_schema_name].tables["Dataset"]
 
         # Element types that have members in this dataset.
-        dataset_obj = self._ml_instance.lookup_dataset(
-            dataset.dataset_rid
-        )
+        dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
         member_element_types: set[Table] = {
-            model.name_to_table(name)
-            for name, members in dataset_obj.list_dataset_members().items()
-            if members
+            model.name_to_table(name) for name, members in dataset_obj.list_dataset_members().items() if members
         }
 
         # Every vocabulary table in any schema — associations into
         # vocabularies always come along for the ride.
         vocab_tables: set[Table] = {
-            table
-            for schema in model.schemas.values()
-            for table in schema.tables.values()
-            if model.is_vocabulary(table)
+            table for schema in model.schemas.values() for table in schema.tables.values() if model.is_vocabulary(table)
         }
 
         # Walk every Dataset_X association. The association links
@@ -752,23 +706,13 @@ class DatasetBagBuilder:
         excluded: set[tuple[str, str]] = set()
         for assoc in dataset_table.find_associations():
             assoc_table = assoc.table
-            links_to_member = any(
-                fk.pk_table in member_element_types
-                for fk in assoc.other_fkeys
-            )
-            links_to_vocab = any(
-                fk.pk_table in vocab_tables
-                for fk in assoc.other_fkeys
-            )
+            links_to_member = any(fk.pk_table in member_element_types for fk in assoc.other_fkeys)
+            links_to_vocab = any(fk.pk_table in vocab_tables for fk in assoc.other_fkeys)
             if not (links_to_member or links_to_vocab):
-                excluded.add(
-                    (assoc_table.schema.name, assoc_table.name)
-                )
+                excluded.add((assoc_table.schema.name, assoc_table.name))
         return excluded
 
-    def _iter_descendant_rids(
-        self, dataset: DatasetLike
-    ) -> Iterable[RID]:
+    def _iter_descendant_rids(self, dataset: DatasetLike) -> Iterable[RID]:
         """Yield every descendant Dataset RID, depth-first.
 
         Walks ``DatasetLike.list_dataset_children`` recursively.
@@ -776,14 +720,10 @@ class DatasetBagBuilder:
         Depth-first traversal so the anchor list reflects the
         dataset's nesting structure as encountered.
         """
-        dataset_obj = self._ml_instance.lookup_dataset(
-            dataset.dataset_rid
-        )
+        dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
         for child in dataset_obj.list_dataset_children():
             yield child.dataset_rid
-            child_proxy = self._ml_instance.lookup_dataset(
-                child.dataset_rid
-            )
+            child_proxy = self._ml_instance.lookup_dataset(child.dataset_rid)
             yield from self._iter_descendant_rids(child_proxy)
 
 

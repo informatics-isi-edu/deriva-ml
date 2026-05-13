@@ -15,7 +15,6 @@ tables all share one connection pool.
 from __future__ import annotations
 
 import contextlib
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
@@ -24,6 +23,7 @@ from sqlalchemy.engine import Connection, Engine
 from deriva.bag import sqlite_helpers as sh
 
 from deriva_ml.local_db import paths as p
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -33,8 +33,7 @@ if TYPE_CHECKING:
     from deriva_ml.local_db.result_cache import CachedResult, CachedResultMeta, ResultCache
     from deriva_ml.local_db.schema import LocalSchema
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 WORKING_DB_SCHEMA_VERSION = 1
 
 

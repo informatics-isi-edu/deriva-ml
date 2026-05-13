@@ -13,7 +13,6 @@ from hydra_zen import hydrated_dataclass
 from packaging.version import Version
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     computed_field,
     conlist,

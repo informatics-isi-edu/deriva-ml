@@ -9,6 +9,7 @@ V1 dimensions: schemas (add/remove), tables (add/remove), columns
 for V1: non-FK keys, annotations, ACLs, column nullability and
 defaults, comments.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
@@ -140,10 +141,7 @@ class SchemaDiff(BaseModel):
         for c in self.removed_columns:
             lines.append(f"- column {c.schema_name}.{c.table}.{c.column}")
         for c in self.column_type_changes:
-            lines.append(
-                f"~ column {c.schema_name}.{c.table}.{c.column}: "
-                f"{c.cached_type} \u2192 {c.live_type}"
-            )
+            lines.append(f"~ column {c.schema_name}.{c.table}.{c.column}: {c.cached_type} \u2192 {c.live_type}")
         for fk in self.added_fkeys:
             lines.append(
                 f"+ fkey {fk.schema_name}.{fk.table}({','.join(fk.columns)}) "
@@ -248,19 +246,21 @@ def _compute_diff(cached: dict, live: dict) -> SchemaDiff:
             for col in sorted(set(live_cols) - set(cached_cols)):
                 added_columns.append(
                     AddedColumn(
-                        schema_name=schema_name, table=t_name,
-                        column=col, type=live_cols[col],
+                        schema_name=schema_name,
+                        table=t_name,
+                        column=col,
+                        type=live_cols[col],
                     )
                 )
             for col in sorted(set(cached_cols) - set(live_cols)):
-                removed_columns.append(
-                    RemovedColumn(schema_name=schema_name, table=t_name, column=col)
-                )
+                removed_columns.append(RemovedColumn(schema_name=schema_name, table=t_name, column=col))
             for col in sorted(set(cached_cols) & set(live_cols)):
                 if cached_cols[col] != live_cols[col]:
                     column_type_changes.append(
                         ColumnTypeChange(
-                            schema_name=schema_name, table=t_name, column=col,
+                            schema_name=schema_name,
+                            table=t_name,
+                            column=col,
                             cached_type=cached_cols[col],
                             live_type=live_cols[col],
                         )
@@ -273,18 +273,28 @@ def _compute_diff(cached: dict, live: dict) -> SchemaDiff:
             live_keyed = {_fkey_key(fk): fk for fk in live_fks}
             for k in sorted(set(live_keyed) - set(cached_keyed)):
                 cols, rs, rt, rcs = _fkey_detail(live_keyed[k])
-                added_fkeys.append(AddedForeignKey(
-                    schema_name=schema_name, table=t_name,
-                    columns=cols, referenced_schema=rs,
-                    referenced_table=rt, referenced_columns=rcs,
-                ))
+                added_fkeys.append(
+                    AddedForeignKey(
+                        schema_name=schema_name,
+                        table=t_name,
+                        columns=cols,
+                        referenced_schema=rs,
+                        referenced_table=rt,
+                        referenced_columns=rcs,
+                    )
+                )
             for k in sorted(set(cached_keyed) - set(live_keyed)):
                 cols, rs, rt, rcs = _fkey_detail(cached_keyed[k])
-                removed_fkeys.append(RemovedForeignKey(
-                    schema_name=schema_name, table=t_name,
-                    columns=cols, referenced_schema=rs,
-                    referenced_table=rt, referenced_columns=rcs,
-                ))
+                removed_fkeys.append(
+                    RemovedForeignKey(
+                        schema_name=schema_name,
+                        table=t_name,
+                        columns=cols,
+                        referenced_schema=rs,
+                        referenced_table=rt,
+                        referenced_columns=rcs,
+                    )
+                )
 
     return SchemaDiff(
         added_schemas=added_schemas,

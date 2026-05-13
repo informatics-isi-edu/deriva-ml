@@ -23,11 +23,11 @@ sets that would exceed GET URL limits, use
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 from urllib.parse import quote
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ErmrestPagedClient:

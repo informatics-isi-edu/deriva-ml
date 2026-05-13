@@ -21,13 +21,12 @@ ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
 ResolveRidResult = _ermrest_catalog.ResolveRidResult
 Table = _ermrest_model.Table
 
-import logging
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger("deriva_ml")
-
+logger = get_logger(__name__)
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 

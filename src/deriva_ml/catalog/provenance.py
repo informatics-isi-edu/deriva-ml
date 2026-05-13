@@ -26,7 +26,6 @@ Public surface:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -34,10 +33,9 @@ from typing import Any
 
 from deriva.core import ErmrestCatalog
 from deriva.core.utils.core_utils import urlquote
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
-
+logger = get_logger(__name__)
 #: ERMrest annotation URL used to attach the provenance payload to
 #: a catalog model. Kept stable across the bag-migration so older
 #: catalogs read by newer code (and vice versa) interoperate.
@@ -148,9 +146,7 @@ class CloneDetails:
             add_ml_schema=data.get("add_ml_schema", False),
             copy_annotations=data.get("copy_annotations", True),
             copy_policy=data.get("copy_policy", True),
-            reinitialize_dataset_versions=data.get(
-                "reinitialize_dataset_versions", True
-            ),
+            reinitialize_dataset_versions=data.get("reinitialize_dataset_versions", True),
             rows_copied=data.get("rows_copied", 0),
             rows_skipped=data.get("rows_skipped", 0),
             skipped_rids=data.get("skipped_rids", []),
@@ -223,10 +219,7 @@ class CatalogProvenance:
     @property
     def is_clone(self) -> bool:
         """``True`` when the catalog was cloned from another."""
-        return (
-            self.creation_method == CatalogCreationMethod.CLONE
-            and self.clone_details is not None
-        )
+        return self.creation_method == CatalogCreationMethod.CLONE and self.clone_details is not None
 
 
 def set_catalog_provenance(

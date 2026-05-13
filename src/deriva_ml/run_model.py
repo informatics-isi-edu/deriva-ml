@@ -80,7 +80,7 @@ class DerivaMLRunCLI(BaseCLI):
             "--catalog",
             type=str,
             default=None,
-            help="Catalog number or identifier (optional if defined in Hydra config)"
+            help="Catalog number or identifier (optional if defined in Hydra config)",
         )
 
         self.parser.add_argument(
@@ -105,7 +105,8 @@ class DerivaMLRunCLI(BaseCLI):
         )
 
         self.parser.add_argument(
-            "--multirun", "-m",
+            "--multirun",
+            "-m",
             action="store_true",
             help="Run multiple configurations (Hydra multirun mode).",
         )
@@ -295,9 +296,9 @@ class DerivaMLRunCLI(BaseCLI):
                     spec = multirun_configs[name]
                     # Show first line of description or overrides summary
                     if spec.description:
-                        first_line = spec.description.strip().split('\n')[0]
+                        first_line = spec.description.strip().split("\n")[0]
                         # Remove markdown formatting for display
-                        first_line = first_line.lstrip('#').strip()
+                        first_line = first_line.lstrip("#").strip()
                         if len(first_line) > 50:
                             first_line = first_line[:47] + "..."
                         print(f"  - {name}: {first_line}")
