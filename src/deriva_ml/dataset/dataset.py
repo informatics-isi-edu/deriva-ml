@@ -3471,37 +3471,6 @@ class Dataset:
         r.raise_for_status()
         return DatasetMinid(dataset_version=version, **r.json())
 
-    @staticmethod
-    def _bag_is_fully_materialized(bag_path: Path) -> bool:
-        """Check whether all fetch.txt entries have been downloaded locally.
-
-        Uses bdbag's validate_bag_structure for a quick structural check, then
-        verifies that every file referenced in fetch.txt is present on disk.
-
-        Args:
-            bag_path: Path to the BDBag directory.
-
-        Returns:
-            True if the bag has no fetch.txt or all fetch.txt entries exist locally.
-            False if any referenced file is missing.
-        """
-        try:
-            bdb.validate_bag_structure(bag_path.as_posix())
-        except Exception as e:
-            self._logger.debug(f"Bag validation check failed for {bag_path}: {e}")
-            return False
-        fetch_file = bag_path / "fetch.txt"
-        if not fetch_file.exists():
-            return True
-        with fetch_file.open("r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split("\t")
-                if len(parts) >= 3:
-                    rel_path = parts[2]
-                    if not (bag_path / rel_path).exists():
-                        return False
-        return True
-
     def _materialize_dataset_bag(
         self,
         minid: DatasetMinid,
@@ -3547,7 +3516,9 @@ class Dataset:
         # If this bag has already been validated, verify completeness using bdbag before trusting the cache.
         # This guards against caches that were marked valid but have missing fetch.txt assets.
         if validated_check.exists():
-            if self._bag_is_fully_materialized(bag_path):
+            from deriva_ml.dataset.bag_cache import BagCache
+
+            if BagCache._is_fully_materialized(bag_path):
                 self._logger.info(
                     f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} verified as complete."
                 )
