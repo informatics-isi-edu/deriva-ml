@@ -57,7 +57,8 @@ def _make_mock_datapath(uri: str) -> tuple[MagicMock, MagicMock]:
 
     Returns:
         ``(dp, target_table)`` tuple matching the shape returned by
-        ``CatalogGraph._aggregate_queries``.
+        ``DatasetBagBuilder.aggregate_queries`` (post-cutover from
+        the deleted ``CatalogGraph._aggregate_queries``).
     """
     dp = MagicMock(spec=[])  # spec=[] prevents auto-creating attributes
     dp.uri = uri

@@ -89,8 +89,6 @@ def _default_dir_name_from_target(
         DerivaMLException: When the target is a dict (multi-target case) and
             no target_transform was provided.
     """
-    from deriva_ml.core.exceptions import DerivaMLException
-
     if target is None:
         return "Unknown"
     if isinstance(target, str):
@@ -769,47 +767,6 @@ class DatasetBag:
             ).all()
             return [r[0] for r in rows]
 
-    def fetch_table_features(self, *args, **kwargs):
-        """Retired — use ``feature_values(table, name)`` or ``Denormalizer``.
-
-        ``DatasetBag.fetch_table_features`` has been removed. Use the new
-        ``feature_values`` method to read a single feature::
-
-            for rec in bag.feature_values("Image", "Quality"):
-                ...
-
-        For wide-table denormalization across all features use the
-        ``Denormalizer`` subsystem.
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DatasetBag.fetch_table_features() has been retired. "
-            "Use feature_values(table, feature_name) to read a single feature, "
-            "or Denormalizer for multi-feature wide tables."
-        )
-
-    def list_feature_values(self, *args, **kwargs) -> Iterable[FeatureRecord]:
-        """Retired — renamed to ``feature_values``.
-
-        ``DatasetBag.list_feature_values`` has been removed. Use the new
-        ``feature_values`` method instead::
-
-            for rec in bag.feature_values("Image", "Quality"):
-                ...
-
-        The signature is identical (``table``, ``feature_name``, optional
-        ``selector``).
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DatasetBag.list_feature_values() has been retired and renamed. "
-            "Use feature_values(table, feature_name, selector=...) instead."
-        )
-
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the ERMrest Table objects that can be members of a dataset.
 
@@ -1301,8 +1258,6 @@ class DatasetBag:
                 - An asset has multiple different vocabulary term values for the same feature
                   and no value_selector is provided.
         """
-        from deriva_ml.core.exceptions import DerivaMLException
-
         cache: dict[str, dict[RID, Any]] = {}
         # Store FeatureRecord objects directly for later selection
         records_cache: dict[str, dict[RID, list[FeatureRecord]]] = {}

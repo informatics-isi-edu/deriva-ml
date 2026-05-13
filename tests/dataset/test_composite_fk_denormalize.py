@@ -254,7 +254,9 @@ class TestCompositeFKDenormalize:
         """Bag export must follow composite FK paths to populate parent tables.
 
         The bag should contain Parent rows that are reachable via composite FK
-        from Child members. This tests the FK path traversal in CatalogGraph.
+        from Child members. Exercises the FK-path traversal in
+        :class:`deriva.bag.catalog_builder.CatalogBagBuilder` via
+        :class:`DatasetBagBuilder` (the post-cutover pipeline).
         """
         self._create_composite_fk_schema(test_ml)
         data = self._populate_composite_fk_data(test_ml)

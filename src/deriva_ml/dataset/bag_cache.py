@@ -20,10 +20,6 @@ After the migration:
   dataset?". The public ``cache_status(dataset_rid)`` API is
   preserved so the one in-tree caller (Dataset.bag_info) doesn't
   change.
-- A one-shot :func:`migrate_legacy_cache` helper scans any leftover
-  ``{cache_dir}/{rid}_{checksum}/`` directories from the
-  pre-migration layout, records them in the index, and (optionally)
-  moves them into the new ``{cache_dir}/bags/{checksum}/`` layout.
 
 The bag-write side (``Dataset.download_dataset_bag``) is rewired
 to the new layout in migration step 9 (the ``DatasetBagBuilder``
@@ -33,7 +29,6 @@ caches written by older code keep working.
 
 from __future__ import annotations
 
-import shutil
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -111,16 +106,6 @@ class BagCache:
     def cache_dir(self) -> Path:
         """Root cache directory."""
         return self._cache_dir
-
-    @property
-    def index(self) -> BagCacheIndex:
-        """The underlying :class:`BagCacheIndex`.
-
-        Exposed for callers that need richer index queries
-        (``find_bags_for_rid``, ``list_bags``, ``total_size_bytes``)
-        than ``cache_status`` provides.
-        """
-        return self._index
 
     def cache_status(self, dataset_rid: str) -> dict[str, Any]:
         """Report cache status for a dataset RID.
@@ -277,111 +262,4 @@ class BagCache:
         return False
 
 
-# =============================================================================
-# Legacy-layout migrator
-# =============================================================================
-
-
-def migrate_legacy_cache(
-    cache_dir: Path,
-    *,
-    move_directories: bool = False,
-) -> dict[str, list[str]]:
-    """One-shot migrator for caches written by pre-deriva.bag deriva-ml.
-
-    Scans ``cache_dir`` for legacy ``{rid}_{checksum}/`` directories
-    (the pre-migration on-disk layout), records each one in the
-    index under its ``(Dataset, rid)`` anchor pair, and — when
-    ``move_directories=True`` — relocates the bag directory into
-    the new ``{cache_dir}/bags/{checksum}/`` layout.
-
-    The default ``move_directories=False`` is conservative: the
-    index records the legacy directory's existence (so
-    ``find_bags_for_rid`` works), but the bytes stay where they
-    are. Callers that want to consolidate on the new layout pass
-    ``move_directories=True``; the old directories are then
-    removed after a successful move.
-
-    Args:
-        cache_dir: Cache root containing the legacy directories
-            and the new ``index.sqlite`` (created if absent).
-        move_directories: Move legacy directories into
-            ``bags/{checksum}/`` after recording them. ``False``
-            (default) only records.
-
-    Returns:
-        ``{"recorded": [...], "skipped": [...]}`` — lists of
-        legacy directory names. ``recorded`` saw a successful
-        index update; ``skipped`` could not be parsed (e.g.,
-        directory name didn't match ``{rid}_{checksum}``).
-
-    Example:
-        >>> from pathlib import Path
-        >>> # cache_dir contains pre-migration ``ABC123_5XYZ.../`` dirs:
-        >>> result = migrate_legacy_cache(  # doctest: +SKIP
-        ...     Path.home() / ".deriva-ml" / "host" / "1",
-        ...     move_directories=True,
-        ... )
-        >>> result["recorded"]  # doctest: +SKIP
-        ['ABC123_5XYZ...']
-    """
-    cache_dir = Path(cache_dir)
-    if not cache_dir.is_dir():
-        return {"recorded": [], "skipped": []}
-
-    recorded: list[str] = []
-    skipped: list[str] = []
-
-    with BagCacheIndex(cache_dir) as index:
-        # Walk top-level directories looking for the
-        # ``{rid}_{checksum}`` pattern. ``bags/`` and ``index.sqlite``
-        # are the new layout and skipped.
-        for entry in sorted(cache_dir.iterdir()):
-            if not entry.is_dir():
-                continue
-            if entry.name in ("bags",):
-                continue
-            # Legacy convention: ``{RID}_{checksum}`` where RID is
-            # an opaque catalog identifier (no underscores in
-            # practice) and checksum is the bag's BDBag MD5/etag
-            # (also no underscores). Split on the first underscore.
-            if "_" not in entry.name:
-                skipped.append(entry.name)
-                continue
-            rid, checksum = entry.name.split("_", 1)
-            if not rid or not checksum:
-                skipped.append(entry.name)
-                continue
-
-            index.record(
-                checksum=checksum,
-                anchors=[("Dataset", rid)],
-            )
-            recorded.append(entry.name)
-            logger.info("BagCache migrator: recorded %s in index", entry.name)
-
-            if move_directories:
-                # Move ``{cache_dir}/{name}/`` to
-                # ``{cache_dir}/bags/{checksum}/``. If the
-                # destination already exists, leave the source in
-                # place (someone else got there first).
-                destination = index.bag_dir_for(checksum)
-                if destination.exists():
-                    logger.info(
-                        "BagCache migrator: destination %s already exists; leaving %s in place",
-                        destination,
-                        entry,
-                    )
-                    continue
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(entry), str(destination))
-                logger.info(
-                    "BagCache migrator: moved %s → %s",
-                    entry,
-                    destination,
-                )
-
-    return {"recorded": recorded, "skipped": skipped}
-
-
-__all__ = ["BagCache", "CacheStatus", "migrate_legacy_cache"]
+__all__ = ["BagCache", "CacheStatus"]

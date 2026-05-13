@@ -872,8 +872,8 @@ class Dataset:
         visited.add(self.dataset_rid)
         # Use current catalog state for graph traversal, not version snapshot.
         # Parent/child relationships need to reflect current state for version updates.
-        children = self._list_dataset_children_current()
-        parents = self._list_dataset_parents_current()
+        children = self.list_dataset_children(version=None)
+        parents = self.list_dataset_parents(version=None)
 
         # Add this node with its children as dependencies.
         # This means: self depends on children, so children will be ordered before self.
@@ -2229,33 +2229,6 @@ class Dataset:
 
         return [version_snapshot_catalog.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
-    def _list_dataset_parents_current(self) -> list[Self]:
-        """Return parent datasets using current catalog state (not version snapshot).
-
-        Used by _build_dataset_graph_1 to find all related datasets for version updates.
-        """
-        pb = self._ml_instance.pathBuilder()
-        atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
-        return [
-            self._ml_instance.lookup_dataset(p["Dataset"])
-            for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
-        ]
-
-    def _list_dataset_children_current(self) -> list[Self]:
-        """Return child datasets using current catalog state (not version snapshot).
-
-        Used by _build_dataset_graph_1 to find all related datasets for version updates.
-        """
-        dataset_dataset_path = (
-            self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
-        )
-        nested_datasets = list(dataset_dataset_path.entities().fetch())
-
-        def find_children(rid: RID) -> list[RID]:
-            return [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
-
-        return [self._ml_instance.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
-
     def list_executions(self) -> list["Execution"]:
         """List all executions associated with this dataset.
 
@@ -2720,11 +2693,6 @@ class Dataset:
             fetch_concurrency=fetch_concurrency,
         )
         return self.bag_info(version=version, exclude_tables=exclude_tables)
-
-    # Backward compatibility alias
-    def prefetch(self, *args, **kwargs) -> dict[str, Any]:
-        """Deprecated: Use cache() instead."""
-        return self.cache(*args, **kwargs)
 
     @staticmethod
     def _estimate_csv_bytes(sample_rows: list[dict], total_row_count: int) -> int:

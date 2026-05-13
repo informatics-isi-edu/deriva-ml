@@ -199,7 +199,7 @@ class TestCacheWarmingAPI:
         dataset = dataset_desc.dataset
         version = dataset.current_version
 
-        result = dataset.prefetch(version=version)
+        result = dataset.cache(version=version)
         assert result["status"] == CacheStatus.cached_materialized.value
 
 
