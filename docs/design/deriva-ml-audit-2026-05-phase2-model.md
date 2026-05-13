@@ -26,14 +26,18 @@ correct Phase-3 move; it is no smaller than it looked.
 Top themes ranked by impact:
 
 1. **`model/annotations.py` (1 264 LoC) has no production
-   consumers.** Every annotation builder class (`Display`,
-   `VisibleColumns`, `TableDisplay`, `ColumnDisplay`, `Facet`,
-   `FacetList`, …) is exported from `model/__init__.py` and
-   instantiated only by `tests/model/test_annotations.py`. The
-   actual navbar builder in `schema/annotations.py` constructs raw
-   dicts. Either there are external (MCP / skill) consumers that
-   the audit can't see, or this is the largest unused file in the
-   codebase. **Severity: high** — 1 264 LoC of test-only code.
+   consumers in `src/`** — *but* (resolved during review, 2026-05-13)
+   it is the documented public API for the
+   `deriva-skills/use-annotation-builders` Claude Code skill.
+   See `deriva-skills/skills/use-annotation-builders/SKILL.md` and
+   `deriva-skills/skills/customize-display/references/annotation-reference.md`.
+   The "no `src/` callers" finding is informational, not actionable
+   — the module is consumed at runtime by external users guided by
+   the skill. The only real gap is that there's no ADR / `CLAUDE.md`
+   entry recording the module as deriva-ml's external typed-annotation
+   surface, and `tests/model/test_annotations.py` covers construction
+   but not the integration the skill teaches. **Severity:
+   informational.** **LoC: 0.**
 2. **`DerivaModel` carries three roles plus a layer of dead type
    aliases.** Phase 1 §6.1 named the denormalization-planner split;
    reading the actual 800 lines confirms it. Beyond the split, the
@@ -70,10 +74,15 @@ Top themes ranked by impact:
 
 Worst-offending files within `model/`:
 
-1. **`annotations.py`** — 1 264 LoC, zero `src/` consumers.
-2. **`catalog.py`** — 2 083 LoC, three responsibilities, one
+1. **`catalog.py`** — 2 083 LoC, three responsibilities, one
    `__getattr__` delegation hatch, one `configuration = None`,
-   eight unused type aliases.
+   eight unused type aliases. *Top concern after the
+   `annotations.py` "dead code" finding resolved as external API
+   surface.*
+2. **`annotations.py`** — 1 264 LoC. Initially flagged as
+   potentially dead; resolved (2026-05-13) as the documented
+   public API for the `deriva-skills/use-annotation-builders`
+   skill. Keep; document the contract.
 3. **`deriva_ml_bag_view.py`** — 316 LoC, clean inheritance but
    one bug (`_get_dataset_execution` is an `_`-prefixed method
    called from a different module) and two O(n²)-feeling loops.
@@ -86,7 +95,7 @@ Worst-offending files within `model/`:
 | File                       | LoC   | Posture |
 |----------------------------|------:|---------|
 | `__init__.py`              |   106 | **Clean post Phase 1.** Single annotation-builder re-export plus a 9-line `__getattr__` lazy-import for the two heavyweight classes. No shim aliases. |
-| `annotations.py`           | 1 264 | **In-the-attic.** Comprehensive Chaise-annotation builder library; zero `src/` callers; only `tests/model/test_annotations.py` exercises it. Either delete-and-archive or document the external API contract. |
+| `annotations.py`           | 1 264 | **External API surface.** Comprehensive Chaise-annotation builder library; zero `src/` callers but consumed at runtime by the `deriva-skills/use-annotation-builders` Claude Code skill (verified 2026-05-13). Keep. Missing only an ADR / CLAUDE.md entry pinning the contract. |
 | `catalog.py`               | 2 083 | **God-class.** Three responsibilities (introspection, denormalization planner, schema mutation) plus dead type aliases and one `__getattr__` delegation escape hatch. Phase-3 split candidate. |
 | `database.py`              |   250 | **Healthy.** `DatabaseModel(BagDatabase, DerivaModel)` with a clean `__init__` ordering and three deriva-ml-specific concerns (`_build_bag_rids`, `dataset_version`, `rid_lookup`, `_get_dataset_execution`). Post Phase 1 the back-compat surface is gone. |
 | `deriva_ml_bag_view.py`    |   316 | **Mostly clean delegation.** 7 protocol property pass-throughs, ~10 read methods, 3 write-rejects. One method (`list_dataset_element_types`) inherited from `DatabaseModel` is also exposed directly here — duplication is harmless but inconsistent with the rest of the class. |
@@ -148,11 +157,27 @@ There are three legitimate possibilities:
     future migration. In that case there should be a note (ADR or
     `CLAUDE.md` entry) saying so.
 
-**Action:** classify (a/b/c) with the maintainer. If (b),
-remove the module + its `__init__.py` re-exports + the
-`tests/model/test_annotations.py` 480-line test file. **Risk:
-low if (b); high if (a).** **LoC: −1 744 if (b).**
-**Severity: high.**
+**Resolved during review (2026-05-13): (a).** The builders are
+the documented public API surface for the
+`deriva-skills/use-annotation-builders` Claude Code skill. See
+`deriva-skills/skills/use-annotation-builders/SKILL.md:13,35,59`
+— the skill's first line says "Requires the typed Python wrappers
+from `deriva_ml.model.annotations`" and the skill teaches users
+to write Chaise annotations as builder instances. Reference docs
+at `deriva-skills/skills/customize-display/references/annotation-reference.md`
+import every builder by name across multiple sections.
+**No action.** The "no `src/` consumers" finding is informational —
+the module is consumed at runtime by external users guided by the
+skill. **LoC: 0.**
+
+**Follow-up worth doing (out of this audit's scope):** ADR or
+CLAUDE.md entry recording that `model/annotations.py` is
+deriva-ml's external typed-annotation API surface, so future
+audits and refactors know not to retire it. Also: add at least one
+end-to-end test that exercises the builders through the skill's
+documented `TableHandle.set_annotation(Display(...))` pattern —
+the current `tests/model/test_annotations.py` only tests
+construction, not the integration the skill teaches.
 
 ### 1.2 Eight unused `TypeAlias` declarations in `catalog.py`
 
@@ -509,10 +534,13 @@ clarifies the layering.
 
 ## Lens 5 — Simplification opportunities
 
-### 5.1 Delete `annotations.py` if no external consumer
+### 5.1 ~~Delete `annotations.py` if no external consumer~~ — resolved as keep
 
-See Lens 1.1. **Risk: depends on classification. LoC: −1 264
-plus tests.** **Severity: high.**
+See Lens 1.1. Verified during review (2026-05-13) that
+`annotations.py` is the documented public API for the
+`deriva-skills/use-annotation-builders` skill. Not dead code.
+**No deletion.** Follow-up: document the contract via ADR or
+`CLAUDE.md` entry, and add an end-to-end skill-pattern test.
 
 ### 5.2 Phase-3 split of the denormalization planner
 
@@ -854,7 +882,7 @@ are scoped follow-ups.
 | 5 | **Lens 4.5** — Move `DatabaseModel._get_dataset_execution` to `DerivaMLBagView._get_dataset_execution` (its only caller) | low | ±0 (move) | `model/database.py`, `model/deriva_ml_bag_view.py` | Clarifies the deriva-ml-domain layering. |
 | 6 | **Lens 5.6** — Index `find_datasets`'s dataset-type lookup by RID (one-line dict-groupby) | trivial | ±0 | `model/deriva_ml_bag_view.py` | O(N×M) → O(N+M); not load-bearing today but obvious. |
 | 7 | **Lens 6.3** — Pick one parameter name for the first arg of table-introspection methods (`table` is shortest), rename the others to match | low | ±0 | `model/catalog.py` | Five conventions for the same concept. Caller-visible only via kwargs — grep first. |
-| 8 | **Lens 1.1** — Classify `annotations.py` (1 264 LoC) as (a) public surface for external consumers, (b) dead code, or (c) deliberate scaffolding. If (b): delete the module + `tests/model/test_annotations.py` + the `model/__init__.py` re-exports | depends | −1 744 if (b) | `model/annotations.py`, `model/__init__.py`, `tests/model/test_annotations.py` | Largest single LoC reduction in the audit if (b); blocked on maintainer call. |
+| 8 | **Lens 1.1** — *Resolved (2026-05-13): (a).* `annotations.py` is the documented public API for the `deriva-skills/use-annotation-builders` Claude Code skill. Follow-up: add an ADR / CLAUDE.md entry pinning the contract, and add an end-to-end test exercising the skill's `TableHandle.set_annotation(Display(...))` pattern (current tests cover construction only). | low | +30 docs + ~20 test | new ADR / CLAUDE.md entry, `tests/model/test_annotations.py` | Not a deletion. Documenting the external API surface so future audits don't re-find it. |
 | 9 | **Lens 4.2** — Replace `DerivaModel.__getattr__` (catalog.py:410-412) with explicit `@property` accessors for the ~8 deriva-py attributes actually used (`schemas`, `annotations`, `chaise_config`, `bulk_upload`, `display`, `column_defaults`, `digest_fkeys`, `apply`) | medium | +20 | `model/catalog.py` | Removes a silent-delegation hatch; fixes IDE completion across all mixins. |
 | 10 | **Lens 5.2** — **Phase 3.** Extract the denormalization planner (Responsibilities B + C from the analysis above) to `model/denormalize_planner.py`. ~880 LoC moves. | medium-high | ±0 net | `model/catalog.py`, new `model/denormalize_planner.py`, every caller in `local_db/*` and `core/mixins/dataset.py:449` | Largest structural improvement; sized for a focused PR. Land action 4 first (rename happens during the move). |
 | 11 | **Lens 5.7** — Convert `DerivaMLBagView.lookup_term`'s linear scan to a SQLAlchemy `select().where()` | low | +15 | `model/deriva_ml_bag_view.py` | Mechanical perf fix on a frequently-called code path. |
