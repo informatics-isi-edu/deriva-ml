@@ -38,7 +38,8 @@ from deriva_ml.core.definitions import (
     _get_domain_schemas,
     _is_system_schema,
 )
-from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
+from deriva_ml.core.catalog_stub import CatalogStub
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLReadOnlyError, DerivaMLTableTypeError
 
 # Local imports
 from deriva_ml.feature import Feature
@@ -287,16 +288,6 @@ class DerivaModel:
         """Return the chaise configuration."""
         return self.model.chaise_config
 
-    def apply(self) -> None:
-        """Apply pending annotation/schema changes via the underlying Model.
-
-        Thin passthrough to ``self.model.apply()``. Kept explicit so the
-        annotation/schema commit boundary is visible on the DerivaModel
-        public surface (rather than hiding inside generic ``__getattr__``
-        delegation).
-        """
-        self.model.apply()
-
     def get_schema_description(self, include_system_columns: bool = False) -> dict[str, Any]:
         """Return a JSON description of the catalog schema structure.
 
@@ -452,7 +443,7 @@ class DerivaModel:
                 return s.tables[table]
         raise DerivaMLException(f"The table {table} doesn't exist.")
 
-    def is_vocabulary(self, table_name: TableInput) -> bool:
+    def is_vocabulary(self, table: TableInput) -> bool:
         """Check if a given table is a controlled vocabulary table.
 
         Delegates to ``Table.is_vocabulary()`` in deriva-py, which enforces both
@@ -465,19 +456,20 @@ class DerivaModel:
         Mirrors :meth:`is_asset`, which already delegates to ``Table.is_asset()``.
 
         Args:
-            table_name: An ERMrest Table object or the name of the table.
+            table: An ERMrest Table object or the name of the table.
 
         Returns:
             True if the table has the structure of a controlled vocabulary,
             False otherwise.
 
         Raises:
-            DerivaMLException: if the table doesn't exist.
+            DerivaMLException: If the table doesn't exist in any searchable
+                schema (raised by :meth:`name_to_table`).
         """
-        table = self.name_to_table(table_name)
+        table = self.name_to_table(table)
         return table.is_vocabulary()
 
-    def vocab_columns(self, table_name: TableInput) -> dict[str, str]:
+    def vocab_columns(self, table: TableInput) -> dict[str, str]:
         """Return mapping from canonical vocab column name to actual column name.
 
         Canonical names are TitleCase (Name, ID, URI, Description, Synonyms).
@@ -485,45 +477,82 @@ class DerivaModel:
         FaceBase-style catalogs or TitleCase for DerivaML-native tables.
 
         Args:
-            table_name: A table object or the name of the table.
+            table: A table object or the name of the table.
 
         Returns:
             Dict mapping canonical name to actual column name in the table.
             E.g. ``{"Name": "name", "ID": "id", ...}`` for FaceBase tables
             or ``{"Name": "Name", "ID": "ID", ...}`` for DerivaML tables.
+
+        Raises:
+            DerivaMLException: If the table doesn't exist (raised by
+                :meth:`name_to_table`).
         """
-        table = self.name_to_table(table_name)
+        table = self.name_to_table(table)
         col_map = {c.name.upper(): c.name for c in table.columns}
         return {canon: col_map[canon.upper()] for canon in ("Name", "ID", "URI", "Description", "Synonyms")}
 
     def is_association(
         self,
-        table_name: str | Table,
+        table: TableInput,
         unqualified: bool = True,
         pure: bool = True,
         min_arity: int = 2,
         max_arity: int = 2,
     ) -> bool | set[str] | int:
-        """Check the specified table to see if it is an association table.
+        """Check whether ``table`` is an association (linking) table.
+
+        Delegates to :meth:`deriva.core.ermrest_model.Table.is_association`.
+        An association table mediates a many-to-many relationship between
+        two (or more) tables via outbound FKs to each end.
 
         Args:
-            table_name: param unqualified:
-            pure: return: (Default value = True)
-            table_name: str | Table:
-            unqualified:  (Default value = True)
+            table: Table name or :class:`Table` to inspect.
+            unqualified: Per deriva-py — if True, the returned column set
+                uses bare column names (no schema/table qualification).
+                Only consulted when the return mode is the column-name set.
+            pure: If True, require a *pure* association — no extra payload
+                columns beyond the FK columns and system metadata (RID,
+                RCT, RMT, RCB, RMB). Excludes feature tables, which carry
+                their own non-FK columns.
+            min_arity: Minimum number of outbound FKs that count as
+                "associating." Defaults to 2 (a binary association).
+            max_arity: Maximum number of outbound FKs. Defaults to 2.
 
         Returns:
-
-
-        """
-        table = self.name_to_table(table_name)
-        return table.is_association(unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity)
-
-    def find_association(self, table1: Table | str, table2: Table | str) -> tuple[Table, Column, Column]:
-        """Given two tables, return an association table that connects the two and the two columns used to link them..
+            ``bool`` when the question is "is this *any* association at the
+            requested arity," or ``set[str]`` / ``int`` when deriva-py's
+            ``is_association`` returns the structural detail set instead.
+            See :meth:`Table.is_association` for the full contract.
 
         Raises:
-            DerivaML exception if there is either not an association table or more than one association table.
+            DerivaMLException: If ``table`` doesn't exist in any searchable
+                schema (raised by :meth:`name_to_table`).
+        """
+        table = self.name_to_table(table)
+        return table.is_association(unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity)
+
+    def find_association(self, table1: TableInput, table2: TableInput) -> tuple[Table, Column, Column]:
+        """Return the unique association table linking ``table1`` and ``table2``.
+
+        Searches all associations on ``table1`` for one whose other-side
+        FK lands on ``table2``. The result lets callers JOIN through the
+        link without re-deriving the column names by hand.
+
+        Args:
+            table1: Either endpoint of the association. Table name or
+                :class:`Table`.
+            table2: The other endpoint. Table name or :class:`Table`.
+
+        Returns:
+            ``(assoc_table, table1_link_column, table2_link_column)``
+            — the association table itself plus the two FK columns on it
+            (one referencing ``table1``, one referencing ``table2``).
+
+        Raises:
+            DerivaMLException: If no association connects the two tables,
+                or if multiple associations connect them (in which case
+                the caller should disambiguate by name).
         """
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
@@ -543,21 +572,26 @@ class DerivaModel:
                 f"There are {len(tables)} association tables between {table1.name} and {table2.name}."
             )
 
-    def is_asset(self, table_name: TableInput) -> bool:
-        """True if the specified table is a proper asset table.
+    def is_asset(self, table: TableInput) -> bool:
+        """Check whether ``table`` is a proper asset table.
 
-        Delegates to Table.is_asset() from deriva-py which checks:
-        - Required columns exist (URL, Filename, Length, MD5)
-        - URL, Length, MD5 are NOT NULL
-        - URL has the asset annotation
+        Delegates to :meth:`Table.is_asset` from deriva-py, which verifies:
+
+        - Required columns exist (``URL``, ``Filename``, ``Length``, ``MD5``).
+        - ``URL``, ``Length``, ``MD5`` are NOT NULL.
+        - ``URL`` carries the ``asset`` annotation.
 
         Args:
-            table_name: str | Table
+            table: Table name or :class:`Table` to inspect.
 
         Returns:
-            True if the specified table is a proper asset table.
+            True if all asset-table requirements are satisfied.
+
+        Raises:
+            DerivaMLException: If ``table`` doesn't exist in any searchable
+                schema (raised by :meth:`name_to_table`).
         """
-        table = self.name_to_table(table_name)
+        table = self.name_to_table(table)
         return table.is_asset()
 
     def find_assets(self) -> list[Table]:
@@ -622,18 +656,24 @@ class DerivaModel:
             return features
 
     def lookup_feature(self, table: TableInput, feature_name: str) -> Feature:
-        """Lookup the named feature associated with the provided table.
+        """Look up the named feature on ``table``.
+
+        Features are association tables (linking a target table to
+        vocabulary terms, assets, and metadata) discovered by
+        :meth:`find_features`. This is the by-name accessor.
 
         Args:
-            table: param feature_name:
-            table: str | Table:
-            feature_name: str:
+            table: The target table the feature is attached to. Name or
+                :class:`Table`.
+            feature_name: The feature's name as set in its
+                ``Feature_Name`` column.
 
         Returns:
-            A Feature class that represents the requested feature.
+            The :class:`Feature` wrapper for the matching association.
 
         Raises:
-          DerivaMLException: If the feature cannot be found.
+            DerivaMLException: If ``table`` doesn't exist, or if no
+                feature with ``feature_name`` is defined on it.
         """
         table = self.name_to_table(table)
         try:
@@ -641,9 +681,28 @@ class DerivaModel:
         except IndexError:
             raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist.")
 
-    def asset_metadata(self, table: str | Table) -> set[str]:
-        """Return the metadata columns for an asset table."""
+    def asset_metadata(self, table: TableInput) -> set[str]:
+        """Return the non-asset columns of an asset table.
 
+        Asset tables are ``Table.is_asset()`` tables: they carry the
+        standard ``URL`` / ``Filename`` / ``Length`` / ``MD5`` columns
+        plus arbitrary domain-specific metadata. This method returns
+        the metadata column names — i.e. everything *except* the four
+        standard asset columns (kept in
+        :data:`~deriva_ml.core.definitions.DerivaAssetColumns`).
+
+        Args:
+            table: The asset table — name or :class:`Table` instance.
+
+        Returns:
+            Set of metadata column names. Empty if the asset table
+            carries no extra columns.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` is not an asset table.
+            DerivaMLException: If ``table`` doesn't exist (raised by
+                :meth:`name_to_table`).
+        """
         table = self.name_to_table(table)
 
         if not self.is_asset(table):
@@ -676,14 +735,53 @@ class DerivaModel:
         )
 
     def apply(self) -> None:
-        """Call ERMRestModel.apply"""
-        if self.catalog == "file-system":
-            raise DerivaMLException("Cannot apply() to non-catalog model.")
-        else:
-            self.model.apply()
+        """Apply pending annotation/schema changes via the underlying Model.
+
+        Thin passthrough to ``self.model.apply()``. Kept explicit so the
+        annotation/schema commit boundary is visible on the DerivaModel
+        public surface rather than hiding behind generic ``__getattr__``
+        delegation.
+
+        Refuses to run when ``self.catalog`` is a
+        :class:`~deriva_ml.core.catalog_stub.CatalogStub` (offline mode):
+        applying a schema change without a live catalog connection is
+        nonsensical, and the underlying ``Model.apply()`` would otherwise
+        raise an unhelpful :class:`DerivaMLReadOnlyError` once it reached
+        through the stub.
+
+        Raises:
+            DerivaMLReadOnlyError: If this DerivaML instance is in offline
+                mode (``self.catalog`` is a ``CatalogStub``).
+        """
+        if isinstance(self.catalog, CatalogStub):
+            raise DerivaMLReadOnlyError(
+                "DerivaModel.apply() requires online mode; "
+                "this DerivaML instance was constructed with mode=offline."
+            )
+        self.model.apply()
 
     def is_dataset_rid(self, rid: RID, deleted: bool = False) -> bool:
-        """Check if a given RID is a dataset RID."""
+        """Check whether ``rid`` identifies a (non-deleted) Dataset row.
+
+        Resolves ``rid`` against the live catalog via
+        :meth:`ErmrestCatalog.resolve_rid` to determine which table it
+        belongs to, then verifies it's the ``Dataset`` table. By default
+        deleted datasets are treated as not-a-dataset; pass ``deleted=True``
+        to include tombstoned rows in the positive set.
+
+        Args:
+            rid: The RID to test.
+            deleted: If True, return ``True`` for soft-deleted datasets
+                too. Defaults to False (deleted rows return ``False``).
+
+        Returns:
+            True if ``rid`` is a Dataset row (filtered by the ``deleted``
+            flag), False if it points at a different table.
+
+        Raises:
+            DerivaMLException: If ``rid`` doesn't resolve in the catalog
+                at all (typically an invalid or fabricated RID).
+        """
         try:
             rid_info = self.model.catalog.resolve_rid(rid, self.model)
         except KeyError as _e:
