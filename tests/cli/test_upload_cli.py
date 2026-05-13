@@ -20,7 +20,7 @@ def test_cli_help_lists_flags():
 
 def test_cli_execution_arg_accepts_multiple(test_ml, monkeypatch):
     from deriva_ml.cli import upload as upload_cli
-    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_report import UploadReport
 
     calls = []
     def _fake(self, **kw):
