@@ -153,10 +153,9 @@ def test_bag_commit_poc_image_round_trip(
     image_stats = report.table_stats.get(f"{ml.default_schema}.Image")
     assert image_stats is not None, list(report.table_stats)
     assert image_stats.rows_inserted >= 1
-    assert image_stats.assets_uploaded >= 1, (
-        f"expected ≥1 asset upload, got "
-        f"{image_stats.assets_uploaded} uploaded, "
-        f"{image_stats.assets_deduped} deduped"
+    assert image_stats.assets_attempted >= 1, (
+        f"expected ≥1 asset upload attempt, got "
+        f"{image_stats.assets_attempted}"
     )
 
     # Image row landed at the destination with the right values.

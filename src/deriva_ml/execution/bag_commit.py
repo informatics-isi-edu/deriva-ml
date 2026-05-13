@@ -603,13 +603,15 @@ def load_execution_bag(
     report = loader.run()
 
     # Per-table completion summaries. The loader's ``LoadReport``
-    # carries ``assets_uploaded`` and ``assets_deduped`` per
-    # table; surface those as one progress event per asset
-    # table, so callers see the load's per-table effect even
-    # without byte-streaming.
+    # carries ``assets_attempted`` per table (the number of
+    # _hatracUpload invocations — the bag-loader doesn't surface
+    # dedup-vs-transfer from the underlying ``put_loc`` call, so
+    # we don't either). Surface one progress event per asset
+    # table with a nonzero attempt count so callers see the
+    # load's per-table effect even without byte-streaming.
     if progress_callback is not None:
         for table_name, stats in report.table_stats.items():
-            if stats.assets_uploaded == 0 and stats.assets_deduped == 0:
+            if stats.assets_attempted == 0:
                 continue
             progress_callback(
                 UploadProgress(
@@ -618,7 +620,7 @@ def load_execution_bag(
                     bytes_total=0,
                     percent_complete=100.0,
                     phase="Uploaded",
-                    message=(f"{table_name}: {stats.assets_uploaded} uploaded, {stats.assets_deduped} deduped"),
+                    message=f"{table_name}: {stats.assets_attempted} upload(s) attempted",
                 )
             )
 

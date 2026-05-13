@@ -174,7 +174,7 @@ def test_clone_via_bag_rows_only_skips_asset_uploads(
     The ROWS_ONLY policy is the cheap path: the bag still records
     the Image rows but the loader doesn't push their byte contents
     into the destination Hatrac. We verify both: row counts match,
-    and the load report shows ``assets_uploaded == 0``.
+    and the load report shows ``assets_attempted == 0``.
     """
     source_ml, dataset_desc = catalog_with_datasets
     root_rid = dataset_desc.dataset.dataset_rid
@@ -205,9 +205,9 @@ def test_clone_via_bag_rows_only_skips_asset_uploads(
         policy=policy,
     )
 
-    # No asset uploads happened.
-    total_assets_uploaded = sum(s.assets_uploaded for s in result.load_report.table_stats.values())
-    assert total_assets_uploaded == 0, f"ROWS_ONLY must not upload asset bytes, got {total_assets_uploaded} uploads"
+    # No asset upload attempts happened.
+    total_attempts = sum(s.assets_attempted for s in result.load_report.table_stats.values())
+    assert total_attempts == 0, f"ROWS_ONLY must not invoke asset upload, got {total_attempts} attempts"
 
     # Image rows land in the destination — at least the dataset's
     # explicit Image members and at most the source's full Image
