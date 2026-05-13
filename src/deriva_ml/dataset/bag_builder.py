@@ -645,7 +645,7 @@ class DatasetBagBuilder:
 
     def build_policy(
         self,
-        dataset: DatasetLike,
+        dataset: DatasetLike | None,
         *,
         vocab_export: VocabExport = VocabExport.FULL,
     ) -> FKTraversalPolicy:
@@ -656,18 +656,23 @@ class DatasetBagBuilder:
 
         - :attr:`FKTraversalPolicy.exclude_tables` includes the
           association tables whose target element type has no
-          members in *this* dataset (the dataset-specific
-          association filter from
-          :meth:`CatalogGraph._collect_paths`).
+          members in *this* dataset. When ``dataset`` is ``None``
+          (the catalog-wide annotation / aggregate-queries path),
+          the member-based filter doesn't apply — every
+          association is potentially in scope for some future
+          row — so the exclusion set falls back to just the
+          user's explicit ``exclude_tables``.
         - :attr:`FKTraversalPolicy.vocab_export` defaults to
           :attr:`VocabExport.FULL` so vocab terms are exported
-          completely (today's
-          :meth:`CatalogGraph._export_vocabulary` behavior).
+          completely.
         - Feature tables reach the walk via FK-following from
           member element rows; no separate field is needed.
 
         Args:
-            dataset: The dataset to derive the policy for.
+            dataset: The dataset to derive the policy for, or
+                ``None`` for the catalog-wide case (used by the
+                annotation pipeline and by ``aggregate_queries``
+                with no per-dataset filter).
             vocab_export: Override the vocabulary-export mode.
                 Default is :attr:`VocabExport.FULL` (every term);
                 pass :attr:`VocabExport.REFERENCED_ONLY` to limit
@@ -696,7 +701,7 @@ class DatasetBagBuilder:
     # ------------------------------------------------------------------
 
     def _exclude_empty_associations(
-        self, dataset: DatasetLike
+        self, dataset: DatasetLike | None
     ) -> set[tuple[str, str]]:
         """Return ``{(schema, table)}`` for associations with no members.
 
@@ -707,7 +712,16 @@ class DatasetBagBuilder:
         type X (or when the association links to a vocabulary
         table — those carry dataset metadata and must always be
         included).
+
+        When ``dataset`` is ``None`` (catalog-wide annotation /
+        aggregate path), the member-based filter doesn't apply —
+        we have no specific dataset to count members for — so
+        return an empty set. The catalog-wide walk includes every
+        association on the model.
         """
+        if dataset is None:
+            return set()
+
         model = self._ml_instance.model
         ml_schema_name = self._ml_instance.ml_schema
         dataset_table = model.schemas[ml_schema_name].tables["Dataset"]
