@@ -27,7 +27,7 @@ Table = _ermrest_model.Table
 deriva_tags = _core_utils.tag
 
 from deriva_ml.core.constants import DerivaAssetColumns
-from deriva_ml.dataset.upload import bulk_upload_configuration
+from deriva_ml.core.upload_layout import bulk_upload_configuration
 from deriva_ml.model.catalog import DerivaModel
 
 

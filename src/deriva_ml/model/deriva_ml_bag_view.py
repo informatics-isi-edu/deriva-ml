@@ -26,6 +26,8 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable
 
 import pandas as pd
 from deriva.core.ermrest_model import Table
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm
@@ -151,7 +153,7 @@ class DerivaMLBagView:
             catalog=self,
             dataset_rid=rid,
             description=dataset_record.get("Description", ""),
-            execution_rid=(self._database_model._get_dataset_execution(rid) or {}).get("Execution"),
+            execution_rid=(self._get_dataset_execution(rid) or {}).get("Execution"),
             dataset_types=ds_types,
         )
 
@@ -164,20 +166,25 @@ class DerivaMLBagView:
         Returns:
             Iterable of DatasetBag objects.
         """
-        # Get dataset types for all datasets from association table
+        # Pre-group the dataset-type association rows by Dataset RID
+        # so the per-dataset lookup below is O(1) instead of O(N).
         atable = f"Dataset_{MLVocab.dataset_type.value}"
-        ds_types = list(self._database_model.get_table_contents(atable))
+        types_by_rid: dict[str, list[str]] = {}
+        for row in self._database_model.get_table_contents(atable):
+            types_by_rid.setdefault(row["Dataset"], []).append(
+                row[MLVocab.dataset_type.value]
+            )
 
         datasets = []
         for dataset in self._database_model.get_table_contents("Dataset"):
-            my_types = [t[MLVocab.dataset_type.value] for t in ds_types if t["Dataset"] == dataset["RID"]]
+            rid = dataset["RID"]
             datasets.append(
                 DatasetBag(
                     catalog=self,
-                    dataset_rid=dataset["RID"],
+                    dataset_rid=rid,
                     description=dataset.get("Description", ""),
-                    execution_rid=(self._database_model._get_dataset_execution(dataset["RID"]) or {}).get("Execution"),
-                    dataset_types=my_types,
+                    execution_rid=(self._get_dataset_execution(rid) or {}).get("Execution"),
+                    dataset_types=types_by_rid.get(rid, []),
                 )
             )
         return datasets
@@ -205,10 +212,26 @@ class DerivaMLBagView:
         if not self._database_model.is_vocabulary(table_obj):
             raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
 
-        # Search for term in SQLite
+        # Fast path: indexed SELECT WHERE Name = term_name. SQLAlchemy
+        # routes through SQLite's primary-/secondary-index machinery
+        # instead of streaming every row through Python.
+        orm_class = self._database_model.get_orm_class_by_name(table_obj.name)
+        if orm_class is not None:
+            with Session(self._database_model.engine) as session:
+                stmt = select(orm_class).where(orm_class.Name == term_name)
+                row = session.execute(stmt).scalars().first()
+                if row is not None:
+                    term = {col.name: getattr(row, col.name) for col in row.__table__.columns}
+                    synonyms = term.get("Synonyms")
+                    if synonyms and not isinstance(synonyms, list):
+                        synonyms = list(synonyms)
+                    term["Synonyms"] = synonyms or []
+                    return VocabularyTerm.model_validate(term)
+
+        # Slow path: scan for synonyms (no portable indexed query for
+        # "term_name in JSON-array Synonyms" across all sqlite versions).
         for term in self.get_table_as_dict(table_obj.name):
-            if term_name == term.get("Name") or (term.get("Synonyms") and term_name in term.get("Synonyms", [])):
-                # Convert synonyms to list if needed
+            if term.get("Synonyms") and term_name in term.get("Synonyms", []):
                 synonyms = term.get("Synonyms")
                 if synonyms and not isinstance(synonyms, list):
                     synonyms = list(synonyms)
@@ -216,6 +239,36 @@ class DerivaMLBagView:
                 return VocabularyTerm.model_validate(term)
 
         raise DerivaMLInvalidTerm(table, term_name)
+
+    def _get_dataset_execution(self, dataset_rid: str) -> dict[str, Any] | None:
+        """Return the ``Dataset_Version`` row for ``(rid, current_version)``.
+
+        Lives on the view (not on :class:`DatabaseModel`) because the
+        join through ``self._database_model.bag_rids`` plus the
+        ``Dataset_Version`` schema-table lookup are both deriva-ml
+        domain knowledge — the generic :class:`BagDatabase` layer
+        doesn't know that "dataset" means a versioned thing.
+
+        Args:
+            dataset_rid: Dataset RID to look up.
+
+        Returns:
+            The matching ``Dataset_Version`` row as a dict, or
+            ``None`` if either the RID isn't in this bag or no row
+            matches the version we hold for it.
+        """
+        version = self._database_model.bag_rids.get(dataset_rid)
+        if not version:
+            return None
+
+        dataset_version_table = self._database_model.find_table("Dataset_Version")
+        stmt = select(dataset_version_table).where(
+            dataset_version_table.columns.Dataset == dataset_rid,
+            dataset_version_table.columns.Version == str(version),
+        )
+        with Session(self._database_model.engine) as session:
+            result = session.execute(stmt).mappings().first()
+            return dict(result) if result else None
 
     def get_table_as_dataframe(self, table: str) -> pd.DataFrame:
         """Get table contents as a pandas DataFrame.

@@ -479,6 +479,24 @@ class Dataset:
         """
         return self._ml_instance.model.schemas[self._ml_instance.ml_schema].tables["Dataset"]
 
+    def _element_to_association_map(self) -> dict[str, str]:
+        """Return ``{member_table_name: association_table_name}`` for the Dataset.
+
+        For each ``Dataset_X`` association on the Dataset table,
+        record the *other* (non-Dataset) endpoint's table name as the
+        key and the association table name as the value. Used by
+        :meth:`add_dataset_members` and :meth:`delete_dataset_members`
+        to route a member RID to the correct ``Dataset_X`` row to
+        insert / delete.
+
+        Returns:
+            ``{element_type_name -> Dataset_ElementType_name}`` map.
+        """
+        return {
+            a.other_fkeys.pop().pk_table.name: a.table.name
+            for a in self._dataset_table.find_associations()
+        }
+
     # ==================== Read Interface Methods ====================
     # These methods implement the DatasetLike protocol for read operations.
     # They delegate to the catalog instance for actual data retrieval.
@@ -872,8 +890,8 @@ class Dataset:
         visited.add(self.dataset_rid)
         # Use current catalog state for graph traversal, not version snapshot.
         # Parent/child relationships need to reflect current state for version updates.
-        children = self._list_dataset_children_current()
-        parents = self._list_dataset_parents_current()
+        children = self.list_dataset_children(version=None)
+        parents = self.list_dataset_parents(version=None)
 
         # Add this node with its children as dependencies.
         # This means: self depends on children, so children will be ordered before self.
@@ -1955,9 +1973,8 @@ class Dataset:
         # need to be made.
         dataset_elements: dict[str, list[RID]] = {}
 
-        # Build map of valid element tables to their association tables
-        associations = list(self._dataset_table.find_associations())
-        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in associations}
+        # Map of valid element tables to their association tables.
+        association_map = self._element_to_association_map()
 
         # Get a list of all the object types that can be linked to a dataset_table.
         if type(members) is list:
@@ -2053,8 +2070,7 @@ class Dataset:
         # Go through every rid to be deleted and sort them based on what association table entries
         # need to be removed.
         dataset_elements: dict[str, list[RID]] = {}
-        associations = list(self._dataset_table.find_associations())
-        association_map = {a.other_fkeys.pop().pk_table.name: a.table.name for a in associations}
+        association_map = self._element_to_association_map()
 
         # Batch resolve all RIDs in one query per candidate table instead
         # of one network round-trip per RID. Mirrors the optimization in
@@ -2228,33 +2244,6 @@ class Dataset:
             return children
 
         return [version_snapshot_catalog.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
-
-    def _list_dataset_parents_current(self) -> list[Self]:
-        """Return parent datasets using current catalog state (not version snapshot).
-
-        Used by _build_dataset_graph_1 to find all related datasets for version updates.
-        """
-        pb = self._ml_instance.pathBuilder()
-        atable_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Dataset
-        return [
-            self._ml_instance.lookup_dataset(p["Dataset"])
-            for p in atable_path.filter(atable_path.Nested_Dataset == self.dataset_rid).entities().fetch()
-        ]
-
-    def _list_dataset_children_current(self) -> list[Self]:
-        """Return child datasets using current catalog state (not version snapshot).
-
-        Used by _build_dataset_graph_1 to find all related datasets for version updates.
-        """
-        dataset_dataset_path = (
-            self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Dataset"]
-        )
-        nested_datasets = list(dataset_dataset_path.entities().fetch())
-
-        def find_children(rid: RID) -> list[RID]:
-            return [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
-
-        return [self._ml_instance.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
 
     def list_executions(self) -> list["Execution"]:
         """List all executions associated with this dataset.
@@ -2720,11 +2709,6 @@ class Dataset:
             fetch_concurrency=fetch_concurrency,
         )
         return self.bag_info(version=version, exclude_tables=exclude_tables)
-
-    # Backward compatibility alias
-    def prefetch(self, *args, **kwargs) -> dict[str, Any]:
-        """Deprecated: Use cache() instead."""
-        return self.cache(*args, **kwargs)
 
     @staticmethod
     def _estimate_csv_bytes(sample_rows: list[dict], total_row_count: int) -> int:
@@ -3471,37 +3455,6 @@ class Dataset:
         r.raise_for_status()
         return DatasetMinid(dataset_version=version, **r.json())
 
-    @staticmethod
-    def _bag_is_fully_materialized(bag_path: Path) -> bool:
-        """Check whether all fetch.txt entries have been downloaded locally.
-
-        Uses bdbag's validate_bag_structure for a quick structural check, then
-        verifies that every file referenced in fetch.txt is present on disk.
-
-        Args:
-            bag_path: Path to the BDBag directory.
-
-        Returns:
-            True if the bag has no fetch.txt or all fetch.txt entries exist locally.
-            False if any referenced file is missing.
-        """
-        try:
-            bdb.validate_bag_structure(bag_path.as_posix())
-        except Exception as e:
-            self._logger.debug(f"Bag validation check failed for {bag_path}: {e}")
-            return False
-        fetch_file = bag_path / "fetch.txt"
-        if not fetch_file.exists():
-            return True
-        with fetch_file.open("r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split("\t")
-                if len(parts) >= 3:
-                    rel_path = parts[2]
-                    if not (bag_path / rel_path).exists():
-                        return False
-        return True
-
     def _materialize_dataset_bag(
         self,
         minid: DatasetMinid,
@@ -3547,7 +3500,9 @@ class Dataset:
         # If this bag has already been validated, verify completeness using bdbag before trusting the cache.
         # This guards against caches that were marked valid but have missing fetch.txt assets.
         if validated_check.exists():
-            if self._bag_is_fully_materialized(bag_path):
+            from deriva_ml.dataset.bag_cache import BagCache
+
+            if BagCache._is_fully_materialized(bag_path):
                 self._logger.info(
                     f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} verified as complete."
                 )

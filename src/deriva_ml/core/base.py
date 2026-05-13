@@ -1473,7 +1473,7 @@ class DerivaML(
         """
         from datetime import datetime
 
-        from deriva_ml.dataset.upload import upload_root
+        from deriva_ml.core.upload_layout import upload_root
 
         results = []
         exec_root = upload_root(self.working_dir) / "execution"
@@ -1533,7 +1533,7 @@ class DerivaML(
         import shutil
         import time
 
-        from deriva_ml.dataset.upload import upload_root
+        from deriva_ml.core.upload_layout import upload_root
 
         stats = {"dirs_removed": 0, "bytes_freed": 0, "errors": 0}
         exclude_rids = set(exclude_rids or [])

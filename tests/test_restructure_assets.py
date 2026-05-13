@@ -23,7 +23,6 @@ def _make_bag(tmp_path: Path, assets: list[dict]) -> MagicMock:
     bag._detect_asset_table.return_value = "Image"
     bag._build_dataset_type_path_map.return_value = {DATASET_RID: ["train"]}
     bag._get_asset_dataset_mapping.return_value = {a["RID"]: DATASET_RID for a in assets}
-    bag._load_feature_values_cache.return_value = {}
     bag._get_reachable_assets.return_value = assets
     return bag
 

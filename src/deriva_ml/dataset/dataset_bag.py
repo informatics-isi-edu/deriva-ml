@@ -89,8 +89,6 @@ def _default_dir_name_from_target(
         DerivaMLException: When the target is a dict (multi-target case) and
             no target_transform was provided.
     """
-    from deriva_ml.core.exceptions import DerivaMLException
-
     if target is None:
         return "Unknown"
     if isinstance(target, str):
@@ -200,7 +198,7 @@ class DatasetBag:
         # Use provided RID or fall back to the bag's primary dataset
         self.dataset_rid = dataset_rid or self.model.dataset_rid
         self.description = description
-        self.execution_rid = execution_rid or (self.model._get_dataset_execution(self.dataset_rid) or {}).get(
+        self.execution_rid = execution_rid or (self._catalog._get_dataset_execution(self.dataset_rid) or {}).get(
             "Execution"
         )
 
@@ -769,47 +767,6 @@ class DatasetBag:
             ).all()
             return [r[0] for r in rows]
 
-    def fetch_table_features(self, *args, **kwargs):
-        """Retired — use ``feature_values(table, name)`` or ``Denormalizer``.
-
-        ``DatasetBag.fetch_table_features`` has been removed. Use the new
-        ``feature_values`` method to read a single feature::
-
-            for rec in bag.feature_values("Image", "Quality"):
-                ...
-
-        For wide-table denormalization across all features use the
-        ``Denormalizer`` subsystem.
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DatasetBag.fetch_table_features() has been retired. "
-            "Use feature_values(table, feature_name) to read a single feature, "
-            "or Denormalizer for multi-feature wide tables."
-        )
-
-    def list_feature_values(self, *args, **kwargs) -> Iterable[FeatureRecord]:
-        """Retired — renamed to ``feature_values``.
-
-        ``DatasetBag.list_feature_values`` has been removed. Use the new
-        ``feature_values`` method instead::
-
-            for rec in bag.feature_values("Image", "Quality"):
-                ...
-
-        The signature is identical (``table``, ``feature_name``, optional
-        ``selector``).
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DatasetBag.list_feature_values() has been retired and renamed. "
-            "Use feature_values(table, feature_name, selector=...) instead."
-        )
-
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the ERMrest Table objects that can be members of a dataset.
 
@@ -1263,222 +1220,6 @@ class DatasetBag:
             rows = [dict(row._mapping) for row in result]
 
         return rows
-
-    def _load_feature_values_cache(
-        self,
-        asset_table: str,
-        group_keys: list[str],
-        enforce_vocabulary: bool = True,
-        value_selector: Callable | None = None,
-    ) -> dict[str, dict[RID, Any]]:
-        """Load feature values into a cache for efficient lookup.
-
-        Pre-loads feature values for any group_keys that are feature names,
-        organizing them by target entity RID for fast lookup.
-
-        Args:
-            asset_table: The asset table name to find features for.
-            group_keys: List of potential feature names to cache. Supports two formats:
-                - "FeatureName": Uses the first term column (default behavior)
-                - "FeatureName.column_name": Uses the specified column from the feature table
-            enforce_vocabulary: If True (default), only allow features with
-                controlled vocabulary term columns and raise an error if an
-                asset has multiple values. If False, allow any feature type
-                and use the first value found when multiple exist.
-            value_selector: Optional function to select which feature value to use
-                when an asset has multiple values for the same feature. Receives a
-                list of FeatureRecord objects and returns the selected one. If not
-                provided and multiple values exist, raises DerivaMLException when
-                enforce_vocabulary=True or uses the first value when False.
-
-        Returns:
-            Dictionary mapping group_key -> {target_rid -> feature_value}
-            Only includes entries for keys that are actually features.
-
-        Raises:
-            DerivaMLException: If enforce_vocabulary is True and:
-                - A feature has no term columns (not vocabulary-based), or
-                - An asset has multiple different vocabulary term values for the same feature
-                  and no value_selector is provided.
-        """
-        from deriva_ml.core.exceptions import DerivaMLException
-
-        cache: dict[str, dict[RID, Any]] = {}
-        # Store FeatureRecord objects directly for later selection
-        records_cache: dict[str, dict[RID, list[FeatureRecord]]] = {}
-        # Track which column to use for each group_key's value extraction
-        column_for_group: dict[str, str] = {}
-        logger = get_logger(__name__)
-        # Parse group_keys to extract feature names and optional column specifications
-        # Format: "FeatureName" or "FeatureName.column_name"
-        feature_column_map: dict[str, str | None] = {}  # group_key -> specific column or None
-        feature_names_to_check: set[str] = set()
-        for key in group_keys:
-            if "." in key:
-                parts = key.split(".", 1)
-                feature_name = parts[0]
-                column_name = parts[1]
-                feature_column_map[key] = column_name
-                feature_names_to_check.add(feature_name)
-            else:
-                feature_column_map[key] = None
-                feature_names_to_check.add(key)
-
-        def process_feature(feat: Any, table_name: str, group_key: str, specific_column: str | None) -> None:
-            """Process a single feature and add its values to the cache."""
-            term_cols = [c.name for c in feat.term_columns]
-            value_cols = [c.name for c in feat.value_columns]
-            all_cols = term_cols + value_cols
-
-            # Determine which column to use for the value
-            if specific_column:
-                # User specified a specific column
-                if specific_column not in all_cols:
-                    raise DerivaMLException(
-                        f"Column '{specific_column}' not found in feature '{feat.feature_name}'. "
-                        f"Available columns: {all_cols}"
-                    )
-                use_column = specific_column
-            elif term_cols:
-                # Use first term column (default behavior)
-                use_column = term_cols[0]
-            elif not enforce_vocabulary and value_cols:
-                # Fall back to value columns if allowed
-                use_column = value_cols[0]
-            else:
-                if enforce_vocabulary:
-                    raise DerivaMLException(
-                        f"Feature '{feat.feature_name}' on table '{table_name}' has no "
-                        f"controlled vocabulary term columns. Only vocabulary-based features "
-                        f"can be used for grouping when enforce_vocabulary=True. "
-                        f"Set enforce_vocabulary=False to allow non-vocabulary features."
-                    )
-                return
-
-            # Track the column used for this group_key
-            column_for_group[group_key] = use_column
-            records_cache[group_key] = defaultdict(list)
-            feature_values = self.feature_values(table_name, feat.feature_name)
-
-            for fv in feature_values:
-                target_rid = getattr(fv, table_name, None)
-                if target_rid is None:
-                    continue
-
-                # Check the value column is populated
-                value = getattr(fv, use_column, None)
-                if value is None:
-                    continue
-
-                records_cache[group_key][target_rid].append(fv)
-
-        # Find all features on tables that this asset table references
-        asset_table_obj = self.model.name_to_table(asset_table)
-
-        # Check features on the asset table itself
-        for feature in self.find_features(asset_table):
-            if feature.feature_name in feature_names_to_check:
-                # Find all group_keys that reference this feature
-                for group_key, specific_col in feature_column_map.items():
-                    # Check if this group_key references this feature
-                    key_feature = group_key.split(".")[0] if "." in group_key else group_key
-                    if key_feature == feature.feature_name:
-                        try:
-                            process_feature(feature, asset_table, group_key, specific_col)
-                        except DerivaMLException:
-                            raise
-                        except Exception as e:
-                            logger.warning(f"Could not load feature {feature.feature_name}: {e}")
-
-        # Also check features on referenced tables (via foreign keys)
-        for fk in asset_table_obj.foreign_keys:
-            target_table = fk.pk_table
-            for feature in self.find_features(target_table):
-                if feature.feature_name in feature_names_to_check:
-                    # Find all group_keys that reference this feature
-                    for group_key, specific_col in feature_column_map.items():
-                        # Check if this group_key references this feature
-                        key_feature = group_key.split(".")[0] if "." in group_key else group_key
-                        if key_feature == feature.feature_name:
-                            try:
-                                process_feature(feature, target_table.name, group_key, specific_col)
-                            except DerivaMLException:
-                                raise
-                            except Exception as e:
-                                logger.warning(f"Could not load feature {feature.feature_name}: {e}")
-
-        # Now resolve multiple values using value_selector or error handling
-        for group_key, target_records in records_cache.items():
-            cache[group_key] = {}
-            use_column = column_for_group[group_key]
-            for target_rid, records in target_records.items():
-                if len(records) == 1:
-                    # Single value - straightforward
-                    cache[group_key][target_rid] = getattr(records[0], use_column)
-                elif len(records) > 1:
-                    # Multiple values - need to resolve
-                    unique_values = set(getattr(r, use_column) for r in records)
-                    if len(unique_values) == 1:
-                        # All records have same value, use it
-                        cache[group_key][target_rid] = getattr(records[0], use_column)
-                    elif value_selector:
-                        # Use provided selector function
-                        selected = value_selector(records)
-                        cache[group_key][target_rid] = getattr(selected, use_column)
-                    elif enforce_vocabulary:
-                        # Multiple different values without selector - error
-                        values_str = ", ".join(f"'{getattr(r, use_column)}' (exec: {r.Execution})" for r in records)
-                        raise DerivaMLException(
-                            f"Asset '{target_rid}' has multiple different values for "
-                            f"feature '{records[0].Feature_Name}': {values_str}. "
-                            f"Provide a value_selector function to choose between values, "
-                            f"or set enforce_vocabulary=False to use the first value."
-                        )
-                    else:
-                        # Not enforcing - use first value
-                        cache[group_key][target_rid] = getattr(records[0], use_column)
-
-        return cache
-
-    def _resolve_grouping_value(
-        self,
-        asset: dict[str, Any],
-        group_key: str,
-        feature_cache: dict[str, dict[RID, Any]],
-    ) -> str:
-        """Resolve a grouping value for an asset.
-
-        First checks if group_key is a direct column on the asset record,
-        then checks if it's a feature name in the feature cache.
-
-        Args:
-            asset: The asset record dictionary.
-            group_key: Column name or feature name to group by.
-            feature_cache: Pre-loaded feature values keyed by feature name -> target RID -> value.
-
-        Returns:
-            The resolved value as a string, or "Unknown" if not found or None.
-            Uses "Unknown" (capitalized) to match vocabulary term naming conventions.
-        """
-        # First check if it's a direct column on the asset table
-        if group_key in asset:
-            value = asset[group_key]
-            if value is not None:
-                return str(value)
-            return "Unknown"
-
-        # Check if it's a feature name
-        if group_key in feature_cache:
-            feature_values = feature_cache[group_key]
-            # Check each column in the asset that might be a FK to the feature target
-            for column_name, column_value in asset.items():
-                if column_value and column_value in feature_values:
-                    return str(feature_values[column_value])
-            # Also check if the asset's own RID is in the feature values
-            if asset.get("RID") in feature_values:
-                return str(feature_values[asset["RID"]])
-
-        return "Unknown"
 
     def _detect_asset_table(self) -> str | None:
         """Auto-detect the asset table from dataset members.
@@ -2179,37 +1920,21 @@ class DatasetBag:
                 else:
                     feature_targets_spec = feature_names
 
-            # Call _resolve_targets only for feature-based targets
+            # Call _resolve_targets only for feature-based targets.
+            # ``enforce_vocabulary`` is enforced inside _resolve_targets so the
+            # validation happens once at the same boundary as the resolution.
             if feature_targets_spec:
                 feature_target_map = _resolve_targets(
                     self,
                     asset_table,
                     targets=feature_targets_spec,
                     missing=missing,
+                    enforce_vocabulary=enforce_vocabulary,
                 )
 
         # Step 4: For column-based targets, load a simple {rid: value_str} map
         # by scanning all asset records once.
         column_value_map: dict[str, dict[str, str]] = {col: {} for col in column_targets}
-
-        # Step 5: Load feature values cache for enforce_vocabulary enforcement.
-        # _load_feature_values_cache raises at load time if enforce_vocabulary=True
-        # and a feature has no vocabulary term columns. We discard the cache dict
-        # itself (naming comes from feature_target_map); this call is for its
-        # validation side-effect only.
-        group_keys_for_cache = [
-            t
-            for t in (
-                list(targets)
-                if isinstance(targets, list)
-                else list(targets.keys())
-                if isinstance(targets, dict)
-                else []
-            )
-            if t not in column_targets
-        ]
-        if group_keys_for_cache:
-            self._load_feature_values_cache(asset_table, group_keys_for_cache, enforce_vocabulary, None)
 
         # Step 6: Get all assets reachable through FK paths
         assets = self._get_reachable_assets(asset_table)

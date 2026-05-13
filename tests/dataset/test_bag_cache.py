@@ -6,7 +6,6 @@ from pathlib import Path
 from deriva_ml.dataset.bag_cache import (
     BagCache,
     CacheStatus,
-    migrate_legacy_cache,
 )
 
 
@@ -176,29 +175,26 @@ class TestCacheStatusEnum:
 
 
 class TestBagCacheIndexIntegration:
-    """BagCache exposes the underlying BagCacheIndex for richer queries."""
-
-    def test_index_property_reachable(self, tmp_path):
-        """``BagCache.index`` exposes the underlying BagCacheIndex."""
-        with BagCache(tmp_path) as cache:
-            assert cache.index is not None
-            # Empty index → no bags for any RID.
-            assert cache.index.find_bags_for_rid(
-                table="Dataset", rid="anything"
-            ) == []
+    """BagCache's cache_status reflects rows written through BagCacheIndex."""
 
     def test_recording_via_index_appears_in_cache_status(self, tmp_path):
         """A bag recorded in the index shows up via cache_status."""
+        from deriva.bag.cache_index import BagCacheIndex
+
         # Set up the new-style on-disk layout: bags/{checksum}/bag
         cache = BagCache(tmp_path)
         try:
             checksum = "abc123"
-            bag_dir = cache.index.bag_dir_for(checksum) / "bag"
-            _make_valid_bag(bag_dir)
-            cache.index.record(
-                checksum=checksum,
-                anchors=[("Dataset", "DS1")],
-            )
+            # Construct an index against the same cache_dir; both
+            # BagCache and this BagCacheIndex point at the same
+            # SQLite file by convention.
+            with BagCacheIndex(tmp_path) as index:
+                bag_dir = index.bag_dir_for(checksum) / "bag"
+                _make_valid_bag(bag_dir)
+                index.record(
+                    checksum=checksum,
+                    anchors=[("Dataset", "DS1")],
+                )
             info = cache.cache_status("DS1")
             assert info["status"] in (
                 CacheStatus.cached_materialized.value,
@@ -210,65 +206,3 @@ class TestBagCacheIndexIntegration:
             cache.dispose()
 
 
-class TestMigrateLegacyCache:
-    """The one-shot legacy-layout migrator."""
-
-    def test_records_legacy_directory(self, tmp_path):
-        """``{rid}_{checksum}/`` directories get recorded in the index."""
-        # Build a legacy-shaped directory.
-        legacy = tmp_path / "DS1_abc123"
-        bag = legacy / "Dataset_DS1"
-        bag.mkdir(parents=True)
-        (bag / "data").mkdir()
-        (bag / "data" / "schema.json").write_text("{}")
-
-        result = migrate_legacy_cache(tmp_path)
-        assert result["recorded"] == ["DS1_abc123"]
-        assert result["skipped"] == []
-
-        # The bag turns up in the index.
-        with BagCache(tmp_path) as cache:
-            checksums = cache.index.find_bags_for_rid(
-                table="Dataset", rid="DS1"
-            )
-            assert checksums == ["abc123"]
-
-    def test_skips_unparseable_directory_names(self, tmp_path):
-        """Directories without an underscore are reported as skipped."""
-        (tmp_path / "no-underscore-here").mkdir()
-        result = migrate_legacy_cache(tmp_path)
-        assert "no-underscore-here" in result["skipped"]
-        assert result["recorded"] == []
-
-    def test_records_only_no_move_when_default(self, tmp_path):
-        """``move_directories=False`` (default) leaves the source in place."""
-        legacy = tmp_path / "DS1_abc123"
-        legacy.mkdir()
-        (legacy / "marker.txt").write_text("legacy")
-
-        migrate_legacy_cache(tmp_path)
-        # Original directory is still there.
-        assert (legacy / "marker.txt").exists()
-
-    def test_moves_when_requested(self, tmp_path):
-        """``move_directories=True`` relocates the bag into ``bags/{checksum}/``."""
-        legacy = tmp_path / "DS1_abc123"
-        legacy.mkdir()
-        (legacy / "marker.txt").write_text("legacy")
-
-        migrate_legacy_cache(tmp_path, move_directories=True)
-
-        assert not legacy.exists(), "legacy dir should be moved away"
-        new_dir = tmp_path / "bags" / "abc123"
-        assert new_dir.exists()
-        assert (new_dir / "marker.txt").read_text() == "legacy"
-
-    def test_idempotent_on_empty_cache(self, tmp_path):
-        """Migrator returns empty lists when no legacy dirs are present."""
-        result = migrate_legacy_cache(tmp_path)
-        assert result == {"recorded": [], "skipped": []}
-
-    def test_missing_cache_dir_is_noop(self, tmp_path):
-        """Pointing the migrator at a non-existent path returns empty."""
-        result = migrate_legacy_cache(tmp_path / "does-not-exist")
-        assert result == {"recorded": [], "skipped": []}

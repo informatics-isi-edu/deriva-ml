@@ -23,7 +23,7 @@ Table = _ermrest_model.Table
 import pandas as pd
 
 from deriva_ml.core.pd_utils import rows_to_dataframe
-from deriva_ml.dataset.upload import table_path as _table_path
+from deriva_ml.core.upload_layout import table_path as _table_path
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel

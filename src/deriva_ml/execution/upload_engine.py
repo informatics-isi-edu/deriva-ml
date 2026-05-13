@@ -32,7 +32,7 @@ from deriva.core import DEFAULT_SESSION_CONFIG
 from deriva.transfer.upload.deriva_upload import GenericUploader, UploadState
 
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.upload import DEFAULT_UPLOAD_TIMEOUT, NULL_SENTINEL, bulk_upload_configuration
+from deriva_ml.core.upload_layout import DEFAULT_UPLOAD_TIMEOUT, NULL_SENTINEL, bulk_upload_configuration
 from deriva_ml.execution.lease_orchestrator import acquire_leases_for_execution
 from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus, PendingRowStatus
