@@ -21,8 +21,9 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from sqlalchemy.engine import Connection, Engine
 
+from deriva.bag import sqlite_helpers as sh
+
 from deriva_ml.local_db import paths as p
-from deriva_ml.local_db import sqlite_helpers as sh
 
 if TYPE_CHECKING:
     from datetime import timedelta

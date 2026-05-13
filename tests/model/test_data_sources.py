@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from deriva_ml.model.data_sources import BagDataSource
+from deriva.bag.sources import BagDataSource
 
 
 @pytest.fixture

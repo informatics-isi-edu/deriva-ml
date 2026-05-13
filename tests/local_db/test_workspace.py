@@ -83,7 +83,7 @@ class TestAttachSlice:
         # Create a real slice.db with a tiny table
         slice_db = tmp_path / "catalogs" / "h__1" / "slices" / "s1" / "slice.db"
         slice_db.parent.mkdir(parents=True, exist_ok=True)
-        from deriva_ml.local_db.sqlite_helpers import create_wal_engine
+        from deriva.bag.sqlite_helpers import create_wal_engine
 
         eng = create_wal_engine(slice_db)
         with eng.connect() as conn:
@@ -182,7 +182,7 @@ class TestMultiSchemaSliceAttach:
 
     def test_legacy_single_file_slice_still_works(self, tmp_path: Path) -> None:
         """A slice with only slice.db (Phase 1 layout) still works under alias 'slice'."""
-        from deriva_ml.local_db.sqlite_helpers import create_wal_engine
+        from deriva.bag.sqlite_helpers import create_wal_engine
 
         s_dir = tmp_path / "catalogs" / "h__1" / "slices" / "legacy1"
         s_dir.mkdir(parents=True)

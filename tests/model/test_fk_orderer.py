@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 from graphlib import CycleError
 
-from deriva_ml.model.fk_orderer import ForeignKeyOrderer
+from deriva.bag.loader import ForeignKeyOrderer
 
 
 def _make_mock_model(table_specs: dict[str, list[str]], schema_name: str = "test") -> MagicMock:

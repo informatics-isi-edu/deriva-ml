@@ -17,11 +17,6 @@ ADR-0006's three-class consumer layer: :class:`BagDatabase` (generic,
 upstream) → :class:`DatabaseModel` (deriva-ml-extended) →
 :class:`DerivaMLBagView` (domain-protocol-shaped, with vocab/feature/
 element-type lookup over the bag).
-
-A re-export shim at the legacy module path
-(``deriva_ml.model.deriva_ml_database``) preserves
-``from deriva_ml.model.deriva_ml_database import DerivaMLDatabase``
-imports for the duration of one release.
 """
 
 from __future__ import annotations

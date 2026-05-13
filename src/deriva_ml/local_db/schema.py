@@ -22,8 +22,8 @@ from sqlalchemy import Table as SQLTable
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from deriva_ml.local_db import sqlite_helpers as sh
-from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
+from deriva.bag import sqlite_helpers as sh
+from deriva.bag.schema import SchemaBuilder, SchemaORM
 
 logger = logging.getLogger(__name__)
 
