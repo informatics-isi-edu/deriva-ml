@@ -85,7 +85,15 @@ class TestDownloadCacheLifecycle:
         assert info["status"] == CacheStatus.cached_materialized.value
 
     def test_non_materialized_download(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """Download with materialize=False results in cached_metadata_only status."""
+        """Download with materialize=False results in a holey or materialized cache.
+
+        Post-cutover (docs/design/bag-client-cutover-2026-05.md) the cache
+        status is determined by walking ``fetch.txt`` for missing files
+        rather than a separate ``validated_check.txt`` marker, so a
+        non-materialized bag with unresolved entries surfaces as
+        ``cached_holey`` (not ``cached_metadata_only``). Bags without
+        fetch.txt entries surface as ``cached_materialized`` either way.
+        """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -95,10 +103,9 @@ class TestDownloadCacheLifecycle:
         assert bag is not None
 
         info = dataset.bag_info(version=version)
-        # Should be metadata_only since we didn't materialize
         assert info["status"] in (
-            CacheStatus.cached_metadata_only.value,
-            CacheStatus.cached_materialized.value,  # May be materialized if no fetch.txt entries
+            CacheStatus.cached_holey.value,
+            CacheStatus.cached_materialized.value,
         )
 
     def test_non_default_cache_directory(self, catalog_manager: CatalogManager, tmp_path: Path):
@@ -237,71 +244,73 @@ class TestMultiVersionCache:
 
 
 class TestCacheStatusTransitions:
-    """Unit tests for cache status transitions using filesystem manipulation."""
+    """Unit tests for cache status transitions using filesystem manipulation.
 
-    def test_not_cached_to_metadata_only(self, tmp_path):
-        """Status transitions from not_cached to cached_metadata_only."""
+    Post-cutover (docs/design/bag-client-cutover-2026-05.md), bags live at
+    ``{cache_dir}/bags/{checksum}/Dataset_{rid}/`` and are tracked in the
+    ``BagCacheIndex`` SQLite reverse index. The transitions are:
+
+    - ``not_cached`` → ``cached_holey``  (index record + bag dir with
+      unresolved fetch.txt entries)
+    - ``cached_holey`` → ``cached_materialized``  (the fetch.txt entries get
+      satisfied or fetch.txt itself goes away)
+    - ``cached_materialized`` → ``cached_holey``  (referenced files vanish)
+    """
+
+    def _record_and_get_bag_dir(self, cache_dir: Path, rid: str, checksum: str) -> Path:
+        """Create a bag entry in the index and return its directory."""
+        from deriva.bag.cache_index import BagCacheIndex
+
+        with BagCacheIndex(cache_dir) as index:
+            bag_dir = index.bag_dir_for(checksum) / f"Dataset_{rid}"
+            bag_dir.mkdir(parents=True, exist_ok=True)
+            index.record(checksum=checksum, anchors=[("Dataset", rid)])
+        return bag_dir
+
+    def test_not_cached_to_holey(self, tmp_path):
+        """Status transitions from not_cached to cached_holey on bag with fetch.txt entries."""
         cache = BagCache(tmp_path)
         rid = "TEST"
 
         # Start: not cached
         assert cache.cache_status(rid)["status"] == CacheStatus.not_cached.value
 
-        # Create a bag directory with unresolved fetch.txt
-        bag_dir = tmp_path / f"{rid}_checksum123"
-        bag_path = bag_dir / f"Dataset_{rid}"
-        bag_path.mkdir(parents=True)
-        (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
-        (bag_path / "data").mkdir()
-        (bag_path / "manifest-sha256.txt").write_text("")
-        (bag_path / "fetch.txt").write_text("https://example.com/file.dat\t100\tdata/file.dat\n")
+        # Record and populate a bag with unresolved fetch.txt entries.
+        bag_dir = self._record_and_get_bag_dir(tmp_path, rid, "checksum123")
+        (bag_dir / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
+        (bag_dir / "data").mkdir()
+        (bag_dir / "manifest-sha256.txt").write_text("")
+        (bag_dir / "fetch.txt").write_text("https://example.com/file.dat\t100\tdata/file.dat\n")
 
-        # Now: metadata only
-        assert cache.cache_status(rid)["status"] == CacheStatus.cached_metadata_only.value
+        assert cache.cache_status(rid)["status"] == CacheStatus.cached_holey.value
 
-    def test_metadata_only_to_materialized(self, tmp_path):
-        """Status transitions from cached_metadata_only to cached_materialized."""
+    def test_no_fetch_txt_is_materialized(self, tmp_path):
+        """A bag without fetch.txt entries is cached_materialized immediately."""
         from bdbag import bdbag_api as bdb
 
         cache = BagCache(tmp_path)
         rid = "TEST"
-
-        bag_dir = tmp_path / f"{rid}_checksum123"
-        bag_path = bag_dir / f"Dataset_{rid}"
-        bag_path.mkdir(parents=True)
-        data_dir = bag_path / "data"
-        data_dir.mkdir()
+        bag_dir = self._record_and_get_bag_dir(tmp_path, rid, "checksum123")
+        data_dir = bag_dir / "data"
+        data_dir.mkdir(exist_ok=True)
         data_dir.joinpath("file.dat").write_text("content")
-        bdb.make_bag(str(bag_path), algs=["sha256"], idempotent=True)
+        bdb.make_bag(str(bag_dir), algs=["sha256"], idempotent=True)
 
-        # Without validated_check: metadata only
-        assert cache.cache_status(rid)["status"] == CacheStatus.cached_metadata_only.value
-
-        # Add validated_check marker
-        (bag_dir / "validated_check.txt").touch()
-
-        # Now: materialized
         assert cache.cache_status(rid)["status"] == CacheStatus.cached_materialized.value
 
-    def test_materialized_to_incomplete(self, tmp_path):
-        """Status transitions to incomplete when files go missing."""
+    def test_materialized_to_holey(self, tmp_path):
+        """Status flips back to cached_holey when a referenced file goes missing."""
         cache = BagCache(tmp_path)
         rid = "TEST"
+        bag_dir = self._record_and_get_bag_dir(tmp_path, rid, "checksum123")
+        (bag_dir / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
+        data_dir = bag_dir / "data"
+        data_dir.mkdir(exist_ok=True)
 
-        bag_dir = tmp_path / f"{rid}_checksum123"
-        bag_path = bag_dir / f"Dataset_{rid}"
-        bag_path.mkdir(parents=True)
-        (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
-        data_dir = bag_path / "data"
-        data_dir.mkdir()
-
-        # Create a file, then add fetch.txt referencing another file that's missing
+        # Create one file present locally, plus one fetch.txt entry that's missing.
         data_dir.joinpath("present.dat").write_text("here")
-        (bag_path / "fetch.txt").write_text("https://example.com/missing.dat\t100\tdata/missing.dat\n")
-        (bag_path / "manifest-sha256.txt").write_text("")
+        (bag_dir / "fetch.txt").write_text("https://example.com/missing.dat\t100\tdata/missing.dat\n")
+        (bag_dir / "manifest-sha256.txt").write_text("")
 
-        # Mark as validated but file is missing
-        (bag_dir / "validated_check.txt").touch()
-
-        # Should be incomplete
-        assert cache.cache_status(rid)["status"] == CacheStatus.cached_incomplete.value
+        # The fetch.txt entry references a missing file — should be holey.
+        assert cache.cache_status(rid)["status"] == CacheStatus.cached_holey.value

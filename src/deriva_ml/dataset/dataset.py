@@ -2656,8 +2656,8 @@ class Dataset:
                 - total_rows: total row count across all tables
                 - total_asset_bytes: total size of asset files in bytes
                 - total_asset_size: human-readable size string
-                - cache_status: one of "not_cached", "cached_metadata_only",
-                  "cached_materialized", "cached_holey"
+                - cache_status: one of "not_cached", "cached_materialized",
+                  "cached_holey"
                 - cache_path: local path to cached bag (if cached), else None
         """
         # Get size estimate
@@ -2822,43 +2822,56 @@ class Dataset:
         Handles three source types based on how the bag was obtained:
 
         1. **Local cache hit** (``minid.checksum`` set by Tier 1 in ``_get_dataset_minid``):
-           The cache directory ``{rid}_{checksum}`` already exists → return immediately.
+           The index already records this checksum and the bag directory
+           exists at ``{cache_root}/bags/{checksum}/Dataset_{rid}`` → return
+           immediately.
 
         2. **S3 download** (``use_minid=True``):
            Download the bag archive from S3 via ``minid.bag_url``.
 
         3. **Client-side bag** (``use_minid=False``):
-           The bag was already generated locally by ``_create_dataset_bag_client``
-           and is referenced via a ``file://`` URI.
+           The bag was already generated locally by
+           :meth:`_create_dataset_minid` driving
+           :meth:`DatasetBagBuilder.build_bag` and is referenced via a
+           ``file://`` URI.
 
         After obtaining the archive, this method:
-        - Extracts it to a staging directory (atomic — prevents corrupt caches)
-        - Validates the BDBag structure
-        - Moves the staging directory to the final cache location
-        - Cleans up temporary files
 
-        Cache directory naming:
-        - Deterministic path (Tier 1/3): ``{rid}_{spec_hash[:16]}_{snapshot}``
-        - MINID path (Tier 2): ``{rid}_{sha256_from_s3}``
+        - Extracts it under a staging directory (atomic — prevents corrupt caches).
+        - Validates the BDBag structure.
+        - Moves the staging directory to its final cache location under
+          ``{cache_root}/bags/{checksum}/Dataset_{rid}/``.
+        - Records the bag in :class:`~deriva.bag.cache_index.BagCacheIndex`
+          so Tier-1 lookups can find it on the next call.
+        - Cleans up temporary files (including any ``client_export``
+          intermediate produced by the non-MINID path).
 
-        Both formats are found by the Tier 1 glob in ``_get_dataset_minid``
-        (the deterministic format by snapshot suffix, the MINID format by
-        its own SHA-256 lookup).
+        Cache layout (post-Phase-2 cutover):
+            ``{cache_root}/bags/{checksum}/Dataset_{rid}/``
+
+            ``checksum`` is the deterministic ``{spec_hash[:16]}_{snapshot}``
+            string for non-MINID downloads (set by Tier 1/3) or the SHA-256
+            of the S3 archive (set by Tier 2).
 
         Args:
             minid: DatasetMinid with bag URL and cache key (in checksum field).
             use_minid: If True, source is S3. If False, source is local file://.
 
         Returns:
-            Path to the extracted bag directory: ``{cache_dir}/{key}/Dataset_{rid}``
+            Path to the extracted bag directory:
+            ``{cache_root}/bags/{checksum}/Dataset_{rid}``.
         """
-        # Check if the bag is already cached under the key provided by _get_dataset_minid.
-        # For Tier 1 hits, this always succeeds (the directory was found by glob).
-        # For Tier 2/3 first downloads, this is a miss and we proceed to download.
-        bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{minid.checksum}"
+        from deriva.bag.cache_index import BagCacheIndex
+
+        index = BagCacheIndex(self._ml_instance.cache_dir)
+
+        # Tier-1 hit: the index lookup in _get_dataset_minid set minid.checksum;
+        # the bag may already exist on disk from a prior download.
+        bag_root = index.bag_dir_for(minid.checksum)
+        bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
         if bag_dir.exists():
             self._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
-            return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+            return bag_dir
 
         # ----- Download the archive -------------------------------------------
         with TemporaryDirectory() as tmp_dir:
@@ -2879,16 +2892,21 @@ class Dataset:
             if not use_minid and not minid.checksum:
                 hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
                 checksum = hashes["sha256"][0]
-                bag_dir = self._ml_instance.cache_dir / f"{minid.dataset_rid}_{checksum}"
+                bag_root = index.bag_dir_for(checksum)
+                bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
                 if bag_dir.exists():
                     self._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
-                    return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+                    return bag_dir
+                # Rebind minid.checksum so the index record at the end of this
+                # method uses the SHA-256 cache key. ``DatasetMinid`` is
+                # immutable; rebuild it with the derived checksum.
+                minid = minid.model_copy(update={"checksums": [{"function": "sha256", "value": checksum}]})
 
             # ----- Extract to staging directory (atomic cache population) ------
             # Write to a temporary staging directory first. Only rename to the
             # final cache location after successful extraction and validation.
             # This prevents partial/corrupt cache entries if the process crashes.
-            staging_dir = self._ml_instance.cache_dir / f"{bag_dir.name}_staging"
+            staging_dir = bag_root.parent / f"{bag_root.name}_staging"
             if staging_dir.exists():
                 shutil.rmtree(staging_dir)
             staging_dir.mkdir(parents=True, exist_ok=True)
@@ -2899,8 +2917,20 @@ class Dataset:
                 shutil.rmtree(staging_dir, ignore_errors=True)
                 raise
 
-        # Atomic move: staging → final cache location.
-        staging_dir.rename(bag_dir)
+        # Atomic move: staging → final cache location. The bag directory's
+        # parent (``cache_root/bags/{checksum}``) is created by the rename.
+        bag_root.parent.mkdir(parents=True, exist_ok=True)
+        staging_dir.rename(bag_root)
+
+        # Record the bag in the index so the next Tier-1 lookup finds it.
+        try:
+            index.record(
+                checksum=minid.checksum,
+                anchors=[("Dataset", minid.dataset_rid)],
+                anchor_summary={"version": str(minid.dataset_version)},
+            )
+        finally:
+            index.dispose()
 
         # Clean up the client_export temp directory for local file:// bags.
         # After extraction to cache, the original archive is no longer needed.
@@ -2909,7 +2939,7 @@ class Dataset:
             if "client_export" in export_dir.parts:
                 shutil.rmtree(export_dir, ignore_errors=True)
 
-        return Path(bag_dir / f"Dataset_{minid.dataset_rid}")
+        return bag_dir
 
     def _create_dataset_minid(
         self,
@@ -3000,243 +3030,54 @@ class Dataset:
                 version_path.update([{"RID": version_rid, "Minid": minid_page_url, "Minid_Spec_Hash": spec_hash}])
                 return minid_page_url
             else:
-                # Client-side download: runs queries locally with paged query support
-                # for automatic retry on query timeout errors. This avoids server-side
-                # export lock contention and gives better control over query execution.
-                return self._create_dataset_bag_client(version, spec, timeout=timeout)
-
-    def _create_dataset_bag_client(
-        self, version: DatasetVersion, spec: dict, timeout: tuple[int, int] | None = None
-    ) -> str:
-        """Create a dataset bag using client-side download.
-
-        Executes ERMrest queries directly using ErmrestCatalog.get_as_file() with
-        paged query support, building a BDBag from the results.
-
-        If any CSV data query fails (e.g., due to server-side query timeouts on deep
-        multi-table joins), the method raises a DerivaMLException listing the failed
-        tables and suggesting that the user add those records as direct dataset members.
-
-        Args:
-            version: The dataset version to export.
-            spec: The download specification dict (from generate_dataset_download_spec).
-
-        Returns:
-            str: A file:// URI pointing to the generated bag zip archive.
-
-        Raises:
-            DerivaMLException: If any data query fails during export.
-        """
-        import uuid
-
-        from deriva.core import DEFAULT_SESSION_CONFIG, DerivaServer, get_credential
-
-        snapshot_catalog_id = self._version_snapshot_catalog_id(version)
-        hostname = self._ml_instance.catalog.deriva_server.server
-        protocol = self._ml_instance.catalog.deriva_server.scheme
-
-        # Connect to the snapshot catalog with optional custom timeout
-        credentials = get_credential(hostname)
-        session_config = None
-        if timeout:
-            session_config = dict(DEFAULT_SESSION_CONFIG)
-            session_config["timeout"] = timeout
-        server = DerivaServer(protocol, hostname, credentials=credentials, session_config=session_config)
-        catalog = server.connect_ermrest(snapshot_catalog_id)
-
-        # Build bag in a persistent directory (survives for _download_dataset_minid)
-        tmp_dir = Path(self._ml_instance.working_dir) / "client_export" / str(uuid.uuid4())[:8]
-        tmp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Format environment variables
-        envars = {"RID": self.dataset_rid}
-        bag_config = spec.get("bag", {})
-        bag_name = bag_config.get("bag_name", f"Dataset_{self.dataset_rid}").format(**envars)
-        bag_path = tmp_dir / bag_name
-        bag_algorithms = bag_config.get("bag_algorithms", ["md5"])
-
-        # Create the bag
-        bdb.ensure_bag_path_exists(str(bag_path))
-        bag = bdb.make_bag(str(bag_path), algs=bag_algorithms, idempotent=True)
-
-        # Process query_processors from the spec
-        query_processors = spec.get("catalog", {}).get("query_processors", [])
-        failed_queries = []
-        skipped_empty = []
-        fetch_entries: dict[str, tuple[str, str, str, str]] = {}  # asset_rid -> (url, length, rel_path, md5)
-
-        for qp in query_processors:
-            processor_name = qp.get("processor", "")
-            params = qp.get("processor_params", {})
-
-            if processor_name == "env":
-                # Environment variable processors — execute and capture values
-                query_path = params.get("query_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                query_keys = params.get("query_keys", [])
+                # Client-side bag construction: drive CatalogBagBuilder.build()
+                # via DatasetBagBuilder.build_bag against the snapshot catalog.
+                # The pre-computed ``spec`` argument is vestigial on this arm
+                # (CatalogBagBuilder recomputes its own spec from the same
+                # anchors/policy); we keep the parameter on the method signature
+                # because the MINID arm above still consumes it.
+                #
+                # The bag is built into a working subdirectory under
+                # ``working_dir/client_export/`` (NOT ``tmp_dir``) so the zip
+                # survives the ``TemporaryDirectory`` cleanup at the end of
+                # this method — the caller (``_download_dataset_minid``)
+                # consumes the file:// URI returned here. The cleanup path in
+                # ``_download_dataset_minid`` recognizes ``client_export`` in
+                # the archive's parent and removes it after extraction.
+                version_snapshot_catalog = self._version_snapshot_catalog(version)
+                builder = DatasetBagBuilder(
+                    ml_instance=version_snapshot_catalog,
+                    s3_bucket=self._ml_instance.s3_bucket,
+                    use_minid=False,
+                    exclude_tables=exclude_tables,
+                )
+                client_export_dir = (
+                    Path(self._ml_instance.working_dir) / "client_export" / spec_hash[:8]
+                )
+                client_export_dir.mkdir(parents=True, exist_ok=True)
                 try:
-                    if query_path == "/":
-                        # Root query returns catalog metadata including snaptime
-                        resp = catalog.get("/").json()
-                    else:
-                        resp = catalog.get(query_path).json()
-                    if isinstance(resp, list) and resp:
-                        resp = resp[0]
-                    if resp and query_keys:
-                        for key in query_keys:
-                            if key in resp:
-                                envars[key] = resp[key]
-                except Exception as e:
-                    self._logger.warning("Failed to execute env query %s: %s", query_path, e)
-
-            elif processor_name == "json":
-                # JSON query (e.g., schema dump)
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                # Output path becomes filename with .json extension
-                dest_file = bag_path / "data" / (output_path + ".json")
-                dest_file.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    resp = catalog.get(query_path).json()
-                    dest_file.write_text(json.dumps(resp, indent=2), encoding="utf-8")
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Failed to download {output_path} from snapshot catalog ({query_path}): {e}"
-                    ) from e
-
-            elif processor_name == "csv":
-                # Data query — use paged mode for resilience
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                paged = params.get("paged_query", False)
-
-                dest_dir = bag_path / "data" / output_path
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                dest_file = str(dest_dir) + ".csv"
-
-                try:
-                    catalog.get_as_file(
-                        query_path,
-                        dest_file,
-                        headers={"accept": "text/csv"},
-                        delete_if_empty=True,
-                        paged=paged,
-                        page_size=100000,
+                    zip_path = builder.build_bag(self, output_dir=client_export_dir, timeout=timeout)
+                except (
+                    DerivaDownloadError,
+                    DerivaDownloadConfigurationError,
+                    DerivaDownloadAuthenticationError,
+                    DerivaDownloadAuthorizationError,
+                    DerivaDownloadTimeoutError,
+                ) as e:
+                    # Preserve the actionable-message contract callers relied on
+                    # from the legacy _create_dataset_bag_client. The original
+                    # advice (add direct dataset members for tables whose deep
+                    # FK joins timed out) still applies — surface it alongside
+                    # the deriva-py error so users have a fix to try.
+                    raise DerivaMLException(
+                        f"Dataset bag export failed: {format_exception(e)}. "
+                        "This typically happens when deep multi-table joins "
+                        "exceed server query time limits. To fix this, add the "
+                        "desired records as direct dataset members using "
+                        "add_dataset_members() with the relevant table's RIDs."
                     )
-                    if not os.path.isfile(dest_file):
-                        skipped_empty.append(output_path)
-                except Exception as e:
-                    # Tolerate individual query failures — log and continue.
-                    # This handles snapshot catalog timeouts for large joins.
-                    self._logger.warning(
-                        "Query failed for %s (will be missing from bag): %s",
-                        output_path,
-                        e,
-                    )
-                    failed_queries.append(output_path)
-                    # Clean up partial file if it exists
-                    if os.path.isfile(dest_file):
-                        os.remove(dest_file)
 
-            elif processor_name == "fetch":
-                # Asset file references — write entries to fetch.txt for lazy materialization.
-                # The actual binary files are downloaded later by bdbag.materialize() when
-                # materialize=True is set on download_dataset_bag().
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-
-                try:
-                    resp = catalog.get(query_path).json()
-                    for record in resp:
-                        url = record.get("url")
-                        filename = record.get("filename", "unknown")
-                        length = record.get("length", "")
-                        md5 = record.get("md5", "")
-                        asset_rid = record.get("asset_rid", "unknown")
-                        if not url:
-                            continue
-                        # Build the full URL for the asset
-                        if url.startswith("/"):
-                            asset_url = f"{protocol}://{hostname}{url}"
-                        else:
-                            asset_url = url
-                        # Build relative path within bag data directory
-                        file_output_path = output_path.format(asset_rid=asset_rid)
-                        rel_path = f"data/{file_output_path}/{filename}"
-                        # Deduplicate by asset RID — the same asset may be
-                        # reachable via multiple FK paths; keep the first entry
-                        # (all paths produce the same URL and file content).
-                        if asset_rid not in fetch_entries:
-                            fetch_entries[asset_rid] = (asset_url, length, rel_path, md5)
-                except Exception as e:
-                    self._logger.warning("Asset query failed for %s: %s", output_path, e)
-
-        # Remove empty directories left behind by empty/failed queries
-        for dirpath, dirnames, filenames in os.walk(str(bag_path / "data"), topdown=False):
-            if not dirnames and not filenames:
-                try:
-                    os.rmdir(dirpath)
-                except OSError:
-                    pass
-
-        if failed_queries:
-            # Extract table names from output paths (format: "schema/table")
-            failed_tables = [q.rsplit("/", 1)[-1] if "/" in q else q for q in failed_queries]
-            raise DerivaMLException(
-                f"Dataset bag export failed: {len(failed_queries)} queries timed out or "
-                f"failed for tables: {failed_tables}. "
-                f"This typically happens when deep multi-table joins exceed server query "
-                f"time limits. To fix this, add the desired records as direct dataset "
-                f"members using add_dataset_members() with the relevant table's RIDs. "
-                f"For example, if Image data is missing, register Image as a dataset "
-                f"element type (add_dataset_element_type('Image')) and add Image RIDs "
-                f"as members so they are exported via a direct association path rather "
-                f"than a deep FK join. Failed paths: {failed_queries}"
-            )
-
-        # Write remote file manifest for BDBag to generate fetch.txt.
-        # The manifest must be a JSON-stream file (one JSON object per line)
-        # with url, length, filename (without data/ prefix), and a hash.
-        # Passing it to make_bag(remote_file_manifest=...) ensures fetch.txt
-        # is generated correctly and not destroyed by make_bag(update=True).
-        remote_manifest_path = None
-        if fetch_entries:
-            remote_manifest_path = str(bag_path / "remote-file-manifest.json")
-            with open(remote_manifest_path, "w", encoding="utf-8") as f:
-                for url, length, rel_path, md5 in fetch_entries.values():
-                    # rel_path has "data/" prefix; bdbag expects filename without it
-                    filename = rel_path.removeprefix("data/")
-                    entry = {
-                        "url": url,
-                        "length": int(length) if length else 0,
-                        "filename": filename,
-                    }
-                    if md5:
-                        entry["md5"] = md5
-                    f.write(json.dumps(entry) + "\n")
-            self._logger.info("Wrote %d remote file manifest entries", len(fetch_entries))
-
-        # Update and archive the bag
-        bdb.make_bag(
-            str(bag_path),
-            algs=bag_algorithms,
-            remote_file_manifest=remote_manifest_path,
-            update=True,
-            idempotent=True,
-        )
-        archive_path = bdb.archive_bag(str(bag_path), bag_config.get("bag_archiver", "zip"))
-        return Path(archive_path).as_uri()
+                return zip_path.as_uri()
 
     def _get_dataset_minid(
         self,
@@ -3339,38 +3180,53 @@ class Dataset:
         cache_suffix = f"{spec_hash[:16]}_{snapshot}"
 
         # =====================================================================
-        # Tier 1: Local deterministic cache (filesystem lookup, no network).
+        # Tier 1: Local deterministic cache (index lookup, no network).
         #
         # Look for a cached bag with BOTH the same spec_hash and snapshot.
         # A snapshot-only match would return stale bags created before schema
         # changes (e.g., new tables added to the FK traversal).
+        #
+        # Post-cutover layout (docs/design/bag-client-cutover-2026-05.md):
+        # bags are recorded in ``BagCacheIndex`` (SQLite reverse index) and
+        # stored at ``{cache_dir}/bags/{checksum}/Dataset_{rid}/``.
         # =====================================================================
-        cache_dir_name = f"{self.dataset_rid}_{cache_suffix}"
-        cached_dir = self._ml_instance.cache_dir / cache_dir_name
-        cached_bag_path = cached_dir / f"Dataset_{self.dataset_rid}"
-        if cached_bag_path.exists():
-            self._logger.info(
-                "Local cache hit for %s version %s (spec+snapshot match: %s)",
-                self.dataset_rid,
-                version,
-                cache_dir_name,
+        from deriva.bag.cache_index import BagCacheIndex
+
+        index = BagCacheIndex(self._ml_instance.cache_dir)
+        try:
+            cached_checksums = index.find_bags_for_rid(table="Dataset", rid=self.dataset_rid)
+        finally:
+            index.dispose()
+
+        if cache_suffix in cached_checksums:
+            # Re-open the index in a short scope to compute the bag path.
+            cached_bag_path = (
+                BagCacheIndex(self._ml_instance.cache_dir).bag_dir_for(cache_suffix)
+                / f"Dataset_{self.dataset_rid}"
             )
-            # ``DatasetVersion.snapshot`` is ``str | None`` — a
-            # version without an associated snapshot is legitimate
-            # (e.g. an in-progress dataset that hasn't been
-            # snapshotted yet). The ``DatasetMinid.RID`` pattern
-            # accepts both ``{rid}`` and ``{rid}@{snap}``; only
-            # append the snapshot segment when there's a real
-            # snapshot to point at. Without this guard the
-            # f-string produces ``{rid}@None`` which fails the
-            # pattern validator with a cryptic regex error.
-            version_rid = f"{self.dataset_rid}@{snapshot}" if snapshot is not None else self.dataset_rid
-            return DatasetMinid(
-                dataset_version=version,
-                RID=version_rid,
-                location=cached_bag_path.parent.as_uri(),
-                checksums=[{"function": "sha256", "value": cache_suffix}],
-            )
+            if cached_bag_path.exists():
+                self._logger.info(
+                    "Local cache hit for %s version %s (spec+snapshot match: %s)",
+                    self.dataset_rid,
+                    version,
+                    cache_suffix,
+                )
+                # ``DatasetVersion.snapshot`` is ``str | None`` — a
+                # version without an associated snapshot is legitimate
+                # (e.g. an in-progress dataset that hasn't been
+                # snapshotted yet). The ``DatasetMinid.RID`` pattern
+                # accepts both ``{rid}`` and ``{rid}@{snap}``; only
+                # append the snapshot segment when there's a real
+                # snapshot to point at. Without this guard the
+                # f-string produces ``{rid}@None`` which fails the
+                # pattern validator with a cryptic regex error.
+                version_rid = f"{self.dataset_rid}@{snapshot}" if snapshot is not None else self.dataset_rid
+                return DatasetMinid(
+                    dataset_version=version,
+                    RID=version_rid,
+                    location=cached_bag_path.parent.as_uri(),
+                    checksums=[{"function": "sha256", "value": cache_suffix}],
+                )
 
         # =====================================================================
         # Tier 2: MINID / S3 download (use_minid=True only).
@@ -3464,11 +3320,18 @@ class Dataset:
         """Materialize a dataset bag by downloading all referenced files.
 
         This method downloads a BDBag and then "materializes" it by fetching
-        all files referenced in the bag's fetch.txt manifest. This includes
-        data files, assets, and any other content referenced by the bag.
+        all files referenced in the bag's ``fetch.txt`` manifest. This
+        includes data files, assets, and any other content referenced by
+        the bag.
 
-        Progress is reported through callbacks that update the execution status
-        if this download is associated with an execution.
+        Progress is reported through callbacks that update the execution
+        status if this download is associated with an execution.
+
+        Materialization status is determined by directly inspecting whether
+        every ``fetch.txt`` entry has a corresponding local file (via
+        :meth:`BagCache._is_fully_materialized`) — there is no separate
+        marker file. A cache that says "materialized" but is missing files
+        is treated as not-materialized and re-fetched.
 
         Args:
             minid: DatasetMinid containing the bag URL and metadata.
@@ -3476,10 +3339,6 @@ class Dataset:
 
         Returns:
             Path: The path to the fully materialized bag directory.
-
-        Note:
-            Materialization status is cached via a 'validated_check.txt' marker
-            file to avoid re-downloading already-materialized bags.
         """
 
         def fetch_progress_callback(current, total):
@@ -3492,27 +3351,17 @@ class Dataset:
             self._logger.info(msg)
             return True
 
-        # request metadata
         bag_path = self._download_dataset_minid(minid, use_minid)
-        bag_dir = bag_path.parent
-        validated_check = bag_dir / "validated_check.txt"
 
-        # If this bag has already been validated, verify completeness using bdbag before trusting the cache.
-        # This guards against caches that were marked valid but have missing fetch.txt assets.
-        if validated_check.exists():
-            from deriva_ml.dataset.bag_cache import BagCache
+        # If the bag already has every fetch.txt entry resolved, skip the
+        # materialize call — there's nothing to download.
+        from deriva_ml.dataset.bag_cache import BagCache
 
-            if BagCache._is_fully_materialized(bag_path):
-                self._logger.info(
-                    f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} verified as complete."
-                )
-                return Path(bag_path)
-            else:
-                self._logger.warning(
-                    f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} is incomplete "
-                    f"(fetch.txt entries missing). Re-materializing."
-                )
-                validated_check.unlink(missing_ok=True)
+        if BagCache._is_fully_materialized(bag_path):
+            self._logger.info(
+                f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} already materialized."
+            )
+            return Path(bag_path)
 
         self._logger.info(f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}")
         # Ensure parent directories exist for all fetch entries
@@ -3530,5 +3379,4 @@ class Dataset:
             validation_callback=validation_progress_callback,
             fetch_concurrency=fetch_concurrency,
         )
-        validated_check.touch()
         return Path(bag_path)

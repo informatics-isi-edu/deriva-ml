@@ -23,7 +23,6 @@ from deriva_ml.execution.state_machine import (
 )
 from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.core.logging_config import get_logger
-from deriva_ml.execution.upload_engine import run_upload_engine
 
 logger = get_logger(__name__)
 
@@ -39,8 +38,7 @@ if TYPE_CHECKING:
         WorkflowSummary,
     )
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
-    from deriva_ml.execution.upload_engine import UploadReport
-    from deriva_ml.execution.upload_job import UploadJob
+    from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
     from deriva_ml.model.catalog import DerivaModel
@@ -760,14 +758,45 @@ class ExecutionMixin:
         """Blocking upload of pending state for selected executions.
 
         Flushes all pending rows (catalog inserts, asset uploads) for the
-        named executions to the live catalog. Blocks until complete. For a
-        non-blocking version that returns a job handle, use
-        :meth:`_start_upload`. Online mode only.
+        named executions to the live catalog. Blocks until complete.
+        Online mode only.
+
+        Implementation: drives
+        :meth:`Execution._bag_commit_upload` per execution. Each call
+        builds an execution-scoped bag (via
+        :func:`~deriva_ml.execution.bag_commit.build_execution_bag`) and
+        hands it to
+        :class:`~deriva.bag.catalog_loader.BagCatalogLoader` for FK-safe
+        row insertion plus asset upload via
+        :meth:`DerivaUpload._hatracUpload`. The bag pipeline replaced
+        the legacy SQLite-queued row-drain engine in Phase 2 Steps
+        11+12 + WI2 (see ``docs/design/bag-client-cutover-2026-05.md``).
+
+        Failure isolation is per-execution: a load failure on execution
+        A does not skip execution B; both outcomes appear in the
+        returned :class:`UploadReport`. The blocking call returns even
+        when one or more executions failed; callers check
+        ``report.total_failed`` and ``report.errors`` for diagnosis.
+
+        Non-blocking variant retired in WI2 — for survive-process
+        uploads run ``deriva-ml upload`` as a subprocess instead of
+        invoking from inside Python.
 
         Args:
-            execution_rids: List of RIDs, or None to drain every execution
-                that has pending work.
-            retry_failed: Include rows in status='failed'.
+            execution_rids: List of RIDs, or None to drain every
+                execution that has pending work in the workspace
+                registry.
+            retry_failed: Currently no-op under the bag pipeline. The
+                legacy engine retried per-row failures from a SQLite
+                ``status='failed'`` queue; the bag pipeline retries by
+                re-running the whole bag-commit (idempotent under
+                ``BagCatalogLoader``'s ``match_by_columns`` dedup), so
+                the per-row distinction doesn't apply. Kept on the
+                signature for API stability — callers may continue to
+                pass ``retry_failed=True`` and will simply re-run the
+                bag-commit, which already handles partial-success
+                cases by virtue of FK-safe ordering + match-by-columns
+                row dedup on the destination.
 
         Returns:
             UploadReport with totals + per-table counts + error lines.
@@ -777,43 +806,63 @@ class ExecutionMixin:
             >>> print(f"{report.total_uploaded} uploaded, "
             ...       f"{report.total_failed} failed")
         """
-        return run_upload_engine(
-            ml=self,
-            execution_rids=execution_rids,
-            retry_failed=retry_failed,
-        )
+        from deriva_ml.core.exceptions import DerivaMLException
+        from deriva_ml.execution.upload_report import UploadReport
 
-    def _start_upload(
-        self,
-        *,
-        execution_rids: "list[RID] | None" = None,
-        retry_failed: bool = False,
-    ) -> "UploadJob":
-        """Non-blocking upload — returns an UploadJob to poll / wait.
+        del retry_failed  # See docstring — no-op under bag pipeline.
 
-        Spawns a daemon thread in the current process. If the process
-        exits, the thread dies. For survive-process uploads, run
-        ``deriva-ml upload`` from a shell (see CLI, Group H).
+        # Enumerate executions to drain. Caller-supplied list wins; an
+        # empty caller-supplied list is treated as "drain nothing." A
+        # ``None`` caller-supplied list means "drain every execution
+        # in the workspace registry."
+        store = self.workspace.execution_state_store()
+        if execution_rids is None:
+            rids = [row["rid"] for row in store.list_executions()]
+        else:
+            rids = list(execution_rids)
 
-        Args: identical to upload_pending.
+        total_uploaded = 0
+        total_failed = 0
+        per_table: dict[str, dict[str, int]] = {}
+        errors: list[str] = []
 
-        Returns:
-            An UploadJob; call job.wait() to block, job.progress() to
-            poll, job.cancel() to stop.
+        for rid in rids:
+            try:
+                execution = self.resume_execution(rid)  # type: ignore[attr-defined]
+            except Exception as e:
+                # Couldn't resume the execution at all (workspace
+                # missing, registry corruption, etc.). Record and move
+                # on — sibling executions may still drain cleanly.
+                total_failed += 1
+                errors.append(f"execution {rid}: resume failed: {e}")
+                continue
+            try:
+                execution._bag_commit_upload()
+            except DerivaMLException as e:
+                total_failed += 1
+                errors.append(f"execution {rid}: bag-commit failed: {e}")
+                continue
+            except Exception as e:  # noqa: BLE001 — surface unexpected failures into the report
+                total_failed += 1
+                errors.append(f"execution {rid}: bag-commit raised: {e!r}")
+                continue
+            # Bag-commit succeeded. The execution's manifest was
+            # marked uploaded inside ``_bag_commit_upload``; we don't
+            # have direct visibility into per-row counts here because
+            # ``_bag_commit_upload`` doesn't return the loader's
+            # ``LoadReport``. The conservative aggregation is "this
+            # execution drained; count it as one successful drain."
+            # Per-table breakdown is left empty for successful drains
+            # until ``_bag_commit_upload`` exposes the underlying
+            # ``LoadReport`` to callers.
+            total_uploaded += 1
 
-        Example:
-            >>> job = ml._start_upload()  # doctest: +SKIP
-            >>> while job.status == "running":
-            ...     time.sleep(5)
-            ...     print(job.progress())
-            >>> report = job.wait()
-        """
-        from deriva_ml.execution.upload_job import UploadJob
-
-        return UploadJob(
-            ml=self,
-            execution_rids=execution_rids,
-            retry_failed=retry_failed,
+        return UploadReport(
+            execution_rids=rids,
+            total_uploaded=total_uploaded,
+            total_failed=total_failed,
+            per_table=per_table,
+            errors=errors,
         )
 
     # ------------------------------------------------------------------

@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML  # noqa: F401
     from deriva_ml.execution.pending_summary import PendingSummary
-    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_report import UploadReport
 
 
 class ExecutionSnapshot(BaseModel):

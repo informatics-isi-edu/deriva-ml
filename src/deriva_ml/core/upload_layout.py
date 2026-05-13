@@ -74,13 +74,20 @@ from deriva_ml.core.logging_config import get_logger
 
 NULL_SENTINEL = "__NULL__"
 """Directory-segment marker for nullable asset-metadata columns with
-no value. Written into the staging tree by ``_invoke_deriva_py_uploader``
-(in ``upload_engine.py``) and translated back to Python ``None`` by
+no value.
+
+The legacy upload path (retired in WI2 along with ``upload_engine.py``)
+wrote this sentinel into the staging tree and relied on
 :class:`deriva_ml.asset.null_sentinel_processor.NullSentinelProcessor`
-before deriva-py builds the catalog insert. The bag-based commit path
-(see :mod:`deriva_ml.execution.bag_commit`) skips this dance entirely —
+to translate it back to Python ``None`` before deriva-py built the
+catalog insert. The bag-based commit path
+(:mod:`deriva_ml.execution.bag_commit`) skips this dance entirely —
 it builds row dicts with real ``None`` values and hands them to
-:class:`deriva.bag.BagBuilder`. See Bug C design doc."""
+:class:`deriva.bag.BagBuilder`. ``NULL_SENTINEL`` remains because
+``upload_directory()`` (cifar-load / model-template / external
+operator scripts) still uses ``GenericUploader`` directly with the
+filesystem-pattern recipe, and that recipe requires a non-empty
+directory segment for every captured group. See Bug C design doc."""
 
 # Use os.path.sep for OS-agnostic paths in regex patterns
 SEP = re.escape(os.path.sep)

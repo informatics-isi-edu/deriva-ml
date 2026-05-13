@@ -1,6 +1,5 @@
 """Tests for BagCache — cache status detection for downloaded dataset bags."""
 
-import hashlib
 import pytest
 from pathlib import Path
 from deriva_ml.dataset.bag_cache import (
@@ -33,91 +32,94 @@ def _make_valid_bag(bag_path: Path, files: dict[str, str] | None = None) -> None
     bdb.make_bag(str(bag_path), algs=["sha256"], idempotent=True)
 
 
+def _record_bag(cache_dir: Path, dataset_rid: str, checksum: str) -> Path:
+    """Register a bag in the cache index and return its bag directory path.
+
+    Post-cutover layout (docs/design/bag-client-cutover-2026-05.md):
+
+    ``{cache_dir}/bags/{checksum}/Dataset_{rid}/``
+
+    The caller is responsible for creating bag contents (bagit.txt, data/,
+    manifest-*, fetch.txt) inside the returned directory.
+    """
+    from deriva.bag.cache_index import BagCacheIndex
+
+    with BagCacheIndex(cache_dir) as index:
+        bag_dir = index.bag_dir_for(checksum) / f"Dataset_{dataset_rid}"
+        bag_dir.mkdir(parents=True, exist_ok=True)
+        index.record(
+            checksum=checksum,
+            anchors=[("Dataset", dataset_rid)],
+        )
+    return bag_dir
+
+
 class TestCacheStatus:
-    """Test BagCache.cache_status with various cache states."""
+    """Test BagCache.cache_status with various cache states (post-cutover layout)."""
 
     def test_not_cached(self, tmp_path):
-        """Returns not_cached when no bag directory exists."""
+        """Returns not_cached when no bag is recorded in the index."""
         cache = BagCache(tmp_path)
         result = cache.cache_status("XXXX")
         assert result["status"] == CacheStatus.not_cached.value
         assert result["cache_path"] is None
         assert result["versions_cached"] == []
 
-    def test_cached_metadata_only(self, tmp_path):
-        """Returns cached_metadata_only when bag exists but no validated_check."""
-        # Create a bag directory with fetch.txt containing unresolved entries
-        bag_dir = tmp_path / "XXXX_abc123"
-        bag_path = bag_dir / "Dataset_XXXX"
-        bag_path.mkdir(parents=True)
-
-        # Create a minimal bag structure
-        (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
-        data_dir = bag_path / "data"
-        data_dir.mkdir()
-
-        # Create fetch.txt with an unresolved entry
-        (bag_path / "fetch.txt").write_text("https://example.com/file.dat\t100\tdata/file.dat\n")
-
-        # Create manifest (required for bag validation)
-        (bag_path / "manifest-sha256.txt").write_text("")
-
-        cache = BagCache(tmp_path)
-        result = cache.cache_status("XXXX")
-        assert result["status"] == CacheStatus.cached_metadata_only.value
-        assert result["cache_path"] is not None
-        assert "XXXX_abc123" in result["versions_cached"][0]
-
     def test_cached_materialized(self, tmp_path):
-        """Returns cached_materialized when bag is fully downloaded."""
-        bag_dir = tmp_path / "XXXX_abc123"
-        bag_path = bag_dir / "Dataset_XXXX"
-        _make_valid_bag(bag_path, files={"file.dat": "test data"})
-
-        # Mark as validated
-        (bag_dir / "validated_check.txt").touch()
+        """Index entry + on-disk bag with no missing files → cached_materialized."""
+        bag_dir = _record_bag(tmp_path, dataset_rid="XXXX", checksum="abc123")
+        _make_valid_bag(bag_dir, files={"file.dat": "test data"})
 
         cache = BagCache(tmp_path)
         result = cache.cache_status("XXXX")
         assert result["status"] == CacheStatus.cached_materialized.value
         assert result["cache_path"] is not None
+        assert "abc123" in result["versions_cached"]
 
-    def test_cached_incomplete(self, tmp_path):
-        """Returns cached_incomplete when validated_check exists but files are missing."""
-        bag_dir = tmp_path / "XXXX_abc123"
-        bag_path = bag_dir / "Dataset_XXXX"
-        bag_path.mkdir(parents=True)
+    def test_cached_holey(self, tmp_path):
+        """Index entry + on-disk bag with unresolved fetch.txt entries → cached_holey."""
+        bag_dir = _record_bag(tmp_path, dataset_rid="XXXX", checksum="abc123")
 
-        # Create bag structure
-        (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
-        data_dir = bag_path / "data"
-        data_dir.mkdir()
-        (bag_path / "manifest-sha256.txt").write_text("")
-
-        # fetch.txt references a file that doesn't exist
-        (bag_path / "fetch.txt").write_text("https://example.com/missing.dat\t100\tdata/missing.dat\n")
-
-        # Has validated_check but file is missing
-        (bag_dir / "validated_check.txt").touch()
+        # Build a minimal bag whose fetch.txt references a missing file.
+        bag_dir.mkdir(parents=True, exist_ok=True)
+        (bag_dir / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
+        data_dir = bag_dir / "data"
+        data_dir.mkdir(exist_ok=True)
+        (bag_dir / "manifest-sha256.txt").write_text("")
+        (bag_dir / "fetch.txt").write_text(
+            "https://example.com/missing.dat\t100\tdata/missing.dat\n"
+        )
 
         cache = BagCache(tmp_path)
         result = cache.cache_status("XXXX")
-        assert result["status"] == CacheStatus.cached_incomplete.value
+        assert result["status"] == CacheStatus.cached_holey.value
+
+    def test_index_entry_without_bag_directory(self, tmp_path):
+        """Index claims cached but bag directory missing → not_cached.
+
+        Surfaces the case where someone deleted ``bags/{checksum}/`` by hand
+        but the index entry remained. The status check reads the disk, not
+        just the index.
+        """
+        # Record without creating the bag directory.
+        from deriva.bag.cache_index import BagCacheIndex
+
+        with BagCacheIndex(tmp_path) as index:
+            index.record(checksum="abc123", anchors=[("Dataset", "XXXX")])
+
+        cache = BagCache(tmp_path)
+        result = cache.cache_status("XXXX")
+        assert result["status"] == CacheStatus.not_cached.value
 
     def test_multiple_cached_versions(self, tmp_path):
-        """Returns info about all cached versions."""
-        # Create two bag directories for the same dataset
-        for checksum in ["abc123", "def456"]:
-            bag_dir = tmp_path / f"XXXX_{checksum}"
-            bag_path = bag_dir / "Dataset_XXXX"
-            bag_path.mkdir(parents=True)
-            (bag_path / "bagit.txt").write_text("BagIt-Version: 1.0\nTag-File-Character-Encoding: UTF-8\n")
-            (bag_path / "data").mkdir()
-            (bag_path / "manifest-sha256.txt").write_text("")
+        """Multiple cache entries for the same dataset surface in versions_cached."""
+        for checksum in ("abc123", "def456"):
+            bag_dir = _record_bag(tmp_path, dataset_rid="XXXX", checksum=checksum)
+            _make_valid_bag(bag_dir)
 
         cache = BagCache(tmp_path)
         result = cache.cache_status("XXXX")
-        assert len(result["versions_cached"]) == 2
+        assert set(result["versions_cached"]) == {"abc123", "def456"}
 
 
 class TestIsFullyMaterialized:
@@ -155,21 +157,15 @@ class TestCacheStatusEnum:
     def test_holey_and_incomplete_alias_to_same_member(self):
         """``cached_incomplete`` resolves to the same member as ``cached_holey``.
 
-        This is the back-compat path: pre-migration code used
-        ``cached_incomplete``; the renamed term is ``cached_holey``
-        (per CONTEXT.md vocabulary). StrEnum aliasing lets both
-        names resolve to one member with the new wire value.
+        Back-compat: callers writing ``cached_incomplete`` get the renamed
+        ``cached_holey`` member. StrEnum aliasing keeps both names usable.
         """
         assert CacheStatus.cached_incomplete is CacheStatus.cached_holey
-        # Value is the new term — clients writing the wire value get
-        # the new name on disk.
         assert CacheStatus.cached_holey.value == "cached_holey"
         assert CacheStatus.cached_incomplete.value == "cached_holey"
 
     def test_str_enum_string_comparison(self):
         """StrEnum members compare equal to their string values."""
-        # Callers like Dataset.bag_info compare against strings;
-        # the StrEnum migration preserves that semantics.
         assert CacheStatus.cached_materialized == "cached_materialized"
         assert CacheStatus.not_cached == "not_cached"
 
@@ -179,22 +175,14 @@ class TestBagCacheIndexIntegration:
 
     def test_recording_via_index_appears_in_cache_status(self, tmp_path):
         """A bag recorded in the index shows up via cache_status."""
-        from deriva.bag.cache_index import BagCacheIndex
-
-        # Set up the new-style on-disk layout: bags/{checksum}/bag
+        # Set up the post-cutover on-disk layout:
+        # ``cache_dir/bags/{checksum}/Dataset_{rid}/``
         cache = BagCache(tmp_path)
         try:
             checksum = "abc123"
-            # Construct an index against the same cache_dir; both
-            # BagCache and this BagCacheIndex point at the same
-            # SQLite file by convention.
-            with BagCacheIndex(tmp_path) as index:
-                bag_dir = index.bag_dir_for(checksum) / "bag"
-                _make_valid_bag(bag_dir)
-                index.record(
-                    checksum=checksum,
-                    anchors=[("Dataset", "DS1")],
-                )
+            bag_dir = _record_bag(tmp_path, dataset_rid="DS1", checksum=checksum)
+            _make_valid_bag(bag_dir)
+
             info = cache.cache_status("DS1")
             assert info["status"] in (
                 CacheStatus.cached_materialized.value,
@@ -204,5 +192,3 @@ class TestBagCacheIndexIntegration:
             assert checksum in info["versions_cached"]
         finally:
             cache.dispose()
-
-

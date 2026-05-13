@@ -45,7 +45,7 @@ from deriva.core import format_exception
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.execution.pending_summary import PendingSummary
-    from deriva_ml.execution.upload_engine import UploadReport
+    from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva.core.hatrac_store import HatracStore
 from pydantic import validate_call
@@ -1515,9 +1515,9 @@ class Execution:
             keys=list(pending.keys()),
         )
         self._logger.info(
-            "Commit bag loaded: %d rows inserted, %d asset bytes uploaded",
+            "Commit bag loaded: %d rows inserted, %d asset upload(s) attempted",
             report.total_rows_inserted,
-            sum(s.assets_uploaded for s in report.table_stats.values()),
+            sum(s.assets_attempted for s in report.table_stats.values()),
         )
         return asset_map
 

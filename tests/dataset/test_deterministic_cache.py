@@ -1,17 +1,21 @@
 """Tests for deterministic cache key (spec_hash + snapshot).
 
 The deterministic cache avoids re-downloading bags when the spec and snapshot
-haven't changed. The cache key is {rid}_{spec_hash[:16]}_{snapshot}, computed
-from the download spec JSON and the catalog snapshot ID.
+haven't changed. The cache key (a.k.a. ``checksum`` in :class:`BagCacheIndex`
+terms) is ``{spec_hash[:16]}_{snapshot}`` — computed from the download spec
+JSON and the catalog snapshot ID. The bag itself lives at
+``{cache_dir}/bags/{checksum}/Dataset_{rid}/`` (post-Steps-11+12 layout —
+see ``docs/design/bag-client-cutover-2026-05.md``).
 
 Tests verify:
-- First download creates deterministic cache entry
-- Second download hits cache without re-generating bag
-- Cache directory uses spec_hash+snapshot naming
-- Schema changes invalidate cache (new spec_hash)
-- New dataset version invalidates cache (new snapshot)
-- bag_info reflects deterministic cache status
-- Coexistence with old SHA-256 cache entries
+
+- First download records a checksum in :class:`BagCacheIndex` and writes
+  the bag at the indexed location.
+- Second download hits the index without re-generating the bag.
+- The checksum format is ``{spec_hash[:16]}_{snapshot}``.
+- Schema changes invalidate the cache (new spec_hash → new checksum).
+- New dataset version invalidates the cache (new snapshot → new checksum).
+- ``bag_info`` reflects index-backed cache status.
 """
 
 from __future__ import annotations
@@ -23,17 +27,38 @@ from pathlib import Path
 
 import pytest
 
+from deriva.bag.cache_index import BagCacheIndex
+
 from deriva_ml import DerivaML
 from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
 from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
 from tests.catalog_manager import CatalogManager
 
 
+def _index_checksums_for(ml: DerivaML, dataset_rid: str) -> list[str]:
+    """Return the list of cached-bag checksums recorded in the index.
+
+    Post-cutover the bag-cache is content-addressed and recorded in a
+    SQLite index alongside the bags themselves. Tests that previously
+    globbed the cache directory now consult the index instead.
+    """
+    with BagCacheIndex(ml.cache_dir) as index:
+        return list(index.find_bags_for_rid(table="Dataset", rid=dataset_rid))
+
+
 class TestDeterministicCacheKey:
     """Tests for the spec_hash+snapshot deterministic cache key."""
 
     def test_cache_dir_uses_deterministic_name(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """Downloaded bag directory name includes spec_hash prefix and snapshot."""
+        """Downloaded bag's index checksum is ``{spec_hash[:16]}_{snapshot}``.
+
+        Post-Steps-11+12 the bag lives at
+        ``{cache_dir}/bags/{checksum}/Dataset_{rid}/`` and the checksum is
+        looked up via :class:`BagCacheIndex` rather than a filesystem
+        glob. The deterministic-name invariant still holds — it just
+        applies to the index's checksum string, not a directory name
+        containing the dataset RID.
+        """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -41,21 +66,33 @@ class TestDeterministicCacheKey:
 
         bag = dataset.download_dataset_bag(version=version, use_minid=False)
 
-        # The cache directory should contain the dataset RID
-        cache_dirs = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
-        assert len(cache_dirs) >= 1, "Should have at least one cache entry"
+        # The index should record exactly one bag for this dataset.
+        checksums = _index_checksums_for(ml, dataset.dataset_rid)
+        assert len(checksums) >= 1, "Should have at least one cache entry"
 
-        # The newest cache dir should have a deterministic name pattern
-        # Format: {rid}_{spec_hash[:16]}_{snapshot}
-        newest = max(cache_dirs, key=lambda p: p.stat().st_mtime)
-        parts = newest.name.split("_", 1)
-        assert parts[0] == dataset.dataset_rid
-        # The suffix should contain both spec_hash prefix and snapshot
-        suffix = parts[1]
-        assert len(suffix) > 16, f"Cache dir suffix '{suffix}' should contain spec_hash + snapshot"
+        # Checksum format: ``{spec_hash[:16]}_{snapshot}``. spec_hash[:16]
+        # is 16 hex chars, then an underscore, then the snapshot — total
+        # length must exceed 16 (spec_hash) + 1 (underscore) + minimum
+        # snapshot length.
+        newest = checksums[0]  # find_bags_for_rid orders by built_at DESC
+        parts = newest.split("_", 1)
+        assert len(parts) == 2, f"Checksum '{newest}' should split into spec_hash and snapshot"
+        spec_hash, snapshot = parts
+        assert len(spec_hash) == 16, f"spec_hash prefix should be 16 hex chars, got {len(spec_hash)}: {spec_hash!r}"
+        assert snapshot, "snapshot portion must not be empty"
+
+        # The bag should physically exist at the indexed location.
+        with BagCacheIndex(ml.cache_dir) as index:
+            bag_dir = index.bag_dir_for(newest) / f"Dataset_{dataset.dataset_rid}"
+        assert bag_dir.exists(), f"Bag directory not found at indexed location: {bag_dir}"
 
     def test_second_download_skips_bag_generation(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """Second download with same version returns immediately from cache."""
+        """Second download with same version returns immediately from cache.
+
+        Post-cutover this is observable in the cache index: the second
+        download finds the existing checksum and shouldn't add another
+        entry for the same dataset RID.
+        """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -66,16 +103,16 @@ class TestDeterministicCacheKey:
         assert bag1 is not None
 
         # Record cache state
-        cache_dirs_after_first = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
+        checksums_after_first = _index_checksums_for(ml, dataset.dataset_rid)
 
         # Second download — should hit deterministic cache
         bag2 = dataset.download_dataset_bag(version=version, use_minid=False)
         assert bag2 is not None
 
-        # No new cache directories should have been created
-        cache_dirs_after_second = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
-        assert len(cache_dirs_after_second) == len(cache_dirs_after_first), (
-            "Second download should not create new cache directories"
+        # No new checksums should have been recorded in the index.
+        checksums_after_second = _index_checksums_for(ml, dataset.dataset_rid)
+        assert len(checksums_after_second) == len(checksums_after_first), (
+            "Second download should not create new cache entries"
         )
 
     def test_same_data_same_cache_key(self, catalog_manager: CatalogManager, tmp_path: Path):
@@ -96,7 +133,12 @@ class TestDeterministicCacheKey:
         assert info["status"] == CacheStatus.cached_materialized.value
 
     def test_new_version_creates_new_cache_entry(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """New dataset version creates a different cache entry (new snapshot)."""
+        """New dataset version creates a different index checksum (new snapshot).
+
+        Different snapshots → different checksums in the cache index, so
+        the index should record at least two distinct bag entries for
+        the same dataset RID after downloading both versions.
+        """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -116,9 +158,10 @@ class TestDeterministicCacheKey:
         # Download v2
         bag2 = dataset.download_dataset_bag(version=v2, use_minid=False)
 
-        # Should have at least 2 cache entries now
-        cache_dirs = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
-        assert len(cache_dirs) >= 2, f"Expected >=2 cache entries for different versions, got {len(cache_dirs)}"
+        # Should have at least 2 checksums in the index now — different
+        # snapshots produce different cache keys.
+        checksums = _index_checksums_for(ml, dataset.dataset_rid)
+        assert len(checksums) >= 2, f"Expected >=2 cache entries for different versions, got {len(checksums)}"
 
 
 class TestDeterministicCacheBagInfo:
@@ -168,7 +211,15 @@ class TestDeterministicCacheInvalidation:
     """Tests for cache invalidation when spec or snapshot changes."""
 
     def test_delete_cache_forces_redownload(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """Deleting cache directory forces full re-download."""
+        """Deleting cache directory forces full re-download.
+
+        Post-cutover the bag lives at ``{cache_dir}/bags/{checksum}/`` and
+        the index records the entry. Deleting the bag directory makes
+        :meth:`BagCache.cache_status` report ``not_cached`` (the index
+        still claims the bag exists, but :meth:`_determine_index_status`
+        notices the directory is gone). A re-download repopulates the
+        directory and re-records the entry.
+        """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -179,11 +230,14 @@ class TestDeterministicCacheInvalidation:
         info = dataset.bag_info(version=version)
         assert info["status"] == CacheStatus.cached_materialized.value
 
-        # Delete all cache entries for this dataset
-        for d in ml.cache_dir.glob(f"{dataset.dataset_rid}_*"):
-            shutil.rmtree(d)
+        # Delete the entire bags/ subtree to wipe every cached bag.
+        bags_root = ml.cache_dir / "bags"
+        if bags_root.exists():
+            shutil.rmtree(bags_root)
 
-        # Verify cache is gone
+        # Verify cache is gone (index entry survives but the directory
+        # doesn't, which surfaces as not_cached per the post-cutover
+        # BagCache semantics).
         info = dataset.bag_info(version=version)
         assert info["status"] == CacheStatus.not_cached.value
 
@@ -261,10 +315,23 @@ class TestStaleCacheInvalidation:
     def test_stale_cache_not_returned_after_schema_change(self, catalog_manager: CatalogManager, tmp_path: Path):
         """A cached bag with old spec_hash is NOT returned when spec changes.
 
+        Post-cutover, the Tier-1 lookup queries :class:`BagCacheIndex` for
+        the *exact* checksum ``{spec_hash[:16]}_{snapshot}`` the current
+        request would produce. A bag built under a different spec_hash
+        has a different checksum and therefore isn't matched, even if it
+        was recorded for the same dataset RID.
+
         Simulates the scenario:
-        1. Download bag → creates cache entry with spec_hash_A
-        2. Schema changes (new table added) → spec_hash_B
-        3. Second download must NOT hit the cache from step 1
+
+        1. Download bag → creates cache entry with checksum_A.
+        2. Schema changes (new table added) → spec_hash changes → checksum_B.
+        3. Second download must NOT hit the cache from step 1.
+
+        We synthesize step 2 by directly recording a stale entry in the
+        index for the same dataset RID with a different (wrong)
+        spec_hash but the same snapshot, then putting a STALE_MARKER in
+        the corresponding bag directory. The Tier-1 lookup should not
+        return that stale entry — only an exact-checksum match counts.
         """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
@@ -274,32 +341,28 @@ class TestStaleCacheInvalidation:
         # Step 1: Download to populate cache
         bag1 = dataset.download_dataset_bag(version=version, use_minid=False)
 
-        # Verify cache entry exists
-        cache_dirs = list(ml.cache_dir.glob(f"{dataset.dataset_rid}_*"))
-        assert len(cache_dirs) >= 1
-        original_cache_dir = cache_dirs[-1]  # Most recent
-        original_name = original_cache_dir.name
+        # Verify cache entry exists in the index
+        checksums = _index_checksums_for(ml, dataset.dataset_rid)
+        assert len(checksums) >= 1
+        # Format: ``{spec_hash[:16]}_{snapshot}``
+        original_checksum = checksums[0]
+        spec_hash, snapshot_part = original_checksum.split("_", 1)
 
-        # Step 2: Create a fake stale cache entry with same snapshot but
-        # different spec_hash (simulating what an old download would have
-        # produced before a schema change)
-        parts = original_name.split("_", 1)  # rid, rest
-        rid = parts[0]
-        # Extract the snapshot from the cache dir name
-        # Format: {rid}_{spec_hash[:16]}_{snapshot}
-        rest = parts[1]
-        # spec_hash is 16 hex chars, then underscore, then snapshot
-        old_spec_hash = rest[:16]
-        snapshot_part = rest[17:]  # skip spec_hash + underscore
-
-        # Create stale entry: different spec_hash, same snapshot
+        # Step 2: Record a *stale* index entry — same snapshot, different
+        # spec_hash. Without an exact-checksum match the Tier-1 lookup
+        # must not return this.
         stale_spec_hash = "0000000000000000"
-        assert stale_spec_hash != old_spec_hash  # Must differ
-        stale_dir = ml.cache_dir / f"{rid}_{stale_spec_hash}_{snapshot_part}"
-        stale_bag = stale_dir / f"Dataset_{rid}"
-        stale_bag.mkdir(parents=True, exist_ok=True)
-        # Put a marker file so we can detect if this stale entry was returned
-        (stale_bag / "STALE_MARKER").touch()
+        assert stale_spec_hash != spec_hash  # Must differ
+        stale_checksum = f"{stale_spec_hash}_{snapshot_part}"
+
+        with BagCacheIndex(ml.cache_dir) as index:
+            stale_bag_dir = index.bag_dir_for(stale_checksum) / f"Dataset_{dataset.dataset_rid}"
+            stale_bag_dir.mkdir(parents=True, exist_ok=True)
+            (stale_bag_dir / "STALE_MARKER").touch()
+            index.record(
+                checksum=stale_checksum,
+                anchors=[("Dataset", dataset.dataset_rid)],
+            )
 
         # Step 3: Download again — must hit the CORRECT cache, not the stale one
         bag2 = dataset.download_dataset_bag(version=version, use_minid=False)
@@ -311,33 +374,46 @@ class TestStaleCacheInvalidation:
         )
 
         # Clean up stale entry
-        shutil.rmtree(stale_dir, ignore_errors=True)
+        shutil.rmtree(stale_bag_dir.parent, ignore_errors=True)
 
     def test_snapshot_only_dir_not_matched(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """A cache entry matching only the snapshot suffix is NOT returned.
+        """A cache entry with matching snapshot but wrong spec_hash is NOT returned.
 
-        Ensures the fix works: the old glob pattern {rid}_*_{snapshot} would
-        match, but the new exact lookup {rid}_{spec_hash[:16]}_{snapshot} does not.
+        Post-cutover, the Tier-1 lookup queries :class:`BagCacheIndex` for
+        the *exact* checksum the current request would produce
+        (``{spec_hash[:16]}_{snapshot}``). A decoy entry recorded with a
+        same-snapshot-but-different-spec_hash checksum gets a different
+        index key and is therefore not matched, even if it's recorded
+        for the same dataset RID.
         """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
         version = dataset.current_version
 
-        # Create a decoy cache entry with matching snapshot but wrong spec_hash
+        # Resolve the snapshot for this version.
         history = dataset.dataset_history()
         version_record = next(v for v in history if v.dataset_version == str(version))
         snapshot = version_record.snapshot
-        decoy_dir = ml.cache_dir / f"{dataset.dataset_rid}_deadbeefdeadbeef_{snapshot}"
-        decoy_bag = decoy_dir / f"Dataset_{dataset.dataset_rid}"
-        decoy_bag.mkdir(parents=True, exist_ok=True)
-        (decoy_bag / "DECOY").touch()
 
-        # Download — should NOT return the decoy
+        # Pre-record a decoy entry with the same snapshot but a wrong
+        # spec_hash. The bag directory exists on disk so the Tier-1 lookup
+        # would happily return it if it matched by snapshot alone.
+        decoy_checksum = f"deadbeefdeadbeef_{snapshot}"
+        with BagCacheIndex(ml.cache_dir) as index:
+            decoy_bag_dir = index.bag_dir_for(decoy_checksum) / f"Dataset_{dataset.dataset_rid}"
+            decoy_bag_dir.mkdir(parents=True, exist_ok=True)
+            (decoy_bag_dir / "DECOY").touch()
+            index.record(
+                checksum=decoy_checksum,
+                anchors=[("Dataset", dataset.dataset_rid)],
+            )
+
+        # Download — should NOT return the decoy.
         bag = dataset.download_dataset_bag(version=version, use_minid=False)
         assert not (bag._catalog._database_model.bag_path / "DECOY").exists(), (
             "Decoy cache entry with wrong spec_hash was returned!"
         )
 
         # Clean up
-        shutil.rmtree(decoy_dir, ignore_errors=True)
+        shutil.rmtree(decoy_bag_dir.parent, ignore_errors=True)

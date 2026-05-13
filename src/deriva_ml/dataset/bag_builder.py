@@ -186,6 +186,97 @@ class DatasetBagBuilder:
             out["post_processors"] = self._minid_post_processors()
         return out
 
+    def build_bag(
+        self,
+        dataset: DatasetLike,
+        output_dir: Path,
+        timeout: tuple[int, int] | None = None,
+    ) -> Path:
+        """Build a bag for ``dataset`` and return the on-disk zip archive path.
+
+        Drives :meth:`CatalogBagBuilder.build` against the catalog the
+        ``DatasetBagBuilder`` is wired to. Callers typically construct this
+        builder with ``ml_instance`` set to a snapshot-bound catalog so the
+        produced bag is reproducible against a fixed catalog state.
+
+        Upstream's :class:`CatalogBagBuilder` hard-codes
+        ``bag_archiver="zip"`` and **removes the unpacked bag directory
+        after archiving**, returning the (now-nonexistent) directory path.
+        We compensate by computing the corresponding ``.zip`` location and
+        returning *that* — the artifact that actually persists.
+
+        The bag inside the zip is named ``Dataset_{rid}`` — :class:`CatalogBagBuilder`
+        derives the bag-name from ``output_dir.name``, so this method
+        creates an ``output_dir / f"Dataset_{rid}"`` directory and passes
+        it as the builder's ``output_dir``. After archive the zip lands at
+        ``output_dir / f"Dataset_{rid}" / f"Dataset_{rid}.zip"``.
+
+        Args:
+            dataset: The dataset to export. Must expose ``dataset_rid``.
+            output_dir: Parent directory to receive the bag artifacts.
+                Created if missing.
+            timeout: Optional ``(connect, read)`` seconds applied to the
+                underlying catalog's HTTP session for the duration of the
+                export. ``None`` keeps the catalog's existing session
+                config.
+
+        Returns:
+            Absolute :class:`Path` to the bag zip archive on success.
+
+        Raises:
+            ValueError: If :class:`CatalogBagBuilder` rejects the anchor
+                (e.g., the dataset RID does not exist in the bound
+                snapshot catalog).
+            FileNotFoundError: If the expected zip artifact is absent
+                after a successful build call (would indicate an upstream
+                ``CatalogBagBuilder`` contract change).
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        # CatalogBagBuilder's bag-name comes from ``output_dir.name``. We
+        # want the bag named ``Dataset_{rid}`` so the zip ends up at
+        # ``output_dir / Dataset_{rid} / Dataset_{rid}.zip``.
+        cb_output_dir = output_dir / f"Dataset_{dataset.dataset_rid}"
+        cb_output_dir.mkdir(parents=True, exist_ok=True)
+
+        anchors = self.anchors_for(dataset)
+        policy = self.build_policy(dataset)
+
+        catalog = self._ml_instance.catalog
+        prior_config = getattr(catalog, "_session_config", None)
+        if timeout is not None:
+            new_config = dict(prior_config) if prior_config else {}
+            new_config["timeout"] = timeout
+            catalog._session_config = new_config  # type: ignore[attr-defined]
+        try:
+            builder = CatalogBagBuilder(
+                catalog=catalog,
+                anchors=anchors,
+                output_dir=cb_output_dir,
+                policy=policy,
+            )
+            unpacked_path = builder.build()
+        finally:
+            if timeout is not None:
+                if prior_config is None:
+                    try:
+                        delattr(catalog, "_session_config")
+                    except AttributeError:
+                        pass
+                else:
+                    catalog._session_config = prior_config  # type: ignore[attr-defined]
+
+        # CatalogBagBuilder.build() returns the path the unpacked bag had,
+        # but the unpacked directory was removed during archival. The real
+        # artifact is the sibling ``.zip`` file.
+        zip_path = unpacked_path.with_suffix(".zip")
+        if not zip_path.exists():
+            raise FileNotFoundError(
+                f"CatalogBagBuilder.build() returned {unpacked_path} but neither "
+                f"the directory nor the expected {zip_path} archive exists."
+            )
+        return zip_path
+
     def generate_dataset_download_annotations(self) -> dict[str, Any]:
         """Return the static Chaise export annotations for the Dataset table.
 
