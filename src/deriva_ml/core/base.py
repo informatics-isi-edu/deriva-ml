@@ -21,7 +21,6 @@ from typing import Dict, cast, TYPE_CHECKING, Any
 from typing_extensions import Self
 
 # Third-party imports
-import requests
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
@@ -39,7 +38,6 @@ ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
 ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
 Table = _ermrest_model.Table
 DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
-deriva_tags = _core_utils.tag
 
 from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.config import DerivaMLConfig
@@ -52,7 +50,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
 )
-from deriva_ml.core.logging_config import _apply_logger_overrides, configure_logging
+from deriva_ml.core.logging_config import _apply_logger_overrides, configure_logging, get_logger
 from deriva_ml.core.mixins import (
     AnnotationMixin,
     AssetMixin,
@@ -66,7 +64,6 @@ from deriva_ml.core.mixins import (
     WorkflowMixin,
 )
 from deriva_ml.core.schema_cache import PinStatus, SchemaCache
-from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 
 if TYPE_CHECKING:
@@ -75,6 +72,8 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
     from deriva_ml.schema.validation import SchemaValidationReport
+
+logger = get_logger(__name__)
 
 # Stop pycharm from complaining about undefined references.
 ml: DerivaML
@@ -374,8 +373,9 @@ class DerivaML(
                 # Best-effort. If reconciliation itself fails, log and
                 # move on — the user's operation can still proceed;
                 # the next acquire_leases call will retry.
-                logging.getLogger("deriva_ml").warning(
-                    "startup lease reconciliation failed (%s); continuing", exc,
+                logger.warning(
+                    "startup lease reconciliation failed (%s); continuing",
+                    exc,
                 )
 
     def __del__(self) -> None:
@@ -449,10 +449,11 @@ class DerivaML(
         if cache.exists():
             cached = cache.load()
             if cached["snapshot_id"] != live_snapshot_id:
-                logging.getLogger("deriva_ml").warning(
+                logger.warning(
                     "schema cache is at snapshot %s; live catalog is at %s. "
                     "Using cached schema. Call ml.refresh_schema() to update.",
-                    cached["snapshot_id"], live_snapshot_id,
+                    cached["snapshot_id"],
+                    live_snapshot_id,
                 )
             self.model = DerivaModel.from_cached(
                 cached["schema"],
@@ -546,9 +547,7 @@ class DerivaML(
         from deriva_ml.model.catalog import DerivaModel
 
         if self._mode is not ConnectionMode.online:
-            raise DerivaMLReadOnlyError(
-                "refresh_schema requires online mode"
-            )
+            raise DerivaMLReadOnlyError("refresh_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         if cache.exists() and cache.pin_status().pinned:
             pin_info = cache.pin_status()
@@ -586,9 +585,10 @@ class DerivaML(
             domain_schemas=self.model.domain_schemas,
             default_schema=self.model.default_schema,
         )
-        logging.getLogger("deriva_ml").info(
+        logger.info(
             "schema cache refreshed from %s to %s",
-            old_snapshot_id, live_snapshot_id,
+            old_snapshot_id,
+            live_snapshot_id,
         )
 
     def pin_schema(self, reason: str | None = None) -> "SchemaDiff | None":
@@ -633,10 +633,10 @@ class DerivaML(
                 live_schema = self.catalog.get("/schema").json()
                 diff = _compute_diff(cached_payload["schema"], live_schema)
                 if not diff.is_empty():
-                    logging.getLogger("deriva_ml").warning(
-                        "pin_schema: cache at %s, live at %s; "
-                        "structural drift detected (see returned SchemaDiff)",
-                        cached_payload["snapshot_id"], live_snapshot_id,
+                    logger.warning(
+                        "pin_schema: cache at %s, live at %s; structural drift detected (see returned SchemaDiff)",
+                        cached_payload["snapshot_id"],
+                        live_snapshot_id,
                     )
                     drift = diff
         cache.pin(reason=reason)
@@ -827,16 +827,12 @@ class DerivaML(
             try:
                 n = self._workspace.import_legacy_manifests()
                 if n:
-                    import logging
-
-                    logging.getLogger("deriva_ml").info(
+                    logger.info(
                         "Migrated %d legacy asset manifests into workspace",
                         n,
                     )
             except Exception as exc:
-                import logging
-
-                logging.getLogger("deriva_ml").warning(
+                logger.warning(
                     "Legacy manifest migration failed: %s",
                     exc,
                 )
@@ -861,36 +857,6 @@ class DerivaML(
                 schemas=[self.ml_schema, *self.domain_schemas],
             )
         return self._workspace
-
-    @property
-    def working_data(self) -> Path:
-        """Return the working data directory path.
-
-        .. deprecated::
-            ``working_data`` is deprecated and will be removed in the next
-            major version. Use ``working_dir`` instead.
-
-            ``working_dir`` is the canonical attribute; it is set during
-            execution initialization and contains all output assets, metadata,
-            and intermediate files for the current execution.
-
-        Returns:
-            Path to the working data directory (same as ``working_dir``).
-
-        Raises:
-            DeprecationWarning: Always emitted at access time.
-
-        Example:
-            >>> exe.working_dir  # use this instead  # doctest: +SKIP
-        """
-        import warnings
-
-        warnings.warn(
-            "DerivaML.working_data is deprecated; use DerivaML.workspace instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.workspace
 
     def cache_table(self, table_name: str, force: bool = False) -> "pd.DataFrame":
         """Fetch a table from the catalog and cache locally as SQLite.
@@ -962,7 +928,9 @@ class DerivaML(
             if cached is not None:
                 return cached.to_dataframe()
 
-        records = [r.model_dump(mode="json") for r in self.feature_values(table_name, feature_name=feature_name, **kwargs)]
+        records = [
+            r.model_dump(mode="json") for r in self.feature_values(table_name, feature_name=feature_name, **kwargs)
+        ]
         df = pd.DataFrame(records)
         if not df.empty:
             columns = list(df.columns)
@@ -1140,199 +1108,15 @@ class DerivaML(
             >>> # Or with custom branding:
             >>> ml.apply_catalog_annotations("My Project Browser", "My ML Project")
         """
-        catalog_id = self.model.catalog.catalog_id
-        ml_schema = self.ml_schema
+        # Single source of truth lives in
+        # :mod:`deriva_ml.schema.annotations`. Delegate to it.
+        from deriva_ml.schema.annotations import catalog_annotation
 
-        # Build domain schema menu items (one menu per domain schema)
-        domain_schema_menus = []
-        for domain_schema in sorted(self.domain_schemas):
-            if domain_schema not in self.model.schemas:
-                continue
-            domain_schema_menus.append(
-                {
-                    "name": domain_schema,
-                    "children": [
-                        {
-                            "name": tname,
-                            "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                        }
-                        for tname in self.model.schemas[domain_schema].tables
-                        # Don't include controlled vocabularies, association tables, or feature tables.
-                        if not (
-                            self.model.is_vocabulary(tname) or self.model.is_association(tname, pure=False, max_arity=3)
-                        )
-                    ],
-                }
-            )
-
-        # Build vocabulary menu items (ML schema + all domain schemas)
-        vocab_children = [{"name": f"{ml_schema} Vocabularies", "header": True}]
-        vocab_children.extend(
-            [
-                {
-                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
-                    "name": tname,
-                }
-                for tname in self.model.schemas[ml_schema].tables
-                if self.model.is_vocabulary(tname)
-            ]
+        catalog_annotation(
+            self.model,
+            navbar_brand_text=navbar_brand_text,
+            head_title=head_title,
         )
-        for domain_schema in sorted(self.domain_schemas):
-            if domain_schema not in self.model.schemas:
-                continue
-            vocab_children.append({"name": f"{domain_schema} Vocabularies", "header": True})
-            vocab_children.extend(
-                [
-                    {
-                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                        "name": tname,
-                    }
-                    for tname in self.model.schemas[domain_schema].tables
-                    if self.model.is_vocabulary(tname)
-                ]
-            )
-
-        # Build asset menu items (ML schema + all domain schemas)
-        asset_children = [
-            {
-                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
-                "name": tname,
-            }
-            for tname in self.model.schemas[ml_schema].tables
-            if self.model.is_asset(tname)
-        ]
-        for domain_schema in sorted(self.domain_schemas):
-            if domain_schema not in self.model.schemas:
-                continue
-            asset_children.extend(
-                [
-                    {
-                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                        "name": tname,
-                    }
-                    for tname in self.model.schemas[domain_schema].tables
-                    if self.model.is_asset(tname)
-                ]
-            )
-
-        catalog_annotation = {
-            deriva_tags.display: {"name_style": {"underline_space": True}},
-            deriva_tags.chaise_config: {
-                "headTitle": head_title,
-                "navbarBrandText": navbar_brand_text,
-                "systemColumnsDisplayEntry": ["RID"],
-                "systemColumnsDisplayCompact": ["RID"],
-                "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
-                "deleteRecord": True,
-                "showFaceting": True,
-                "shareCiteAcls": True,
-                "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
-                "resolverImplicitCatalog": False,
-                "navbarMenu": {
-                    "newTab": False,
-                    "children": [
-                        {
-                            "name": "User Info",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Client",
-                                    "name": "Users",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Group",
-                                    "name": "Groups",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_RID_Lease",
-                                    "name": "ERMrest RID Lease",
-                                },
-                            ],
-                        },
-                        {  # All the primary tables in deriva-ml schema.
-                            "name": "Deriva-ML",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Workflow",
-                                    "name": "Workflow",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution",
-                                    "name": "Execution",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Metadata",
-                                    "name": "Execution Metadata",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Asset",
-                                    "name": "Execution Asset",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset",
-                                    "name": "Dataset",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
-                                    "name": "Dataset Version",
-                                },
-                            ],
-                        },
-                        {  # WWW schema tables.
-                            "name": "WWW",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/WWW:Page",
-                                    "name": "Page",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/WWW:File",
-                                    "name": "File",
-                                },
-                            ],
-                        },
-                        *domain_schema_menus,  # One menu per domain schema
-                        {  # Vocabulary menu with all controlled vocabularies.
-                            "name": "Vocabulary",
-                            "children": vocab_children,
-                        },
-                        {  # List of all asset tables.
-                            "name": "Assets",
-                            "children": asset_children,
-                        },
-                        {  # List of all feature tables in the catalog.
-                            "name": "Features",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{f.feature_table.schema.name}:{f.feature_table.name}",
-                                    "name": f"{f.target_table.name}:{f.feature_name}",
-                                }
-                                for f in self.model.find_features()
-                            ],
-                        },
-                        {
-                            "url": "/chaise/recordset/#0/ermrest:registry@sort(RID)",
-                            "name": "Catalog Registry",
-                        },
-                        {
-                            "name": "Documentation",
-                            "children": [
-                                {
-                                    "url": "https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/ml_workflow_instruction.md",
-                                    "name": "ML Notebook Instruction",
-                                },
-                                {
-                                    "url": "https://informatics-isi-edu.github.io/deriva-ml/",
-                                    "name": "Deriva-ML Documentation",
-                                },
-                            ],
-                        },
-                    ],
-                },
-            },
-            deriva_tags.bulk_upload: bulk_upload_configuration(model=self.model),
-        }
-        self.model.annotations.update(catalog_annotation)
-        self.model.apply()
 
     def create_vocabulary(
         self, vocab_name: str, comment: str = "", schema: str | None = None, update_navbar: bool = True

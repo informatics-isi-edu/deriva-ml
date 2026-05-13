@@ -17,7 +17,6 @@ from the Workspace engine configuration.
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -41,11 +40,12 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.core.connection_mode import ConnectionMode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExecutionStatus(StrEnum):
@@ -62,6 +62,7 @@ class ExecutionStatus(StrEnum):
     Python identifiers are title-case to match the values (precedent:
     stdlib http.HTTPStatus uses uppercase identifiers).
     """
+
     Created = "Created"
     Running = "Running"
     Stopped = "Stopped"
@@ -77,6 +78,7 @@ class PendingRowStatus(StrEnum):
     Transitions are:
         staged → leasing → leased → uploading → {uploaded, failed}
     """
+
     staged = "staged"
     leasing = "leasing"
     leased = "leased"
@@ -92,6 +94,7 @@ class DirectoryRuleStatus(StrEnum):
     further register/scan calls but their existing pending_rows can
     still drain.
     """
+
     active = "active"
     closed = "closed"
 
@@ -137,7 +140,8 @@ class ExecutionStateStore:
         # status values: created|running|stopped|failed|pending_upload|uploaded|aborted
         # mode values: online|offline
         self.executions = Table(
-            EXECUTIONS_TABLE, self.metadata,
+            EXECUTIONS_TABLE,
+            self.metadata,
             Column("rid", String, primary_key=True),
             Column("workflow_rid", String, nullable=True),
             Column("description", Text, nullable=True),
@@ -167,10 +171,12 @@ class ExecutionStateStore:
         # pending_rows — see spec §2.5.2. status values:
         # staged|leasing|leased|uploading|uploaded|failed
         self.pending_rows = Table(
-            PENDING_ROWS_TABLE, self.metadata,
+            PENDING_ROWS_TABLE,
+            self.metadata,
             Column("id", Integer, primary_key=True, autoincrement=True),
             Column(
-                "execution_rid", String,
+                "execution_rid",
+                String,
                 ForeignKey(
                     f"{EXECUTIONS_TABLE}.rid",
                     name="fk_pending_rows_execution_rid_fkey",
@@ -192,7 +198,8 @@ class ExecutionStateStore:
             Column("leased_at", DateTime(timezone=True), nullable=True),
             Column("uploaded_at", DateTime(timezone=True), nullable=True),
             Column(
-                "rule_id", Integer,
+                "rule_id",
+                Integer,
                 ForeignKey(
                     f"{DIRECTORY_RULES_TABLE}.id",
                     name="fk_pending_rows_rule_id_fkey",
@@ -206,10 +213,12 @@ class ExecutionStateStore:
         # directory_rules — see spec §2.5.3.
         # status values: active|closed
         self.directory_rules = Table(
-            DIRECTORY_RULES_TABLE, self.metadata,
+            DIRECTORY_RULES_TABLE,
+            self.metadata,
             Column("id", Integer, primary_key=True, autoincrement=True),
             Column(
-                "execution_rid", String,
+                "execution_rid",
+                String,
                 ForeignKey(
                     f"{EXECUTIONS_TABLE}.rid",
                     name="fk_directory_rules_execution_rid_fkey",
@@ -289,13 +298,19 @@ class ExecutionStateStore:
         with self.engine.begin() as conn:
             conn.execute(
                 insert(self.executions).values(
-                    rid=rid, workflow_rid=workflow_rid,
-                    description=description, config_json=config_json,
-                    status=str(status), mode=str(mode),
+                    rid=rid,
+                    workflow_rid=workflow_rid,
+                    description=description,
+                    config_json=config_json,
+                    status=str(status),
+                    mode=str(mode),
                     working_dir_rel=working_dir_rel,
-                    start_time=start_time, stop_time=stop_time,
-                    last_activity=last_activity, error=error,
-                    sync_pending=sync_pending, created_at=created_at,
+                    start_time=start_time,
+                    stop_time=stop_time,
+                    last_activity=last_activity,
+                    error=error,
+                    sync_pending=sync_pending,
+                    created_at=created_at,
                 )
             )
 
@@ -316,9 +331,7 @@ class ExecutionStateStore:
             'running'
         """
         with self.engine.connect() as conn:
-            result = conn.execute(
-                select(self.executions).where(self.executions.c.rid == rid)
-            ).mappings().first()
+            result = conn.execute(select(self.executions).where(self.executions.c.rid == rid)).mappings().first()
         return dict(result) if result is not None else None
 
     def update_execution(
@@ -346,17 +359,10 @@ class ExecutionStateStore:
 
         # Coerce enum values to strings — the table columns are plain
         # String, not Enum, so SQLAlchemy won't auto-coerce.
-        coerced = {
-            k: str(v) if isinstance(v, ExecutionStatus) else v
-            for k, v in fields.items()
-        }
+        coerced = {k: str(v) if isinstance(v, ExecutionStatus) else v for k, v in fields.items()}
 
         with self.engine.begin() as conn:
-            conn.execute(
-                update(self.executions)
-                .where(self.executions.c.rid == rid)
-                .values(**coerced)
-            )
+            conn.execute(update(self.executions).where(self.executions.c.rid == rid).values(**coerced))
 
     def list_executions(
         self,
@@ -448,9 +454,12 @@ class ExecutionStateStore:
         with self.engine.begin() as conn:
             result = conn.execute(
                 insert(self.pending_rows).values(
-                    execution_rid=execution_rid, key=key,
-                    target_schema=target_schema, target_table=target_table,
-                    rid=rid, lease_token=lease_token,
+                    execution_rid=execution_rid,
+                    key=key,
+                    target_schema=target_schema,
+                    target_table=target_table,
+                    rid=rid,
+                    lease_token=lease_token,
                     metadata_json=metadata_json,
                     asset_file_path=asset_file_path,
                     asset_types_json=asset_types_json,
@@ -520,19 +529,12 @@ class ExecutionStateStore:
             unknown = set(fields) - valid_cols
             if unknown:
                 raise KeyError(f"unknown columns on pending_rows: {unknown}")
-            coerced = {
-                k: str(v) if isinstance(v, PendingRowStatus) else v
-                for k, v in fields.items()
-            }
+            coerced = {k: str(v) if isinstance(v, PendingRowStatus) else v for k, v in fields.items()}
             prepared.append((pending_id, coerced))
 
         with self.engine.begin() as conn:
             for pending_id, coerced in prepared:
-                conn.execute(
-                    update(self.pending_rows)
-                    .where(self.pending_rows.c.id == pending_id)
-                    .values(**coerced)
-                )
+                conn.execute(update(self.pending_rows).where(self.pending_rows.c.id == pending_id).values(**coerced))
 
     def list_pending_rows(
         self,
@@ -552,9 +554,7 @@ class ExecutionStateStore:
         Returns:
             List of dicts — empty if nothing matches.
         """
-        stmt = select(self.pending_rows).where(
-            self.pending_rows.c.execution_rid == execution_rid
-        )
+        stmt = select(self.pending_rows).where(self.pending_rows.c.execution_rid == execution_rid)
         if status is not None:
             if isinstance(status, PendingRowStatus):
                 statuses = [str(status)]
@@ -615,27 +615,19 @@ class ExecutionStateStore:
 
         stmt = select(
             func.coalesce(
-                func.sum(
-                    case((is_plain & status_col.in_(pending_statuses), 1), else_=0)
-                ),
+                func.sum(case((is_plain & status_col.in_(pending_statuses), 1), else_=0)),
                 0,
             ).label("pending_rows"),
             func.coalesce(
-                func.sum(
-                    case((is_plain & (status_col == failed_status), 1), else_=0)
-                ),
+                func.sum(case((is_plain & (status_col == failed_status), 1), else_=0)),
                 0,
             ).label("failed_rows"),
             func.coalesce(
-                func.sum(
-                    case((is_asset & status_col.in_(pending_statuses), 1), else_=0)
-                ),
+                func.sum(case((is_asset & status_col.in_(pending_statuses), 1), else_=0)),
                 0,
             ).label("pending_files"),
             func.coalesce(
-                func.sum(
-                    case((is_asset & (status_col == failed_status), 1), else_=0)
-                ),
+                func.sum(case((is_asset & (status_col == failed_status), 1), else_=0)),
                 0,
             ).label("failed_files"),
         ).where(self.pending_rows.c.execution_rid == execution_rid)
@@ -671,9 +663,7 @@ class ExecutionStateStore:
             str(PendingRowStatus.uploading),
             str(PendingRowStatus.failed),
         ]
-        stmt = select(func.count()).select_from(self.pending_rows).where(
-            self.pending_rows.c.status.in_(non_terminal)
-        )
+        stmt = select(func.count()).select_from(self.pending_rows).where(self.pending_rows.c.status.in_(non_terminal))
         with self.engine.begin() as conn:
             return int(conn.scalar(stmt) or 0)
 
@@ -712,28 +702,21 @@ class ExecutionStateStore:
 
         is_asset = self.pending_rows.c.asset_file_path.isnot(None)
 
-        stmt = select(
-            self.pending_rows.c.target_schema,
-            self.pending_rows.c.target_table,
-            is_asset.label("is_asset"),
-            func.sum(
-                case((self.pending_rows.c.status.in_(pending_statuses), 1),
-                     else_=0)
-            ).label("pending"),
-            func.sum(
-                case((self.pending_rows.c.status == failed_status, 1),
-                     else_=0)
-            ).label("failed"),
-            func.sum(
-                case((self.pending_rows.c.status == uploaded_status, 1),
-                     else_=0)
-            ).label("uploaded"),
-        ).where(
-            self.pending_rows.c.execution_rid == execution_rid
-        ).group_by(
-            self.pending_rows.c.target_schema,
-            self.pending_rows.c.target_table,
-            is_asset,
+        stmt = (
+            select(
+                self.pending_rows.c.target_schema,
+                self.pending_rows.c.target_table,
+                is_asset.label("is_asset"),
+                func.sum(case((self.pending_rows.c.status.in_(pending_statuses), 1), else_=0)).label("pending"),
+                func.sum(case((self.pending_rows.c.status == failed_status, 1), else_=0)).label("failed"),
+                func.sum(case((self.pending_rows.c.status == uploaded_status, 1), else_=0)).label("uploaded"),
+            )
+            .where(self.pending_rows.c.execution_rid == execution_rid)
+            .group_by(
+                self.pending_rows.c.target_schema,
+                self.pending_rows.c.target_table,
+                is_asset,
+            )
         )
 
         rows_out: list[dict] = []
@@ -743,9 +726,7 @@ class ExecutionStateStore:
             for r in conn.execute(stmt).mappings().all():
                 table_fqn = f"{r['target_schema']}:{r['target_table']}"
                 if r["is_asset"]:
-                    bytes_stmt = select(
-                        self.pending_rows.c.asset_file_path
-                    ).where(
+                    bytes_stmt = select(self.pending_rows.c.asset_file_path).where(
                         and_(
                             self.pending_rows.c.execution_rid == execution_rid,
                             self.pending_rows.c.target_schema == r["target_schema"],
@@ -760,40 +741,44 @@ class ExecutionStateStore:
                         except OSError:
                             # File missing — surface as diagnostic,
                             # don't crash the summary.
-                            missing_file_diagnostics.append(
-                                f"{table_fqn} asset file missing on disk: {p}"
-                            )
-                    assets_out.append({
-                        "table": table_fqn,
-                        "pending_files": int(r["pending"]),
-                        "failed_files": int(r["failed"]),
-                        "uploaded_files": int(r["uploaded"]),
-                        "total_bytes_pending": int(total_bytes),
-                    })
+                            missing_file_diagnostics.append(f"{table_fqn} asset file missing on disk: {p}")
+                    assets_out.append(
+                        {
+                            "table": table_fqn,
+                            "pending_files": int(r["pending"]),
+                            "failed_files": int(r["failed"]),
+                            "uploaded_files": int(r["uploaded"]),
+                            "total_bytes_pending": int(total_bytes),
+                        }
+                    )
                 else:
-                    rows_out.append({
-                        "table": table_fqn,
-                        "pending": int(r["pending"]),
-                        "failed": int(r["failed"]),
-                        "uploaded": int(r["uploaded"]),
-                    })
+                    rows_out.append(
+                        {
+                            "table": table_fqn,
+                            "pending": int(r["pending"]),
+                            "failed": int(r["failed"]),
+                            "uploaded": int(r["uploaded"]),
+                        }
+                    )
 
-            diag_stmt = select(
-                self.pending_rows.c.target_table,
-                self.pending_rows.c.rid,
-                self.pending_rows.c.error,
-            ).where(
-                and_(
-                    self.pending_rows.c.execution_rid == execution_rid,
-                    self.pending_rows.c.status == failed_status,
+            diag_stmt = (
+                select(
+                    self.pending_rows.c.target_table,
+                    self.pending_rows.c.rid,
+                    self.pending_rows.c.error,
                 )
-            ).limit(20)
+                .where(
+                    and_(
+                        self.pending_rows.c.execution_rid == execution_rid,
+                        self.pending_rows.c.status == failed_status,
+                    )
+                )
+                .limit(20)
+            )
             diagnostics: list[str] = []
             for dr in conn.execute(diag_stmt).mappings().all():
                 ident = dr["rid"] or "(unleased)"
-                diagnostics.append(
-                    f"{dr['target_table']} row {ident} failed: {dr['error']}"
-                )
+                diagnostics.append(f"{dr['target_table']} row {ident} failed: {dr['error']}")
 
             # Missing files are added after the cap is applied to the
             # failed-row diagnostics. In practice, missing files are rare
@@ -829,9 +814,7 @@ class ExecutionStateStore:
         """
         self.mark_pending_leasing_batch([(pending_id, lease_token)])
 
-    def mark_pending_leasing_batch(
-        self, items: "list[tuple[int, str]]"
-    ) -> None:
+    def mark_pending_leasing_batch(self, items: "list[tuple[int, str]]") -> None:
         """Phase 1 of RID leasing for a batch.
 
         Writes ``status='leasing'`` + ``lease_token`` for every supplied
@@ -848,10 +831,12 @@ class ExecutionStateStore:
         """
         if not items:
             return
-        self.update_pending_rows_batch([
-            (pending_id, {"status": PendingRowStatus.leasing, "lease_token": lease_token})
-            for pending_id, lease_token in items
-        ])
+        self.update_pending_rows_batch(
+            [
+                (pending_id, {"status": PendingRowStatus.leasing, "lease_token": lease_token})
+                for pending_id, lease_token in items
+            ]
+        )
 
     def finalize_pending_lease(
         self,
@@ -879,9 +864,7 @@ class ExecutionStateStore:
         """
         self.finalize_pending_leases_batch([(lease_token, assigned_rid)])
 
-    def finalize_pending_leases_batch(
-        self, items: "list[tuple[str, str]]"
-    ) -> None:
+    def finalize_pending_leases_batch(self, items: "list[tuple[str, str]]") -> None:
         """Phase 2 for a batch of leases.
 
         Writes the assigned RID and ``status='leased'`` for every
@@ -964,9 +947,7 @@ class ExecutionStateStore:
             >>> for r in store.list_leasing_rows():
             ...     print(r["lease_token"], r["execution_rid"])
         """
-        stmt = select(self.pending_rows).where(
-            self.pending_rows.c.status == str(PendingRowStatus.leasing)
-        )
+        stmt = select(self.pending_rows).where(self.pending_rows.c.status == str(PendingRowStatus.leasing))
         if execution_rid is not None:
             stmt = stmt.where(self.pending_rows.c.execution_rid == execution_rid)
         with self.engine.connect() as conn:
@@ -1012,9 +993,12 @@ class ExecutionStateStore:
             result = conn.execute(
                 insert(self.directory_rules).values(
                     execution_rid=execution_rid,
-                    target_schema=target_schema, target_table=target_table,
+                    target_schema=target_schema,
+                    target_table=target_table,
                     source_dir=source_dir,
-                    glob=glob, recurse=recurse, copy_files=copy_files,
+                    glob=glob,
+                    recurse=recurse,
+                    copy_files=copy_files,
                     asset_types_json=asset_types_json,
                     status=str(status),
                     created_at=created_at,
@@ -1036,17 +1020,10 @@ class ExecutionStateStore:
         unknown = set(fields) - valid_cols
         if unknown:
             raise KeyError(f"unknown columns on directory_rules: {unknown}")
-        coerced = {
-            k: str(v) if isinstance(v, DirectoryRuleStatus) else v
-            for k, v in fields.items()
-        }
+        coerced = {k: str(v) if isinstance(v, DirectoryRuleStatus) else v for k, v in fields.items()}
 
         with self.engine.begin() as conn:
-            conn.execute(
-                update(self.directory_rules)
-                .where(self.directory_rules.c.id == rule_id)
-                .values(**coerced)
-            )
+            conn.execute(update(self.directory_rules).where(self.directory_rules.c.id == rule_id).values(**coerced))
 
     def list_directory_rules(
         self,
@@ -1063,9 +1040,7 @@ class ExecutionStateStore:
         Returns:
             List of dicts — empty if nothing matches.
         """
-        stmt = select(self.directory_rules).where(
-            self.directory_rules.c.execution_rid == execution_rid
-        )
+        stmt = select(self.directory_rules).where(self.directory_rules.c.execution_rid == execution_rid)
         if status is not None:
             stmt = stmt.where(self.directory_rules.c.status == str(status))
 
@@ -1092,18 +1067,6 @@ class ExecutionStateStore:
             True
         """
         with self.engine.begin() as conn:
-            conn.execute(
-                delete(self.pending_rows).where(
-                    self.pending_rows.c.execution_rid == execution_rid
-                )
-            )
-            conn.execute(
-                delete(self.directory_rules).where(
-                    self.directory_rules.c.execution_rid == execution_rid
-                )
-            )
-            conn.execute(
-                delete(self.executions).where(
-                    self.executions.c.rid == execution_rid
-                )
-            )
+            conn.execute(delete(self.pending_rows).where(self.pending_rows.c.execution_rid == execution_rid))
+            conn.execute(delete(self.directory_rules).where(self.directory_rules.c.execution_rid == execution_rid))
+            conn.execute(delete(self.executions).where(self.executions.c.rid == execution_rid))

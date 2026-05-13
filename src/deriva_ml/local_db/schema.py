@@ -12,7 +12,6 @@ with a WAL-mode SQLAlchemy engine.
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -22,11 +21,11 @@ from sqlalchemy import Table as SQLTable
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from deriva_ml.local_db import sqlite_helpers as sh
-from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
+from deriva.bag import sqlite_helpers as sh
+from deriva.bag.schema import SchemaBuilder, SchemaORM
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 SCHEMA_VERSION = 1
 
 

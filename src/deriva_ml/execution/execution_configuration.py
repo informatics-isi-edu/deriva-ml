@@ -24,17 +24,16 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from omegaconf import DictConfig
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from deriva_ml.asset.aux_classes import AssetSpec
-from deriva_ml.core.definitions import RID
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.workflow import Workflow
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 class ExecutionConfiguration(BaseModel):
@@ -83,15 +82,15 @@ class ExecutionConfiguration(BaseModel):
     argv: list[str] = Field(default_factory=lambda: sys.argv)
     config_choices: dict[str, str] = Field(default_factory=dict)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @field_validator("assets", mode="before")
     @classmethod
     def validate_assets(cls, value: Any) -> Any:
         """Normalize asset entries to AssetSpec objects.
 
-        Accepts plain RID strings, AssetRID objects, DictConfig from Hydra,
-        AssetSpec objects, or dicts with 'rid' and optional 'cache' keys.
+        Accepts plain RID strings, DictConfig from Hydra, AssetSpec objects,
+        or dicts with 'rid' and optional 'cache' keys.
         """
         result = []
         for v in value:
@@ -106,10 +105,8 @@ class ExecutionConfiguration(BaseModel):
                 if "rid" in d:
                     result.append(AssetSpec(**d))
                 else:
-                    # Legacy DictConfig with just .rid attribute (AssetRID-style)
+                    # Bare DictConfig with just a .rid attribute.
                     result.append(AssetSpec(rid=v.rid, cache=getattr(v, "cache", False)))
-            elif isinstance(v, AssetRID):
-                result.append(AssetSpec(rid=v.rid))
             elif isinstance(v, str):
                 result.append(AssetSpec(rid=v))
             else:
@@ -142,30 +139,3 @@ class ExecutionConfiguration(BaseModel):
         with Path(path).open() as fd:
             config = json.load(fd)
         return ExecutionConfiguration.model_validate(config)
-
-
-@dataclass
-class AssetRID(str):
-    """A string subclass representing an asset Resource ID with optional description.
-
-    .. deprecated::
-        Use :class:`AssetSpec` instead for new code. ``AssetRID`` is retained
-        for backward compatibility.
-
-    Attributes:
-        rid: The Resource ID string identifying the asset in Deriva.
-        description: Optional human-readable description of the asset.
-
-    Example:
-        >>> asset = AssetRID("3RA", "Pretrained model weights")
-        >>> print(asset)  # "3RA"
-        >>> print(asset.description)  # "Pretrained model weights"
-    """
-
-    rid: str
-    description: str = ""
-
-    def __new__(cls, rid: str, description: str = ""):
-        obj = super().__new__(cls, rid)
-        obj.description = description
-        return obj

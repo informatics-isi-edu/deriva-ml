@@ -18,14 +18,13 @@ fake client used in tests for the exact interface contract.
 
 from __future__ import annotations
 
-import logging
 from typing import Any, Iterable, Protocol
 
 from sqlalchemy import Table, insert, select
 from sqlalchemy.engine import Engine
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 DEFAULT_PAGE_SIZE = 1000
 DEFAULT_BATCH_SIZE = 500
 DEFAULT_MAX_URL_BYTES = 6144

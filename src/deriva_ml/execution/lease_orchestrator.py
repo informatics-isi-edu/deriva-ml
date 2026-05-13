@@ -7,7 +7,6 @@ handle.rid property and by the upload-engine drain.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
@@ -17,13 +16,14 @@ from deriva_ml.execution.rid_lease import (
     post_lease_batch,
 )
 from deriva_ml.execution.state_store import PendingRowStatus
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog
 
     from deriva_ml.execution.state_store import ExecutionStateStore
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def acquire_leases_for_execution(
@@ -84,7 +84,8 @@ def acquire_leases_for_execution(
         if row is None:
             logger.warning(
                 "acquire_leases: pending_id %d not in execution %s; skipping",
-                pid, execution_rid,
+                pid,
+                execution_rid,
             )
             continue
         if row["status"] != str(PendingRowStatus.staged):
@@ -110,7 +111,8 @@ def acquire_leases_for_execution(
     except Exception:
         logger.warning(
             "acquire_leases: POST failed for execution %s; reverting %d rows to staged",
-            execution_rid, len(rows_to_lease),
+            execution_rid,
+            len(rows_to_lease),
         )
         # Revert every leasing row in one transaction. revert is
         # rare (only fires when ERMrest's lease POST fails) so the
@@ -129,9 +131,9 @@ def acquire_leases_for_execution(
             # Server response missing this token. Revert just this
             # row; leave the others (they did succeed).
             logger.warning(
-                "acquire_leases: token %s missing from server response "
-                "for execution %s; reverting that row",
-                token, execution_rid,
+                "acquire_leases: token %s missing from server response for execution %s; reverting that row",
+                token,
+                execution_rid,
             )
             store.revert_pending_leasing(lease_token=token)
         else:
@@ -140,7 +142,8 @@ def acquire_leases_for_execution(
 
     logger.debug(
         "acquire_leases: %d rows leased for execution %s",
-        len(rows_to_lease), execution_rid,
+        len(rows_to_lease),
+        execution_rid,
     )
 
 

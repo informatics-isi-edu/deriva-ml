@@ -9,11 +9,11 @@ an execution. It supports:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.local_db.manifest_store import ManifestStore
@@ -35,7 +35,7 @@ def _json_default(obj: Any) -> Any:
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -229,9 +229,7 @@ def _validate_pending_asset_metadata_iter(
     if not missing_by_key:
         return
 
-    lines = [
-        f"Missing required metadata for {len(missing_by_key)} pending asset(s):"
-    ]
+    lines = [f"Missing required metadata for {len(missing_by_key)} pending asset(s):"]
     for key in sorted(missing_by_key.keys()):
         cols = missing_by_key[key]
         noun = "column" if len(cols) == 1 else "columns"
@@ -266,7 +264,6 @@ def _validate_pending_asset_metadata(
     translates to SQL NULL.
     """
     entries = (
-        (key, entry.schema, entry.asset_table, dict(entry.metadata))
-        for key, entry in manifest.pending_assets().items()
+        (key, entry.schema, entry.asset_table, dict(entry.metadata)) for key, entry in manifest.pending_assets().items()
     )
     _validate_pending_asset_metadata_iter(model, entries)

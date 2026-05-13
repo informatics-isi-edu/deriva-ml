@@ -110,6 +110,7 @@ class BaseConfig:
         ...     learning_rate: float = 0.001
         ...     epochs: int = 10
     """
+
     deriva_ml: Any = None
     datasets: Any = None
     assets: Any = None
@@ -232,6 +233,7 @@ def get_notebook_configuration(
         # Filter out None values (some Hydra internal groups have None choices)
         try:
             from hydra.core.hydra_config import HydraConfig
+
             hydra_cfg = HydraConfig.get()
             choices = hydra_cfg.runtime.choices
             captured_choices = {k: v for k, v in choices.items() if v is not None}
@@ -538,9 +540,7 @@ def run_notebook(
     if not validation_result.is_valid:
         from deriva_ml.core.exceptions import DerivaMLException
 
-        raise DerivaMLException(
-            f"Notebook config validation failed:\n{validation_result}"
-        )
+        raise DerivaMLException(f"Notebook config validation failed:\n{validation_result}")
     if validation_result.warnings:
         import logging as _logging
 

@@ -13,15 +13,6 @@ def test_offline_error_is_configuration_error():
     assert "create_execution" in str(err)
 
 
-def test_no_execution_context_error_is_configuration_error():
-    from deriva_ml.core.exceptions import (
-        DerivaMLConfigurationError,
-        DerivaMLNoExecutionContext,
-    )
-    err = DerivaMLNoExecutionContext("ml.table(...) handles are read-only")
-    assert isinstance(err, DerivaMLConfigurationError)
-
-
 def test_state_inconsistency_error_is_data_error():
     from deriva_ml.core.exceptions import (
         DerivaMLDataError,

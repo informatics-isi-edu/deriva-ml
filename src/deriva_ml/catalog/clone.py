@@ -21,11 +21,9 @@ What's preserved for back-compat:
   :class:`deriva.bag.traversal.DanglingFKStrategy`. The legacy
   ``FAIL`` / ``DELETE`` / ``NULLIFY`` value names are preserved
   (both enums use those values).
-- :data:`AssetCopyMode` — alias of
-  :class:`deriva.bag.traversal.AssetMode` with legacy value names
-  mapped: ``REFERENCES`` → ``ROWS_ONLY``, ``FULL`` →
-  ``UPLOAD_IF_MISSING``. ``NONE`` no longer applies (use
-  ``exclude_tables`` on the policy instead).
+- :func:`_coerce_asset_mode` accepts legacy string spellings
+  (``"REFERENCES"`` / ``"FULL"`` / ``"none"`` / ``"refs"`` /
+  ``"full"``) and maps them to :class:`AssetMode` members.
 - Provenance API (:class:`CatalogProvenance`,
   :class:`CatalogCreationMethod`, :class:`CloneDetails`,
   :func:`set_catalog_provenance`, :func:`get_catalog_provenance`) —
@@ -54,7 +52,6 @@ tests for the new path are tracked separately.
 
 from __future__ import annotations
 
-import logging
 import warnings
 from pathlib import Path
 from typing import Any, Callable
@@ -73,10 +70,9 @@ from deriva_ml.catalog.provenance import (  # noqa: F401  (re-export)
     get_catalog_provenance,
     set_catalog_provenance,
 )
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
-
+logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Legacy enums — aliased to deriva.bag.traversal
 # ---------------------------------------------------------------------------
@@ -89,52 +85,9 @@ logger = logging.getLogger(__name__)
 OrphanStrategy = _DanglingFKStrategy
 
 
-class AssetCopyMode:
-    """Legacy enum-like surface for the pre-migration ``AssetCopyMode``.
-
-    Maps the pre-migration value names to the new
-    :class:`~deriva.bag.traversal.AssetMode`:
-
-    - ``AssetCopyMode.NONE`` → ``AssetMode.ROWS_ONLY`` (closest
-      equivalent; truly skipping is now expressed via
-      ``policy.exclude_tables``).
-    - ``AssetCopyMode.REFERENCES`` → ``AssetMode.ROWS_ONLY``.
-    - ``AssetCopyMode.FULL`` → ``AssetMode.UPLOAD_IF_MISSING``.
-
-    Members compare equal to their underlying :class:`AssetMode`
-    counterparts so legacy callers' ``mode == AssetCopyMode.REFERENCES``
-    checks continue to work.
-    """
-
-    NONE = _AssetMode.ROWS_ONLY
-    REFERENCES = _AssetMode.ROWS_ONLY
-    FULL = _AssetMode.UPLOAD_IF_MISSING
-
-    def __new__(cls, *args, **kwargs):  # pragma: no cover - sentinel
-        raise TypeError(
-            "AssetCopyMode is an enum-style namespace; use the class "
-            "attributes (NONE, REFERENCES, FULL), do not instantiate."
-        )
-
-
 # ---------------------------------------------------------------------------
 # create_ml_workspace — bag-pipeline reimplementation
 # ---------------------------------------------------------------------------
-
-
-_LEGACY_ONLY_PARAMS = {
-    "prune_hidden_fkeys",
-    "truncate_oversized",
-    "reinitialize_dataset_versions",
-    "table_concurrency",
-    "progress_callback",
-    "copy_annotations",
-    "copy_policy",
-    "add_ml_schema",
-    "alias",
-    "include_associations",
-    "include_vocabularies",
-}
 
 
 def create_ml_workspace(
@@ -150,7 +103,7 @@ def create_ml_workspace(
     dest_hostname: str | None = None,
     alias: str | None = None,
     add_ml_schema: bool = True,
-    asset_mode: Any = AssetCopyMode.REFERENCES,
+    asset_mode: Any = _AssetMode.ROWS_ONLY,
     copy_annotations: bool = True,
     copy_policy: bool = True,
     source_credential: dict | None = None,
@@ -192,9 +145,10 @@ def create_ml_workspace(
             destination catalog. Use deriva-py's
             :meth:`DerivaServer.create_ermrest_catalog` separately
             if you need to materialize one.
-        asset_mode: Maps to :class:`AssetMode` via
-            :class:`AssetCopyMode`. ``REFERENCES`` → ``ROWS_ONLY``,
-            ``FULL`` → ``UPLOAD_IF_MISSING``.
+        asset_mode: An :class:`AssetMode` value. Legacy string
+            spellings ``"refs"``/``"REFERENCES"`` map to
+            ``ROWS_ONLY`` and ``"full"``/``"FULL"`` maps to
+            ``UPLOAD_IF_MISSING`` via :func:`_coerce_asset_mode`.
         orphan_strategy: Maps to :attr:`FKTraversalPolicy.dangling_fk_strategy`.
         source_credential, dest_credential: Optional credential
             dicts. ``None`` triggers :func:`get_credential` on
@@ -272,9 +226,7 @@ def create_ml_workspace(
     # tables.
     policy_schemas: set[str] | None = None
     if include_tables:
-        policy_schemas = {
-            entry.split(":", 1)[0] for entry in include_tables if ":" in entry
-        }
+        policy_schemas = {entry.split(":", 1)[0] for entry in include_tables if ":" in entry}
 
     policy_exclude_tables: set[tuple[str, str]] = set()
     if exclude_objects:
@@ -283,12 +235,11 @@ def create_ml_workspace(
                 schema, table = entry.split(":", 1)
                 policy_exclude_tables.add((schema, table))
 
-    policy_exclude_schemas = (
-        set(exclude_schemas) if exclude_schemas else set()
-    )
+    policy_exclude_schemas = set(exclude_schemas) if exclude_schemas else set()
     # Default system-schema exclusions stay on; merge rather than
     # replace.
     from deriva.bag.traversal import DEFAULT_EXCLUDE_SCHEMAS
+
     policy_exclude_schemas |= set(DEFAULT_EXCLUDE_SCHEMAS)
 
     # Coerce legacy enum spellings to the new ones.
@@ -322,15 +273,16 @@ def create_ml_workspace(
 
 
 def _coerce_asset_mode(value: Any) -> _AssetMode:
-    """Accept either an :class:`AssetMode` or a legacy
-    :class:`AssetCopyMode` value, return an :class:`AssetMode`.
+    """Accept an :class:`AssetMode` or legacy string spelling.
+
+    Pre-bag-pipeline callers passed strings like ``"refs"``,
+    ``"REFERENCES"``, ``"full"``, ``"FULL"``, or ``"none"``. We
+    translate those to the new :class:`AssetMode` members so the
+    legacy signature still accepts them. Unrecognized values
+    raise.
     """
     if isinstance(value, _AssetMode):
         return value
-    # Legacy AssetCopyMode class attributes are already AssetMode
-    # values (see the alias declaration above), so isinstance
-    # catches them. This branch handles stray strings (``"refs"``,
-    # ``"full"``, ``"none"``).
     if isinstance(value, str):
         if value in ("refs", "REFERENCES", "rows_only"):
             return _AssetMode.ROWS_ONLY
@@ -340,10 +292,7 @@ def _coerce_asset_mode(value: Any) -> _AssetMode:
             return _AssetMode.UPLOAD_FORCE
         if value in ("none", "NONE"):
             return _AssetMode.ROWS_ONLY
-    raise TypeError(
-        f"Unrecognized asset_mode value: {value!r}. "
-        f"Use deriva.bag.traversal.AssetMode members."
-    )
+    raise TypeError(f"Unrecognized asset_mode value: {value!r}. Use deriva.bag.traversal.AssetMode members.")
 
 
 def _coerce_orphan_strategy(value: Any) -> _DanglingFKStrategy:
@@ -358,8 +307,7 @@ def _coerce_orphan_strategy(value: Any) -> _DanglingFKStrategy:
         except ValueError:
             pass
     raise TypeError(
-        f"Unrecognized orphan_strategy value: {value!r}. "
-        f"Use deriva.bag.traversal.DanglingFKStrategy members."
+        f"Unrecognized orphan_strategy value: {value!r}. Use deriva.bag.traversal.DanglingFKStrategy members."
     )
 
 
@@ -401,7 +349,6 @@ def _warn_about_legacy_params(**kwargs: Any) -> None:
 
 
 __all__ = [
-    "AssetCopyMode",
     "CatalogCreationMethod",
     "CatalogProvenance",
     "CloneDetails",

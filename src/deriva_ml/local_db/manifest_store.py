@@ -12,7 +12,6 @@ prefix as a logical namespace on table names.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -34,9 +33,9 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 
 from deriva_ml.asset.manifest import AssetEntry
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 ASSETS_TABLE = "execution_state__assets"
 
 # Row-per-record staging for feature writes. Replaces the earlier file-based
@@ -135,12 +134,12 @@ class ManifestStore:
             self._metadata,
             Column("stage_id", Integer, primary_key=True, autoincrement=True),
             Column("execution_rid", String, nullable=False),
-            Column("feature_table", String, nullable=False),   # "schema.Table"
+            Column("feature_table", String, nullable=False),  # "schema.Table"
             Column("feature_name", String, nullable=False),
-            Column("target_table", String, nullable=False),    # target table name — avoids re-lookup at flush
+            Column("target_table", String, nullable=False),  # target table name — avoids re-lookup at flush
             Column("record_json", Text, nullable=False),
             Column("created_at", String, nullable=False),
-            Column("status", String, nullable=False),          # pending | uploaded | failed
+            Column("status", String, nullable=False),  # pending | uploaded | failed
             Column("uploaded_at", String),
             Column("error", Text),
         )
@@ -337,9 +336,7 @@ class ManifestStore:
         self._require_asset(execution_rid, key)
         self.mark_assets_uploaded(execution_rid, [(key, rid)])
 
-    def mark_assets_uploaded(
-        self, execution_rid: str, items: "list[tuple[str, str]]"
-    ) -> None:
+    def mark_assets_uploaded(self, execution_rid: str, items: "list[tuple[str, str]]") -> None:
         """Bulk transition multiple asset entries to ``status="uploaded"``.
 
         Equivalent to calling :meth:`mark_asset_uploaded` for each
@@ -375,10 +372,7 @@ class ManifestStore:
             for key, rid in items:
                 conn.execute(
                     update(self._assets_t)
-                    .where(
-                        (self._assets_t.c.execution_rid == execution_rid)
-                        & (self._assets_t.c.key == key)
-                    )
+                    .where((self._assets_t.c.execution_rid == execution_rid) & (self._assets_t.c.key == key))
                     .values(
                         status="uploaded",
                         rid=rid,
@@ -411,9 +405,7 @@ class ManifestStore:
         self._require_asset(execution_rid, key)
         self.set_asset_rids(execution_rid, [(key, rid)])
 
-    def set_asset_rids(
-        self, execution_rid: str, items: "list[tuple[str, str]]"
-    ) -> None:
+    def set_asset_rids(self, execution_rid: str, items: "list[tuple[str, str]]") -> None:
         """Bulk variant of :meth:`set_asset_rid` for batched RID assignment.
 
         Equivalent to calling ``set_asset_rid`` for each ``(key, rid)``
@@ -440,10 +432,7 @@ class ManifestStore:
             for key, rid in items:
                 conn.execute(
                     update(self._assets_t)
-                    .where(
-                        (self._assets_t.c.execution_rid == execution_rid)
-                        & (self._assets_t.c.key == key)
-                    )
+                    .where((self._assets_t.c.execution_rid == execution_rid) & (self._assets_t.c.key == key))
                     .values(rid=rid, updated_at=now)
                 )
 
@@ -631,9 +620,7 @@ class ManifestStore:
     def _require_feature_record(self, stage_id: int) -> None:
         with self._engine.connect() as conn:
             exists = conn.execute(
-                select(self._feature_records_t.c.stage_id).where(
-                    self._feature_records_t.c.stage_id == stage_id
-                )
+                select(self._feature_records_t.c.stage_id).where(self._feature_records_t.c.stage_id == stage_id)
             ).first()
         if exists is None:
             raise KeyError(f"Staged feature record with stage_id={stage_id!r} not found")
@@ -703,9 +690,7 @@ class ManifestStore:
         self._require_feature_record(stage_id)
         self.mark_feature_records_failed([(stage_id, error)])
 
-    def mark_feature_records_failed(
-        self, items: "list[tuple[int, str]]"
-    ) -> None:
+    def mark_feature_records_failed(self, items: "list[tuple[int, str]]") -> None:
         """Bulk variant of :meth:`mark_feature_record_failed`.
 
         Updates every ``(stage_id, error)`` pair to ``status="failed"``

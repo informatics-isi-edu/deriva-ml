@@ -17,7 +17,7 @@ from deriva_ml import (
     TableDefinition,
 )
 from deriva_ml.dataset.aux_classes import DatasetSpec
-from deriva_ml.dataset.catalog_graph import CatalogGraph
+from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 from deriva_ml.demo_catalog import DatasetDescription
 from deriva_ml.execution.execution import ExecutionConfiguration
 
@@ -152,7 +152,7 @@ class TestDataset:
         reference_datasets = dataset_test.list_datasets(dataset_description)
         assert len(list(catalog_datasets)) == len(reference_datasets)
 
-        assert CatalogGraph(ml_instance=ml_instance, s3_bucket=ml_instance.s3_bucket)._dataset_nesting_depth() == 2
+        assert DatasetBagBuilder(ml_instance=ml_instance, s3_bucket=ml_instance.s3_bucket)._dataset_nesting_depth() == 2
 
         for dataset in reference_datasets:
             # See if the list of RIDs in the dataset matches up with what is expected.

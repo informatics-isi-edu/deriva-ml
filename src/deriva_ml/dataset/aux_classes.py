@@ -7,14 +7,12 @@ records, and hydra-zen configuration entries.
 """
 
 from enum import Enum
-from pprint import pformat
 from typing import Any, Optional, SupportsInt
 
 from hydra_zen import hydrated_dataclass
 from packaging.version import Version
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     computed_field,
     conlist,
@@ -24,16 +22,7 @@ from pydantic import (
 )
 
 from deriva_ml.core.definitions import RID
-
-try:
-    from icecream import ic
-
-    ic.configureOutput(
-        includeContext=True,
-        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
-    )
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
 class VersionPart(Enum):
@@ -227,7 +216,7 @@ class DatasetHistory(BaseModel):
     spec_hash: str | None = None
     snapshot: str | None = None
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @field_validator("execution_rid", mode="before")
     @classmethod
@@ -256,7 +245,7 @@ class DatasetMinid(BaseModel):
 
     dataset_version: DatasetVersion
     metadata: dict[str, str | int] = {}
-    minid: str = Field(alias="compact_uri", default=None)
+    minid: str | None = Field(alias="compact_uri", default=None)
     bag_url: str = Field(alias="location")
     identifier: Optional[str] = None
     landing_page: Optional[str] = None
@@ -302,7 +291,7 @@ class DatasetMinid(BaseModel):
                 break
         return checksum_value
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
 
 class DatasetSpec(BaseModel):
@@ -328,7 +317,7 @@ class DatasetSpec(BaseModel):
     timeout: tuple[int, int] | None = None
     fetch_concurrency: int = 8
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @field_validator("version", mode="before")
     @classmethod

@@ -125,6 +125,7 @@ class FileUploadState(BaseModel):
         status (str): Detailed status message.
         result (Any): Upload result data, if any.
     """
+
     state: UploadState
     status: str
     result: Any
@@ -151,6 +152,7 @@ class UploadProgress:
         phase: Current phase of the upload operation.
         message: Human-readable status message.
     """
+
     file_path: str = ""
     file_name: str = ""
     bytes_completed: int = 0
@@ -173,6 +175,7 @@ class UploadCallback(Protocol):
         ...
         >>> execution.upload_execution_outputs(progress_callback=my_callback)  # doctest: +SKIP
     """
+
     def __call__(self, progress: UploadProgress) -> None:
         """Called with upload progress information.
 
@@ -206,6 +209,7 @@ class VocabularyTerm(BaseModel):
         ...     RID="1-abc123"
         ... )
     """
+
     _name: str = PrivateAttr()
     _synonyms: list[str] | None = PrivateAttr()
     _description: str = PrivateAttr()

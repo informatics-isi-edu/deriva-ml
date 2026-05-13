@@ -1,22 +1,22 @@
 """Model module for DerivaML.
 
-This module provides catalog and database model classes, as well as
-handle wrappers for ERMrest model objects and annotation builders.
+This module provides catalog and database model classes, plus
+annotation builders. Schema/data infrastructure that used to live
+here (``SchemaBuilder``, ``DataLoader``, ``DataSource``, etc.) now
+lives upstream in :mod:`deriva.bag`; import from there directly.
 
 Key components:
 - DerivaModel: Schema analysis utilities
 - DatabaseModel: SQLite database from BDBag
-- SchemaBuilder/SchemaORM: Create ORM from Deriva Model (Phase 1)
-- DataLoader: Fill database from data source (Phase 2)
-- DataSource: Protocol for data sources (BagDataSource, CatalogDataSource)
-- ForeignKeyOrderer: Compute FK-safe insertion order
+- DerivaMLBagView: deriva-ml-domain view over a DatabaseModel
 
-Lazy imports are used for DatabaseModel and DerivaMLBagView (formerly
-DerivaMLDatabase) to avoid circular imports with the dataset module.
-The legacy ``DerivaMLDatabase`` name is preserved as an alias.
+Lazy imports are used for DatabaseModel and DerivaMLBagView to
+avoid circular imports with the dataset module.
 """
 
 # Annotation builders - import the most common ones for convenience
+from deriva.core.model_handles import ColumnHandle, TableHandle
+
 from deriva_ml.model.annotations import (
     CONTEXT_COMPACT,
     # Context constants
@@ -51,30 +51,14 @@ from deriva_ml.model.annotations import (
     fk_constraint,
 )
 from deriva_ml.model.catalog import DerivaModel
-from deriva_ml.model.data_loader import DataLoader
-from deriva_ml.model.data_sources import BagDataSource, CatalogDataSource, DataSource
-from deriva_ml.model.fk_orderer import ForeignKeyOrderer
-from deriva_ml.model.handles import ColumnHandle, TableHandle
-
-# Two-phase ORM creation components
-from deriva_ml.model.schema_builder import SchemaBuilder, SchemaORM
 
 __all__ = [
     # Core classes
     "DerivaModel",
     "DatabaseModel",
     "DerivaMLBagView",
-    "DerivaMLDatabase",  # legacy alias for DerivaMLBagView
     "TableHandle",
     "ColumnHandle",
-    # Two-phase ORM creation
-    "SchemaBuilder",
-    "SchemaORM",
-    "DataSource",
-    "BagDataSource",
-    "CatalogDataSource",
-    "DataLoader",
-    "ForeignKeyOrderer",
     # Annotation builders
     "Display",
     "VisibleColumns",
@@ -110,16 +94,12 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Lazy import for DatabaseModel and DerivaMLBagView.
-
-    ``DerivaMLDatabase`` is the legacy name for ``DerivaMLBagView``
-    and resolves to the same class.
-    """
+    """Lazy import for DatabaseModel and DerivaMLBagView."""
     if name == "DatabaseModel":
         from deriva_ml.model.database import DatabaseModel
 
         return DatabaseModel
-    if name in ("DerivaMLBagView", "DerivaMLDatabase"):
+    if name == "DerivaMLBagView":
         from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
         return DerivaMLBagView

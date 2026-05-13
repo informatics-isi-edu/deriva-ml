@@ -31,14 +31,15 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterable
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, PrivateAttr
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger("deriva_ml")
-
+logger = get_logger(__name__)
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.dataset.dataset import Dataset
@@ -112,7 +113,7 @@ class ExecutionRecord(BaseModel):
             >>> record.status = ExecutionStatus.Uploaded  # Raises DerivaMLException
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     execution_rid: RID
     _workflow: "Workflow | None" = PrivateAttr(default=None)
@@ -123,7 +124,7 @@ class ExecutionRecord(BaseModel):
     duration: str | None = None
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
-    _logger: logging.Logger = PrivateAttr(default_factory=lambda: logging.getLogger("deriva_ml"))
+    _logger: logging.Logger = PrivateAttr(default_factory=lambda: get_logger(__name__))
 
     def __init__(
         self,
@@ -243,23 +244,19 @@ class ExecutionRecord(BaseModel):
                 or if the catalog is read-only (a snapshot).
         """
         import importlib
+
         _deriva_core = importlib.import_module("deriva.core")
         ErmrestSnapshot = _deriva_core.ErmrestSnapshot
 
         if self.execution_rid is None:
-            raise DerivaMLException(
-                f"Cannot {operation}: Execution is not registered in the catalog (no RID)"
-            )
+            raise DerivaMLException(f"Cannot {operation}: Execution is not registered in the catalog (no RID)")
 
         if self._ml_instance is None:
-            raise DerivaMLException(
-                f"Cannot {operation}: ExecutionRecord is not bound to a catalog"
-            )
+            raise DerivaMLException(f"Cannot {operation}: ExecutionRecord is not bound to a catalog")
 
         if isinstance(self._ml_instance.catalog, ErmrestSnapshot):
             raise DerivaMLException(
-                f"Cannot {operation} on a read-only catalog snapshot. "
-                "Use a writable catalog connection instead."
+                f"Cannot {operation} on a read-only catalog snapshot. Use a writable catalog connection instead."
             )
 
     def _update_status_in_catalog(self, new_status: ExecutionStatus, status_detail: str = "") -> None:
@@ -397,8 +394,7 @@ class ExecutionRecord(BaseModel):
 
         # Query for child executions (Execution column = parent, Nested_Execution = child)
         records = list(
-            exec_exec_path
-            .filter(exec_exec_path.Execution == self.execution_rid)
+            exec_exec_path.filter(exec_exec_path.Execution == self.execution_rid)
             .link(execution_path, on=(exec_exec_path.Nested_Execution == execution_path.RID))
             .entities()
             .fetch()
@@ -477,8 +473,7 @@ class ExecutionRecord(BaseModel):
 
         # Query for parent executions (Execution column = parent, Nested_Execution = child)
         records = list(
-            exec_exec_path
-            .filter(exec_exec_path.Nested_Execution == self.execution_rid)
+            exec_exec_path.filter(exec_exec_path.Nested_Execution == self.execution_rid)
             .link(execution_path, on=(exec_exec_path.Execution == execution_path.RID))
             .entities()
             .fetch()
@@ -551,12 +546,7 @@ class ExecutionRecord(BaseModel):
         pb = self._ml_instance.pathBuilder()
         dataset_exec_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Execution
 
-        records = list(
-            dataset_exec_path
-            .filter(dataset_exec_path.Execution == self.execution_rid)
-            .entities()
-            .fetch()
-        )
+        records = list(dataset_exec_path.filter(dataset_exec_path.Execution == self.execution_rid).entities().fetch())
 
         # Look up each dataset and return Dataset objects
         datasets = []

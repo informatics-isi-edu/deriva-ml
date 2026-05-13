@@ -16,6 +16,7 @@ Dunders pass through to the default ``__getattribute__`` path so
 attribute names that don't start with ``_`` raise
 ``DerivaMLReadOnlyError``.
 """
+
 from __future__ import annotations
 
 from deriva_ml.core.exceptions import DerivaMLReadOnlyError
@@ -33,8 +34,7 @@ class CatalogStub:
         if name.startswith("_"):
             raise AttributeError(name)
         raise DerivaMLReadOnlyError(
-            f"catalog.{name} requires online mode; "
-            f"this DerivaML instance was constructed with mode=offline"
+            f"catalog.{name} requires online mode; this DerivaML instance was constructed with mode=offline"
         )
 
     def __repr__(self) -> str:

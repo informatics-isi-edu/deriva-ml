@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.core.definitions import RID
@@ -29,6 +29,7 @@ from deriva_ml.dataset.validation import (
     ExecutionConfigurationValidationReport,
     WorkflowSpecResult,
 )
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset import Dataset
@@ -203,9 +204,8 @@ class DatasetMixin:
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the table types that can be added as dataset members.
 
-        Returns every table that has an association with the Dataset table,
-        restricted to domain-schema tables and the Dataset table itself.
-        These are the types accepted by ``add_dataset_members()``.
+        Thin wrapper over :meth:`DerivaModel.list_dataset_element_types`;
+        the model layer owns the filter logic.
 
         Returns:
             Iterable of ``Table`` objects representing valid member types.
@@ -217,17 +217,9 @@ class DatasetMixin:
             >>> types = ml.list_dataset_element_types()  # doctest: +SKIP
             >>> print([t.name for t in types])  # doctest: +SKIP
         """
+        return self.model.list_dataset_element_types()
 
-        def is_domain_or_dataset_table(table: Table) -> bool:
-            return self.model.is_domain_schema(table.schema.name) or table.name == self._dataset_table.name
-
-        return [
-            t
-            for a in self._dataset_table.find_associations()
-            if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
-        ]
-
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_dataset_element_type(self, element: str | Table) -> Table:
         """Make it possible to add objects from ``element`` table to a dataset.
 
@@ -384,7 +376,7 @@ class DatasetMixin:
                 - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
                 - total_rows, total_asset_bytes, total_asset_size
                 - cache_status: one of "not_cached", "cached_metadata_only",
-                  "cached_materialized", "cached_incomplete"
+                  "cached_materialized", "cached_holey"
                 - cache_path: local path to cached bag (if cached), else None
         """
         if not self.model.is_dataset_rid(dataset.rid):

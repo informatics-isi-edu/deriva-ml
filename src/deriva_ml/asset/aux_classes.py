@@ -8,20 +8,21 @@ This module defines helper classes for asset operations including:
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 from hydra_zen import hydrated_dataclass
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, model_validator
 
 from deriva_ml.core.definitions import RID
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset_record import AssetRecord
     from deriva_ml.asset.manifest import AssetManifest
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AssetFilePath(Path):
@@ -110,9 +111,7 @@ class AssetFilePath(Path):
         """
         if hasattr(record, "model_dump"):
             # It's a Pydantic model (AssetRecord subclass)
-            metadata_dict = {
-                k: v for k, v in record.model_dump().items() if v is not None
-            }
+            metadata_dict = {k: v for k, v in record.model_dump().items() if v is not None}
         else:
             metadata_dict = dict(record)
 
@@ -174,7 +173,7 @@ class AssetSpec(BaseModel):
     asset_role: str = "Input"
     cache: bool = False
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = VALIDATION_CONFIG
 
     @model_validator(mode="before")
     @classmethod

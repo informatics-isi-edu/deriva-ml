@@ -3,6 +3,7 @@
 Part of the Bug C fix — see
 ``docs/superpowers/specs/2026-04-22-bug-c-asset-metadata-design.md``.
 """
+
 from __future__ import annotations
 
 from deriva.transfer.upload.processors import BaseProcessor
@@ -36,6 +37,7 @@ class NullSentinelProcessor(BaseProcessor):
 
     def process(self):
         from deriva_ml.dataset.upload import NULL_SENTINEL
+
         for k, v in list(self.metadata.items()):
             if v == NULL_SENTINEL:
                 self.metadata[k] = None

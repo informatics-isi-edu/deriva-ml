@@ -1,7 +1,8 @@
 """Benchmark tests for _schema_to_paths() — the shared FK path discovery engine.
 
-_schema_to_paths() is the foundation for both bag export (catalog_graph._collect_paths)
-and denormalization (_prepare_wide_table). Changes to path discovery affect both systems.
+_schema_to_paths() is the foundation for denormalization (_prepare_wide_table).
+Bag export uses its own walker (see deriva.bag.catalog_builder.CatalogBagBuilder).
+Changes here only affect the denormalization path.
 
 These tests capture the EXACT set of paths produced for the demo schema so that any
 regressions are immediately visible. When modifying _schema_to_paths(), update these

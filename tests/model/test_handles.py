@@ -3,7 +3,7 @@
 import pytest
 
 from deriva_ml.core.enums import BuiltinTypes
-from deriva_ml.model.handles import ColumnHandle, TableHandle
+from deriva.core.model_handles import ColumnHandle, TableHandle
 
 
 class TestColumnHandle:

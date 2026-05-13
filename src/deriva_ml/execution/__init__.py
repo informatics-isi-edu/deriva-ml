@@ -25,7 +25,7 @@ from deriva_ml.execution.base_config import (
     run_notebook,
     with_description,
 )
-from deriva_ml.execution.execution_configuration import AssetRID, ExecutionConfiguration
+from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.lineage import (
     AssetSummary,
     DatasetSummary,
@@ -64,7 +64,6 @@ __all__ = [
     "Execution",  # Lazy-loaded
     "ExecutionConfiguration",
     "Workflow",
-    "AssetRID",
     "AssetSpec",
     "AssetSpecConfig",
     "run_model",

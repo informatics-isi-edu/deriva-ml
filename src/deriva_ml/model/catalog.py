@@ -9,12 +9,10 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
-import logging
 
 # Standard library imports
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
-from graphlib import CycleError, TopologicalSorter
 from typing import Any, Callable, Iterable, NewType, TypeAlias
 
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
@@ -29,7 +27,7 @@ Schema = _ermrest_model.Schema
 Table = _ermrest_model.Table
 
 # Third-party imports
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
@@ -44,11 +42,8 @@ from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 
 # Local imports
 from deriva_ml.feature import Feature
-
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 
 @dataclass
@@ -117,8 +112,7 @@ def denormalize_column_name(schema_name: str, table_name: str, column_name: str,
     return f"{table_name}.{column_name}"
 
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 # Define common types:
 TableInput: TypeAlias = str | Table
 SchemaDict: TypeAlias = dict[str, Schema]
@@ -566,7 +560,7 @@ class DerivaModel:
                 tables.extend(t for t in schema.tables.values() if self.is_vocabulary(t))
         return tables
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def find_features(self, table: TableInput | None = None) -> Iterable[Feature]:
         """List features in the catalog.
 
@@ -1905,8 +1899,12 @@ class DerivaModel:
     ) -> list[list[Table]]:
         """Discover all FK paths through the schema graph via depth-first traversal.
 
-        This is the shared foundation for both bag export (catalog_graph._collect_paths)
-        and denormalization (_prepare_wide_table). Changes here affect both systems.
+        Used by the denormalization machinery (_prepare_wide_table)
+        to enumerate joinable paths through the schema. Bag export
+        no longer routes through this method — the bag pipeline
+        (:class:`deriva.bag.catalog_builder.CatalogBagBuilder`) has
+        its own walker, anchored at user-supplied :class:`Anchor`s
+        rather than the Dataset table.
 
         Traversal rules:
         - Follows both outbound FKs (table.foreign_keys) and inbound FKs (table.referenced_by)

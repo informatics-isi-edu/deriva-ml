@@ -24,6 +24,7 @@ import yaml
 @dataclass(frozen=True)
 class ColumnModel:
     """Column definition (name + ERMrest type)."""
+
     name: str
     type: str
 
@@ -31,6 +32,7 @@ class ColumnModel:
 @dataclass(frozen=True)
 class ForeignKeyModel:
     """FK from a set of columns to a referenced table's columns."""
+
     columns: list[str]
     referenced_schema: str
     referenced_table: str
@@ -40,12 +42,14 @@ class ForeignKeyModel:
 @dataclass(frozen=True)
 class VocabularyTermModel:
     """One seeded term in a vocabulary table."""
+
     name: str
 
 
 @dataclass(frozen=True)
 class AssociationEndpointModel:
     """One endpoint of an association table."""
+
     table: str
     role: str | None = None
 
@@ -53,6 +57,7 @@ class AssociationEndpointModel:
 @dataclass(frozen=True)
 class TableModel:
     """One table in the schema — plain, vocabulary, or association."""
+
     name: str
     kind: str  # "table", "vocabulary", "association"
     columns: list[ColumnModel] = field(default_factory=list)
@@ -65,11 +70,13 @@ class TableModel:
 @dataclass(frozen=True)
 class SchemaModel:
     """The full schema — one list of tables."""
+
     tables: list[TableModel]
 
 
 class MismatchKind(StrEnum):
     """Categories of doc↔code mismatch."""
+
     MISSING_TABLE = "missing_table"
     EXTRA_TABLE = "extra_table"
     COLUMN_MISMATCH = "column_mismatch"
@@ -108,15 +115,11 @@ def _extract_yaml_blocks(path: Path) -> list[dict]:
         try:
             parsed = yaml.safe_load(body)
         except yaml.YAMLError as exc:
-            raise SchemaDocError(
-                f"YAML parse error in {path}:{line_number}: {exc}"
-            ) from exc
+            raise SchemaDocError(f"YAML parse error in {path}:{line_number}: {exc}") from exc
         if parsed is None:
             continue
         if not isinstance(parsed, dict):
-            raise SchemaDocError(
-                f"{path}:{line_number}: expected a mapping, got {type(parsed).__name__}"
-            )
+            raise SchemaDocError(f"{path}:{line_number}: expected a mapping, got {type(parsed).__name__}")
         blocks.append(parsed)
     return blocks
 
@@ -141,24 +144,15 @@ def _load_from_doc(path: Path) -> SchemaModel:
     tables: list[TableModel] = []
     for block in blocks:
         if "table" not in block:
-            raise SchemaDocError(
-                f"{path}: block missing required key 'table': {block}"
-            )
+            raise SchemaDocError(f"{path}: block missing required key 'table': {block}")
         if "kind" not in block:
-            raise SchemaDocError(
-                f"{path}: block missing required key 'kind' for table "
-                f"{block['table']!r}"
-            )
+            raise SchemaDocError(f"{path}: block missing required key 'kind' for table {block['table']!r}")
         kind = block["kind"]
         if kind not in _VALID_KINDS:
             raise SchemaDocError(
-                f"{path}: table {block['table']!r} has unknown kind {kind!r}; "
-                f"expected one of {sorted(_VALID_KINDS)}"
+                f"{path}: table {block['table']!r} has unknown kind {kind!r}; expected one of {sorted(_VALID_KINDS)}"
             )
-        columns = [
-            ColumnModel(name=c["name"], type=c["type"])
-            for c in block.get("columns", [])
-        ]
+        columns = [ColumnModel(name=c["name"], type=c["type"]) for c in block.get("columns", [])]
         foreign_keys = [
             ForeignKeyModel(
                 columns=fk["columns"],
@@ -168,27 +162,22 @@ def _load_from_doc(path: Path) -> SchemaModel:
             )
             for fk in block.get("foreign_keys", [])
         ]
-        terms = [
-            VocabularyTermModel(name=t["name"])
-            for t in block.get("terms", [])
-        ]
+        terms = [VocabularyTermModel(name=t["name"]) for t in block.get("terms", [])]
         associates = [
-            AssociationEndpointModel(table=a["table"], role=a.get("role"))
-            for a in block.get("associates", [])
+            AssociationEndpointModel(table=a["table"], role=a.get("role")) for a in block.get("associates", [])
         ]
-        metadata = [
-            ColumnModel(name=m["name"], type=m["type"])
-            for m in block.get("metadata", [])
-        ]
-        tables.append(TableModel(
-            name=block["table"],
-            kind=kind,
-            columns=columns,
-            foreign_keys=foreign_keys,
-            terms=terms,
-            associates=associates,
-            metadata=metadata,
-        ))
+        metadata = [ColumnModel(name=m["name"], type=m["type"]) for m in block.get("metadata", [])]
+        tables.append(
+            TableModel(
+                name=block["table"],
+                kind=kind,
+                columns=columns,
+                foreign_keys=foreign_keys,
+                terms=terms,
+                associates=associates,
+                metadata=metadata,
+            )
+        )
     return SchemaModel(tables=tables)
 
 
@@ -219,14 +208,10 @@ def _resolve_enum_ref(enum_name: str, member: str) -> str:
     """Resolve an enum-member reference like MLTable.execution → 'Execution'."""
     lookup = _load_enum_lookup()
     if enum_name not in lookup:
-        raise SchemaCodeError(
-            f"unknown enum {enum_name!r}; expected one of {sorted(lookup)}"
-        )
+        raise SchemaCodeError(f"unknown enum {enum_name!r}; expected one of {sorted(lookup)}")
     members = lookup[enum_name]
     if member not in members:
-        raise SchemaCodeError(
-            f"{enum_name} has no member {member!r}; known: {sorted(members)}"
-        )
+        raise SchemaCodeError(f"{enum_name} has no member {member!r}; known: {sorted(members)}")
     return members[member]
 
 
@@ -245,9 +230,7 @@ def _extract_ast_str(node: ast.AST) -> str:
     # Attribute access like BuiltinType.text → "text"
     if isinstance(node, ast.Attribute):
         return node.attr
-    raise SchemaCodeError(
-        f"expected string constant or attribute, got {ast.dump(node)}"
-    )
+    raise SchemaCodeError(f"expected string constant or attribute, got {ast.dump(node)}")
 
 
 _KNOWN_TYPE_HOLDERS = frozenset({"BuiltinType"})
@@ -292,17 +275,13 @@ def _extract_ast_name_or_enum(node: ast.AST) -> str:
         # Expect: MLTable.execution or MLVocab.workflow_type
         if isinstance(node.value, ast.Name):
             return _resolve_enum_ref(node.value.id, node.attr)
-    raise SchemaCodeError(
-        f"expected string literal or enum reference, got {ast.dump(node)}"
-    )
+    raise SchemaCodeError(f"expected string literal or enum reference, got {ast.dump(node)}")
 
 
 def _extract_ast_str_list(node: ast.AST) -> list[str]:
     """Extract a list[str] from an ast.List node."""
     if not isinstance(node, ast.List):
-        raise SchemaCodeError(
-            f"expected list literal, got {ast.dump(node)}"
-        )
+        raise SchemaCodeError(f"expected list literal, got {ast.dump(node)}")
     return [_extract_ast_str(elt) for elt in node.elts]
 
 
@@ -321,9 +300,7 @@ def _extract_column(node: ast.Call) -> ColumnModel:
         elif kw.arg == "type":
             type_ = _extract_ast_str(kw.value)
     if name is None or type_ is None:
-        raise SchemaCodeError(
-            f"ColumnDef missing name or type: {ast.dump(node)}"
-        )
+        raise SchemaCodeError(f"ColumnDef missing name or type: {ast.dump(node)}")
     return ColumnModel(name=name, type=type_)
 
 
@@ -411,23 +388,15 @@ def _extract_vocabulary(node: ast.Call) -> TableModel:
 def _extract_ensure_terms(node: ast.Call) -> tuple[str, list[VocabularyTermModel]]:
     """Extract (vocab_name, terms) from an _ensure_terms(vocab, [...]) call."""
     if len(node.args) < 2:
-        raise SchemaCodeError(
-            f"_ensure_terms expects 2 positional args, got {len(node.args)}"
-        )
+        raise SchemaCodeError(f"_ensure_terms expects 2 positional args, got {len(node.args)}")
     vocab_name = _extract_ast_name_or_enum(node.args[0])
     terms_list = node.args[1]
     if not isinstance(terms_list, ast.List):
-        raise SchemaCodeError(
-            f"_ensure_terms second arg must be a list literal, got "
-            f"{ast.dump(terms_list)}"
-        )
+        raise SchemaCodeError(f"_ensure_terms second arg must be a list literal, got {ast.dump(terms_list)}")
     terms: list[VocabularyTermModel] = []
     for elt in terms_list.elts:
         if not isinstance(elt, ast.Dict):
-            raise SchemaCodeError(
-                f"_ensure_terms term must be a dict literal, got "
-                f"{ast.dump(elt)}"
-            )
+            raise SchemaCodeError(f"_ensure_terms term must be a dict literal, got {ast.dump(elt)}")
         name_val: str | None = None
         for k, v in zip(elt.keys, elt.values, strict=True):
             if (
@@ -438,9 +407,7 @@ def _extract_ensure_terms(node: ast.Call) -> tuple[str, list[VocabularyTermModel
             ):
                 name_val = v.value
         if name_val is None:
-            raise SchemaCodeError(
-                f"_ensure_terms term missing 'Name': {ast.dump(elt)}"
-            )
+            raise SchemaCodeError(f"_ensure_terms term missing 'Name': {ast.dump(elt)}")
         terms.append(VocabularyTermModel(name=name_val))
     return vocab_name, terms
 
@@ -543,15 +510,17 @@ def _load_from_code(path: Path) -> SchemaModel:
     tables_with_terms: list[TableModel] = []
     for t in tables:
         if t.kind == "vocabulary" and t.name in terms_by_vocab:
-            tables_with_terms.append(TableModel(
-                name=t.name,
-                kind=t.kind,
-                columns=t.columns,
-                foreign_keys=t.foreign_keys,
-                terms=terms_by_vocab[t.name],
-                associates=t.associates,
-                metadata=t.metadata,
-            ))
+            tables_with_terms.append(
+                TableModel(
+                    name=t.name,
+                    kind=t.kind,
+                    columns=t.columns,
+                    foreign_keys=t.foreign_keys,
+                    terms=terms_by_vocab[t.name],
+                    associates=t.associates,
+                    metadata=t.metadata,
+                )
+            )
         else:
             tables_with_terms.append(t)
     return SchemaModel(tables=tables_with_terms)
@@ -560,6 +529,7 @@ def _load_from_code(path: Path) -> SchemaModel:
 @dataclass(frozen=True)
 class Mismatch:
     """One discrepancy between expected and actual schemas."""
+
     kind: "MismatchKind"
     table: str | None
     detail: str
@@ -581,18 +551,22 @@ def _diff_schemas(*, expected: SchemaModel, actual: SchemaModel) -> list[Mismatc
 
     # Missing from actual (in doc but not in code).
     for name in sorted(expected_tables.keys() - actual_tables.keys()):
-        mismatches.append(Mismatch(
-            kind=MismatchKind.MISSING_TABLE,
-            table=name,
-            detail=f"table {name!r} is in the doc but not in the code",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.MISSING_TABLE,
+                table=name,
+                detail=f"table {name!r} is in the doc but not in the code",
+            )
+        )
     # Extra in actual (in code but not in doc).
     for name in sorted(actual_tables.keys() - expected_tables.keys()):
-        mismatches.append(Mismatch(
-            kind=MismatchKind.EXTRA_TABLE,
-            table=name,
-            detail=f"table {name!r} is in the code but not in the doc",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.EXTRA_TABLE,
+                table=name,
+                detail=f"table {name!r} is in the code but not in the doc",
+            )
+        )
     # Tables in both: D2-D4 extend this loop.
     for name in sorted(expected_tables.keys() & actual_tables.keys()):
         _compare_tables(mismatches, expected_tables[name], actual_tables[name])
@@ -622,29 +596,32 @@ def _compare_columns(
     expected_cols = {c.name: c for c in expected.columns}
     actual_cols = {c.name: c for c in actual.columns}
     for col_name in sorted(expected_cols.keys() - actual_cols.keys()):
-        mismatches.append(Mismatch(
-            kind=MismatchKind.COLUMN_MISMATCH,
-            table=expected.name,
-            detail=f"column {col_name!r} in doc but not in code",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.COLUMN_MISMATCH,
+                table=expected.name,
+                detail=f"column {col_name!r} in doc but not in code",
+            )
+        )
     for col_name in sorted(actual_cols.keys() - expected_cols.keys()):
-        mismatches.append(Mismatch(
-            kind=MismatchKind.COLUMN_MISMATCH,
-            table=expected.name,
-            detail=f"column {col_name!r} in code but not in doc",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.COLUMN_MISMATCH,
+                table=expected.name,
+                detail=f"column {col_name!r} in code but not in doc",
+            )
+        )
     for col_name in sorted(expected_cols.keys() & actual_cols.keys()):
         exp_c = expected_cols[col_name]
         act_c = actual_cols[col_name]
         if exp_c.type != act_c.type:
-            mismatches.append(Mismatch(
-                kind=MismatchKind.COLUMN_MISMATCH,
-                table=expected.name,
-                detail=(
-                    f"column {col_name!r}: doc type {exp_c.type!r} "
-                    f"vs code type {act_c.type!r}"
-                ),
-            ))
+            mismatches.append(
+                Mismatch(
+                    kind=MismatchKind.COLUMN_MISMATCH,
+                    table=expected.name,
+                    detail=(f"column {col_name!r}: doc type {exp_c.type!r} vs code type {act_c.type!r}"),
+                )
+            )
 
 
 def _compare_fks(
@@ -657,6 +634,7 @@ def _compare_fks(
     FKs are matched by their source columns tuple. If a doc FK and a code
     FK share columns, their referenced_* must match.
     """
+
     def key(fk: ForeignKeyModel) -> tuple[str, ...]:
         return tuple(fk.columns)
 
@@ -664,17 +642,21 @@ def _compare_fks(
     actual_fks = {key(fk): fk for fk in actual.foreign_keys}
 
     for k in sorted(expected_fks.keys() - actual_fks.keys()):
-        mismatches.append(Mismatch(
-            kind=MismatchKind.FK_MISMATCH,
-            table=expected.name,
-            detail=f"FK on {list(k)} in doc but not in code",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.FK_MISMATCH,
+                table=expected.name,
+                detail=f"FK on {list(k)} in doc but not in code",
+            )
+        )
     for k in sorted(actual_fks.keys() - expected_fks.keys()):
-        mismatches.append(Mismatch(
-            kind=MismatchKind.FK_MISMATCH,
-            table=expected.name,
-            detail=f"FK on {list(k)} in code but not in doc",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.FK_MISMATCH,
+                table=expected.name,
+                detail=f"FK on {list(k)} in code but not in doc",
+            )
+        )
     for k in sorted(expected_fks.keys() & actual_fks.keys()):
         exp_fk = expected_fks[k]
         act_fk = actual_fks[k]
@@ -687,17 +669,20 @@ def _compare_fks(
             or exp_fk.referenced_schema == act_fk.referenced_schema
         )
         if not schemas_match or (exp_fk.referenced_table, tuple(exp_fk.referenced_columns)) != (
-            act_fk.referenced_table, tuple(act_fk.referenced_columns)
+            act_fk.referenced_table,
+            tuple(act_fk.referenced_columns),
         ):
-            mismatches.append(Mismatch(
-                kind=MismatchKind.FK_MISMATCH,
-                table=expected.name,
-                detail=(
-                    f"FK on {list(k)} differs: "
-                    f"doc → {exp_fk.referenced_schema}.{exp_fk.referenced_table}{exp_fk.referenced_columns}; "
-                    f"code → {act_fk.referenced_schema}.{act_fk.referenced_table}{act_fk.referenced_columns}"
-                ),
-            ))
+            mismatches.append(
+                Mismatch(
+                    kind=MismatchKind.FK_MISMATCH,
+                    table=expected.name,
+                    detail=(
+                        f"FK on {list(k)} differs: "
+                        f"doc → {exp_fk.referenced_schema}.{exp_fk.referenced_table}{exp_fk.referenced_columns}; "
+                        f"code → {act_fk.referenced_schema}.{act_fk.referenced_table}{act_fk.referenced_columns}"
+                    ),
+                )
+            )
 
 
 def _compare_terms(
@@ -711,11 +696,13 @@ def _compare_terms(
     if expected_terms != actual_terms:
         doc_only = sorted(expected_terms - actual_terms)
         code_only = sorted(actual_terms - expected_terms)
-        mismatches.append(Mismatch(
-            kind=MismatchKind.VOCAB_TERMS_MISMATCH,
-            table=expected.name,
-            detail=f"doc-only: {doc_only}; code-only: {code_only}",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.VOCAB_TERMS_MISMATCH,
+                table=expected.name,
+                detail=f"doc-only: {doc_only}; code-only: {code_only}",
+            )
+        )
 
 
 def _compare_associates(
@@ -727,11 +714,13 @@ def _compare_associates(
     expected_assoc = [a.table for a in expected.associates]
     actual_assoc = [a.table for a in actual.associates]
     if expected_assoc != actual_assoc:
-        mismatches.append(Mismatch(
-            kind=MismatchKind.ASSOCIATION_MISMATCH,
-            table=expected.name,
-            detail=f"associates doc {expected_assoc} vs code {actual_assoc}",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.ASSOCIATION_MISMATCH,
+                table=expected.name,
+                detail=f"associates doc {expected_assoc} vs code {actual_assoc}",
+            )
+        )
     # Association tables may carry metadata columns (e.g. Execution_Nested_Execution.Sequence).
     # Diff by (name, type) tuples — same semantics as the regular column diff.
     expected_meta = {(m.name, m.type) for m in expected.metadata}
@@ -739,11 +728,13 @@ def _compare_associates(
     if expected_meta != actual_meta:
         doc_only = sorted(expected_meta - actual_meta)
         code_only = sorted(actual_meta - expected_meta)
-        mismatches.append(Mismatch(
-            kind=MismatchKind.ASSOCIATION_MISMATCH,
-            table=expected.name,
-            detail=f"metadata doc-only {doc_only} vs code-only {code_only}",
-        ))
+        mismatches.append(
+            Mismatch(
+                kind=MismatchKind.ASSOCIATION_MISMATCH,
+                table=expected.name,
+                detail=f"metadata doc-only {doc_only} vs code-only {code_only}",
+            )
+        )
 
 
 def _format_mismatches(mismatches: list[Mismatch]) -> str:
@@ -849,9 +840,7 @@ def to_doc_markdown(model: SchemaModel) -> str:
             "kind": t.kind,
         }
         if t.columns:
-            yaml_body["columns"] = [
-                {"name": c.name, "type": c.type} for c in t.columns
-            ]
+            yaml_body["columns"] = [{"name": c.name, "type": c.type} for c in t.columns]
         if t.foreign_keys:
             yaml_body["foreign_keys"] = [
                 {
@@ -867,15 +856,13 @@ def to_doc_markdown(model: SchemaModel) -> str:
         if t.terms:
             yaml_body["terms"] = [{"name": term.name} for term in t.terms]
         if t.associates:
-            yaml_body["associates"] = [
-                {"table": a.table} for a in t.associates
-            ]
+            yaml_body["associates"] = [{"table": a.table} for a in t.associates]
         if t.metadata:
-            yaml_body["metadata"] = [
-                {"name": m.name, "type": m.type} for m in t.metadata
-            ]
+            yaml_body["metadata"] = [{"name": m.name, "type": m.type} for m in t.metadata]
         yaml_text = yaml.safe_dump(
-            yaml_body, sort_keys=False, default_flow_style=False,
+            yaml_body,
+            sort_keys=False,
+            default_flow_style=False,
         )
         block = "```yaml\n" + yaml_text + "```\n"
         sections.append(header + "\n" + block)

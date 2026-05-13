@@ -12,15 +12,14 @@ and assign them RIDs" orchestration.
 
 from __future__ import annotations
 
-import logging
 import uuid
 from typing import TYPE_CHECKING, Iterable
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 # Chunk size for batched POSTs. 500 keeps us comfortably under
 # ERMrest URL and body-size limits while amortizing round-trip cost.
 # See spec §2.6 — may be tuned by tests via monkeypatch.
@@ -121,12 +120,12 @@ def _validate_pending_asset_leases(
     all_rids = list(rid_to_keys.keys())
     found_rids: set[str] = set()
 
+    pb = catalog.getPathBuilder()
+    lease_table = pb.schemas["public"].tables["ERMrest_RID_Lease"]
     for i in range(0, len(all_rids), PENDING_ROWS_LEASE_CHUNK):
         chunk = all_rids[i : i + PENDING_ROWS_LEASE_CHUNK]
-        filter_clause = ";".join(f"RID={rid}" for rid in chunk)
-        path = f"/entity/public:ERMrest_RID_Lease/{filter_clause}"
-        response = catalog.get(path)
-        for row in response.json():
+        rows = lease_table.filter(lease_table.RID.in_(chunk)).attributes(lease_table.RID).fetch()
+        for row in rows:
             found_rids.add(row["RID"])
 
     missing: list[tuple[str, str]] = []
@@ -136,10 +135,7 @@ def _validate_pending_asset_leases(
     if not missing:
         return
 
-    lines = [
-        f"Missing or invalid pre-allocated RIDs for "
-        f"{len(missing)} pending asset(s):"
-    ]
+    lines = [f"Missing or invalid pre-allocated RIDs for {len(missing)} pending asset(s):"]
     for key, rid in sorted(missing):
         lines.append(f"  - {key}: RID {rid} not found in ERMrest_RID_Lease")
     lines.append(

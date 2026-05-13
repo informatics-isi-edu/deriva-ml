@@ -89,30 +89,21 @@ class SchemaValidationReport:
 
     def add_error(self, category: str, message: str, **kwargs) -> None:
         """Add an error-level issue."""
-        self.issues.append(ValidationIssue(
-            severity=ValidationSeverity.ERROR,
-            category=category,
-            message=message,
-            **kwargs
-        ))
+        self.issues.append(
+            ValidationIssue(severity=ValidationSeverity.ERROR, category=category, message=message, **kwargs)
+        )
 
     def add_warning(self, category: str, message: str, **kwargs) -> None:
         """Add a warning-level issue."""
-        self.issues.append(ValidationIssue(
-            severity=ValidationSeverity.WARNING,
-            category=category,
-            message=message,
-            **kwargs
-        ))
+        self.issues.append(
+            ValidationIssue(severity=ValidationSeverity.WARNING, category=category, message=message, **kwargs)
+        )
 
     def add_info(self, category: str, message: str, **kwargs) -> None:
         """Add an info-level issue."""
-        self.issues.append(ValidationIssue(
-            severity=ValidationSeverity.INFO,
-            category=category,
-            message=message,
-            **kwargs
-        ))
+        self.issues.append(
+            ValidationIssue(severity=ValidationSeverity.INFO, category=category, message=message, **kwargs)
+        )
 
     def to_text(self) -> str:
         """Generate a human-readable text report."""
@@ -431,9 +422,7 @@ class SchemaValidator:
                 continue
 
             table = schema.tables[table_name]
-            self._validate_table_columns(
-                table, table_name, expected_columns, report, strict
-            )
+            self._validate_table_columns(table, table_name, expected_columns, report, strict)
 
     def _validate_vocabulary_tables(
         self,
@@ -452,9 +441,7 @@ class SchemaValidator:
                 continue
 
             table = schema.tables[table_name]
-            self._validate_table_columns(
-                table, table_name, EXPECTED_VOCABULARY_COLUMNS, report, strict
-            )
+            self._validate_table_columns(table, table_name, EXPECTED_VOCABULARY_COLUMNS, report, strict)
 
     def _validate_association_tables(
         self,
@@ -579,9 +566,7 @@ class SchemaValidator:
     ) -> None:
         """Check for extra tables not in the expected schema."""
         expected_tables = (
-            set(EXPECTED_TABLE_COLUMNS.keys())
-            | set(EXPECTED_VOCABULARY_TABLES)
-            | set(EXPECTED_ASSOCIATION_TABLES)
+            set(EXPECTED_TABLE_COLUMNS.keys()) | set(EXPECTED_VOCABULARY_TABLES) | set(EXPECTED_ASSOCIATION_TABLES)
         )
 
         for table_name in schema.tables:

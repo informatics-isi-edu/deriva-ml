@@ -23,6 +23,7 @@ get ``fsync``'d, then ``os.replace`` moves the tmp over the
 original. If anything crashes mid-write, the old file remains
 intact.
 """
+
 from __future__ import annotations
 
 import json

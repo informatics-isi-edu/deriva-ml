@@ -47,7 +47,6 @@ Progress reporting:
 from __future__ import annotations
 
 import json
-import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -68,6 +67,7 @@ from deriva_ml.core.definitions import MLVocab
 from deriva_ml.core.ermrest import UploadProgress
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.upload import asset_type_path, flat_asset_dir
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -78,7 +78,7 @@ if TYPE_CHECKING:
     ProgressCallback = Callable[[UploadProgress], None]
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def build_execution_bag(

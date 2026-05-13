@@ -10,17 +10,17 @@ for the semantic rules this class implements.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any, Generator
 
 import pandas as pd
 
 from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     from deriva_ml.interfaces import DatasetLike
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Denormalizer:

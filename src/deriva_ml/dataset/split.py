@@ -84,10 +84,9 @@ if TYPE_CHECKING:
     from deriva_ml import DerivaML
 
 from deriva_ml.execution import ExecutionConfiguration
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger("deriva_ml")
-
-
+logger = get_logger(__name__)
 # =============================================================================
 # Result Models
 # =============================================================================
@@ -1173,8 +1172,9 @@ def main() -> int:
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.INFO)
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-    logging.getLogger("deriva_ml").addHandler(handler)
-    logging.getLogger("deriva_ml").setLevel(logging.INFO)
+    root_logger = get_logger()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
 
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)

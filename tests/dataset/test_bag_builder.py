@@ -1,22 +1,25 @@
 """Tests for :class:`deriva_ml.dataset.bag_builder.DatasetBagBuilder`.
 
-The headline test is *spec equivalence*: the new
-:class:`DatasetBagBuilder` must produce byte-identical export
-specs to the legacy :class:`CatalogGraph` for the same
-``(catalog, dataset)`` input. That's the safety net that lets us
-cut :meth:`Dataset.download_dataset_bag` over to the new class
-in a follow-up commit without regression.
+Two layers:
 
-The equivalence test requires a live catalog (the spec embeds
-the catalog's host URL, snapshot, and reachable-table set), so
-it's gated on the ``catalog_manager`` fixture and skipped when
-``DERIVA_HOST`` isn't set.
+* :class:`TestSpecSmoke` — light live-catalog tests confirming the
+  three public methods (:meth:`generate_dataset_download_spec`,
+  :meth:`generate_dataset_download_annotations`,
+  :meth:`aggregate_queries`) run end-to-end against
+  ``catalog_with_datasets``. These catch construction-level
+  errors that would otherwise surface only as download failures.
 
-Two thinner unit tests verify the bag-pipeline-shaped helpers
-(:meth:`DatasetBagBuilder.anchors_for`,
-:meth:`DatasetBagBuilder.build_policy`) — they exercise the
-dataset-anchor + policy logic without needing the full export-
-engine spec.
+* :class:`TestAnchorsAndPolicy` — exercises the bag-pipeline-shaped
+  helpers (:meth:`anchors_for`, :meth:`build_policy`) without
+  driving a full export.
+
+The bag-content equivalence harness that gated the cutover from
+``CatalogGraph`` to :class:`CatalogBagBuilder` is **gone** —
+it served its purpose (verified row-set + asset (RID, MD5)
+equivalence on ``catalog_with_datasets``), then was deleted
+along with ``CatalogGraph`` itself. See
+``docs/design/dataset-bag-cutover-2026-05.md`` in deriva-ml for
+the design and the verified-equivalence record.
 """
 
 from __future__ import annotations
@@ -29,117 +32,71 @@ from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 
 
 # ---------------------------------------------------------------------------
-# Spec equivalence — gated on catalog_manager fixture
+# Spec smoke tests — confirm the new spec generator is callable
 # ---------------------------------------------------------------------------
 
 
-class TestSpecEquivalence:
-    """``DatasetBagBuilder`` must emit specs equivalent to ``CatalogGraph``.
+class TestSpecSmoke:
+    """Light tests confirming the new spec generator runs end-to-end.
 
-    These tests are the migration's load-bearing safety net.
-    When :meth:`Dataset.download_dataset_bag` is rewired to call
-    ``DatasetBagBuilder`` instead of ``CatalogGraph`` (a follow-up
-    commit), byte-equivalence ensures every existing cache,
-    MINID, and downstream consumer keeps working.
+    Not equivalence tests — those live in :class:`TestBagEquivalence`.
+    These exercise the spec/annotation methods enough to catch
+    construction-level errors (missing imports, attribute access)
+    that the harness would otherwise only surface as a download
+    failure.
     """
 
-    def test_spec_byte_equivalent_to_catalog_graph(
+    def test_spec_runs_without_error(
         self, catalog_with_datasets
     ) -> None:
-        """The two spec generators emit identical dicts for the same dataset.
-
-        ``catalog_with_datasets`` provides a populated catalog
-        with at least one dataset; we build both spec generators
-        over it and compare the outputs verbatim.
-        """
-        from deriva_ml.dataset.catalog_graph import CatalogGraph
-
-        ml, _ = catalog_with_datasets
-        datasets = list(ml.find_datasets())
-        if not datasets:
-            pytest.skip(
-                "Need at least one dataset in the catalog to test spec "
-                "equivalence; catalog_with_datasets returned none."
-            )
-        dataset_rid = datasets[0].dataset_rid
-        dataset = ml.lookup_dataset(dataset_rid)
-
-        legacy = CatalogGraph(ml_instance=ml).generate_dataset_download_spec(
-            dataset
-        )
-        new = DatasetBagBuilder(
-            ml_instance=ml
-        ).generate_dataset_download_spec(dataset)
-
-        assert legacy == new, (
-            "DatasetBagBuilder spec drifted from CatalogGraph spec. "
-            "This breaks the migration safety net — Dataset."
-            "download_dataset_bag relies on byte equivalence to cut "
-            "over without regression."
-        )
-
-    def test_annotations_byte_equivalent(
-        self, catalog_with_datasets
-    ) -> None:
-        """Chaise export annotations also match the legacy form.
-
-        The annotations are written to the Dataset table so
-        browser-based downloads from Chaise produce the same
-        bags. A mismatch here would mean Chaise downloads diverge
-        from Python-API downloads after the cutover.
-        """
-        from deriva_ml.dataset.catalog_graph import CatalogGraph
-
-        ml, _ = catalog_with_datasets
-        legacy = CatalogGraph(
-            ml_instance=ml
-        ).generate_dataset_download_annotations()
-        new = DatasetBagBuilder(
-            ml_instance=ml
-        ).generate_dataset_download_annotations()
-        assert legacy == new
-
-    def test_spec_with_exclude_tables(self, catalog_with_datasets) -> None:
-        """``exclude_tables`` flows through both generators identically."""
-        from deriva_ml.dataset.catalog_graph import CatalogGraph
-
+        """``generate_dataset_download_spec`` produces a dict with the right keys."""
         ml, _ = catalog_with_datasets
         datasets = list(ml.find_datasets())
         if not datasets:
             pytest.skip("Need at least one dataset.")
         dataset = ml.lookup_dataset(datasets[0].dataset_rid)
-        # Pick a table name guaranteed not to exist so the
-        # exclusion is a no-op but exercises the parameter
-        # plumbing. A real test against a deep-join table would
-        # require a richer fixture.
-        excluded = {"NoSuchTable"}
 
-        legacy = CatalogGraph(
-            ml_instance=ml, exclude_tables=excluded
+        spec = DatasetBagBuilder(
+            ml_instance=ml
         ).generate_dataset_download_spec(dataset)
-        new = DatasetBagBuilder(
-            ml_instance=ml, exclude_tables=excluded
-        ).generate_dataset_download_spec(dataset)
-        assert legacy == new
+        assert "env" in spec
+        assert "bag" in spec
+        assert "catalog" in spec
+        assert spec["bag"]["bag_name"] == "Dataset_{RID}"
+        assert spec["env"]["RID"] == "{RID}"
+        assert "query_processors" in spec["catalog"]
 
-    def test_spec_with_s3_bucket(self, catalog_with_datasets) -> None:
-        """When ``s3_bucket`` is set, post_processors match."""
-        from deriva_ml.dataset.catalog_graph import CatalogGraph
+    def test_annotations_run_without_error(
+        self, catalog_with_datasets
+    ) -> None:
+        """``generate_dataset_download_annotations`` produces a dict with the right keys."""
+        ml, _ = catalog_with_datasets
+        ann = DatasetBagBuilder(
+            ml_instance=ml
+        ).generate_dataset_download_annotations()
+        from deriva.core.utils.core_utils import tag as deriva_tags
 
+        assert deriva_tags.export_fragment_definitions in ann
+        assert deriva_tags.visible_foreign_keys in ann
+        assert deriva_tags.export_2019 in ann
+
+    def test_aggregate_queries_runs_without_error(
+        self, catalog_with_datasets
+    ) -> None:
+        """``aggregate_queries`` produces a non-empty dict for a real dataset."""
         ml, _ = catalog_with_datasets
         datasets = list(ml.find_datasets())
         if not datasets:
             pytest.skip("Need at least one dataset.")
         dataset = ml.lookup_dataset(datasets[0].dataset_rid)
-        bucket = "s3://test-bucket-name"
-
-        legacy = CatalogGraph(
-            ml_instance=ml, s3_bucket=bucket, use_minid=True
-        ).generate_dataset_download_spec(dataset)
-        new = DatasetBagBuilder(
-            ml_instance=ml, s3_bucket=bucket, use_minid=True
-        ).generate_dataset_download_spec(dataset)
-        assert legacy == new
+        result = DatasetBagBuilder(ml_instance=ml).aggregate_queries(dataset)
+        # Should produce at least one entry for the Dataset table.
+        assert "Dataset" in result
+        for table_name, entries in result.items():
+            for dp, pb_table, is_asset in entries:
+                assert dp is not None
+                assert pb_table is not None
+                assert isinstance(is_asset, bool)
 
 
 # ---------------------------------------------------------------------------

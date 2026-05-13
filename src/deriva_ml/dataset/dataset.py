@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import os
 import shutil
 from collections import defaultdict
@@ -40,7 +39,6 @@ from graphlib import TopologicalSorter
 from pathlib import Path
 
 # Local imports
-from pprint import pformat
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Iterator, Self
 from urllib.parse import urlparse
@@ -69,18 +67,7 @@ from deriva.transfer.download import (
     DerivaDownloadTimeoutError,
 )
 from deriva.transfer.download.deriva_export import DerivaExport
-from pydantic import ConfigDict, validate_call
-
-try:
-    from icecream import ic
-
-    ic.configureOutput(
-        includeContext=True,
-        argToStringFunction=lambda x: pformat(x.model_dump() if hasattr(x, "model_dump") else x, width=80, depth=10),
-    )
-
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+from pydantic import validate_call
 
 from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.constants import RID
@@ -102,6 +89,8 @@ from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 
 def _hash_spec(spec: Any) -> str:
@@ -160,7 +149,7 @@ class Dataset:
         >>> bag = dataset.download_dataset_bag(version=new_version)  # doctest: +SKIP
     """
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def __init__(
         self,
         catalog: DerivaMLCatalog,
@@ -183,7 +172,7 @@ class Dataset:
             >>> # Wrap an existing dataset
             >>> dataset = Dataset(catalog=ml, dataset_rid="4HM")  # doctest: +SKIP
         """
-        self._logger = logging.getLogger("deriva_ml")
+        self._logger = get_logger(__name__)
         self.dataset_rid = dataset_rid
         self.execution_rid = execution_rid
         self._ml_instance = catalog
@@ -262,7 +251,7 @@ class Dataset:
         return [ds[MLVocab.dataset_type] for ds in ds_types]
 
     @staticmethod
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def create_dataset(
         ml_instance: DerivaMLCatalog,
         execution_rid: RID,
@@ -736,7 +725,7 @@ class Dataset:
         return entries
 
     @property
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def current_version(self) -> DatasetVersion:
         """Return the dataset's current version label.
 
@@ -898,7 +887,7 @@ class Dataset:
         for parent in parents:
             parent._build_dataset_graph_1(ts, visited)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def _increment_dataset_version(
         self,
         component: VersionPart,
@@ -1496,7 +1485,7 @@ class Dataset:
             execution_rid=execution_rid,
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_dataset_members(
         self,
         recurse: bool = False,
@@ -1871,7 +1860,7 @@ class Dataset:
         )
         return result.to_dataframe()
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_dataset_members(
         self,
         members: list[RID] | dict[str, list[RID]],
@@ -2019,7 +2008,7 @@ class Dataset:
                 execution_rid=execution_rid,
             )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def delete_dataset_members(
         self,
         members: list[RID],
@@ -2116,7 +2105,7 @@ class Dataset:
             execution_rid=execution_rid,
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_dataset_parents(
         self,
         recurse: bool = False,
@@ -2181,7 +2170,7 @@ class Dataset:
                 parents.extend(parent.list_dataset_parents(recurse=True, _visited=_visited, version=None))
         return parents
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def list_dataset_children(
         self,
         recurse: bool = False,
@@ -2362,7 +2351,7 @@ class Dataset:
             [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def download_dataset_bag(
         self,
         version: DatasetVersion | str,
@@ -2446,7 +2435,7 @@ class Dataset:
         db_model = DatabaseModel(minid, bag_path, self._ml_instance.working_dir)
         return DerivaMLBagView(db_model).lookup_dataset(self.dataset_rid)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def estimate_bag_size(
         self,
         version: DatasetVersion | str,
@@ -2655,7 +2644,7 @@ class Dataset:
             "total_estimated_size": self._human_readable_size(total_size),
         }
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def bag_info(
         self,
         version: DatasetVersion | str,
@@ -2679,7 +2668,7 @@ class Dataset:
                 - total_asset_bytes: total size of asset files in bytes
                 - total_asset_size: human-readable size string
                 - cache_status: one of "not_cached", "cached_metadata_only",
-                  "cached_materialized", "cached_incomplete"
+                  "cached_materialized", "cached_holey"
                 - cache_path: local path to cached bag (if cached), else None
         """
         # Get size estimate
@@ -3499,7 +3488,7 @@ class Dataset:
         try:
             bdb.validate_bag_structure(bag_path.as_posix())
         except Exception as e:
-            logging.getLogger("deriva_ml").debug(f"Bag validation check failed for {bag_path}: {e}")
+            self._logger.debug(f"Bag validation check failed for {bag_path}: {e}")
             return False
         fetch_file = bag_path / "fetch.txt"
         if not fetch_file.exists():

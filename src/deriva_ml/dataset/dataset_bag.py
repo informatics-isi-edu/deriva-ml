@@ -32,7 +32,6 @@ Typical usage:
 from __future__ import annotations
 
 # Standard library imports
-import logging
 import shutil
 from collections import defaultdict
 from copy import copy
@@ -55,6 +54,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.pd_utils import rows_to_dataframe
 from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 from deriva_ml.feature import Feature, FeatureRecord
+from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
     import tensorflow as tf
@@ -62,11 +62,6 @@ if TYPE_CHECKING:
 
     from deriva_ml.dataset.target_resolution import FeatureSelector
     from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
-
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 def _default_dir_name_from_target(
@@ -443,7 +438,7 @@ class DatasetBag:
                 description=v["Description"],
                 execution_rid=v["Execution"],
             )
-            for v in self.model._get_table_contents("Dataset_Version")
+            for v in self.model.get_table_contents("Dataset_Version")
             if v["Dataset"] == self.dataset_rid
         ]
 
@@ -506,7 +501,7 @@ class DatasetBag:
         for element_table in self.model.list_dataset_element_types():
             element_class = self.model.get_orm_class_for_table(element_table)
 
-            assoc_class, dataset_rel, element_rel = self.model.get_orm_association_class(dataset_class, element_class)
+            assoc_class, dataset_rel, element_rel = self.model.get_association_class(dataset_class, element_class)
 
             element_table = inspect(element_class).mapped_table
             if not self.model.is_domain_schema(element_table.schema) and element_table.name not in ["Dataset", "File"]:
@@ -1307,15 +1302,13 @@ class DatasetBag:
                   and no value_selector is provided.
         """
         from deriva_ml.core.exceptions import DerivaMLException
-        from deriva_ml.feature import FeatureRecord
 
         cache: dict[str, dict[RID, Any]] = {}
         # Store FeatureRecord objects directly for later selection
         records_cache: dict[str, dict[RID, list[FeatureRecord]]] = {}
         # Track which column to use for each group_key's value extraction
         column_for_group: dict[str, str] = {}
-        logger = logging.getLogger("deriva_ml")
-
+        logger = get_logger(__name__)
         # Parse group_keys to extract feature names and optional column specifications
         # Format: "FeatureName" or "FeatureName.column_name"
         feature_column_map: dict[str, str | None] = {}  # group_key -> specific column or None
@@ -2103,7 +2096,7 @@ class DatasetBag:
         from deriva_ml.core.exceptions import DerivaMLValidationError
         from deriva_ml.dataset.target_resolution import _resolve_targets
 
-        logger = logging.getLogger("deriva_ml")
+        logger = get_logger(__name__)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 

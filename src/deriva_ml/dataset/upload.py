@@ -58,7 +58,7 @@ HatracStore = _hatrac_store.HatracStore
 hash_utils = _hash_utils
 mime_utils = _mime_utils
 GenericUploader = _deriva_upload.GenericUploader
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.core.definitions import (
     RID,
@@ -69,11 +69,8 @@ from deriva_ml.core.definitions import (
 )
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.model.catalog import DerivaModel
-
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.core.logging_config import get_logger
 
 NULL_SENTINEL = "__NULL__"
 """Directory-segment marker for nullable asset-metadata columns with
@@ -336,7 +333,7 @@ def bulk_upload_configuration(model: DerivaModel, chunk_size: int | None = None)
 DEFAULT_UPLOAD_TIMEOUT = (600, 600)
 
 
-@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+@validate_call(config=VALIDATION_CONFIG)
 def upload_directory(
     model: DerivaModel,
     directory: Path | str,
@@ -369,13 +366,11 @@ def upload_directory(
     Raises:
         DerivaMLException: If there is an issue with uploading the assets.
     """
-    import logging
     import time
 
     from deriva.core import DEFAULT_SESSION_CONFIG
 
-    logger = logging.getLogger("deriva_ml")
-
+    logger = get_logger(__name__)
     directory = Path(directory)
     if not directory.is_dir():
         raise DerivaMLException("Directory does not exist")
@@ -529,7 +524,7 @@ def upload_directory(
         return all_results
 
 
-@validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+@validate_call(config=VALIDATION_CONFIG)
 def upload_asset(model: DerivaModel, file: Path | str, table: Table, **kwargs: Any) -> dict:
     """Upload the specified file into Hatrac and update the associated asset table.
 

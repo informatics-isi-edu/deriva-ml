@@ -33,12 +33,12 @@ Example (RID validation):
 
 from __future__ import annotations
 
-import logging
 
 from pydantic import ConfigDict
 
-logger = logging.getLogger("deriva_ml")
+from deriva_ml.core.logging_config import get_logger
 
+logger = get_logger(__name__)
 # =============================================================================
 # Shared Pydantic Configuration
 # =============================================================================
@@ -272,16 +272,13 @@ def validate_rids(
 
                 if current_version is None:
                     result.add_warning(
-                        f"Dataset '{rid}' has no version information. "
-                        f"Required version: {required_version}"
+                        f"Dataset '{rid}' has no version information. Required version: {required_version}"
                     )
                 elif current_version != required_version:
                     # Check if the required version exists in history
                     try:
                         history = dataset.list_versions()
-                        version_exists = any(
-                            str(h.dataset_version) == required_version for h in history
-                        )
+                        version_exists = any(str(h.dataset_version) == required_version for h in history)
                         if not version_exists:
                             result.add_error(
                                 f"Dataset '{rid}' does not have version '{required_version}'. "
@@ -427,10 +424,6 @@ def validate_execution_config(
     >>> if not result.is_valid:
     ...     raise DerivaMLException(f"Config validation failed:\\n{result}")
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     # Extract dataset RIDs and versions
     dataset_rids: list[str] = []
     dataset_versions: dict[str, str] = {}

@@ -135,6 +135,7 @@ from typing import Any, Literal
 # Enums for constrained values
 # =============================================================================
 
+
 class TemplateEngine(str, Enum):
     """Template engine for markdown patterns.
 
@@ -148,6 +149,7 @@ class TemplateEngine(str, Enum):
         ...     template_engine=TemplateEngine.HANDLEBARS
         ... )
     """
+
     HANDLEBARS = "handlebars"
     MUSTACHE = "mustache"
 
@@ -181,6 +183,7 @@ class Aggregate(str, Enum):
         ...     markdown_name="Tags"
         ... )
     """
+
     MIN = "min"
     MAX = "max"
     CNT = "cnt"
@@ -207,6 +210,7 @@ class ArrayUxMode(str, Enum):
         ...     display=PseudoColumnDisplay(array_ux_mode=ArrayUxMode.CSV)
         ... )
     """
+
     RAW = "raw"
     CSV = "csv"
     OLIST = "olist"
@@ -233,6 +237,7 @@ class FacetUxMode(str, Enum):
         >>> # Check presence (has value / no value)
         >>> Facet(source="Notes", ux_mode=FacetUxMode.CHECK_PRESENCE)
     """
+
     CHOICES = "choices"
     RANGES = "ranges"
     CHECK_PRESENCE = "check_presence"
@@ -273,6 +278,7 @@ TAG_SOURCE_DEFINITIONS = "tag:isrd.isi.edu,2019:source-definitions"
 # Base Protocol for Annotations
 # =============================================================================
 
+
 class AnnotationBuilder:
     """Base class for annotation builders.
 
@@ -292,6 +298,7 @@ class AnnotationBuilder:
 # Display Annotation
 # =============================================================================
 
+
 @dataclass
 class NameStyle:
     """Styling options for automatic display name formatting.
@@ -309,6 +316,7 @@ class NameStyle:
         ...     name_style=NameStyle(underline_space=True, title_case=True)
         ... )
     """
+
     underline_space: bool | None = None
     title_case: bool | None = None
     markdown: bool | None = None
@@ -379,6 +387,7 @@ class Display(AnnotationBuilder):
             ...     show_foreign_key_link={CONTEXT_COMPACT: False}
             ... )
     """
+
     tag = TAG_DISPLAY
 
     name: str | None = None
@@ -415,6 +424,7 @@ class Display(AnnotationBuilder):
 # Sort Key
 # =============================================================================
 
+
 @dataclass
 class SortKey:
     """A sort key for row ordering.
@@ -427,6 +437,7 @@ class SortKey:
         >>> SortKey("Name")  # Ascending
         >>> SortKey("Created", descending=True)  # Descending
     """
+
     column: str
     descending: bool = False
 
@@ -440,6 +451,7 @@ class SortKey:
 # =============================================================================
 # Foreign Key Path Components
 # =============================================================================
+
 
 @dataclass
 class InboundFK:
@@ -462,6 +474,7 @@ class InboundFK:
             ...     markdown_name="Image Count"
             ... )
     """
+
     schema: str
     constraint: str
 
@@ -501,6 +514,7 @@ class OutboundFK:
             ...     markdown_name="Species"
             ... )
     """
+
     schema: str
     constraint: str
 
@@ -543,6 +557,7 @@ def fk_constraint(schema: str, constraint: str) -> list[str]:
 # Pseudo-Column Display Options
 # =============================================================================
 
+
 @dataclass
 class PseudoColumnDisplay:
     """Display options for a pseudo-column.
@@ -555,6 +570,7 @@ class PseudoColumnDisplay:
         column_order: Sort order for the column, or False to disable
         wait_for: Template variables to wait for before rendering
     """
+
     markdown_pattern: str | None = None
     template_engine: TemplateEngine | None = None
     show_foreign_key_link: bool | None = None
@@ -576,10 +592,7 @@ class PseudoColumnDisplay:
             if self.column_order is False:
                 result["column_order"] = False
             else:
-                result["column_order"] = [
-                    k.to_dict() if isinstance(k, SortKey) else k
-                    for k in self.column_order
-                ]
+                result["column_order"] = [k.to_dict() if isinstance(k, SortKey) else k for k in self.column_order]
         if self.wait_for is not None:
             result["wait_for"] = self.wait_for
         return result
@@ -588,6 +601,7 @@ class PseudoColumnDisplay:
 # =============================================================================
 # Pseudo-Column (for visible-columns and visible-foreign-keys)
 # =============================================================================
+
 
 @dataclass
 class PseudoColumn:
@@ -670,6 +684,7 @@ class PseudoColumn:
             ...     markdown_name="Tags"
             ... )
     """
+
     source: str | list[str | InboundFK | OutboundFK] | None = None
     sourcekey: str | None = None
     markdown_name: str | None = None
@@ -692,10 +707,7 @@ class PseudoColumn:
                 result["source"] = self.source
             else:
                 # Convert path elements
-                result["source"] = [
-                    item.to_dict() if hasattr(item, "to_dict") else item
-                    for item in self.source
-                ]
+                result["source"] = [item.to_dict() if hasattr(item, "to_dict") else item for item in self.source]
 
         if self.sourcekey is not None:
             result["sourcekey"] = self.sourcekey
@@ -798,15 +810,12 @@ class VisibleColumns(AnnotationBuilder):
             >>> facets.add(Facet(source="Status", open=True))
             >>> vc._contexts["filter"] = facets.to_dict()
     """
+
     tag = TAG_VISIBLE_COLUMNS
 
     _contexts: dict[str, list[ColumnEntry] | str] = field(default_factory=dict)
 
-    def set_context(
-        self,
-        context: str,
-        columns: list[ColumnEntry] | str
-    ) -> "VisibleColumns":
+    def set_context(self, context: str, columns: list[ColumnEntry] | str) -> "VisibleColumns":
         """Set columns for a context.
 
         Args:
@@ -849,10 +858,7 @@ class VisibleColumns(AnnotationBuilder):
             if isinstance(columns, str):
                 result[context] = columns
             else:
-                result[context] = [
-                    c.to_dict() if isinstance(c, PseudoColumn) else c
-                    for c in columns
-                ]
+                result[context] = [c.to_dict() if isinstance(c, PseudoColumn) else c for c in columns]
         return result
 
 
@@ -877,15 +883,12 @@ class VisibleForeignKeys(AnnotationBuilder):
         ...     fk_constraint("domain", "Diagnosis_Subject_fkey")
         ... ])
     """
+
     tag = TAG_VISIBLE_FOREIGN_KEYS
 
     _contexts: dict[str, list[ForeignKeyEntry] | str] = field(default_factory=dict)
 
-    def set_context(
-        self,
-        context: str,
-        foreign_keys: list[ForeignKeyEntry] | str
-    ) -> "VisibleForeignKeys":
+    def set_context(self, context: str, foreign_keys: list[ForeignKeyEntry] | str) -> "VisibleForeignKeys":
         """Set foreign keys for a context."""
         self._contexts[context] = foreign_keys
         return self
@@ -904,16 +907,14 @@ class VisibleForeignKeys(AnnotationBuilder):
             if isinstance(fkeys, str):
                 result[context] = fkeys
             else:
-                result[context] = [
-                    fk.to_dict() if isinstance(fk, PseudoColumn) else fk
-                    for fk in fkeys
-                ]
+                result[context] = [fk.to_dict() if isinstance(fk, PseudoColumn) else fk for fk in fkeys]
         return result
 
 
 # =============================================================================
 # Table Display Annotation
 # =============================================================================
+
 
 @dataclass
 class TableDisplayOptions:
@@ -931,6 +932,7 @@ class TableDisplayOptions:
         collapse_toc_panel: Collapse TOC panel
         hide_column_headers: Hide column headers
     """
+
     row_order: list[SortKey] | None = None
     page_size: int | None = None
     row_markdown_pattern: str | None = None
@@ -945,10 +947,7 @@ class TableDisplayOptions:
     def to_dict(self) -> dict[str, Any]:
         result = {}
         if self.row_order is not None:
-            result["row_order"] = [
-                k.to_dict() if isinstance(k, SortKey) else k
-                for k in self.row_order
-            ]
+            result["row_order"] = [k.to_dict() if isinstance(k, SortKey) else k for k in self.row_order]
         if self.page_size is not None:
             result["page_size"] = self.page_size
         if self.row_markdown_pattern is not None:
@@ -981,31 +980,21 @@ class TableDisplay(AnnotationBuilder):
         >>> td.row_name(row_markdown_pattern="{{{Name}}} ({{{Species}}})")
         >>> td.compact(row_order=[SortKey("Name")])
     """
+
     tag = TAG_TABLE_DISPLAY
 
     _contexts: dict[str, TableDisplayOptions | str | None] = field(default_factory=dict)
 
-    def set_context(
-        self,
-        context: str,
-        options: TableDisplayOptions | str | None
-    ) -> "TableDisplay":
+    def set_context(self, context: str, options: TableDisplayOptions | str | None) -> "TableDisplay":
         """Set options for a context."""
         self._contexts[context] = options
         return self
 
-    def row_name(
-        self,
-        row_markdown_pattern: str,
-        template_engine: TemplateEngine | None = None
-    ) -> "TableDisplay":
+    def row_name(self, row_markdown_pattern: str, template_engine: TemplateEngine | None = None) -> "TableDisplay":
         """Set row name pattern (used in foreign key dropdowns, etc.)."""
         return self.set_context(
             CONTEXT_ROW_NAME,
-            TableDisplayOptions(
-                row_markdown_pattern=row_markdown_pattern,
-                template_engine=template_engine
-            )
+            TableDisplayOptions(row_markdown_pattern=row_markdown_pattern, template_engine=template_engine),
         )
 
     def compact(self, options: TableDisplayOptions) -> "TableDisplay":
@@ -1036,6 +1025,7 @@ class TableDisplay(AnnotationBuilder):
 # Column Display Annotation
 # =============================================================================
 
+
 @dataclass
 class PreFormat:
     """Pre-formatting options for column values.
@@ -1045,6 +1035,7 @@ class PreFormat:
         bool_true_value: Display value for True
         bool_false_value: Display value for False
     """
+
     format: str | None = None
     bool_true_value: str | None = None
     bool_false_value: str | None = None
@@ -1070,6 +1061,7 @@ class ColumnDisplayOptions:
         template_engine: Template engine to use
         column_order: Sort order, or False to disable
     """
+
     pre_format: PreFormat | None = None
     markdown_pattern: str | None = None
     template_engine: TemplateEngine | None = None
@@ -1087,10 +1079,7 @@ class ColumnDisplayOptions:
             if self.column_order is False:
                 result["column_order"] = False
             else:
-                result["column_order"] = [
-                    k.to_dict() if isinstance(k, SortKey) else k
-                    for k in self.column_order
-                ]
+                result["column_order"] = [k.to_dict() if isinstance(k, SortKey) else k for k in self.column_order]
         return result
 
 
@@ -1112,15 +1101,12 @@ class ColumnDisplay(AnnotationBuilder):
         ...     markdown_pattern="[Link]({{{_value}}})"
         ... ))
     """
+
     tag = TAG_COLUMN_DISPLAY
 
     _contexts: dict[str, ColumnDisplayOptions | str] = field(default_factory=dict)
 
-    def set_context(
-        self,
-        context: str,
-        options: ColumnDisplayOptions | str
-    ) -> "ColumnDisplay":
+    def set_context(self, context: str, options: ColumnDisplayOptions | str) -> "ColumnDisplay":
         """Set options for a context."""
         self._contexts[context] = options
         return self
@@ -1151,6 +1137,7 @@ class ColumnDisplay(AnnotationBuilder):
 # Facet Entry (for filter context)
 # =============================================================================
 
+
 @dataclass
 class FacetRange:
     """A range for facet filtering.
@@ -1161,6 +1148,7 @@ class FacetRange:
         min_exclusive: Exclude min value
         max_exclusive: Exclude max value
     """
+
     min: float | None = None
     max: float | None = None
     min_exclusive: bool | None = None
@@ -1199,6 +1187,7 @@ class Facet:
         hide_not_null_choice: Hide "not null" option
         n_bins: Number of bins for histogram
     """
+
     source: str | list[str | InboundFK | OutboundFK] | None = None
     sourcekey: str | None = None
     markdown_name: str | None = None
@@ -1221,10 +1210,7 @@ class Facet:
             if isinstance(self.source, str):
                 result["source"] = self.source
             else:
-                result["source"] = [
-                    item.to_dict() if hasattr(item, "to_dict") else item
-                    for item in self.source
-                ]
+                result["source"] = [item.to_dict() if hasattr(item, "to_dict") else item for item in self.source]
 
         if self.sourcekey is not None:
             result["sourcekey"] = self.sourcekey
@@ -1266,6 +1252,7 @@ class FacetList:
         ...     Facet(source="Age", ux_mode=FacetUxMode.RANGES)
         ... ])
     """
+
     facets: list[Facet] = field(default_factory=list)
 
     def add(self, facet: Facet) -> "FacetList":

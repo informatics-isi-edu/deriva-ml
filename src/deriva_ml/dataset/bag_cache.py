@@ -33,15 +33,15 @@ caches written by older code keep working.
 
 from __future__ import annotations
 
-import logging
 import shutil
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from deriva.bag.cache_index import BagCacheIndex
+from deriva_ml.core.logging_config import get_logger
 
-logger = logging.getLogger("deriva_ml")
+logger = get_logger(__name__)
 
 
 class CacheStatus(StrEnum):
@@ -140,9 +140,7 @@ class BagCache:
                   names found for this RID — supplied for
                   back-compat with the pre-migration API.
         """
-        checksums = self._index.find_bags_for_rid(
-            table="Dataset", rid=dataset_rid
-        )
+        checksums = self._index.find_bags_for_rid(table="Dataset", rid=dataset_rid)
 
         # Pre-migration callers also picked up *legacy* directories
         # (``{cache_dir}/{rid}_{checksum}/``) that this BagCache had
@@ -191,9 +189,7 @@ class BagCache:
     # Status detection helpers
     # ------------------------------------------------------------------
 
-    def _determine_index_status(
-        self, checksum: str, bag_path: Path
-    ) -> CacheStatus:
+    def _determine_index_status(self, checksum: str, bag_path: Path) -> CacheStatus:
         """Compute the status of a bag known to the index.
 
         The index records that a bag exists; the *on-disk* state
@@ -212,9 +208,7 @@ class BagCache:
         # missing.
         return CacheStatus.cached_holey
 
-    def _determine_legacy_status(
-        self, bag_path: Path, validated_check: Path
-    ) -> CacheStatus:
+    def _determine_legacy_status(self, bag_path: Path, validated_check: Path) -> CacheStatus:
         """Pre-migration status detection.
 
         Matches the behavior of the original
@@ -364,9 +358,7 @@ def migrate_legacy_cache(
                 anchors=[("Dataset", rid)],
             )
             recorded.append(entry.name)
-            logger.info(
-                "BagCache migrator: recorded %s in index", entry.name
-            )
+            logger.info("BagCache migrator: recorded %s in index", entry.name)
 
             if move_directories:
                 # Move ``{cache_dir}/{name}/`` to
@@ -376,8 +368,7 @@ def migrate_legacy_cache(
                 destination = index.bag_dir_for(checksum)
                 if destination.exists():
                     logger.info(
-                        "BagCache migrator: destination %s already "
-                        "exists; leaving %s in place",
+                        "BagCache migrator: destination %s already exists; leaving %s in place",
                         destination,
                         entry,
                     )

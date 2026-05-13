@@ -189,27 +189,31 @@ def discover_entries() -> list[DirectoryEntry]:
                         if exec_entry.is_dir():
                             ex_size = _dir_size(exec_entry)
                             ex_mtime = _dir_mtime(exec_entry)
-                            entries.append(DirectoryEntry(
-                                path=exec_entry,
-                                label=exec_entry.name,
-                                category="execution",
-                                size_bytes=ex_size,
-                                item_count=_dir_file_count(exec_entry),
-                                modified=ex_mtime,
-                                parent_label=parent_label,
-                                rid=exec_entry.name,
-                            ))
+                            entries.append(
+                                DirectoryEntry(
+                                    path=exec_entry,
+                                    label=exec_entry.name,
+                                    category="execution",
+                                    size_bytes=ex_size,
+                                    item_count=_dir_file_count(exec_entry),
+                                    modified=ex_mtime,
+                                    parent_label=parent_label,
+                                    rid=exec_entry.name,
+                                )
+                            )
                 # If there's nothing in execution but the dir exists, offer the whole thing
                 if size > 0 and not (exec_dir.exists() and any(exec_dir.iterdir())):
-                    entries.append(DirectoryEntry(
-                        path=entry,
-                        label="deriva-ml/",
-                        category="execution",
-                        size_bytes=size,
-                        item_count=file_count,
-                        modified=mtime,
-                        parent_label=parent_label,
-                    ))
+                    entries.append(
+                        DirectoryEntry(
+                            path=entry,
+                            label="deriva-ml/",
+                            category="execution",
+                            size_bytes=size,
+                            item_count=file_count,
+                            modified=mtime,
+                            parent_label=parent_label,
+                        )
+                    )
             else:
                 # Check for {RID}_{hash} pattern (dataset snapshot dirs)
                 parsed = _is_rid_hash_dir(entry.name)
@@ -218,15 +222,17 @@ def discover_entries() -> list[DirectoryEntry]:
                     rid_hash_items.append((entry, rid, size, file_count, mtime, "dataset"))
                     rid_counts[rid] = rid_counts.get(rid, 0) + 1
                 else:
-                    entries.append(DirectoryEntry(
-                        path=entry,
-                        label=entry.name,
-                        category="other",
-                        size_bytes=size,
-                        item_count=file_count,
-                        modified=mtime,
-                        parent_label=parent_label,
-                    ))
+                    entries.append(
+                        DirectoryEntry(
+                            path=entry,
+                            label=entry.name,
+                            category="other",
+                            size_bytes=size,
+                            item_count=file_count,
+                            modified=mtime,
+                            parent_label=parent_label,
+                        )
+                    )
 
         # Second pass: create entries for all {RID}_{hash} items with disambiguation
         for item_path, rid, item_size, item_count, item_mtime, category in rid_hash_items:
@@ -241,16 +247,18 @@ def discover_entries() -> list[DirectoryEntry]:
             else:
                 label = rid
 
-            entries.append(DirectoryEntry(
-                path=item_path,
-                label=label,
-                category=category,
-                size_bytes=item_size,
-                item_count=item_count,
-                modified=item_mtime,
-                parent_label=parent_label,
-                rid=rid,
-            ))
+            entries.append(
+                DirectoryEntry(
+                    path=item_path,
+                    label=label,
+                    category=category,
+                    size_bytes=item_size,
+                    item_count=item_count,
+                    modified=item_mtime,
+                    parent_label=parent_label,
+                    rid=rid,
+                )
+            )
 
     # Scan two levels: hostname/catalog_id
     for host_dir in sorted(default_root.iterdir()):
@@ -299,10 +307,7 @@ class SelectionSummary(Static):
         if count == 0:
             self.update("No items selected")
         else:
-            self.update(
-                f"[bold]{count}[/bold] selected  |  "
-                f"[bold red]{_human_readable_size(total)}[/bold red] to free"
-            )
+            self.update(f"[bold]{count}[/bold] selected  |  [bold red]{_human_readable_size(total)}[/bold red] to free")
 
 
 class CacheTUI(App):
@@ -394,9 +399,7 @@ class CacheTUI(App):
             )
 
         total_size = sum(e.size_bytes for e in self.entries)
-        status.update(
-            f"{len(self.entries)} entries  |  {_human_readable_size(total_size)} total"
-        )
+        status.update(f"{len(self.entries)} entries  |  {_human_readable_size(total_size)} total")
         self._update_summary()
 
     def _update_summary(self) -> None:
@@ -592,20 +595,28 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="DerivaML storage manager")
     parser.add_argument(
-        "--list", nargs="?", const="all", choices=["cache", "executions", "all"],
+        "--list",
+        nargs="?",
+        const="all",
+        choices=["cache", "executions", "all"],
         help="Non-interactive listing (cache, executions, or all). Defaults to all.",
     )
     parser.add_argument(
-        "--sort", choices=["size", "location", "type", "modified"],
+        "--sort",
+        choices=["size", "location", "type", "modified"],
         default=None,
         help="Sort order for --list (default: location). Implies --list if not set.",
     )
     parser.add_argument(
-        "--delete", metavar="RID", nargs="+",
+        "--delete",
+        metavar="RID",
+        nargs="+",
         help="Delete entries matching dataset or execution RID(s)",
     )
     parser.add_argument(
-        "--yes", "-y", action="store_true",
+        "--yes",
+        "-y",
+        action="store_true",
         help="Skip confirmation prompt (use with --delete)",
     )
     args = parser.parse_args()
@@ -637,7 +648,7 @@ def _cli_list(filter_type: str = "all", sort: str = "location") -> None:
     elif sort == "type":
         entries.sort(key=lambda e: (e.category, -e.size_bytes))
     elif sort == "modified":
-        entries.sort(key=lambda e: (e.modified or datetime.min), reverse=True)
+        entries.sort(key=lambda e: e.modified or datetime.min, reverse=True)
     else:  # location (default) — group by location, then size within group
         entries.sort(key=lambda e: (e.parent_label, -e.size_bytes))
 
@@ -668,10 +679,7 @@ def _cli_delete(rids: list[str], confirm: bool = False) -> None:
     total = sum(e.size_bytes for e in matches)
     print(f"Found {len(matches)} matching entries ({_human_readable_size(total)}):\n")
     for entry in matches:
-        print(
-            f"  {entry.parent_label:30s} {entry.label:40s} "
-            f"{entry.category:12s} {entry.size:>10s}"
-        )
+        print(f"  {entry.parent_label:30s} {entry.label:40s} {entry.category:12s} {entry.size:>10s}")
 
     if not confirm:
         response = input(f"\nDelete {len(matches)} entries? [y/N] ").strip().lower()

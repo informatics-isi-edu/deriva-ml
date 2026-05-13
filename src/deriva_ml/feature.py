@@ -178,17 +178,13 @@ class FeatureRecord(BaseModel):
             if not filtered:
                 from deriva_ml.core.exceptions import DerivaMLException
 
-                raise DerivaMLException(
-                    f"No feature records match execution '{execution_rid}'."
-                )
+                raise DerivaMLException(f"No feature records match execution '{execution_rid}'.")
             return FeatureRecord.select_newest(filtered)
 
         return _selector
 
     @classmethod
-    def select_by_workflow(
-        cls, workflow: str, *, container
-    ) -> "Callable[[list[FeatureRecord]], FeatureRecord | None]":
+    def select_by_workflow(cls, workflow: str, *, container) -> "Callable[[list[FeatureRecord]], FeatureRecord | None]":
         """Return a selector that picks the newest record from a specific workflow.
 
         Creates a selector function that filters records to those produced by
@@ -350,11 +346,7 @@ class FeatureRecord(BaseModel):
             if col is None:
                 # Auto-detect from feature metadata on the record class
                 record_cls = type(records[0])
-                if (
-                    hasattr(record_cls, "feature")
-                    and record_cls.feature
-                    and record_cls.feature.term_columns
-                ):
+                if hasattr(record_cls, "feature") and record_cls.feature and record_cls.feature.term_columns:
                     if len(record_cls.feature.term_columns) == 1:
                         col = record_cls.feature.term_columns[0].name
                     else:
@@ -373,8 +365,7 @@ class FeatureRecord(BaseModel):
                     )
 
                     raise DerivaMLException(
-                        "select_majority_vote requires a column name — "
-                        "could not auto-detect from feature metadata."
+                        "select_majority_vote requires a column name — could not auto-detect from feature metadata."
                     )
 
             from collections import Counter
@@ -382,9 +373,7 @@ class FeatureRecord(BaseModel):
             counts = Counter(getattr(r, col, None) for r in records)
             max_count = max(counts.values())
             majority_values = {v for v, c in counts.items() if c == max_count}
-            candidates = [
-                r for r in records if getattr(r, col, None) in majority_values
-            ]
+            candidates = [r for r in records if getattr(r, col, None) in majority_values]
             return max(candidates, key=lambda r: r.RCT or "")
 
         return _selector

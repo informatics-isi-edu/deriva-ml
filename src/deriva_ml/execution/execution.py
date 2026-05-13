@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from deriva_ml.execution.upload_engine import UploadReport
     from deriva_ml.local_db.manifest_store import ManifestStore
 from deriva.core.hatrac_store import HatracStore
-from pydantic import ConfigDict, validate_call
+from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.asset.manifest import AssetEntry, AssetManifest
@@ -85,16 +85,15 @@ from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
+from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
+
+logger = get_logger(__name__)
 
 # Keep pycharm from complaining about undefined references in docstrings.
 execution: Execution
 ml: DerivaML
 dataset_spec: DatasetSpec
-
-try:
-    from icecream import ic
-except ImportError:  # Graceful fallback if IceCream isn't installed.
-    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 
 
 try:
@@ -162,7 +161,7 @@ class Execution:
             >>> execution.upload_execution_outputs()  # doctest: +SKIP
     """
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def __init__(
         self,
         configuration: ExecutionConfiguration,
@@ -349,9 +348,6 @@ class Execution:
                 # Log and re-raise; the user can recover via
                 # lookup_execution, but workspace-based resume is
                 # impaired until the row is re-registered manually.
-                import logging
-
-                logger = logging.getLogger("deriva_ml.execution")
                 logger.error(
                     "create_execution %s: catalog POST succeeded but "
                     "SQLite registry write FAILED (%s). Execution can "
@@ -987,7 +983,7 @@ class Execution:
         )
         return len(features)
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def download_dataset_bag(self, dataset: DatasetSpec) -> DatasetBag:
         """Downloads and materializes a dataset for use in the execution.
 
@@ -1054,9 +1050,7 @@ class Execution:
             if error is not None:
                 extra_fields["error"] = error
         elif error is not None:
-            import logging
-
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "error= ignored on non-terminal transition to %s: %s",
                 target.value,
                 error,
@@ -1169,7 +1163,7 @@ class Execution:
                 [{"RID": self.execution_rid, "Duration": duration_str}]
             )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def download_asset(
         self,
         asset_rid: RID,
@@ -1267,7 +1261,7 @@ class Execution:
             )
         return asset_path
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def upload_assets(
         self,
         assets_dir: str | Path,
@@ -1749,7 +1743,7 @@ class Execution:
                 on_conflict_skip=True,
             )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def asset_file_path(
         self,
         asset_name: str,
@@ -2064,7 +2058,7 @@ class Execution:
                 pass  # Skip assets that can't be looked up
         return assets
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def create_dataset(
         self,
         dataset_types: str | list[str] | None = None,
@@ -2108,7 +2102,7 @@ class Execution:
             description=description,
         )
 
-    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    @validate_call(config=VALIDATION_CONFIG)
     def add_files(
         self,
         files: Iterable[FileSpec],
@@ -2407,7 +2401,7 @@ class Execution:
         store = self._ml_object.workspace.execution_state_store()
         counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
         if counts["pending_rows"] or counts["pending_files"]:
-            logging.getLogger("deriva_ml.execution").info(
+            logger.info(
                 "[Execution %s] exited with pending: %d rows, %d files. Call exe.upload_outputs() to flush.",
                 self.execution_rid,
                 counts["pending_rows"],

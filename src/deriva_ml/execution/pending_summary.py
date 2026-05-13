@@ -27,6 +27,7 @@ class PendingRowCount:
         >>> c = PendingRowCount(table="deriva-ml:Subject",
         ...                     pending=5, failed=0, uploaded=12)
     """
+
     table: str
     pending: int
     failed: int
@@ -52,6 +53,7 @@ class PendingAssetCount:
         ...                       uploaded_files=0,
         ...                       total_bytes_pending=4_200_000)
     """
+
     table: str
     pending_files: int
     failed_files: int
@@ -76,6 +78,7 @@ class PendingSummary:
         >>> if summary.has_pending:
         ...     print(summary.render())
     """
+
     execution_rid: str
     rows: list[PendingRowCount]
     assets: list[PendingAssetCount]
@@ -88,10 +91,7 @@ class PendingSummary:
         Excludes failed and uploaded — "pending" specifically means
         "not yet attempted or not yet completed."
         """
-        return (
-            any(r.pending > 0 for r in self.rows)
-            or any(a.pending_files > 0 for a in self.assets)
-        )
+        return any(r.pending > 0 for r in self.rows) or any(a.pending_files > 0 for a in self.assets)
 
     @property
     def total_pending_rows(self) -> int:
@@ -129,9 +129,7 @@ class PendingSummary:
         out = [f"Execution {self.execution_rid} pending state:"]
         if self.rows:
             row_lines = [
-                f"    {r.table} ({r.pending} pending, {r.failed} failed)"
-                for r in self.rows
-                if r.pending or r.failed
+                f"    {r.table} ({r.pending} pending, {r.failed} failed)" for r in self.rows if r.pending or r.failed
             ]
             if row_lines:
                 out.append("  rows:")
@@ -142,10 +140,7 @@ class PendingSummary:
                 if not (a.pending_files or a.failed_files):
                     continue
                 size = _humanize_bytes(a.total_bytes_pending)
-                asset_lines.append(
-                    f"    {a.table} ({a.pending_files} pending, "
-                    f"{a.failed_files} failed, {size})"
-                )
+                asset_lines.append(f"    {a.table} ({a.pending_files} pending, {a.failed_files} failed, {size})")
             if asset_lines:
                 out.append("  assets:")
                 out.extend(asset_lines)
@@ -170,6 +165,7 @@ class WorkspacePendingSummary:
             filter at the caller if only non-empty summaries are
             wanted.
     """
+
     per_execution: list[PendingSummary]
 
     @property

@@ -83,7 +83,7 @@ class TestAttachSlice:
         # Create a real slice.db with a tiny table
         slice_db = tmp_path / "catalogs" / "h__1" / "slices" / "s1" / "slice.db"
         slice_db.parent.mkdir(parents=True, exist_ok=True)
-        from deriva_ml.local_db.sqlite_helpers import create_wal_engine
+        from deriva.bag.sqlite_helpers import create_wal_engine
 
         eng = create_wal_engine(slice_db)
         with eng.connect() as conn:
@@ -182,7 +182,7 @@ class TestMultiSchemaSliceAttach:
 
     def test_legacy_single_file_slice_still_works(self, tmp_path: Path) -> None:
         """A slice with only slice.db (Phase 1 layout) still works under alias 'slice'."""
-        from deriva_ml.local_db.sqlite_helpers import create_wal_engine
+        from deriva.bag.sqlite_helpers import create_wal_engine
 
         s_dir = tmp_path / "catalogs" / "h__1" / "slices" / "legacy1"
         s_dir.mkdir(parents=True)
@@ -452,51 +452,3 @@ class TestWorkspaceCachedReads:
         # Same cache_key → same cached entry
         assert result1.cache_key == result2.cache_key
         assert result1.row_count == result2.row_count
-
-
-class TestWorkingDataDeprecation:
-    """Test that accessing working_data on DerivaML emits DeprecationWarning."""
-
-    def test_working_data_deprecated(self, tmp_path: Path, canned_bag_model) -> None:
-        """DerivaML.working_data emits DeprecationWarning and returns workspace."""
-        import warnings
-        from unittest.mock import MagicMock, PropertyMock
-
-        from deriva_ml.local_db.workspace import Workspace
-
-        # Build a minimal mock DerivaML that has a real workspace property
-        ws = Workspace(working_dir=tmp_path, hostname="h", catalog_id="1")
-        try:
-            # Create a mock ml instance that has working_data wired the same
-            # way as the real base.py implementation.
-            class FakeDerivaML:
-                _workspace = ws
-
-                @property
-                def workspace(self):
-                    return self._workspace
-
-                @property
-                def working_data(self):
-                    """Deprecated: use ``workspace`` instead."""
-                    import warnings
-
-                    warnings.warn(
-                        "DerivaML.working_data is deprecated; use DerivaML.workspace instead.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                    return self.workspace
-
-            ml = FakeDerivaML()
-
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                result = ml.working_data
-
-            dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(dep_warnings) == 1
-            assert "working_data" in str(dep_warnings[0].message)
-            assert result is ws
-        finally:
-            ws.close()

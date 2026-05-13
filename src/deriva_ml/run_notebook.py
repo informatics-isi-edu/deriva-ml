@@ -77,13 +77,13 @@ def _html_table_to_markdown(html: str) -> str | None:
         Markdown table string if an HTML table was found, None otherwise.
     """
     # Check if this looks like a pandas DataFrame HTML output
-    if '<table' not in html or 'dataframe' not in html:
+    if "<table" not in html or "dataframe" not in html:
         return None
 
     try:
         # Extract table content using regex (avoid heavy dependency on BeautifulSoup)
-        thead_match = re.search(r'<thead>(.*?)</thead>', html, re.DOTALL)
-        tbody_match = re.search(r'<tbody>(.*?)</tbody>', html, re.DOTALL)
+        thead_match = re.search(r"<thead>(.*?)</thead>", html, re.DOTALL)
+        tbody_match = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL)
 
         if not thead_match or not tbody_match:
             return None
@@ -92,7 +92,7 @@ def _html_table_to_markdown(html: str) -> str | None:
         tbody = tbody_match.group(1)
 
         # Extract header row(s)
-        header_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', thead, re.DOTALL)
+        header_rows = re.findall(r"<tr[^>]*>(.*?)</tr>", thead, re.DOTALL)
         if not header_rows:
             return None
 
@@ -102,15 +102,15 @@ def _html_table_to_markdown(html: str) -> str | None:
         # We need to use the first row for column names and second row for index name
 
         first_row = header_rows[0]
-        first_headers = re.findall(r'<th[^>]*>(.*?)</th>', first_row, re.DOTALL)
-        first_headers = [re.sub(r'<[^>]+>', '', h).strip() for h in first_headers]
+        first_headers = re.findall(r"<th[^>]*>(.*?)</th>", first_row, re.DOTALL)
+        first_headers = [re.sub(r"<[^>]+>", "", h).strip() for h in first_headers]
 
         # Check if there's a second header row with an index name
         index_name = ""
         if len(header_rows) > 1:
             second_row = header_rows[1]
-            second_headers = re.findall(r'<th[^>]*>(.*?)</th>', second_row, re.DOTALL)
-            second_headers = [re.sub(r'<[^>]+>', '', h).strip() for h in second_headers]
+            second_headers = re.findall(r"<th[^>]*>(.*?)</th>", second_row, re.DOTALL)
+            second_headers = [re.sub(r"<[^>]+>", "", h).strip() for h in second_headers]
             # The index name is typically in the first cell of the second row
             if second_headers and second_headers[0]:
                 index_name = second_headers[0]
@@ -121,13 +121,13 @@ def _html_table_to_markdown(html: str) -> str | None:
             headers[0] = index_name
 
         # Extract body rows
-        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tbody, re.DOTALL)
+        body_rows = re.findall(r"<tr[^>]*>(.*?)</tr>", tbody, re.DOTALL)
 
         rows = []
         for row_html in body_rows:
             # Get both th (index) and td (data) cells
-            cells = re.findall(r'<t[hd][^>]*>(.*?)</t[hd]>', row_html, re.DOTALL)
-            cells = [re.sub(r'<[^>]+>', '', c).strip() for c in cells]
+            cells = re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row_html, re.DOTALL)
+            cells = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
             rows.append(cells)
 
         if not headers or not rows:
@@ -142,21 +142,24 @@ def _html_table_to_markdown(html: str) -> str | None:
                     col_widths[i] = max(col_widths[i], len(cell))
 
         # Format header
-        header_line = '| ' + ' | '.join(h.ljust(col_widths[i]) for i, h in enumerate(headers)) + ' |'
-        separator = '|' + '|'.join('-' * (w + 2) for w in col_widths) + '|'
+        header_line = "| " + " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers)) + " |"
+        separator = "|" + "|".join("-" * (w + 2) for w in col_widths) + "|"
 
         # Format rows
         formatted_rows = []
         for row in rows:
             # Pad row if needed
-            padded = row + [''] * (len(headers) - len(row))
-            formatted = '| ' + ' | '.join(
-                padded[i].ljust(col_widths[i]) if i < len(col_widths) else padded[i]
-                for i in range(len(headers))
-            ) + ' |'
+            padded = row + [""] * (len(headers) - len(row))
+            formatted = (
+                "| "
+                + " | ".join(
+                    padded[i].ljust(col_widths[i]) if i < len(col_widths) else padded[i] for i in range(len(headers))
+                )
+                + " |"
+            )
             formatted_rows.append(formatted)
 
-        return '\n'.join([header_line, separator] + formatted_rows)
+        return "\n".join([header_line, separator] + formatted_rows)
 
     except Exception:
         # If parsing fails, return None to use default behavior
@@ -176,28 +179,28 @@ def _convert_dataframe_outputs(nb: nbformat.NotebookNode) -> nbformat.NotebookNo
         The modified notebook node with converted outputs.
     """
     for cell in nb.cells:
-        if cell.cell_type != 'code':
+        if cell.cell_type != "code":
             continue
 
         new_outputs = []
-        for output in cell.get('outputs', []):
-            if output.get('output_type') in ('display_data', 'execute_result'):
-                data = output.get('data', {})
-                html = data.get('text/html', '')
+        for output in cell.get("outputs", []):
+            if output.get("output_type") in ("display_data", "execute_result"):
+                data = output.get("data", {})
+                html = data.get("text/html", "")
 
-                if html and '<table' in html and 'dataframe' in html:
+                if html and "<table" in html and "dataframe" in html:
                     md_table = _html_table_to_markdown(html)
                     if md_table:
                         # Replace the output with markdown text
                         # Keep the original output type but change the data
                         new_output = output.copy()
-                        new_output['data'] = {'text/plain': md_table}
+                        new_output["data"] = {"text/plain": md_table}
                         new_outputs.append(new_output)
                         continue
 
             new_outputs.append(output)
 
-        cell['outputs'] = new_outputs
+        cell["outputs"] = new_outputs
 
     return nb
 
@@ -260,7 +263,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             "--catalog",
             type=str,
             default=None,
-            help="Catalog number or identifier (optional if defined in Hydra config)"
+            help="Catalog number or identifier (optional if defined in Hydra config)",
         )
 
         self.parser.add_argument(
@@ -375,9 +378,9 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         # Inject host and catalog if provided on command line
         # If not provided, the notebook will use values from Hydra config
         if args.host:
-            parameters['host'] = args.host
+            parameters["host"] = args.host
         if args.catalog:
-            parameters['catalog'] = args.catalog
+            parameters["catalog"] = args.catalog
 
         # Merge parameters from configuration file if provided
         if parameter_file:
@@ -457,10 +460,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         # Try to load configs using the new API, fall back to old method
         try:
             from deriva_ml.execution import load_configs
+
             loaded = load_configs("configs")
             if not loaded:
                 # Try the old way
                 from configs import load_all_configs
+
                 load_all_configs()
         except ImportError:
             print("Could not import configs module. Make sure src/configs/__init__.py exists.")

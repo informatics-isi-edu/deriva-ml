@@ -31,7 +31,10 @@ from pydantic import BaseModel, ConfigDict
 
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.execution.state_store import ExecutionStatus
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML  # noqa: F401
@@ -220,9 +223,7 @@ class ExecutionSnapshot(BaseModel):
         store = ml.workspace.execution_state_store()
         row = store.get_execution(self.rid)
         if row is None:
-            raise DerivaMLException(
-                f"Execution {self.rid} not in workspace registry"
-            )
+            raise DerivaMLException(f"Execution {self.rid} not in workspace registry")
         current = ExecutionStatus(row["status"])
 
         extra_fields: dict = {}
@@ -230,10 +231,10 @@ class ExecutionSnapshot(BaseModel):
             if error is not None:
                 extra_fields["error"] = error
         elif error is not None:
-            import logging
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "error= ignored on non-terminal transition to %s: %s",
-                target.value, error,
+                target.value,
+                error,
             )
 
         transition(
