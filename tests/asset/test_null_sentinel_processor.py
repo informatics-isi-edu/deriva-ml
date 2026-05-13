@@ -50,7 +50,7 @@ def test_empty_metadata_is_no_op():
 def test_asset_table_upload_spec_includes_null_sentinel_processor_when_metadata_present(test_ml):
     """Upload spec for an asset table with metadata wires the processor."""
     from deriva_ml import BuiltinTypes, ColumnDefinition
-    from deriva_ml.dataset.upload import asset_table_upload_spec
+    from deriva_ml.core.upload_layout import asset_table_upload_spec
 
     # Create an asset table with a metadata column — expect the processor wired.
     test_ml.create_asset(
@@ -67,7 +67,7 @@ def test_asset_table_upload_spec_includes_null_sentinel_processor_when_metadata_
 
 def test_asset_table_upload_spec_omits_pre_processors_when_no_metadata(test_ml):
     """Asset tables with zero metadata columns don't need the processor."""
-    from deriva_ml.dataset.upload import asset_table_upload_spec
+    from deriva_ml.core.upload_layout import asset_table_upload_spec
 
     # Execution_Asset is a built-in ML asset table with zero user metadata
     # columns — a clean canonical example.
@@ -77,7 +77,7 @@ def test_asset_table_upload_spec_omits_pre_processors_when_no_metadata(test_ml):
 
 def test_asset_table_upload_spec_has_use_pre_allocated_rid_flag(test_ml):
     from deriva_ml import BuiltinTypes, ColumnDefinition
-    from deriva_ml.dataset.upload import asset_table_upload_spec
+    from deriva_ml.core.upload_layout import asset_table_upload_spec
 
     test_ml.create_asset(
         "UsePreAllocatedFlagTest",
@@ -89,7 +89,7 @@ def test_asset_table_upload_spec_has_use_pre_allocated_rid_flag(test_ml):
 
 def test_asset_table_upload_spec_file_pattern_captures_rid(test_ml):
     from deriva_ml import BuiltinTypes, ColumnDefinition
-    from deriva_ml.dataset.upload import asset_table_upload_spec
+    from deriva_ml.core.upload_layout import asset_table_upload_spec
 
     test_ml.create_asset(
         "UsePreAllocatedRegexTest",
@@ -103,7 +103,7 @@ def test_asset_table_upload_spec_file_pattern_captures_rid(test_ml):
 
 def test_asset_table_upload_spec_column_map_includes_rid(test_ml):
     from deriva_ml import BuiltinTypes, ColumnDefinition
-    from deriva_ml.dataset.upload import asset_table_upload_spec
+    from deriva_ml.core.upload_layout import asset_table_upload_spec
 
     test_ml.create_asset(
         "UsePreAllocatedColumnMapTest",

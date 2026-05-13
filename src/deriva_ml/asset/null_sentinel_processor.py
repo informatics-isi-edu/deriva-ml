@@ -15,13 +15,13 @@ class NullSentinelProcessor(BaseProcessor):
     Runs before deriva-py's ``interpolateDict`` expansion. Mutates
     the in-flight ``self.metadata`` dict in place: any value equal
     to ``"__NULL__"`` (see
-    :data:`deriva_ml.dataset.upload.NULL_SENTINEL`) is replaced
+    :data:`deriva_ml.core.upload_layout.NULL_SENTINEL`) is replaced
     with ``None``. deriva-py then drops None-valued keys, causing
     the resulting catalog insert to send SQL ``NULL`` for those
     columns.
 
     Not part of the end-user API — configured automatically by
-    :func:`deriva_ml.dataset.upload.asset_table_upload_spec`.
+    :func:`deriva_ml.core.upload_layout.asset_table_upload_spec`.
 
     Note: if a user's legitimate metadata value equals the sentinel
     string, it will be corrupted to NULL. Known constraint; chosen
@@ -36,7 +36,7 @@ class NullSentinelProcessor(BaseProcessor):
         self.metadata = kwargs.get("metadata", {})
 
     def process(self):
-        from deriva_ml.dataset.upload import NULL_SENTINEL
+        from deriva_ml.core.upload_layout import NULL_SENTINEL
 
         for k, v in list(self.metadata.items()):
             if v == NULL_SENTINEL:

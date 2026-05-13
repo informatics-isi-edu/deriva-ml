@@ -66,7 +66,7 @@ from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.core.definitions import MLVocab
 from deriva_ml.core.ermrest import UploadProgress
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.upload import asset_type_path, flat_asset_dir
+from deriva_ml.core.upload_layout import asset_type_path, flat_asset_dir
 from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:

@@ -68,7 +68,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.dataset.upload import (
+from deriva_ml.core.upload_layout import (
     asset_root,
     asset_type_path,
     execution_root,
