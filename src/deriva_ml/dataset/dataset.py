@@ -3000,243 +3000,54 @@ class Dataset:
                 version_path.update([{"RID": version_rid, "Minid": minid_page_url, "Minid_Spec_Hash": spec_hash}])
                 return minid_page_url
             else:
-                # Client-side download: runs queries locally with paged query support
-                # for automatic retry on query timeout errors. This avoids server-side
-                # export lock contention and gives better control over query execution.
-                return self._create_dataset_bag_client(version, spec, timeout=timeout)
-
-    def _create_dataset_bag_client(
-        self, version: DatasetVersion, spec: dict, timeout: tuple[int, int] | None = None
-    ) -> str:
-        """Create a dataset bag using client-side download.
-
-        Executes ERMrest queries directly using ErmrestCatalog.get_as_file() with
-        paged query support, building a BDBag from the results.
-
-        If any CSV data query fails (e.g., due to server-side query timeouts on deep
-        multi-table joins), the method raises a DerivaMLException listing the failed
-        tables and suggesting that the user add those records as direct dataset members.
-
-        Args:
-            version: The dataset version to export.
-            spec: The download specification dict (from generate_dataset_download_spec).
-
-        Returns:
-            str: A file:// URI pointing to the generated bag zip archive.
-
-        Raises:
-            DerivaMLException: If any data query fails during export.
-        """
-        import uuid
-
-        from deriva.core import DEFAULT_SESSION_CONFIG, DerivaServer, get_credential
-
-        snapshot_catalog_id = self._version_snapshot_catalog_id(version)
-        hostname = self._ml_instance.catalog.deriva_server.server
-        protocol = self._ml_instance.catalog.deriva_server.scheme
-
-        # Connect to the snapshot catalog with optional custom timeout
-        credentials = get_credential(hostname)
-        session_config = None
-        if timeout:
-            session_config = dict(DEFAULT_SESSION_CONFIG)
-            session_config["timeout"] = timeout
-        server = DerivaServer(protocol, hostname, credentials=credentials, session_config=session_config)
-        catalog = server.connect_ermrest(snapshot_catalog_id)
-
-        # Build bag in a persistent directory (survives for _download_dataset_minid)
-        tmp_dir = Path(self._ml_instance.working_dir) / "client_export" / str(uuid.uuid4())[:8]
-        tmp_dir.mkdir(parents=True, exist_ok=True)
-
-        # Format environment variables
-        envars = {"RID": self.dataset_rid}
-        bag_config = spec.get("bag", {})
-        bag_name = bag_config.get("bag_name", f"Dataset_{self.dataset_rid}").format(**envars)
-        bag_path = tmp_dir / bag_name
-        bag_algorithms = bag_config.get("bag_algorithms", ["md5"])
-
-        # Create the bag
-        bdb.ensure_bag_path_exists(str(bag_path))
-        bag = bdb.make_bag(str(bag_path), algs=bag_algorithms, idempotent=True)
-
-        # Process query_processors from the spec
-        query_processors = spec.get("catalog", {}).get("query_processors", [])
-        failed_queries = []
-        skipped_empty = []
-        fetch_entries: dict[str, tuple[str, str, str, str]] = {}  # asset_rid -> (url, length, rel_path, md5)
-
-        for qp in query_processors:
-            processor_name = qp.get("processor", "")
-            params = qp.get("processor_params", {})
-
-            if processor_name == "env":
-                # Environment variable processors — execute and capture values
-                query_path = params.get("query_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                query_keys = params.get("query_keys", [])
+                # Client-side bag construction: drive CatalogBagBuilder.build()
+                # via DatasetBagBuilder.build_bag against the snapshot catalog.
+                # The pre-computed ``spec`` argument is vestigial on this arm
+                # (CatalogBagBuilder recomputes its own spec from the same
+                # anchors/policy); we keep the parameter on the method signature
+                # because the MINID arm above still consumes it.
+                #
+                # The bag is built into a working subdirectory under
+                # ``working_dir/client_export/`` (NOT ``tmp_dir``) so the zip
+                # survives the ``TemporaryDirectory`` cleanup at the end of
+                # this method — the caller (``_download_dataset_minid``)
+                # consumes the file:// URI returned here. The cleanup path in
+                # ``_download_dataset_minid`` recognizes ``client_export`` in
+                # the archive's parent and removes it after extraction.
+                version_snapshot_catalog = self._version_snapshot_catalog(version)
+                builder = DatasetBagBuilder(
+                    ml_instance=version_snapshot_catalog,
+                    s3_bucket=self._ml_instance.s3_bucket,
+                    use_minid=False,
+                    exclude_tables=exclude_tables,
+                )
+                client_export_dir = (
+                    Path(self._ml_instance.working_dir) / "client_export" / spec_hash[:8]
+                )
+                client_export_dir.mkdir(parents=True, exist_ok=True)
                 try:
-                    if query_path == "/":
-                        # Root query returns catalog metadata including snaptime
-                        resp = catalog.get("/").json()
-                    else:
-                        resp = catalog.get(query_path).json()
-                    if isinstance(resp, list) and resp:
-                        resp = resp[0]
-                    if resp and query_keys:
-                        for key in query_keys:
-                            if key in resp:
-                                envars[key] = resp[key]
-                except Exception as e:
-                    self._logger.warning("Failed to execute env query %s: %s", query_path, e)
-
-            elif processor_name == "json":
-                # JSON query (e.g., schema dump)
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                # Output path becomes filename with .json extension
-                dest_file = bag_path / "data" / (output_path + ".json")
-                dest_file.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    resp = catalog.get(query_path).json()
-                    dest_file.write_text(json.dumps(resp, indent=2), encoding="utf-8")
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Failed to download {output_path} from snapshot catalog ({query_path}): {e}"
-                    ) from e
-
-            elif processor_name == "csv":
-                # Data query — use paged mode for resilience
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-                paged = params.get("paged_query", False)
-
-                dest_dir = bag_path / "data" / output_path
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                dest_file = str(dest_dir) + ".csv"
-
-                try:
-                    catalog.get_as_file(
-                        query_path,
-                        dest_file,
-                        headers={"accept": "text/csv"},
-                        delete_if_empty=True,
-                        paged=paged,
-                        page_size=100000,
+                    zip_path = builder.build_bag(self, output_dir=client_export_dir, timeout=timeout)
+                except (
+                    DerivaDownloadError,
+                    DerivaDownloadConfigurationError,
+                    DerivaDownloadAuthenticationError,
+                    DerivaDownloadAuthorizationError,
+                    DerivaDownloadTimeoutError,
+                ) as e:
+                    # Preserve the actionable-message contract callers relied on
+                    # from the legacy _create_dataset_bag_client. The original
+                    # advice (add direct dataset members for tables whose deep
+                    # FK joins timed out) still applies — surface it alongside
+                    # the deriva-py error so users have a fix to try.
+                    raise DerivaMLException(
+                        f"Dataset bag export failed: {format_exception(e)}. "
+                        "This typically happens when deep multi-table joins "
+                        "exceed server query time limits. To fix this, add the "
+                        "desired records as direct dataset members using "
+                        "add_dataset_members() with the relevant table's RIDs."
                     )
-                    if not os.path.isfile(dest_file):
-                        skipped_empty.append(output_path)
-                except Exception as e:
-                    # Tolerate individual query failures — log and continue.
-                    # This handles snapshot catalog timeouts for large joins.
-                    self._logger.warning(
-                        "Query failed for %s (will be missing from bag): %s",
-                        output_path,
-                        e,
-                    )
-                    failed_queries.append(output_path)
-                    # Clean up partial file if it exists
-                    if os.path.isfile(dest_file):
-                        os.remove(dest_file)
 
-            elif processor_name == "fetch":
-                # Asset file references — write entries to fetch.txt for lazy materialization.
-                # The actual binary files are downloaded later by bdbag.materialize() when
-                # materialize=True is set on download_dataset_bag().
-                query_path = params.get("query_path", "")
-                output_path = params.get("output_path", "")
-                if not query_path:
-                    continue
-                query_path = query_path.format(**envars)
-
-                try:
-                    resp = catalog.get(query_path).json()
-                    for record in resp:
-                        url = record.get("url")
-                        filename = record.get("filename", "unknown")
-                        length = record.get("length", "")
-                        md5 = record.get("md5", "")
-                        asset_rid = record.get("asset_rid", "unknown")
-                        if not url:
-                            continue
-                        # Build the full URL for the asset
-                        if url.startswith("/"):
-                            asset_url = f"{protocol}://{hostname}{url}"
-                        else:
-                            asset_url = url
-                        # Build relative path within bag data directory
-                        file_output_path = output_path.format(asset_rid=asset_rid)
-                        rel_path = f"data/{file_output_path}/{filename}"
-                        # Deduplicate by asset RID — the same asset may be
-                        # reachable via multiple FK paths; keep the first entry
-                        # (all paths produce the same URL and file content).
-                        if asset_rid not in fetch_entries:
-                            fetch_entries[asset_rid] = (asset_url, length, rel_path, md5)
-                except Exception as e:
-                    self._logger.warning("Asset query failed for %s: %s", output_path, e)
-
-        # Remove empty directories left behind by empty/failed queries
-        for dirpath, dirnames, filenames in os.walk(str(bag_path / "data"), topdown=False):
-            if not dirnames and not filenames:
-                try:
-                    os.rmdir(dirpath)
-                except OSError:
-                    pass
-
-        if failed_queries:
-            # Extract table names from output paths (format: "schema/table")
-            failed_tables = [q.rsplit("/", 1)[-1] if "/" in q else q for q in failed_queries]
-            raise DerivaMLException(
-                f"Dataset bag export failed: {len(failed_queries)} queries timed out or "
-                f"failed for tables: {failed_tables}. "
-                f"This typically happens when deep multi-table joins exceed server query "
-                f"time limits. To fix this, add the desired records as direct dataset "
-                f"members using add_dataset_members() with the relevant table's RIDs. "
-                f"For example, if Image data is missing, register Image as a dataset "
-                f"element type (add_dataset_element_type('Image')) and add Image RIDs "
-                f"as members so they are exported via a direct association path rather "
-                f"than a deep FK join. Failed paths: {failed_queries}"
-            )
-
-        # Write remote file manifest for BDBag to generate fetch.txt.
-        # The manifest must be a JSON-stream file (one JSON object per line)
-        # with url, length, filename (without data/ prefix), and a hash.
-        # Passing it to make_bag(remote_file_manifest=...) ensures fetch.txt
-        # is generated correctly and not destroyed by make_bag(update=True).
-        remote_manifest_path = None
-        if fetch_entries:
-            remote_manifest_path = str(bag_path / "remote-file-manifest.json")
-            with open(remote_manifest_path, "w", encoding="utf-8") as f:
-                for url, length, rel_path, md5 in fetch_entries.values():
-                    # rel_path has "data/" prefix; bdbag expects filename without it
-                    filename = rel_path.removeprefix("data/")
-                    entry = {
-                        "url": url,
-                        "length": int(length) if length else 0,
-                        "filename": filename,
-                    }
-                    if md5:
-                        entry["md5"] = md5
-                    f.write(json.dumps(entry) + "\n")
-            self._logger.info("Wrote %d remote file manifest entries", len(fetch_entries))
-
-        # Update and archive the bag
-        bdb.make_bag(
-            str(bag_path),
-            algs=bag_algorithms,
-            remote_file_manifest=remote_manifest_path,
-            update=True,
-            idempotent=True,
-        )
-        archive_path = bdb.archive_bag(str(bag_path), bag_config.get("bag_archiver", "zip"))
-        return Path(archive_path).as_uri()
+                return zip_path.as_uri()
 
     def _get_dataset_minid(
         self,
