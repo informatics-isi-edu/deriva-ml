@@ -39,7 +39,6 @@ ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
 ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
 Table = _ermrest_model.Table
 DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
-deriva_tags = _core_utils.tag
 
 from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.config import DerivaMLConfig
@@ -66,7 +65,6 @@ from deriva_ml.core.mixins import (
     WorkflowMixin,
 )
 from deriva_ml.core.schema_cache import PinStatus, SchemaCache
-from deriva_ml.dataset.upload import bulk_upload_configuration
 from deriva_ml.interfaces import DerivaMLCatalog
 
 if TYPE_CHECKING:
@@ -1110,199 +1108,15 @@ class DerivaML(
             >>> # Or with custom branding:
             >>> ml.apply_catalog_annotations("My Project Browser", "My ML Project")
         """
-        catalog_id = self.model.catalog.catalog_id
-        ml_schema = self.ml_schema
+        # Single source of truth lives in
+        # :mod:`deriva_ml.schema.annotations`. Delegate to it.
+        from deriva_ml.schema.annotations import catalog_annotation
 
-        # Build domain schema menu items (one menu per domain schema)
-        domain_schema_menus = []
-        for domain_schema in sorted(self.domain_schemas):
-            if domain_schema not in self.model.schemas:
-                continue
-            domain_schema_menus.append(
-                {
-                    "name": domain_schema,
-                    "children": [
-                        {
-                            "name": tname,
-                            "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                        }
-                        for tname in self.model.schemas[domain_schema].tables
-                        # Don't include controlled vocabularies, association tables, or feature tables.
-                        if not (
-                            self.model.is_vocabulary(tname) or self.model.is_association(tname, pure=False, max_arity=3)
-                        )
-                    ],
-                }
-            )
-
-        # Build vocabulary menu items (ML schema + all domain schemas)
-        vocab_children = [{"name": f"{ml_schema} Vocabularies", "header": True}]
-        vocab_children.extend(
-            [
-                {
-                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
-                    "name": tname,
-                }
-                for tname in self.model.schemas[ml_schema].tables
-                if self.model.is_vocabulary(tname)
-            ]
+        catalog_annotation(
+            self.model,
+            navbar_brand_text=navbar_brand_text,
+            head_title=head_title,
         )
-        for domain_schema in sorted(self.domain_schemas):
-            if domain_schema not in self.model.schemas:
-                continue
-            vocab_children.append({"name": f"{domain_schema} Vocabularies", "header": True})
-            vocab_children.extend(
-                [
-                    {
-                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                        "name": tname,
-                    }
-                    for tname in self.model.schemas[domain_schema].tables
-                    if self.model.is_vocabulary(tname)
-                ]
-            )
-
-        # Build asset menu items (ML schema + all domain schemas)
-        asset_children = [
-            {
-                "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:{tname}",
-                "name": tname,
-            }
-            for tname in self.model.schemas[ml_schema].tables
-            if self.model.is_asset(tname)
-        ]
-        for domain_schema in sorted(self.domain_schemas):
-            if domain_schema not in self.model.schemas:
-                continue
-            asset_children.extend(
-                [
-                    {
-                        "url": f"/chaise/recordset/#{catalog_id}/{domain_schema}:{tname}",
-                        "name": tname,
-                    }
-                    for tname in self.model.schemas[domain_schema].tables
-                    if self.model.is_asset(tname)
-                ]
-            )
-
-        catalog_annotation = {
-            deriva_tags.display: {"name_style": {"underline_space": True}},
-            deriva_tags.chaise_config: {
-                "headTitle": head_title,
-                "navbarBrandText": navbar_brand_text,
-                "systemColumnsDisplayEntry": ["RID"],
-                "systemColumnsDisplayCompact": ["RID"],
-                "defaultTable": {"table": "Dataset", "schema": "deriva-ml"},
-                "deleteRecord": True,
-                "showFaceting": True,
-                "shareCiteAcls": True,
-                "exportConfigsSubmenu": {"acls": {"show": ["*"], "enable": ["*"]}},
-                "resolverImplicitCatalog": False,
-                "navbarMenu": {
-                    "newTab": False,
-                    "children": [
-                        {
-                            "name": "User Info",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Client",
-                                    "name": "Users",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_Group",
-                                    "name": "Groups",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/public:ERMrest_RID_Lease",
-                                    "name": "ERMrest RID Lease",
-                                },
-                            ],
-                        },
-                        {  # All the primary tables in deriva-ml schema.
-                            "name": "Deriva-ML",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Workflow",
-                                    "name": "Workflow",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution",
-                                    "name": "Execution",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Metadata",
-                                    "name": "Execution Metadata",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Execution_Asset",
-                                    "name": "Execution Asset",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset",
-                                    "name": "Dataset",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
-                                    "name": "Dataset Version",
-                                },
-                            ],
-                        },
-                        {  # WWW schema tables.
-                            "name": "WWW",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/WWW:Page",
-                                    "name": "Page",
-                                },
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/WWW:File",
-                                    "name": "File",
-                                },
-                            ],
-                        },
-                        *domain_schema_menus,  # One menu per domain schema
-                        {  # Vocabulary menu with all controlled vocabularies.
-                            "name": "Vocabulary",
-                            "children": vocab_children,
-                        },
-                        {  # List of all asset tables.
-                            "name": "Assets",
-                            "children": asset_children,
-                        },
-                        {  # List of all feature tables in the catalog.
-                            "name": "Features",
-                            "children": [
-                                {
-                                    "url": f"/chaise/recordset/#{catalog_id}/{f.feature_table.schema.name}:{f.feature_table.name}",
-                                    "name": f"{f.target_table.name}:{f.feature_name}",
-                                }
-                                for f in self.model.find_features()
-                            ],
-                        },
-                        {
-                            "url": "/chaise/recordset/#0/ermrest:registry@sort(RID)",
-                            "name": "Catalog Registry",
-                        },
-                        {
-                            "name": "Documentation",
-                            "children": [
-                                {
-                                    "url": "https://github.com/informatics-isi-edu/deriva-ml/blob/main/docs/ml_workflow_instruction.md",
-                                    "name": "ML Notebook Instruction",
-                                },
-                                {
-                                    "url": "https://informatics-isi-edu.github.io/deriva-ml/",
-                                    "name": "Deriva-ML Documentation",
-                                },
-                            ],
-                        },
-                    ],
-                },
-            },
-            deriva_tags.bulk_upload: bulk_upload_configuration(model=self.model),
-        }
-        self.model.annotations.update(catalog_annotation)
-        self.model.apply()
 
     def create_vocabulary(
         self, vocab_name: str, comment: str = "", schema: str | None = None, update_navbar: bool = True
