@@ -15,7 +15,6 @@ Public API:
     - :func:`get_logger`: Return the main ``deriva_ml`` logger (or a child).
     - :func:`configure_logging`: Set log levels for DerivaML and related libs.
     - :func:`is_hydra_initialized`: Test whether a Hydra context is active.
-    - :class:`LoggerMixin`: Mixin providing a ``_logger`` property.
 
 Internal helpers (not part of the public API):
     - :func:`_apply_logger_overrides`: Apply per-logger level overrides dict.
@@ -192,31 +191,9 @@ def _apply_logger_overrides(overrides: dict[str, Any]) -> None:
         logging.getLogger(name).setLevel(level_value)
 
 
-class LoggerMixin:
-    """Mixin class that provides a _logger attribute.
-
-    Classes that inherit from this mixin get a _logger property that
-    returns a child logger under the deriva_ml namespace, named after
-    the class.
-
-    Example:
-        >>> class MyProcessor(LoggerMixin):
-        ...     def process(self):
-        ...         self._logger.info("Processing started")
-        ...
-        >>> # Logs to 'deriva_ml.MyProcessor'
-    """
-
-    @property
-    def _logger(self) -> logging.Logger:
-        """Get the logger for this class."""
-        return get_logger(self.__class__.__name__)
-
-
 __all__ = [
     "LOGGER_NAME",
     "get_logger",
     "configure_logging",
     "is_hydra_initialized",
-    "LoggerMixin",
 ]

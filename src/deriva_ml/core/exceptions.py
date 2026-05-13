@@ -10,8 +10,7 @@ Exception Hierarchy:
     ├── DerivaMLConfigurationError (configuration and initialization)
     │   ├── DerivaMLSchemaError (schema/catalog structure issues)
     │   ├── DerivaMLAuthenticationError (authentication failures)
-    │   ├── DerivaMLOfflineError (online-only operation in offline mode)
-    │   └── DerivaMLNoExecutionContext (write attempted on read-only handle)
+    │   └── DerivaMLOfflineError (online-only operation in offline mode)
     │
     ├── DerivaMLDataError (data access and validation)
     │   ├── DerivaMLNotFoundError (entity not found)
@@ -166,28 +165,6 @@ class DerivaMLOfflineError(DerivaMLConfigurationError):
             Traceback (most recent call last):
                 ...
             DerivaMLOfflineError: create_execution requires online mode
-    """
-
-    pass
-
-
-class DerivaMLNoExecutionContext(DerivaMLConfigurationError):
-    """Exception raised when an execution-scoped operation is attempted without an execution context.
-
-    Handles returned by ``ml.table(name)`` are read-only — useful for schema
-    introspection — but their ``.insert(...)`` and asset-file methods raise
-    this exception. Use ``exe.table(name)`` to get a handle bound to an
-    execution that permits writes.
-
-    Example:
-        Calling a write method on a read-only handle raises this error::
-
-            >>> handle = ml.table("Subject")  # doctest: +SKIP
-            >>> handle.record_class()              # OK  # doctest: +SKIP
-            >>> handle.insert({"Name": "x"})       # raises  # doctest: +SKIP
-            Traceback (most recent call last):
-                ...
-            DerivaMLNoExecutionContext: ml.table() handles are read-only; use exe.table() for writes
     """
 
     pass

@@ -862,36 +862,6 @@ class DerivaML(
             )
         return self._workspace
 
-    @property
-    def working_data(self) -> Path:
-        """Return the working data directory path.
-
-        .. deprecated::
-            ``working_data`` is deprecated and will be removed in the next
-            major version. Use ``working_dir`` instead.
-
-            ``working_dir`` is the canonical attribute; it is set during
-            execution initialization and contains all output assets, metadata,
-            and intermediate files for the current execution.
-
-        Returns:
-            Path to the working data directory (same as ``working_dir``).
-
-        Raises:
-            DeprecationWarning: Always emitted at access time.
-
-        Example:
-            >>> exe.working_dir  # use this instead  # doctest: +SKIP
-        """
-        import warnings
-
-        warnings.warn(
-            "DerivaML.working_data is deprecated; use DerivaML.workspace instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.workspace
-
     def cache_table(self, table_name: str, force: bool = False) -> "pd.DataFrame":
         """Fetch a table from the catalog and cache locally as SQLite.
 
