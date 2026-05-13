@@ -773,7 +773,7 @@ class Denormalizer:
               downstream via FK, sorted]}``.
             - ``association_tables``: sorted list of pure M:N association
               tables in the schema (detected via
-              :meth:`DerivaModel._is_association_table`).
+              :meth:`DerivaModel.is_topological_association`).
             - ``feature_tables``: sorted list of feature tables
               (via :meth:`DerivaModel.find_features`). Empty if the
               model doesn't expose ``find_features`` or has no features.
@@ -829,7 +829,7 @@ class Denormalizer:
             reachable_tables[t] = sorted(reach)
 
         # association_tables: pure M-to-N linking tables
-        association_tables = sorted(t for t in all_table_names if model._is_association_table(t))
+        association_tables = sorted(t for t in all_table_names if model.is_topological_association(t))
 
         # feature_tables: derive from DerivaModel.find_features (the canonical
         # feature-discovery API — see model/catalog.py:510). Each Feature's

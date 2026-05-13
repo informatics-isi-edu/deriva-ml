@@ -697,7 +697,7 @@ class DerivaModel:
             if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
         ]
 
-    def _is_association_table(self, name_or_table: str | Table) -> bool:
+    def is_topological_association(self, name_or_table: str | Table) -> bool:
         """Check if a table is an M:N association (link) table.
 
         An association table (like ``Dataset_Image`` linking ``Dataset``
@@ -734,10 +734,10 @@ class DerivaModel:
 
         Example::
 
-            model._is_association_table("Dataset_Image")       # True
-            model._is_association_table("Dataset_Image_Role")  # True — extra Role col OK
-            model._is_association_table("Image")               # False (has ≤1 FK)
-            model._is_association_table("Observation")         # False (has 1 FK)
+            model.is_topological_association("Dataset_Image")       # True
+            model.is_topological_association("Dataset_Image_Role")  # True — extra Role col OK
+            model.is_topological_association("Image")               # False (has ≤1 FK)
+            model.is_topological_association("Observation")         # False (has 1 FK)
         """
         try:
             tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.name_to_table(name_or_table)
@@ -903,7 +903,7 @@ class DerivaModel:
             # infrastructure that the user shouldn't need to name explicitly —
             # they are transparently included in the join chain.
             #
-            # We detect association tables via ``self._is_association_table``
+            # We detect association tables via ``self.is_topological_association``
             # (module-level method that ignores ERMrest system FKs).
 
             def _intermediates_covered(sp: list[Table], ints: tuple[str, ...]) -> bool:
@@ -913,7 +913,7 @@ class DerivaModel:
                         # In include_tables OR in via= — explicitly routed.
                         continue
                     tbl = sp_tables.get(t)
-                    if tbl is not None and self._is_association_table(tbl):
+                    if tbl is not None and self.is_topological_association(tbl):
                         continue  # transparent — doesn't need to be in include_tables
                     return False
                 return True
@@ -1045,7 +1045,7 @@ class DerivaModel:
     # Denormalization planner helpers (Rules 2, 5, 6)
     #
     # These methods compose ``_fk_neighbors`` / ``_schema_to_paths`` /
-    # ``_is_association_table`` — they do NOT introduce new FK traversal.
+    # ``is_topological_association`` — they do NOT introduce new FK traversal.
     # ------------------------------------------------------------------
 
     def _downstream_fk_sources(self, table: str | Table) -> set[Table]:
@@ -1112,7 +1112,7 @@ class DerivaModel:
         transparency logic — does NOT walk FKs directly.
 
         **Transparent association hops**: when the walker hits an
-        association table (per :meth:`_is_association_table`) that isn't
+        association table (per :meth:`is_topological_association`) that isn't
         in ``tables_in_set``, it hops through it in BOTH directions —
         both the tables that point at the association (inbound) AND the
         tables the association's FKs point at (outbound). This lets
@@ -1169,7 +1169,7 @@ class DerivaModel:
             # points to (foreign_keys). This is the "transparent bridge"
             # semantics — M:N link tables should be traversable in both
             # directions so that A→assoc→B discovers B from A.
-            hopping_through_association = t != from_table and self._is_association_table(tbl)
+            hopping_through_association = t != from_table and self.is_topological_association(tbl)
 
             valid_schemas = self.domain_schemas | {self.ml_schema}
             neighbors: list[Table] = list(self._downstream_fk_sources(t))
@@ -1188,9 +1188,9 @@ class DerivaModel:
                 if target_name in tables_in_set:
                     seen_names.add(target_name)
                     # Continue only if this is itself an association (transparent)
-                    if self._is_association_table(neighbor):
+                    if self.is_topological_association(neighbor):
                         stack.append(target_name)
-                elif self._is_association_table(neighbor):
+                elif self.is_topological_association(neighbor):
                     # Transparent hop: continue through the association
                     stack.append(target_name)
                 # else: non-requested, non-association — dead end
@@ -1388,7 +1388,7 @@ class DerivaModel:
             names = [t.name for t in path]
             # Transparency filter: every intermediate must be either
             # requested (in tables_in_set) or a pure association.
-            if all(mid in tables_in_set or self._is_association_table(mid) for mid in names[1:-1]):
+            if all(mid in tables_in_set or self.is_topological_association(mid) for mid in names[1:-1]):
                 result.append(names)
         return result
 
@@ -1508,7 +1508,7 @@ class DerivaModel:
             # spuriously flagged.
             #
             # Association tables remain transparent: the walker handles
-            # them correctly via ``_is_association_table`` check inside
+            # them correctly via ``is_topological_association`` check inside
             # the direction test.
             def _edge_direction(a: str, b: str) -> str | None:
                 """Return 'down' if a has a direct FK to b (outbound from
@@ -1540,7 +1540,7 @@ class DerivaModel:
                     # If b is an interior association table, hop across
                     # it: count the A → assoc → C edge as a single
                     # transparent bridge and move two steps forward.
-                    if i + 2 < len(p) and self._is_association_table(b):
+                    if i + 2 < len(p) and self.is_topological_association(b):
                         # A → assoc → C: the bridge is legitimate
                         # regardless of internal direction; advance past.
                         i += 2
@@ -1571,7 +1571,7 @@ class DerivaModel:
             def _is_signaled(p: list[str]) -> bool:
                 intermediates = p[1:-1]
                 for mid in intermediates:
-                    if mid in all_tables and not self._is_association_table(mid):
+                    if mid in all_tables and not self.is_topological_association(mid):
                         return True
                 return False
 
@@ -1585,7 +1585,7 @@ class DerivaModel:
             all_intermediates: set[str] = set()
             for p in reportable:
                 for node in p[1:-1]:
-                    if node not in include_tables and not self._is_association_table(node):
+                    if node not in include_tables and not self.is_topological_association(node):
                         all_intermediates.add(node)
             ambiguities.append(
                 {
@@ -1946,7 +1946,7 @@ class DerivaModel:
             Prevents: Subject -> Dataset_Subject -> Dataset (looping back to root).
             Allows: Dataset -> Dataset_Subject -> Subject (the intended direction).
 
-            Uses :meth:`_is_association_table` (FK-arity topology) rather
+            Uses :meth:`is_topological_association` (FK-arity topology) rather
             than ermrest's ``find_associations(pure=True)`` so that non-
             pure association tables — bridges that carry user metadata
             like ``Image_Dataset_Legacy`` — are ALSO recognized as
@@ -1963,7 +1963,7 @@ class DerivaModel:
                 return False
             # Is n2 an association table that points at Dataset (i.e. one
             # of its FK targets is the Dataset root)?
-            if not self._is_association_table(n2):
+            if not self.is_topological_association(n2):
                 return False
             for fk in n2.foreign_keys:
                 if fk.pk_table == dataset_table:
