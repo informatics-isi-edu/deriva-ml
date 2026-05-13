@@ -287,6 +287,16 @@ class DerivaModel:
         """Return the chaise configuration."""
         return self.model.chaise_config
 
+    def apply(self) -> None:
+        """Apply pending annotation/schema changes via the underlying Model.
+
+        Thin passthrough to ``self.model.apply()``. Kept explicit so the
+        annotation/schema commit boundary is visible on the DerivaModel
+        public surface (rather than hiding inside generic ``__getattr__``
+        delegation).
+        """
+        self.model.apply()
+
     def get_schema_description(self, include_system_columns: bool = False) -> dict[str, Any]:
         """Return a JSON description of the catalog schema structure.
 
@@ -397,7 +407,21 @@ class DerivaModel:
         return result
 
     def __getattr__(self, name: str) -> Any:
-        # Called only if `name` is not found in Manager.  Delegate attributes to model class.
+        """Delegate unknown attribute access to the underlying deriva-py Model.
+
+        Called only when ``name`` is not already an attribute of the
+        ``DerivaModel`` instance (per Python's attribute resolution order),
+        so explicit properties on this class — ``chaise_config``,
+        ``apply``, ``catalog``, ``schemas`` (inherited via :class:`DatabaseModel`
+        from :class:`deriva.bag.database.BagDatabase`) — take precedence.
+
+        Kept as a fallback because ``self.model.<attr>`` is reached at 50+
+        call sites for ``schemas``, ``annotations`` and a long tail of
+        deriva-py Model attributes. Replacing each with explicit
+        accessors would collide with mixins (e.g. ``BagDatabase.schemas``
+        is an instance-attribute set in its ``__init__``, which a
+        ``@property`` would shadow and block assignment to).
+        """
         return getattr(self.model, name)
 
     def name_to_table(self, table: TableInput) -> Table:
