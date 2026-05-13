@@ -342,7 +342,18 @@ class TestBreakCyclesRegression:
         assert names.index("Dataset_Type") < names.index("Dataset")
 
     def test_max_depth_safety(self):
-        """Test that the max depth safety guard works."""
+        """Test that the max depth safety guard raises rather than recurses.
+
+        Bag-package audit action #9 (deriva-py PR landed before the
+        deriva-ml branch's last lock refresh) hardened
+        ``_break_cycles_and_sort`` to raise ``RuntimeError`` on depth
+        exhaust instead of silently returning a partial result. The
+        previous "list-on-exhaust" behavior was a debugging hazard —
+        a real schema cannot have more independent cycles than edges,
+        so depth-exhaust indicates a bug in the cycle detector.
+        """
+        import pytest
+
         model = _make_mock_model(
             {
                 "A": ["B"],
@@ -353,10 +364,10 @@ class TestBreakCyclesRegression:
         graph = orderer._build_dependency_graph()
 
         # Simulate a broken CycleError that can't be resolved
-        # by passing an empty cycle
+        # by passing an empty cycle.
         from graphlib import CycleError
 
         error = CycleError("nodes are in a cycle", [])
-        # Should not infinite-recurse due to max depth guard
-        result = orderer._break_cycles_and_sort(graph, error, _depth=999)
-        assert isinstance(result, list)
+        # Should fail-loud on depth exhaust (bag-audit action #9).
+        with pytest.raises(RuntimeError, match="Too many cycles"):
+            orderer._break_cycles_and_sort(graph, error, _depth=999)

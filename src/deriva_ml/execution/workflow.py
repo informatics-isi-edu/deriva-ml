@@ -31,6 +31,8 @@ from deriva_ml.execution.find_caller import _get_calling_module
 from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.core.logging_config import get_logger
 
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from deriva_ml.interfaces import DerivaMLCatalog
 
