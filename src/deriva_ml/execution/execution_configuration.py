@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -90,8 +89,8 @@ class ExecutionConfiguration(BaseModel):
     def validate_assets(cls, value: Any) -> Any:
         """Normalize asset entries to AssetSpec objects.
 
-        Accepts plain RID strings, AssetRID objects, DictConfig from Hydra,
-        AssetSpec objects, or dicts with 'rid' and optional 'cache' keys.
+        Accepts plain RID strings, DictConfig from Hydra, AssetSpec objects,
+        or dicts with 'rid' and optional 'cache' keys.
         """
         result = []
         for v in value:
@@ -106,10 +105,8 @@ class ExecutionConfiguration(BaseModel):
                 if "rid" in d:
                     result.append(AssetSpec(**d))
                 else:
-                    # Legacy DictConfig with just .rid attribute (AssetRID-style)
+                    # Bare DictConfig with just a .rid attribute.
                     result.append(AssetSpec(rid=v.rid, cache=getattr(v, "cache", False)))
-            elif isinstance(v, AssetRID):
-                result.append(AssetSpec(rid=v.rid))
             elif isinstance(v, str):
                 result.append(AssetSpec(rid=v))
             else:
@@ -144,28 +141,3 @@ class ExecutionConfiguration(BaseModel):
         return ExecutionConfiguration.model_validate(config)
 
 
-@dataclass
-class AssetRID(str):
-    """A string subclass representing an asset Resource ID with optional description.
-
-    .. deprecated::
-        Use :class:`AssetSpec` instead for new code. ``AssetRID`` is retained
-        for backward compatibility.
-
-    Attributes:
-        rid: The Resource ID string identifying the asset in Deriva.
-        description: Optional human-readable description of the asset.
-
-    Example:
-        >>> asset = AssetRID("3RA", "Pretrained model weights")
-        >>> print(asset)  # "3RA"
-        >>> print(asset.description)  # "Pretrained model weights"
-    """
-
-    rid: str
-    description: str = ""
-
-    def __new__(cls, rid: str, description: str = ""):
-        obj = super().__new__(cls, rid)
-        obj.description = description
-        return obj

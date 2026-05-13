@@ -2667,7 +2667,7 @@ class Dataset:
                 - total_asset_bytes: total size of asset files in bytes
                 - total_asset_size: human-readable size string
                 - cache_status: one of "not_cached", "cached_metadata_only",
-                  "cached_materialized", "cached_incomplete"
+                  "cached_materialized", "cached_holey"
                 - cache_path: local path to cached bag (if cached), else None
         """
         # Get size estimate

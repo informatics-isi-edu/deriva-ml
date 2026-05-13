@@ -384,7 +384,7 @@ class DatasetMixin:
                 - tables: dict mapping table name to {row_count, is_asset, asset_bytes}
                 - total_rows, total_asset_bytes, total_asset_size
                 - cache_status: one of "not_cached", "cached_metadata_only",
-                  "cached_materialized", "cached_incomplete"
+                  "cached_materialized", "cached_holey"
                 - cache_path: local path to cached bag (if cached), else None
         """
         if not self.model.is_dataset_rid(dataset.rid):

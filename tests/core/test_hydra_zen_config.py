@@ -370,47 +370,11 @@ class TestDatasetSpecConfig:
         assert datasets[2].description == "Testing"
 
 
-class TestAssetRID:
-    """Test AssetRID class for asset specifications."""
-
-    def test_asset_rid_basic(self):
-        """Test basic AssetRID usage."""
-        from deriva_ml.execution import AssetRID
-
-        asset = AssetRID(rid="WXYZ")
-
-        # AssetRID is a str subclass
-        assert asset == "WXYZ"
-        assert asset.rid == "WXYZ"
-
-    def test_asset_rid_with_description(self):
-        """Test AssetRID with description."""
-        from deriva_ml.execution import AssetRID
-
-        asset = AssetRID(rid="ABCD", description="Model weights file")
-
-        assert asset == "ABCD"
-        assert asset.rid == "ABCD"
-        assert asset.description == "Model weights file"
-
-    def test_asset_rid_list(self):
-        """Test creating a list of asset RIDs for execution configuration."""
-        from deriva_ml.execution import AssetRID
-
-        # Create a list of asset RIDs (typical pattern for execution configs)
-        assets = [
-            AssetRID(rid="1ABC"),
-            AssetRID(rid="2DEF", description="Pretrained weights"),
-            AssetRID(rid="3GHI", description="Config file"),
-        ]
-
-        assert len(assets) == 3
-        assert assets[1].description == "Pretrained weights"
-        # Can also use plain strings
-        assert assets[0] == "1ABC"
+class TestPlainStringAssets:
+    """Plain RID strings are accepted as asset references."""
 
     def test_plain_string_assets(self):
-        """Test that plain strings work as asset RIDs."""
+        """Plain RID strings are the simplest asset spec."""
         # Plain strings are the simplest option when descriptions aren't needed
         assets = ["3RA", "3R8", "3R6"]
 

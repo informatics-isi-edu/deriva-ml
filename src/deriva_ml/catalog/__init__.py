@@ -14,9 +14,10 @@ through a single bag-pipeline path:
   concurrency knobs, etc.) are accepted but no longer load-bearing
   and emit a deprecation warning when set away from default.
 - :data:`~deriva_ml.catalog.clone.OrphanStrategy` is an alias of
-  :class:`deriva.bag.traversal.DanglingFKStrategy`;
-  :data:`~deriva_ml.catalog.clone.AssetCopyMode` maps its
-  legacy values onto :class:`deriva.bag.traversal.AssetMode`.
+  :class:`deriva.bag.traversal.DanglingFKStrategy`. ``asset_mode``
+  takes :class:`deriva.bag.traversal.AssetMode` members directly
+  (legacy string spellings like ``"REFERENCES"`` / ``"FULL"`` are
+  coerced at the boundary).
 
 The provenance API
 (:class:`~deriva_ml.catalog.provenance.CatalogProvenance` etc.)
@@ -25,7 +26,6 @@ here for back-compat.
 """
 
 from deriva_ml.catalog.clone import (
-    AssetCopyMode,
     OrphanStrategy,
     create_ml_workspace,
 )
@@ -58,7 +58,6 @@ __all__ = [
     "CloneViaBagResult",
     "clone_via_bag",
     # Legacy clone surface (now on top of clone_via_bag)
-    "AssetCopyMode",
     "OrphanStrategy",
     "create_ml_workspace",
     # Localize
