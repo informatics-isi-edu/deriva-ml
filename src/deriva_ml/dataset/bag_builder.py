@@ -186,6 +186,78 @@ class DatasetBagBuilder:
             out["post_processors"] = self._minid_post_processors()
         return out
 
+    def build_bag(
+        self,
+        dataset: DatasetLike,
+        output_dir: Path,
+        timeout: tuple[int, int] | None = None,
+    ) -> Path:
+        """Build a bag directory for ``dataset`` on disk.
+
+        Drives :meth:`CatalogBagBuilder.build` against the catalog the
+        ``DatasetBagBuilder`` is wired to. Callers typically construct this
+        builder with ``ml_instance`` set to a snapshot-bound catalog so the
+        produced bag is reproducible against a fixed catalog state.
+
+        The bag's on-disk name is ``Dataset_{rid}`` — :class:`CatalogBagBuilder`
+        uses ``output_dir.name`` as the bag-name, so this method constructs a
+        child directory of ``output_dir`` named ``Dataset_{rid}`` and passes
+        *that* as the builder's ``output_dir``.
+
+        Args:
+            dataset: The dataset to export. Must expose ``dataset_rid``.
+            output_dir: Parent directory to receive the bag. Created if
+                missing; the bag itself lives at
+                ``output_dir / f"Dataset_{rid}"`` on return.
+            timeout: Optional ``(connect, read)`` seconds applied to the
+                underlying catalog's HTTP session for the duration of the
+                export. ``None`` keeps the catalog's existing session
+                config.
+
+        Returns:
+            Path to the unarchived bag directory on success. Callers wishing
+            to ship a zip should archive the directory via
+            :func:`bdbag.bdbag_api.archive_bag`.
+
+        Raises:
+            ValueError: If :class:`CatalogBagBuilder` rejects the anchor
+                (e.g., the dataset RID does not exist in the bound
+                snapshot catalog).
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        bag_root = output_dir / f"Dataset_{dataset.dataset_rid}"
+        bag_root.mkdir(parents=True, exist_ok=True)
+
+        anchors = self.anchors_for(dataset)
+        policy = self.build_policy(dataset)
+
+        catalog = self._ml_instance.catalog
+        prior_config = getattr(catalog, "_session_config", None)
+        if timeout is not None:
+            new_config = dict(prior_config) if prior_config else {}
+            new_config["timeout"] = timeout
+            catalog._session_config = new_config  # type: ignore[attr-defined]
+        try:
+            builder = CatalogBagBuilder(
+                catalog=catalog,
+                anchors=anchors,
+                output_dir=bag_root,
+                policy=policy,
+            )
+            return builder.build()
+        finally:
+            if timeout is not None:
+                if prior_config is None:
+                    # ErmrestCatalog tolerates missing attribute on subsequent
+                    # access; restore by deleting our temporary insertion.
+                    try:
+                        delattr(catalog, "_session_config")
+                    except AttributeError:
+                        pass
+                else:
+                    catalog._session_config = prior_config  # type: ignore[attr-defined]
+
     def generate_dataset_download_annotations(self) -> dict[str, Any]:
         """Return the static Chaise export annotations for the Dataset table.
 
