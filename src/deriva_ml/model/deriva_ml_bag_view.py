@@ -135,7 +135,7 @@ class DerivaMLBagView:
         self._database_model.rid_lookup(rid)
 
         # Get dataset metadata
-        dataset_record = next((d for d in self._database_model._get_table_contents("Dataset") if d["RID"] == rid), None)
+        dataset_record = next((d for d in self._database_model.get_table_contents("Dataset") if d["RID"] == rid), None)
         if not dataset_record:
             raise DerivaMLException(f"Dataset {rid} not found in bag")
 
@@ -143,7 +143,7 @@ class DerivaMLBagView:
         atable = f"Dataset_{MLVocab.dataset_type.value}"
         ds_types = [
             t[MLVocab.dataset_type.value]
-            for t in self._database_model._get_table_contents(atable)
+            for t in self._database_model.get_table_contents(atable)
             if t["Dataset"] == rid
         ]
 
@@ -166,10 +166,10 @@ class DerivaMLBagView:
         """
         # Get dataset types for all datasets from association table
         atable = f"Dataset_{MLVocab.dataset_type.value}"
-        ds_types = list(self._database_model._get_table_contents(atable))
+        ds_types = list(self._database_model.get_table_contents(atable))
 
         datasets = []
-        for dataset in self._database_model._get_table_contents("Dataset"):
+        for dataset in self._database_model.get_table_contents("Dataset"):
             my_types = [t[MLVocab.dataset_type.value] for t in ds_types if t["Dataset"] == dataset["RID"]]
             datasets.append(
                 DatasetBag(
@@ -237,7 +237,7 @@ class DerivaMLBagView:
         Returns:
             Generator yielding dictionaries for each row.
         """
-        yield from self._database_model._get_table_contents(table)
+        yield from self._database_model.get_table_contents(table)
 
     def list_dataset_element_types(self) -> list[Table]:
         """List the types of elements that can be in datasets.

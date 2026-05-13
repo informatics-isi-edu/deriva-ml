@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 from deriva.bag.database import BagDatabase
 from deriva.core.ermrest_model import Model
@@ -257,34 +257,5 @@ class DatabaseModel(BagDatabase, DerivaModel):
         with Session(self.engine) as session:
             result = session.execute(cmd).mappings().first()
             return dict(result) if result else None
-
-    # ------------------------------------------------------------------
-    # Compat aliases preserved from pre-migration DatabaseModel
-    # ------------------------------------------------------------------
-
-    def _get_table_contents(
-        self, table: str
-    ) -> Generator[dict[str, Any], None, None]:
-        """Alias of :meth:`get_table_contents` for legacy callers.
-
-        New code should call :meth:`get_table_contents` (inherited
-        from :class:`BagDatabase`) directly.
-        """
-        yield from self.get_table_contents(table)
-
-    def get_orm_association_class(self, left_cls, right_cls, **kwargs):
-        """Alias of :meth:`get_association_class` for legacy callers."""
-        return self.get_association_class(left_cls, right_cls)
-
-    def delete_database(self) -> None:
-        """Deprecated. Use :meth:`dispose` and remove files manually.
-
-        Pre-migration this method did the same thing :meth:`dispose`
-        does. The "delete" name was misleading — it never actually
-        removed the database files. Preserved as a no-effective-op
-        for back-compat; new callers should use :meth:`dispose`.
-        """
-        self.dispose()
-
 
 __all__ = ["DatabaseModel"]

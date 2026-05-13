@@ -438,7 +438,7 @@ class DatasetBag:
                 description=v["Description"],
                 execution_rid=v["Execution"],
             )
-            for v in self.model._get_table_contents("Dataset_Version")
+            for v in self.model.get_table_contents("Dataset_Version")
             if v["Dataset"] == self.dataset_rid
         ]
 
@@ -501,7 +501,7 @@ class DatasetBag:
         for element_table in self.model.list_dataset_element_types():
             element_class = self.model.get_orm_class_for_table(element_table)
 
-            assoc_class, dataset_rel, element_rel = self.model.get_orm_association_class(dataset_class, element_class)
+            assoc_class, dataset_rel, element_rel = self.model.get_association_class(dataset_class, element_class)
 
             element_table = inspect(element_class).mapped_table
             if not self.model.is_domain_schema(element_table.schema) and element_table.name not in ["Dataset", "File"]:

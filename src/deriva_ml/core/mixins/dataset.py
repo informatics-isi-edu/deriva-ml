@@ -203,9 +203,8 @@ class DatasetMixin:
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the table types that can be added as dataset members.
 
-        Returns every table that has an association with the Dataset table,
-        restricted to domain-schema tables and the Dataset table itself.
-        These are the types accepted by ``add_dataset_members()``.
+        Thin wrapper over :meth:`DerivaModel.list_dataset_element_types`;
+        the model layer owns the filter logic.
 
         Returns:
             Iterable of ``Table`` objects representing valid member types.
@@ -217,15 +216,7 @@ class DatasetMixin:
             >>> types = ml.list_dataset_element_types()  # doctest: +SKIP
             >>> print([t.name for t in types])  # doctest: +SKIP
         """
-
-        def is_domain_or_dataset_table(table: Table) -> bool:
-            return self.model.is_domain_schema(table.schema.name) or table.name == self._dataset_table.name
-
-        return [
-            t
-            for a in self._dataset_table.find_associations()
-            if is_domain_or_dataset_table(t := a.other_fkeys.pop().pk_table)
-        ]
+        return self.model.list_dataset_element_types()
 
     @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
     def add_dataset_element_type(self, element: str | Table) -> Table:
