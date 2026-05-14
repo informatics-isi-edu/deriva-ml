@@ -676,6 +676,44 @@ class DatasetBag:
             if chosen is not None:
                 yield chosen
 
+    def fetch_table_features(self, *args: Any, **kwargs: Any) -> None:
+        """Retired — use ``feature_values(table, name)`` or ``Denormalizer``.
+
+        ``DatasetBag.fetch_table_features`` has been removed. To read
+        feature values for a single feature, use :meth:`feature_values`::
+
+            for rec in bag.feature_values("Image", "Quality"):
+                ...
+
+        For wide-table denormalization across multiple features, use the
+        ``Denormalizer`` subsystem.
+
+        Raises:
+            DerivaMLException: Always. Points at the replacement API.
+        """
+        raise DerivaMLException(
+            "DatasetBag.fetch_table_features() has been retired. "
+            "Use feature_values(table, feature_name) to read a single feature, "
+            "or Denormalizer for multi-feature wide tables."
+        )
+
+    def list_feature_values(self, *args: Any, **kwargs: Any) -> None:
+        """Retired — renamed to :meth:`feature_values`.
+
+        ``DatasetBag.list_feature_values`` has been removed; use
+        :meth:`feature_values` (identical signature) instead::
+
+            for rec in bag.feature_values("Image", "Quality"):
+                ...
+
+        Raises:
+            DerivaMLException: Always. Points at the replacement API.
+        """
+        raise DerivaMLException(
+            "DatasetBag.list_feature_values() has been retired and renamed. "
+            "Use feature_values(table, feature_name, selector=...) instead."
+        )
+
     def lookup_feature(self, table: str | Table, feature_name: str) -> "Feature":
         """Look up a feature definition from bag metadata — works fully offline.
 
