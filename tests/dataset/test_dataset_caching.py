@@ -214,22 +214,37 @@ class TestMultiVersionCache:
     """Tests for caching multiple versions of the same dataset."""
 
     def test_different_versions_cached_separately(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """Different versions of the same dataset have separate cache entries."""
+        """Different released versions of the same dataset have separate cache entries.
+
+        Dev versions deliberately don't participate in the cache index
+        (their ``Snapshot`` is ``NULL`` so every dev mutation would map
+        to the same ``{spec_hash}_None`` cache key — see ADR-0003). The
+        demo fixture's ``create_datasets`` calls ``add_dataset_members``
+        immediately after ``create_dataset``, leaving the dataset on a
+        dev row; the test therefore promotes each version to a release
+        so the cache key actually differs.
+        """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
+
+        # Demo fixture leaves us on a dev row; promote to release for v1.
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="v1 baseline")
         v1 = dataset.current_version
 
         # Download v1
         bag1 = dataset.download_dataset_bag(version=v1, use_minid=False)
 
-        # Create v2 by adding members
+        # Mutate then release for v2 so its snapshot is distinct from v1's.
         pb = ml.pathBuilder()
         subjects = [s["RID"] for s in pb.schemas[ml.default_schema].tables["Subject"].path.entities().fetch()]
         if len(subjects) >= 2:
             dataset.add_dataset_members(subjects[-2:])
+        dataset.release(bump=VersionPart.minor, description="v2 with extra subjects")
         v2 = dataset.current_version
         assert str(v2) != str(v1)
+        assert not v2.is_devrelease
 
         # Download v2
         bag2 = dataset.download_dataset_bag(version=v2, use_minid=False)
