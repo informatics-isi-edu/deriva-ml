@@ -93,10 +93,13 @@ class TestCatalogDatasetFunctions:
 
     def test_dataset_spec(self):
         """Test DatasetSpec creation and validation."""
-        # Create with required fields
+        # Create with required fields. DatasetSpec coerces the version
+        # string through DatasetVersion.parse so spec.version is a
+        # DatasetVersion (a PEP 440 Version subclass), not a bare
+        # string — compare on the rendered form.
         spec = DatasetSpec(rid="1234", version="1.0.0")
         assert spec.rid == "1234"
-        assert spec.version == "1.0.0"
+        assert str(spec.version) == "1.0.0"
         assert spec.materialize  # Default value
 
         # Create with all fields
