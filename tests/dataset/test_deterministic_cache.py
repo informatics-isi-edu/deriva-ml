@@ -133,27 +133,41 @@ class TestDeterministicCacheKey:
         assert info["status"] == CacheStatus.cached_materialized.value
 
     def test_new_version_creates_new_cache_entry(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """New dataset version creates a different index checksum (new snapshot).
+        """New released dataset version creates a different index checksum.
 
-        Different snapshots → different checksums in the cache index, so
-        the index should record at least two distinct bag entries for
-        the same dataset RID after downloading both versions.
+        Different *released* snapshots → different checksums in the cache
+        index, so after downloading two distinct released versions the
+        index should record at least two distinct bag entries for the
+        same dataset RID.
+
+        Dev versions deliberately don't participate in the cache index
+        (their ``Snapshot`` is ``NULL`` so the cache key would be
+        ``{spec_hash}_None`` for every dev mutation — see ADR-0003 on
+        the mutable-dev-row contract). The test promotes each dev period
+        to a release so the cache key actually differs across versions.
         """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
+
+        # The demo fixture leaves the dataset on a dev row; promote it
+        # to a release so we have a stable snapshot-bearing v1.
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="v1 baseline")
         v1 = dataset.current_version
 
         # Download v1
         bag1 = dataset.download_dataset_bag(version=v1, use_minid=False)
 
-        # Create v2 by modifying data
+        # Mutate, then release to v2 so its snapshot is distinct from v1.
         pb = ml.pathBuilder()
         subjects = [s["RID"] for s in pb.schemas[ml.default_schema].tables["Subject"].path.entities().fetch()]
         if len(subjects) >= 2:
             dataset.add_dataset_members(subjects[-2:])
+        dataset.release(bump=VersionPart.minor, description="v2 with extra subjects")
         v2 = dataset.current_version
         assert str(v2) != str(v1)
+        assert not v2.is_devrelease
 
         # Download v2
         bag2 = dataset.download_dataset_bag(version=v2, use_minid=False)
@@ -385,15 +399,24 @@ class TestStaleCacheInvalidation:
         same-snapshot-but-different-spec_hash checksum gets a different
         index key and is therefore not matched, even if it's recorded
         for the same dataset RID.
+
+        Needs a released version (snapshot is non-NULL) so the cache key
+        is meaningful — dev versions have ``Snapshot=NULL`` and don't
+        participate in the cache. See ADR-0003 on dev semantics.
         """
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
+        # Demo fixture leaves us on a dev row; promote to a release.
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="cache test baseline")
         version = dataset.current_version
 
-        # Resolve the snapshot for this version.
+        # Resolve the snapshot for this version. Use str-vs-str
+        # comparison; DatasetVersion inherits from packaging.Version
+        # whose ``__eq__`` against a bare string returns NotImplemented.
         history = dataset.dataset_history()
-        version_record = next(v for v in history if v.dataset_version == str(version))
+        version_record = next(v for v in history if str(v.dataset_version) == str(version))
         snapshot = version_record.snapshot
 
         # Pre-record a decoy entry with the same snapshot but a wrong
