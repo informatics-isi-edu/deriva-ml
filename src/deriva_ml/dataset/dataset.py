@@ -2105,9 +2105,13 @@ class Dataset:
             fk_column = "Nested_Dataset" if table == "Dataset" else table
 
             atable_path = schema_path.tables[association_map[table]]
+            # Chain two .filter() calls rather than ``& (a == AnyQuantifier(*xs))``
+            # — the compound-and form generates an URL the server rejects with
+            # "URL parse error at token: None" for the Any-quantified clause.
             atable_path.filter(
-                (atable_path.Dataset == self.dataset_rid)
-                & (atable_path.columns[fk_column] == AnyQuantifier(*elements)),
+                atable_path.Dataset == self.dataset_rid,
+            ).filter(
+                atable_path.columns[fk_column] == AnyQuantifier(*elements),
             ).delete()
 
         # Per ADR-0003: every mutation lands on dev. The caller passed a
