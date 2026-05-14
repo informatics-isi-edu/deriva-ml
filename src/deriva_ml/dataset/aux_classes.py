@@ -6,7 +6,7 @@ used throughout DerivaML to represent dataset versions, provenance
 records, and hydra-zen configuration entries.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Optional, SupportsInt
 
 from hydra_zen import hydrated_dataclass
@@ -25,13 +25,20 @@ from deriva_ml.core.definitions import RID
 from deriva_ml.core.validation import VALIDATION_CONFIG
 
 
-class VersionPart(Enum):
+class VersionPart(StrEnum):
     """Names the component of a dataset version to advance on release.
 
     DerivaML uses a ``major.minor.patch`` release segment within the broader
     PEP 440 version space (see ADR-0004). Picking a ``VersionPart`` selects
     which component is incremented when a dev period is promoted to a
     released version.
+
+    Inherits from :class:`enum.StrEnum` so members compare equal to their
+    raw string values. This matters because ``VALIDATION_CONFIG`` has
+    ``use_enum_values=True``, so Pydantic's ``@validate_call`` coerces
+    members to their string values at the call boundary; the
+    ``match``/``case`` in :meth:`DatasetVersion.next_release` needs the
+    coerced string to still equal the enum member it's being compared to.
 
     Attributes:
         major: Schema-altering changes that break backward compatibility.
