@@ -389,29 +389,48 @@ def _make_mock_catalog_with_dataset_dataset_rows(
 ) -> MagicMock:
     """Mock that returns predetermined Dataset_Dataset rows per query.
 
+    Mirrors the implementation's datapath call shape:
+
+        pb = catalog.getPathBuilder()
+        dd = pb.schemas["deriva-ml"].tables["Dataset_Dataset"]
+        rows = dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch()
+
     Args:
-        rows_by_seed: ``{frozenset(seed_rids): rows}`` mapping —
+        rows_by_seed: ``{tuple(sorted(seed_rids)): rows}`` mapping —
             the helper looks up by the comma-sorted seed list as a
             tuple. Each ``rows`` is a list of ``{"Nested_Dataset": rid}``.
     """
     catalog = MagicMock()
 
-    def _get(path: str, **_: Any):
-        # Path looks like:
-        # /entity/deriva-ml:Dataset_Dataset/Dataset=any(rid1,rid2,...)
-        match = path.split("any(")
-        if len(match) < 2:
-            seeds = ()
-        else:
-            inner = match[1].rstrip(")")
-            seeds = tuple(sorted(inner.split(",")))
-        rows = rows_by_seed.get(seeds, [])
-        resp = MagicMock()
-        resp.raise_for_status.return_value = None
-        resp.json.return_value = rows
-        return resp
+    # The end of the chain — .fetch() — returns rows keyed off the
+    # last seen seed list. We capture the seeds during the .in_(...)
+    # call so .fetch() can look them up.
+    def fetch_side_effect():
+        seeds = tuple(sorted(catalog._current_seeds))
+        return rows_by_seed.get(seeds, [])
 
-    catalog.get = _get
+    def in_side_effect(seeds):
+        catalog._current_seeds = list(seeds)
+        return MagicMock()  # the in_(...) predicate object
+
+    def filter_side_effect(_predicate):
+        return catalog._chain
+
+    pb = MagicMock()
+    catalog.getPathBuilder.return_value = pb
+
+    dd_table = MagicMock()
+    pb.schemas = {"deriva-ml": MagicMock()}
+    pb.schemas["deriva-ml"].tables = {"Dataset_Dataset": dd_table}
+
+    chain = MagicMock()
+    catalog._chain = chain
+    dd_table.filter.side_effect = filter_side_effect
+    chain.entities.return_value = chain  # entities() returns self
+    chain.fetch.side_effect = fetch_side_effect
+
+    dd_table.Dataset.in_.side_effect = in_side_effect
+
     return catalog
 
 
