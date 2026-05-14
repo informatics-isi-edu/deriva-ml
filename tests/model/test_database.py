@@ -92,15 +92,47 @@ class TestDataBaseModel:
             assert catalog_image == image_table
 
     def test_database_methods(self, dataset_test):
+        """Bag's SQLite replica contains the catalog's tables.
+
+        Bag-builder ``_exclude_empty_associations`` deliberately prunes
+        ``Dataset_X`` association tables whose target element type has
+        zero members in the dataset tree — that's a feature, not a bug.
+        So the bag's table set is a *subset* of the catalog's, not an
+        exact match. Assert subset + spot-check core ML tables.
+        """
         ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         current_bag = ml_instance.download_dataset_bag(current_spec)
-        tables = current_bag.model.list_tables()
+        all_bag_tables = set(current_bag.model.list_tables())
+        # The bag carries bookkeeping tables that don't exist in the
+        # catalog (e.g. ``schema_meta``). Drop anything without a
+        # schema-qualified name before comparing to the catalog's set.
+        tables = {t for t in all_bag_tables if "." in t}
         schemas = ml_instance.model.schemas
-        catalog_tables = len(schemas[ml_instance.default_schema].tables) + len(schemas[ml_instance.ml_schema].tables)
-        assert catalog_tables == len(tables)
+        ml_schema = ml_instance.ml_schema
+        default_schema = ml_instance.default_schema
+        catalog_tables = {
+            f"{default_schema}.{name}" for name in schemas[default_schema].tables
+        } | {
+            f"{ml_schema}.{name}" for name in schemas[ml_schema].tables
+        }
+        # Bag tables are a subset of the catalog's (empty associations
+        # are pruned by the bag builder's exclude-empty-associations
+        # pass — see DatasetBagBuilder._exclude_empty_associations).
+        assert tables.issubset(catalog_tables), (
+            f"Bag table not in catalog: {tables - catalog_tables}"
+        )
+        # Spot-check the core ML tables that every dataset bag should
+        # carry, regardless of which element types are populated.
+        for core in (
+            f"{ml_schema}.Dataset",
+            f"{ml_schema}.Dataset_Version",
+            f"{ml_schema}.Execution",
+            f"{ml_schema}.Workflow",
+        ):
+            assert core in tables, f"Core ML table {core} missing from bag"
 
     def test_table_as_dict(self, dataset_test):
         ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
