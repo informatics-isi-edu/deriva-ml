@@ -247,9 +247,17 @@ class TestDataset:
 
         dataset = execution.create_dataset(dataset_types=["TestSet"], description="Test dataset")
         dataset.add_dataset_members({"TestTableDelete": test_rids})
+        # add_dataset_members above lands on a dev row; release so the
+        # subsequent delete_dataset_members exercises the "starting from
+        # a released version" path. Without this, the test would
+        # observe dev2 (1 from add, 1 from delete) — see ADR-0003 on
+        # per-call dev increments.
+        from deriva_ml.dataset.aux_classes import VersionPart
+        dataset.release(bump=VersionPart.minor, description="Released after seed")
 
-        # Get initial version
+        # Get initial version (now a released label).
         initial_version = dataset.current_version
+        assert not initial_version.is_devrelease
         initial_members = dataset.list_dataset_members()
         assert len(initial_members.get("TestTableDelete", [])) == 5
 
