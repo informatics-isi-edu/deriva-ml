@@ -2004,6 +2004,11 @@ class Execution:
     def list_input_datasets(self) -> list[Dataset]:
         """List all datasets that were inputs to this execution.
 
+        Excludes any dataset this execution itself *produced* — the
+        ``Dataset_Execution`` association table has no role column to
+        distinguish inputs from outputs, so we infer authorship from
+        each dataset's ``Dataset_Version.Execution`` link.
+
         Returns:
             List of Dataset objects that were used as inputs.
 
@@ -2014,13 +2019,20 @@ class Execution:
         if self._execution_record is not None:
             return self._execution_record.list_input_datasets()
 
-        # Fallback for dry_run mode
+        # Fallback for dry_run mode — apply the same producer filter so
+        # dry-run lineage queries agree with the persistent path.
         pb = self._ml_object.pathBuilder()
         dataset_exec = pb.schemas[self._ml_object.ml_schema].Dataset_Execution
 
         records = list(dataset_exec.filter(dataset_exec.Execution == self.execution_rid).entities().fetch())
 
-        return [self._ml_object.lookup_dataset(r["Dataset"]) for r in records]
+        datasets: list[Dataset] = []
+        for r in records:
+            rid = r["Dataset"]
+            if self._ml_object._producer_of_dataset(rid) == self.execution_rid:
+                continue
+            datasets.append(self._ml_object.lookup_dataset(rid))
+        return datasets
 
     def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List all assets that were inputs or outputs of this execution.

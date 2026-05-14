@@ -530,6 +530,12 @@ class ExecutionRecord(BaseModel):
     def list_input_datasets(self) -> list["Dataset"]:
         """List datasets that were input to this execution.
 
+        Filters out datasets that this execution *produced* (their
+        ``Dataset_Version.Execution`` row points back at this execution).
+        The catalog's ``Dataset_Execution`` table carries no role
+        column, so it can't natively distinguish inputs from outputs;
+        we use the version row's authorship as the source of truth.
+
         Returns:
             List of Dataset objects that were used as inputs to this execution.
 
@@ -548,12 +554,18 @@ class ExecutionRecord(BaseModel):
 
         records = list(dataset_exec_path.filter(dataset_exec_path.Execution == self.execution_rid).entities().fetch())
 
-        # Look up each dataset and return Dataset objects
+        # Look up each dataset and return Dataset objects, excluding
+        # any that this execution itself produced (those go on the
+        # output side; the Dataset_Execution table conflates both).
         datasets = []
         for record in records:
             dataset_rid = record.get("Dataset")
-            if dataset_rid:
-                datasets.append(self._ml_instance.lookup_dataset(dataset_rid))
+            if not dataset_rid:
+                continue
+            producer = self._ml_instance._producer_of_dataset(dataset_rid)
+            if producer == self.execution_rid:
+                continue
+            datasets.append(self._ml_instance.lookup_dataset(dataset_rid))
         return datasets
 
     def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
