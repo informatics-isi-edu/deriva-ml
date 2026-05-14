@@ -50,6 +50,10 @@ def catalog_with_feature_values(populated_catalog):
         with execution.execute() as exe:
             for img_rid in image_rids:
                 exe.add_features([record_class(Image=img_rid, score=0.5 + i * 0.1)])
+        # ``add_features`` only stages records to SQLite; the flush to
+        # ermrest happens during upload. Without this call the feature
+        # rows never land at the catalog and the tests see 0 records.
+        execution.upload_execution_outputs()
 
     return ml
 
