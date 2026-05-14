@@ -937,16 +937,30 @@ class TestSplitDataset:
         assert len(history) > 0
 
     def test_versions_returned(self, test_ml):
-        """Test that result includes version strings."""
+        """Test that result includes valid PEP 440 version strings.
+
+        split_dataset creates sub-datasets and adds members to them,
+        which per ADR-0003 lands them on a dev row. The version is
+        therefore PEP 440 dev form: ``MAJOR.MINOR.PATCH.postN.devN``
+        rather than a bare MAJOR.MINOR.PATCH. Any valid release-
+        segment + optional dev-segment shape is acceptable.
+        """
+        from deriva_ml.dataset.aux_classes import DatasetVersion
+
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
         result = split_dataset(ml, source_rid, test_size=4, seed=42)
 
-        # Versions should be valid semver-like strings
+        # Versions should be valid PEP 440 strings — round-trip through
+        # DatasetVersion.parse and have at least major.minor.patch in
+        # the release segment.
         for info in [result.split, result.training, result.testing]:
-            parts = str(info.version).split(".")
-            assert len(parts) == 3
+            parsed = DatasetVersion.parse(str(info.version))
+            assert parsed.release  # tuple (major, minor, patch?) is non-empty
+            # Bare dev rows still anchor at a 3-segment release.
+            release_parts = parsed.release
+            assert len(release_parts) >= 2  # at least major.minor
 
     def test_no_shuffle(self, test_ml):
         """Test splitting without shuffle preserves order."""
