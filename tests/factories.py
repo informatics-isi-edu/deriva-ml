@@ -15,16 +15,16 @@ Mock Helpers:
     MockCatalogContext: Context manager for mocking catalog operations
 
 Example:
-    >>> from tests.factories import make_dataset, make_execution_config
+    >>> from tests.factories import make_dataset, make_execution_config  # doctest: +SKIP
     >>>
     >>> # Create a simple dataset
-    >>> dataset = make_dataset(ml, description="Test dataset")
+    >>> dataset = make_dataset(ml, description="Test dataset")  # doctest: +SKIP
     >>>
     >>> # Create a dataset with specific types
-    >>> dataset = make_dataset(ml, dataset_types=["Training", "Test"])
+    >>> dataset = make_dataset(ml, dataset_types=["Training", "Test"])  # doctest: +SKIP
     >>>
     >>> # Create an execution configuration
-    >>> config = make_execution_config(description="My test run")
+    >>> config = make_execution_config(description="My test run")  # doctest: +SKIP
 """
 
 from __future__ import annotations
@@ -78,10 +78,10 @@ def make_dataset(
 
     Example:
         >>> # Using DerivaML directly (auto-creates execution)
-        >>> dataset = make_dataset(ml, description="Test dataset")
+        >>> dataset = make_dataset(ml, description="Test dataset")  # doctest: +SKIP
         >>>
         >>> # Using Execution for explicit provenance
-        >>> with ml.create_execution(config) as exe:
+        >>> with ml.create_execution(config) as exe:  # doctest: +SKIP
         ...     dataset = make_dataset(exe, description="Training data")
     """
     if dataset_types is None:
@@ -134,8 +134,8 @@ def make_dataset_spec(
         A DatasetSpec configured for testing.
 
     Example:
-        >>> spec = make_dataset_spec("1-ABC", version="1.0.0")
-        >>> spec = make_dataset_spec(dataset.dataset_rid, version=dataset.current_version)
+        >>> spec = make_dataset_spec("1-ABC", version="1.0.0")  # doctest: +SKIP
+        >>> spec = make_dataset_spec(dataset.dataset_rid, version=dataset.current_version)  # doctest: +SKIP
     """
     if isinstance(version, str):
         version = DatasetVersion.parse(version)
@@ -168,8 +168,8 @@ def make_nested_datasets(
         The root (parent) Dataset containing the hierarchy.
 
     Example:
-        >>> root = make_nested_datasets(ml, depth=3, children_per_level=2)
-        >>> children = root.list_dataset_children(recurse=True)
+        >>> root = make_nested_datasets(ml, depth=3, children_per_level=2)  # doctest: +SKIP
+        >>> children = root.list_dataset_children(recurse=True)  # doctest: +SKIP
     """
 
     def create_level(level: int, parent_desc: str) -> Dataset:
@@ -211,8 +211,8 @@ def make_execution_config(
         An ExecutionConfiguration ready for use.
 
     Example:
-        >>> config = make_execution_config()
-        >>> config = make_execution_config(
+        >>> config = make_execution_config()  # doctest: +SKIP
+        >>> config = make_execution_config(  # doctest: +SKIP
         ...     description="Training run",
         ...     datasets=[make_dataset_spec("1-ABC")],
         ... )
@@ -245,8 +245,8 @@ def make_workflow(
         The created Workflow object.
 
     Example:
-        >>> workflow = make_workflow(ml)
-        >>> workflow = make_workflow(ml, name="Training Pipeline", workflow_type="ML")
+        >>> workflow = make_workflow(ml)  # doctest: +SKIP
+        >>> workflow = make_workflow(ml, name="Training Pipeline", workflow_type="ML")  # doctest: +SKIP
     """
     # Ensure workflow type exists
     if ensure_type:
@@ -291,8 +291,8 @@ def make_execution(
         An Execution ready for testing (not yet entered as context manager).
 
     Example:
-        >>> execution = make_execution(ml)
-        >>> with execution.execute() as exe:
+        >>> execution = make_execution(ml)  # doctest: +SKIP
+        >>> with execution.execute() as exe:  # doctest: +SKIP
         ...     # perform test operations
         ...     pass
     """
@@ -337,8 +337,8 @@ def make_vocabulary_term(
         The RID of the created (or existing) term.
 
     Example:
-        >>> rid = make_vocabulary_term(ml, MLVocab.dataset_type, "Training")
-        >>> rid = make_vocabulary_term(
+        >>> rid = make_vocabulary_term(ml, MLVocab.dataset_type, "Training")  # doctest: +SKIP
+        >>> rid = make_vocabulary_term(  # doctest: +SKIP
         ...     ml, "Asset_Type", "Model",
         ...     description="ML model file",
         ...     synonyms=["model", "weights"],
@@ -387,7 +387,7 @@ def make_table_rows(
         List of RIDs for the inserted rows.
 
     Example:
-        >>> rids = make_table_rows(ml, "Subject", [
+        >>> rids = make_table_rows(ml, "Subject", [  # doctest: +SKIP
         ...     {"Name": "Subject1"},
         ...     {"Name": "Subject2"},
         ... ])
@@ -422,8 +422,8 @@ def make_test_file(
         Path to the created file.
 
     Example:
-        >>> test_file = make_test_file(tmp_path)
-        >>> test_file = make_test_file(tmp_path, "data.csv", "col1,col2\\n1,2")
+        >>> test_file = make_test_file(tmp_path)  # doctest: +SKIP
+        >>> test_file = make_test_file(tmp_path, "data.csv", "col1,col2\\n1,2")  # doctest: +SKIP
     """
     file_path = directory / filename
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -449,8 +449,8 @@ def make_test_files(
         List of paths to created files.
 
     Example:
-        >>> files = make_test_files(tmp_path, count=5)
-        >>> files = make_test_files(tmp_path, prefix="image", extension=".png")
+        >>> files = make_test_files(tmp_path, count=5)  # doctest: +SKIP
+        >>> files = make_test_files(tmp_path, prefix="image", extension=".png")  # doctest: +SKIP
     """
     files = []
     for i in range(count):
@@ -481,7 +481,7 @@ def assert_dataset_has_members(
         AssertionError: If member counts don't match expectations.
 
     Example:
-        >>> assert_dataset_has_members(dataset, {"Subject": 5, "Image": 10})
+        >>> assert_dataset_has_members(dataset, {"Subject": 5, "Image": 10})  # doctest: +SKIP
     """
     members = dataset.list_dataset_members(recurse=recurse)
     for member_type, expected_count in expected_types.items():
@@ -503,8 +503,8 @@ def assert_dataset_version(
         AssertionError: If version doesn't match.
 
     Example:
-        >>> assert_dataset_version(dataset, "1.0.0")
-        >>> assert_dataset_version(dataset, DatasetVersion(1, 2, 0))
+        >>> assert_dataset_version(dataset, "1.0.0")  # doctest: +SKIP
+        >>> assert_dataset_version(dataset, DatasetVersion(1, 2, 0))  # doctest: +SKIP
     """
     if isinstance(expected_version, str):
         expected_version = DatasetVersion.parse(expected_version)
