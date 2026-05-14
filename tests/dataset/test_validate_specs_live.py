@@ -86,11 +86,14 @@ def test_validate_dataset_specs_live_unknown_rid(test_ml):
 
 def test_validate_execution_configuration_live_full(test_ml):
     rid, version = _make_dataset(test_ml)
+    # create_workflow is a pure constructor; persist via _add_workflow
+    # so the Workflow has a real RID that the validator can resolve.
     wf = test_ml.create_workflow(
         name="Validate composite workflow",
         workflow_type="Validate Test",
         description="composite smoke",
     )
+    wf = wf.model_copy(update={"rid": test_ml._add_workflow(wf)})
     config = ExecutionConfiguration(
         workflow=wf,
         datasets=[DatasetSpec(rid=rid, version=version)],
@@ -146,12 +149,15 @@ def test_validate_execution_configuration_live_assets(test_ml):
 
     Skipped when no asset table can be enumerated."""
     # Use the workflow RID created above as the "wrong-shape" target so we
-    # always have a known non-asset RID.
+    # always have a known non-asset RID. create_workflow is a pure
+    # constructor; persist via _add_workflow so the Workflow has a real
+    # RID that the AssetSpec can reference.
     wf = test_ml.create_workflow(
         name="Validate asset workflow",
         workflow_type="Validate Test",
         description="asset smoke",
     )
+    wf = wf.model_copy(update={"rid": test_ml._add_workflow(wf)})
     config = ExecutionConfiguration(
         workflow=wf,
         assets=[AssetSpec(rid=wf.rid)],
