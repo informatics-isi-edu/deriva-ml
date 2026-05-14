@@ -758,12 +758,21 @@ class DatasetBagBuilder:
         """Return ``{(schema, table)}`` for associations with no members.
 
         For each ``Dataset_X`` association table, include it in
-        the walk only when the dataset has at least one member of
-        element type X (or when the association links to a
-        vocabulary table — those carry dataset metadata and must
-        always be included). Empty associations are added to the
+        the walk only when the dataset (or any of its nested
+        descendants) has at least one member of element type X
+        (or when the association links to a vocabulary table —
+        those carry dataset metadata and must always be included).
+        Empty associations are added to the
         :attr:`FKTraversalPolicy.exclude_tables` set so the
         generic walker prunes them.
+
+        Descendants matter because the walker anchors at every
+        descendant dataset RID (via :meth:`anchors_for`). An
+        association that's empty at the root but populated under
+        a nested child must stay in the walk so the child's
+        member rows are reachable. Limiting the member scan to
+        the root would silently drop all rows of element types
+        only owned by descendants.
 
         When ``dataset`` is ``None`` (catalog-wide annotation /
         aggregate path), the member-based filter doesn't apply —
@@ -778,11 +787,21 @@ class DatasetBagBuilder:
         ml_schema_name = self._ml_instance.ml_schema
         dataset_table = model.schemas[ml_schema_name].tables["Dataset"]
 
-        # Element types that have members in this dataset.
+        # Element types that have members anywhere in the dataset
+        # tree — root or any nested descendant. Excluding by root
+        # alone would prune Dataset_X for element types X that
+        # only appear under a nested child, dropping their rows
+        # from the bag (see #94: child Image members disappearing).
         dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
-        member_element_types: set[Table] = {
-            model.name_to_table(name) for name, members in dataset_obj.list_dataset_members().items() if members
-        }
+        rids_to_scan: list[RID] = [dataset.dataset_rid]
+        rids_to_scan.extend(self._iter_descendant_rids(dataset))
+
+        member_element_types: set[Table] = set()
+        for rid in rids_to_scan:
+            ds = self._ml_instance.lookup_dataset(rid) if rid != dataset.dataset_rid else dataset_obj
+            for name, members in ds.list_dataset_members().items():
+                if members:
+                    member_element_types.add(model.name_to_table(name))
 
         # Every vocabulary table in any schema — associations into
         # vocabularies always come along for the ride.
