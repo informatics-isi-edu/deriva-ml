@@ -561,9 +561,11 @@ def create_ml_catalog(
         The created ErmrestCatalog instance.
 
     Example:
-        # Create catalog with alias
-        catalog = create_ml_catalog("localhost", "my_project", catalog_alias="my-project")
-        # Now accessible as both /ermrest/catalog/<id> and /ermrest/catalog/my-project
+        >>> # Create catalog with alias
+        >>> catalog = create_ml_catalog(  # doctest: +SKIP
+        ...     "localhost", "my_project", catalog_alias="my-project"
+        ... )
+        >>> # Now accessible as both /ermrest/catalog/<id> and /ermrest/catalog/my-project
     """
     server = DerivaServer("https", hostname, credentials=get_credential(hostname))
     catalog = server.create_ermrest_catalog()
