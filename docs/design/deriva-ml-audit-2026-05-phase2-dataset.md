@@ -1045,11 +1045,16 @@ the round-trip story explicitly before merging the cutover.
 
 **Update (Phase 3 follow-up):** the round-trip test exists at
 `tests/dataset/test_multi_anchor_bag_cache.py`. The audit's
-"one bag, not two" hypothesis is half-true — storage *is* shared
-(one row in `bags`), but `BagCacheIndex.record()` replaces
-anchors on every call, so `cache_status("A")` returns
-`not_cached` after `download_dataset_bag(rid=B)` lands on the
-same checksum. Tracking the fix in
-[#142](https://github.com/informatics-isi-edu/deriva-ml/issues/142);
-the test pins current behaviour and carries an `xfail(strict=True)`
-for the desired outcome so the fix flips an explicit signal in CI.
+"one bag, not two" hypothesis was originally **half-true** — storage
+*was* shared (one row in `bags`), but `BagCacheIndex.record()`
+replaced anchors on every call, so `cache_status("A")` returned
+`not_cached` after `download_dataset_bag(rid=B)` landed on the same
+checksum.
+
+**Resolution:** Fixed upstream in
+[deriva-py#254](https://github.com/informatics-isi-edu/deriva-py/pull/254).
+`BagCacheIndex.record()` now **accumulates** anchors via
+`INSERT OR IGNORE`. The test file no longer carries an
+`xfail` — it pins the new accumulation behaviour positively.
+Issue [#142](https://github.com/informatics-isi-edu/deriva-ml/issues/142)
+closed.
