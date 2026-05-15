@@ -73,7 +73,6 @@ from deriva_ml.core.upload_layout import (
     asset_type_path,
     execution_root,
     flat_asset_dir,
-    normalize_asset_dir,
     table_path,
     upload_directory,
 )
@@ -1447,13 +1446,11 @@ class Execution:
             self._logger.error("BagCatalogLoader failed: %s", error)
             # Mark every pending feature record as failed with the
             # loader's error so the user can retry from a known
-            # state. The legacy ``_flush_staged_features`` path
-            # marked per-group failures; the bag path is atomic at
-            # load time, so all pending records share the same
-            # failure mode (the bag's load transaction either
-            # committed or didn't). Preserving the loader error
-            # message in each record's ``error`` column is the
-            # equivalent observability.
+            # state. Bag commit is atomic at load time, so all
+            # pending records share the same failure mode (the
+            # bag's load transaction either committed or didn't).
+            # Preserving the loader error message in each record's
+            # ``error`` column is the right observability shape.
             try:
                 pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
                 if pending_features:
@@ -1543,118 +1540,6 @@ class Execution:
 
         except OSError as e:
             logging.warning(f"Failed to clean folder {folder_path}: {e}")
-
-    def _flush_staged_features(self, uploaded_files: dict[str, list[AssetFilePath]] | None = None) -> None:
-        """Flush all Pending staged-feature rows to ermrest.
-
-        Historically called from ``_upload_execution_dirs()`` after
-        staged-asset upload. The bag-based commit path
-        (:func:`bag_commit._add_staged_feature_rows_to_bag`) carries
-        feature rows inside the bag alongside assets, so this method
-        is retained only for the few remaining direct-flush callers
-        (tests). Per-group failures mark those rows ``Failed`` without
-        aborting the other groups; an overall ``DerivaMLUploadError``
-        is raised at the end if any failure occurred.
-
-        Args:
-            uploaded_files: Map of "{schema}/{table}" → list[AssetFilePath] returned
-                by the asset-upload step. Used to rewrite asset-column values
-                (local filenames → uploaded asset RIDs). May be None when no
-                assets were uploaded.
-
-        See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md
-        §Data flow — flush order.
-        """
-        from collections import defaultdict as _defaultdict
-
-        from deriva_ml.core.exceptions import DerivaMLUploadError
-
-        pending = self._manifest_store.list_pending_feature_records(self.execution_rid)
-        if not pending:
-            return
-
-        # Build asset lookup maps from the uploaded_files (same logic as _update_feature_table)
-        uploaded_files = uploaded_files or {}
-        asset_map = {
-            (asset_table, asset.file_name): asset.asset_rid
-            for asset_table, assets in uploaded_files.items()
-            for asset in assets
-        }
-        asset_map_by_table = {
-            (asset_table.split("/")[1] if "/" in asset_table else asset_table, asset.file_name): asset.asset_rid
-            for asset_table, assets in uploaded_files.items()
-            for asset in assets
-        }
-
-        # Group pending rows by feature_table for batch insertion
-        groups: dict[str, list] = _defaultdict(list)
-        for row in pending:
-            groups[row.feature_table].append(row)
-
-        failures: list[str] = []
-        for qualified, rows in groups.items():
-            schema_name, table_name = qualified.split(".", 1)
-            feature_name = rows[0].feature_name
-            target_table = rows[0].target_table
-            try:
-                # Build payload dicts directly from staged JSON.
-                payloads = [json.loads(r.record_json) for r in rows]
-                # Remove RCT — server-assigned, causes insert failure if present.
-                for p in payloads:
-                    p.pop("RCT", None)
-
-                # Asset-column rewriting: replace local filenames with uploaded RIDs.
-                # Requires looking up the feature to find which columns are assets.
-                # If lookup_feature raises DerivaMLException (unknown feature / stale
-                # schema), we fail the entire group rather than silently inserting
-                # raw local file paths into asset-RID columns — that would produce
-                # corrupt catalog data with no visible error.
-                try:
-                    feat = self._ml_object.lookup_feature(target_table, feature_name)
-                except DerivaMLException as e:
-                    error_msg = f"lookup_feature failed for {qualified}: {e}"
-                    self._logger.error(error_msg)
-                    # Mark all rows failed in a single bulk transaction.
-                    self._manifest_store.mark_feature_records_failed([(r.stage_id, error_msg) for r in rows])
-                    failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
-                    continue  # skip to next group — do not attempt insert
-
-                asset_col_names = [c.name for c in feat.asset_columns]
-                if asset_col_names:
-                    for p in payloads:
-                        for col in asset_col_names:
-                            val = p.get(col)
-                            if val is None:
-                                continue
-                            # Try the structured-path lookup first (schema/table/file)
-                            key = normalize_asset_dir(val)
-                            if key is not None and key in asset_map:
-                                p[col] = asset_map[key]
-                            else:
-                                # Fall back to flat-path lookup: (table_name, filename)
-                                pv = Path(val)
-                                flat_key = (pv.parent.name, pv.name)
-                                if flat_key in asset_map_by_table:
-                                    p[col] = asset_map_by_table[flat_key]
-                                # If neither map has it, leave the value unchanged —
-                                # it may already be a catalog RID.
-
-                pb = self._ml_object.pathBuilder()
-                pb.schemas[schema_name].tables[table_name].insert(payloads)
-                # Success — mark all rows uploaded in a single
-                # batched UPDATE … WHERE stage_id IN (…). Replaces
-                # one engine.begin() per row.
-                self._manifest_store.mark_feature_records_uploaded([r.stage_id for r in rows])
-            except Exception as e:  # noqa: BLE001 — capture broad, propagate summary
-                error_msg = f"{type(e).__name__}: {e}"
-                # Mark all rows failed in a single bulk transaction.
-                self._manifest_store.mark_feature_records_failed([(r.stage_id, error_msg) for r in rows])
-                failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
-
-        if failures:
-            raise DerivaMLUploadError(
-                f"Feature flush failed for {len(failures)} feature table(s): " + "; ".join(failures)
-            )
 
     def _update_asset_execution_table(
         self,
@@ -1924,8 +1809,9 @@ class Execution:
     def _manifest_store(self) -> "ManifestStore":
         """Return the ManifestStore for this workspace.
 
-        Used by ``add_features`` to stage feature records to SQLite and by
-        ``_flush_staged_features`` to read them back for batch ermrest insert.
+        Used by ``add_features`` to stage feature records to SQLite; the
+        bag-commit path reads them back via
+        ``bag_commit._add_staged_feature_rows_to_bag`` for the catalog insert.
         """
         return self._ml_object.workspace.manifest_store()
 

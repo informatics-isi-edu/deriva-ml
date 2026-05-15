@@ -408,9 +408,8 @@ def _add_staged_feature_rows_to_bag(
 
     # Build a lookup from manifest-key → leased RID. Asset
     # references in feature rows are stored as local filename
-    # paths; the legacy ``_flush_staged_features`` does the same
-    # rewrite by walking the uploaded_files map (which carries
-    # the same key-to-rid mapping).
+    # paths; the rewrite walks the pending-asset map to substitute
+    # the pre-leased RID before the bag insert.
     by_filename: dict[tuple[str, str], str] = {}
     for key, entry in pending.items():
         parts = key.split("/", 1)
@@ -432,8 +431,8 @@ def _add_staged_feature_rows_to_bag(
                 e,
             )
             continue
-        # Strip RCT — server-assigned. Matches the legacy
-        # _flush_staged_features behavior.
+        # Strip RCT — server-assigned; ermrest rejects inserts
+        # that pre-set it.
         payload.pop("RCT", None)
 
         # Asset-column rewriting. Read the feature's spec to
