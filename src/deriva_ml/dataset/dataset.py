@@ -452,10 +452,7 @@ class Dataset:
         Returns:
             ``{element_type_name -> Dataset_ElementType_name}`` map.
         """
-        return {
-            a.other_fkeys.pop().pk_table.name: a.table.name
-            for a in self._dataset_table.find_associations()
-        }
+        return {a.other_fkeys.pop().pk_table.name: a.table.name for a in self._dataset_table.find_associations()}
 
     # ==================== Read Interface Methods ====================
     # These methods implement the DatasetLike protocol for read operations.
@@ -1469,6 +1466,7 @@ class Dataset:
         recurse: bool = False,
         limit: int | None = None,
         _visited: set[RID] | None = None,
+        *,
         version: DatasetVersion | str | None = None,
         **kwargs: Any,
     ) -> dict[str, list[dict[str, Any]]]:
@@ -2090,6 +2088,7 @@ class Dataset:
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
+        *,
         version: DatasetVersion | str | None = None,
         **kwargs: Any,
     ) -> list[Self]:
@@ -2155,6 +2154,7 @@ class Dataset:
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
+        *,
         version: DatasetVersion | str | None = None,
         **kwargs: Any,
     ) -> list[Self]:
@@ -2790,4 +2790,3 @@ class Dataset:
             if version_record.snapshot
             else self._ml_instance.catalog.catalog_id
         )
-
