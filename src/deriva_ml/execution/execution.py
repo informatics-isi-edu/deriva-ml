@@ -201,8 +201,10 @@ class Execution:
         # intentionally removed — execution status and lifecycle
         # timestamps now live in SQLite (see `status`, `start_time`,
         # `stop_time` properties below). Every read hits the workspace
-        # registry; no in-memory copy is kept.
-        self.uploaded_assets: dict[str, list[AssetFilePath]] | None = None
+        # registry; no in-memory copy is kept. ``uploaded_assets``
+        # similarly reads from the asset manifest on every access
+        # (see the ``uploaded_assets`` @property below) — no instance
+        # field needed.
         self.configuration.argv = sys.argv
         self._execution_record: ExecutionRecord | None = None  # Lazily created after RID is assigned
 
@@ -379,10 +381,9 @@ class Execution:
         instance.configuration = None  # Group E loads from config_json
         instance._working_dir = ml_object.working_dir
         instance._cache_dir = ml_object.cache_dir
-        # NOTE(E1/E3): self._status / self.start_time / self.stop_time
-        # intentionally not set — status and lifecycle timestamps live
-        # in SQLite and are read through the respective properties.
-        instance.uploaded_assets = None
+        # NOTE(E1/E3): self._status / self.start_time / self.stop_time /
+        # self.uploaded_assets intentionally not set — they are all
+        # read-through properties backed by SQLite / the asset manifest.
         instance._execution_record = None
         instance.workflow_rid = None
         return instance
@@ -611,8 +612,8 @@ class Execution:
             self._save_runtime_environment()
 
             # Now upload the files so we have the info in case the execution fails.
-            self.uploaded_assets = self._bag_commit_upload()
-            self._set_asset_descriptions(self.uploaded_assets)
+            uploaded = self._bag_commit_upload()
+            self._set_asset_descriptions(uploaded)
         # NOTE(E3): `start_time` is no longer an instance attribute —
         # the authoritative value is written to SQLite by __enter__ via
         # state_machine.transition. `_initialize_execution` predates the
@@ -753,6 +754,54 @@ class Execution:
             ...     print(f"stopped at {exe.stop_time}")  # doctest: +SKIP
         """
         return self._coerce_utc(self._get_registry_row()["stop_time"])
+
+    @property
+    def uploaded_assets(self) -> dict[str, list[AssetFilePath]]:
+        """Assets this execution has uploaded, read from the asset manifest.
+
+        Reads the manifest on every access — no in-memory cache. The
+        returned dict carries every entry whose status is
+        ``uploaded`` across the manifest's lifetime, regardless of
+        which ``upload_execution_outputs()`` call produced it. Each
+        value is a list of :class:`AssetFilePath` objects giving the
+        leased ``asset_rid`` and ``file_name`` for the entry.
+
+        Returns:
+            Map of ``"{schema}/{table}"`` → list of
+            :class:`AssetFilePath`. Empty dict for dry-run executions
+            and for executions that haven't uploaded anything yet.
+            Never ``None``.
+
+        Note:
+            Until the Phase 3 cleanup landed (audit §A.8) this was an
+            instance attribute holding the **most-recent call's**
+            return value. The manifest is now the source of truth;
+            the property returns the full manifest's uploaded
+            entries. Callers that need the per-call subset should
+            use the return value of ``upload_execution_outputs()``
+            directly.
+
+        Example:
+            >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     pass  # doctest: +SKIP
+            >>> uploaded = exe.upload_execution_outputs()  # doctest: +SKIP
+            >>> # After upload, the property reflects the manifest:
+            >>> exe.uploaded_assets == uploaded or len(exe.uploaded_assets) >= len(uploaded)  # doctest: +SKIP
+            True
+        """
+        if self._dry_run:
+            return {}
+        from deriva_ml.execution.bag_commit import report_to_asset_map
+
+        manifest = self._get_manifest()
+        # ``report`` is unused when ``keys=None`` — pass a sentinel
+        # that ``report_to_asset_map`` won't dereference.
+        return report_to_asset_map(
+            execution=self,
+            report=None,  # type: ignore[arg-type]
+            manifest=manifest,
+            keys=None,
+        )
 
     @property
     def datasets(self) -> "DatasetCollection":
@@ -1070,7 +1119,6 @@ class Execution:
         """
         from datetime import timezone
 
-        self.uploaded_assets = None
         self._logger.info("Start execution...")
 
         # Dry-run executions don't have a SQLite registry row — there's
@@ -1323,7 +1371,14 @@ class Execution:
         if self.status is ExecutionStatus.Uploaded:
             manifest = self._get_manifest()
             if not manifest.pending_assets():
-                return self.uploaded_assets or {}
+                # Short-circuit: no new work. Return the full
+                # manifest view of what's been uploaded for this
+                # execution (the ``uploaded_assets`` property reads
+                # the manifest). Pre-Phase-3 this returned the
+                # most-recent call's subset; the manifest view is
+                # more useful for the typical caller ("what assets
+                # did this execution produce so far?").
+                return self.uploaded_assets
             self.update_status(ExecutionStatus.Pending_Upload)
 
         # Transition to Pending_Upload BEFORE starting the upload work. This
@@ -1334,16 +1389,21 @@ class Execution:
             self.update_status(ExecutionStatus.Pending_Upload)
 
         try:
-            self.uploaded_assets = self._bag_commit_upload(
+            # ``_bag_commit_upload`` returns the per-call subset of
+            # uploaded assets (see ``report_to_asset_map``). External
+            # callers of ``upload_execution_outputs`` depend on this
+            # per-call shape; the ``uploaded_assets`` property is the
+            # full-manifest view.
+            uploaded = self._bag_commit_upload(
                 progress_callback=progress_callback,
             )
-            self._set_asset_descriptions(self.uploaded_assets)
+            self._set_asset_descriptions(uploaded)
             # Successful end of upload: Pending_Upload → Uploaded.
             if self.status is ExecutionStatus.Pending_Upload:
                 self.update_status(ExecutionStatus.Uploaded)
             if clean_folder:
                 self._clean_folder_contents(self._execution_root)
-            return self.uploaded_assets
+            return uploaded
         except Exception as e:
             error = format_exception(e)
             self.update_status(ExecutionStatus.Failed, error=error)

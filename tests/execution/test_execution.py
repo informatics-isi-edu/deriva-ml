@@ -534,10 +534,16 @@ class TestExecutionLifecycle:
         assert len(second_uploaded["deriva-ml/Execution_Asset"]) == 1
 
         # Phase 3: a third call with nothing pending is a no-op — must
-        # not cycle the state machine, must not raise.
+        # not cycle the state machine, must not raise. Returns the full
+        # manifest view of all assets uploaded by this execution
+        # (kernel's + runner's), not the last call's per-call subset
+        # (see audit §A.8 / Phase 3 #14 — the in-memory cache was
+        # retired; the manifest is the source of truth).
         third_uploaded = basic_execution.upload_execution_outputs()
         assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
-        assert third_uploaded == second_uploaded  # last cached result preserved
+        assert "deriva-ml/Execution_Asset" in third_uploaded
+        # Both prior uploads (kernel + runner) surface in the manifest view.
+        assert len(third_uploaded["deriva-ml/Execution_Asset"]) == 2
 
     def test_multirun_parent_lifecycle(self, workflow_terms, test_workflow):
         """Multirun parent execution flows through the full state-machine cycle.
