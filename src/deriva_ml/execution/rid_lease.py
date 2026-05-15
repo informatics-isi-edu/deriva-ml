@@ -1,19 +1,19 @@
 """RID leasing against public:ERMrest_RID_Lease.
 
-Per spec §2.6. Pure helpers — no SQLite awareness here. The
-acquire_leases_for_pending function in state_store composition (Task
-F2) wires these into the two-phase SQLite protocol.
+Pure helpers — no SQLite awareness here. The production consumer is
+``bag_commit._add_asset_rows_to_bag``, which leases RIDs in batch
+before adding asset / association rows to the transient commit bag.
 
 Why a dedicated module: the POST body format, chunking, and
 error-handling choices are specific to the lease table and worth
-isolating from the higher-level "take pending_rows with status=staged
-and assign them RIDs" orchestration.
+isolating from higher-level orchestration.
 """
 
 from __future__ import annotations
 
 import uuid
 from typing import TYPE_CHECKING, Iterable
+
 from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:

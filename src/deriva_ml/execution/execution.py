@@ -59,23 +59,23 @@ from deriva_ml.core.definitions import (
     RID,
     ExecMetadataType,
     FileSpec,
-    FileUploadState,
     MLAsset,
     MLVocab,
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
-from deriva_ml.dataset.dataset import Dataset
-from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.upload_layout import (
     asset_root,
     asset_type_path,
     execution_root,
     flat_asset_dir,
     table_path,
-    upload_directory,
 )
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.dataset import Dataset
+from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
@@ -84,8 +84,6 @@ from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
-from deriva_ml.core.logging_config import get_logger
-from deriva_ml.core.validation import VALIDATION_CONFIG
 
 logger = get_logger(__name__)
 
@@ -93,17 +91,6 @@ logger = get_logger(__name__)
 execution: Execution
 ml: DerivaML
 dataset_spec: DatasetSpec
-
-
-try:
-    from IPython.display import Markdown, display
-except ImportError:
-
-    def display(s):
-        print(s)
-
-    def Markdown(s):
-        return s
 
 
 # Descriptions for execution metadata files, keyed by original filename.
@@ -361,11 +348,13 @@ class Execution:
     def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
         """Bind an Execution to an existing SQLite registry row.
 
-        Distinct from create_execution: does NOT contact the catalog and
-        does NOT POST a new row. Called by ml.resume_execution.
+        Distinct from ``create_execution`` — does NOT contact the
+        catalog and does NOT POST a new row. The bound ``Execution``
+        instance reads its lifecycle fields (``status``, ``error``,
+        ``start_time``, ``stop_time``) from SQLite via the
+        read-through property machinery.
 
-        Temporary implementation for Group D — Group E replaces the body
-        to wire up read-through lifecycle properties.
+        Called by :meth:`DerivaML.resume_execution`.
 
         Args:
             ml_object: The DerivaML instance this Execution is bound to.
@@ -375,9 +364,8 @@ class Execution:
             A minimally-initialized Execution with just enough state for
             execution_rid lookup.
         """
-        # Minimal construction: skip the existing __init__'s catalog
-        # interactions. Store the rid and ml_object so Group E has a
-        # starting point.
+        # Minimal construction: skip __init__'s catalog interactions.
+        # The read-through properties handle lifecycle field access.
         instance = cls.__new__(cls)
         instance._ml_object = ml_object
         instance._model = ml_object.model
@@ -1251,42 +1239,6 @@ class Execution:
         return asset_path
 
     @validate_call(config=VALIDATION_CONFIG)
-    def upload_assets(
-        self,
-        assets_dir: str | Path,
-    ) -> dict[Any, FileUploadState] | None:
-        """Uploads assets from a directory to the catalog.
-
-        Scans the specified directory for assets and uploads them to the catalog,
-        recording their metadata and types. Assets are organized by their types
-        and associated with the execution.
-
-        Args:
-            assets_dir: Directory containing assets to upload.
-
-        Returns:
-            dict[Any, FileUploadState] | None: Mapping of assets to their upload states,
-                or None if no assets were found.
-
-        Raises:
-            DerivaMLException: If upload fails or assets are invalid.
-
-        Example:
-            >>> states = execution.upload_assets("output/results")  # doctest: +SKIP
-            >>> for asset, state in states.items():  # doctest: +SKIP
-            ...     print(f"{asset}: {state}")  # doctest: +SKIP
-        """
-
-        def path_to_asset(path: str) -> str:
-            """Pull the asset name out of a path to that asset in the filesystem"""
-            components = path.split("/")
-            return components[components.index("asset") + 2]  # Look for asset in the path to find the name
-
-        if not self._model.is_asset(Path(assets_dir).name):
-            raise DerivaMLException("Directory does not have name of an asset table.")
-        results = upload_directory(self._model, assets_dir)
-        return {path_to_asset(p): r for p, r in results.items()}
-
     def upload_execution_outputs(
         self,
         clean_folder: bool | None = None,

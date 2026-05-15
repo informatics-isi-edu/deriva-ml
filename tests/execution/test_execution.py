@@ -518,9 +518,7 @@ class TestExecutionLifecycle:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "kernel_output.txt", "kernel content")
         first_uploaded = basic_execution.upload_execution_outputs()
-        assert get_execution_status(
-            basic_execution._ml_object, basic_execution.execution_rid
-        ) == "Uploaded"
+        assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
         assert "deriva-ml/Execution_Asset" in first_uploaded
         assert len(first_uploaded["deriva-ml/Execution_Asset"]) == 1
 
@@ -529,9 +527,7 @@ class TestExecutionLifecycle:
         # machine takes Uploaded → Pending_Upload → Uploaded.
         create_test_asset(basic_execution, "runner_output.txt", "runner content")
         second_uploaded = basic_execution.upload_execution_outputs()
-        assert get_execution_status(
-            basic_execution._ml_object, basic_execution.execution_rid
-        ) == "Uploaded"
+        assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
         # Only the runner's newly-staged asset uploads on the second
         # call (the kernel's asset is already settled in the catalog).
         assert "deriva-ml/Execution_Asset" in second_uploaded
@@ -540,9 +536,7 @@ class TestExecutionLifecycle:
         # Phase 3: a third call with nothing pending is a no-op — must
         # not cycle the state machine, must not raise.
         third_uploaded = basic_execution.upload_execution_outputs()
-        assert get_execution_status(
-            basic_execution._ml_object, basic_execution.execution_rid
-        ) == "Uploaded"
+        assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
         assert third_uploaded == second_uploaded  # last cached result preserved
 
     def test_multirun_parent_lifecycle(self, workflow_terms, test_workflow):
@@ -595,7 +589,6 @@ class TestExecutionLifecycle:
         validates against ALLOWED_TRANSITIONS; tests verifying an error
         string are covered by test_update_status.py (terminal states only).
         """
-        from deriva_ml.execution.state_store import ExecutionStatus
 
         execution = basic_execution
         ml = execution._ml_object
@@ -1359,12 +1352,6 @@ class TestExecutionErrors:
             with pytest.raises(DerivaMLException):
                 execution.table_path("NonExistentTable")
 
-    def test_upload_assets_invalid_directory(self, basic_execution):
-        """Test uploading from invalid directory."""
-        with basic_execution.execute() as execution:
-            with pytest.raises(DerivaMLException):
-                execution.upload_assets("/nonexistent/path")
-
 
 # =============================================================================
 # TestExecutionIntegration - Integration Tests
@@ -1709,16 +1696,12 @@ class TestExecutionNesting:
         parent_exec.add_nested_execution(child_exec, sequence=0)
 
         # Non-recursive should only return direct children
-        direct_children = list(
-            grandparent_exec.execution_record.list_execution_children(recurse=False)
-        )
+        direct_children = list(grandparent_exec.execution_record.list_execution_children(recurse=False))
         assert len(direct_children) == 1
         assert direct_children[0].execution_rid == parent_exec.execution_rid
 
         # Recursive should return all descendants
-        all_descendants = list(
-            grandparent_exec.execution_record.list_execution_children(recurse=True)
-        )
+        all_descendants = list(grandparent_exec.execution_record.list_execution_children(recurse=True))
         assert len(all_descendants) == 2
         descendant_rids = [d.execution_rid for d in all_descendants]
         assert parent_exec.execution_rid in descendant_rids
@@ -1752,16 +1735,12 @@ class TestExecutionNesting:
         parent_exec.add_nested_execution(child_exec, sequence=0)
 
         # Non-recursive should only return direct parent
-        direct_parents = list(
-            child_exec.execution_record.list_execution_parents(recurse=False)
-        )
+        direct_parents = list(child_exec.execution_record.list_execution_parents(recurse=False))
         assert len(direct_parents) == 1
         assert direct_parents[0].execution_rid == parent_exec.execution_rid
 
         # Recursive should return all ancestors
-        all_ancestors = list(
-            child_exec.execution_record.list_execution_parents(recurse=True)
-        )
+        all_ancestors = list(child_exec.execution_record.list_execution_parents(recurse=True))
         assert len(all_ancestors) == 2
         ancestor_rids = [a.execution_rid for a in all_ancestors]
         assert parent_exec.execution_rid in ancestor_rids
