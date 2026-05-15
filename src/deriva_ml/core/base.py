@@ -71,7 +71,6 @@ if TYPE_CHECKING:
     from deriva_ml.core.schema_diff import SchemaDiff
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
-    from deriva_ml.schema.validation import SchemaValidationReport
 
 logger = get_logger(__name__)
 
@@ -1590,71 +1589,14 @@ class DerivaML(
             "total_size_mb": cache_stats["total_mb"] + exec_size_mb,
         }
 
-    # =========================================================================
-    # Schema Validation
-    # =========================================================================
-
-    def validate_schema(self, strict: bool = False) -> "SchemaValidationReport":
-        """Validate that the catalog's ML schema matches the expected structure.
-
-        This method inspects the catalog schema and verifies that it contains all
-        the required tables, columns, vocabulary terms, and relationships that are
-        created by the ML schema initialization routines in create_schema.py.
-
-        The validation checks:
-        - All required ML tables exist (Dataset, Execution, Workflow, etc.)
-        - All required columns exist with correct types
-        - All required vocabulary tables exist (Asset_Type, Dataset_Type, etc.)
-        - All required vocabulary terms are initialized
-        - All association tables exist for relationships
-
-        In strict mode, the validator also reports errors for:
-        - Extra tables not in the expected schema
-        - Extra columns not in the expected table definitions
-
-        Args:
-            strict: If True, extra tables and columns are reported as errors.
-                   If False (default), they are reported as informational items.
-                   Use strict=True to verify a clean ML catalog matches exactly.
-                   Use strict=False to validate a catalog that may have domain extensions.
-
-        Returns:
-            SchemaValidationReport with validation results. Key attributes:
-                - is_valid: True if no errors were found
-                - errors: List of error-level issues
-                - warnings: List of warning-level issues
-                - info: List of informational items
-                - to_text(): Human-readable report
-                - to_dict(): JSON-serializable dictionary
-
-        Example:
-            >>> ml = DerivaML('localhost', 'my_catalog')
-            >>> report = ml.validate_schema(strict=False)
-            >>> if report.is_valid:
-            ...     print("Schema is valid!")
-            ... else:
-            ...     print(report.to_text())
-
-            >>> # Strict validation for a fresh ML catalog
-            >>> report = ml.validate_schema(strict=True)
-            >>> print(f"Found {len(report.errors)} errors, {len(report.warnings)} warnings")
-
-            >>> # Get report as dictionary for JSON/logging
-            >>> import json
-            >>> print(json.dumps(report.to_dict(), indent=2))
-
-        Note:
-            This method validates the ML schema (typically 'deriva-ml'), not the
-            domain schema. Domain-specific tables and columns are not checked
-            unless they are part of the ML schema itself.
-
-        See Also:
-            - deriva_ml.schema.validation.SchemaValidationReport
-            - deriva_ml.schema.validation.validate_ml_schema
-        """
-        from deriva_ml.schema.validation import validate_ml_schema
-
-        return validate_ml_schema(self, strict=strict)
+    # Schema integrity validation runs at CI time via the
+    # ``deriva-ml-validate-schema`` console script, which compares
+    # ``docs/reference/schema.md`` (the canonical source of truth)
+    # against the Python definitions in
+    # ``deriva_ml.schema.create_schema``. There is no live-catalog
+    # validator; one is unnecessary because clones / fresh catalogs
+    # are produced from the same Python definitions the doc check
+    # validates.
 
     # Methods moved to mixins:
     # - create_asset, list_assets -> AssetMixin
