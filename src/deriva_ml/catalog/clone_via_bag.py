@@ -68,6 +68,11 @@ from deriva.bag.traversal import (
 from deriva.core import DerivaServer, get_credential
 from pydantic import BaseModel
 
+from deriva_ml.catalog.provenance import (
+    CatalogCreationMethod,
+    CloneDetails,
+    set_catalog_provenance,
+)
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
 
@@ -459,12 +464,82 @@ def clone_via_bag(
     ) as loader:
         report = loader.run()
 
+    # Record the clone in the destination's provenance annotation.
+    # Phase 1 of the split-phase model: metadata is copied; assets
+    # carry source-server URLs (if policy.asset_mode is REFERENCES /
+    # ROWS_ONLY) and are later moved by localize_assets which
+    # updates the same annotation with the phase-2 stats.
+    _record_clone_provenance(
+        dest_catalog=dest_catalog,
+        source_hostname=source_hostname,
+        source_catalog_id=source_catalog_id,
+        policy=policy,
+        report=report,
+    )
+
     return CloneViaBagResult(
         source_catalog_id=source_catalog_id,
         dest_catalog_id=dest_catalog_id,
         bag_path=bag_path,
         load_report=report,
     )
+
+
+def _record_clone_provenance(
+    *,
+    dest_catalog: "ErmrestCatalog",
+    source_hostname: str,
+    source_catalog_id: str,
+    policy: FKTraversalPolicy,
+    report: Any,
+) -> None:
+    """Write a phase-1 clone provenance annotation on the destination.
+
+    Best-effort: failures are logged but do not block the clone
+    result. The annotation is later updated by
+    :func:`~deriva_ml.catalog.localize.localize_assets` when phase
+    two completes.
+
+    Args:
+        dest_catalog: Live ERMrest catalog handle for the destination.
+        source_hostname: The hostname clone-via-bag pulled from.
+        source_catalog_id: The catalog ID on that host.
+        policy: The merged FKTraversalPolicy that drove the clone.
+        report: deriva.bag :class:`LoadReport` from the load step.
+            Typed ``Any`` to mirror :class:`CloneViaBagResult` — the
+            field set used here is documented inline.
+    """
+    try:
+        # Aggregate orphan stats per dangling_fk_strategy outcome.
+        # LoadReport.table_stats[*].rows_skipped_orphan counts
+        # rows deleted under DELETE; rows_nullified_orphan counts
+        # rows whose FK was set NULL under NULLIFY.
+        orphan_removed = 0
+        orphan_nullified = 0
+        for stats in report.table_stats.values():
+            orphan_removed += getattr(stats, "rows_skipped_orphan", 0)
+            orphan_nullified += getattr(stats, "rows_nullified_orphan", 0)
+
+        clone_details = CloneDetails(
+            source_hostname=source_hostname,
+            source_catalog_id=source_catalog_id,
+            orphan_strategy=str(policy.dangling_fk_strategy).split(".")[-1].lower(),
+            asset_mode=str(policy.asset_mode).split(".")[-1].lower(),
+            rows_copied=report.total_rows_inserted,
+            orphan_rows_removed=orphan_removed,
+            orphan_rows_nullified=orphan_nullified,
+        )
+        set_catalog_provenance(
+            dest_catalog,
+            creation_method=CatalogCreationMethod.CLONE,
+            clone_details=clone_details,
+        )
+    except Exception as e:
+        # set_catalog_provenance is already best-effort internally,
+        # but the LoadReport access above can also fail on a mock or
+        # an unexpected report shape. Don't let provenance write
+        # failures break a successful clone.
+        logger.warning("clone_via_bag: failed to write provenance: %s", e)
 
 
 __all__ = ["CloneViaBagResult", "clone_via_bag"]
