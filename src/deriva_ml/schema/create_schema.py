@@ -9,7 +9,6 @@ ERMrest catalog. The main entry points are:
 - ``initialize_ml_schema``: Populate vocabulary tables with standard terms
   after schema creation.
 - ``create_ml_catalog``: Create a brand-new catalog and install the schema.
-- ``reset_ml_schema``: Drop and recreate the schema (test/dev helper).
 """
 
 import argparse
@@ -622,15 +621,6 @@ def create_ml_catalog(
         )
 
     return catalog
-
-
-def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
-    model = catalog.getCatalogModel()
-    schemas = [schema for sname, schema in model.schemas.items() if sname not in ["public", "WWW"]]
-    for s in schemas:
-        s.drop(cascade=True)
-    model = catalog.getCatalogModel()
-    create_ml_schema(catalog, ml_schema)
 
 
 def main():
