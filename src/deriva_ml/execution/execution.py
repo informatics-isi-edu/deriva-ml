@@ -347,7 +347,7 @@ class Execution:
                 raise
 
     @classmethod
-    def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
+    def from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
         """Bind an Execution to an existing SQLite registry row.
 
         Distinct from ``create_execution`` — does NOT contact the

@@ -473,7 +473,7 @@ class ExecutionMixin:
 
         # Construct Execution bound to this DerivaML — it reads lifecycle
         # fields from SQLite via read-through properties (Group E).
-        return Execution._from_registry(
+        return Execution.from_registry(
             ml_object=self,
             execution_rid=execution_rid,
         )
