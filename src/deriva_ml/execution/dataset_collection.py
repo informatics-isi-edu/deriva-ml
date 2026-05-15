@@ -29,6 +29,9 @@ if TYPE_CHECKING:
     from deriva_ml.dataset.dataset_bag import DatasetBag
 
 
+__all__ = ["DatasetCollection"]
+
+
 class DatasetCollection:
     """Immutable RID-keyed lookup plus iterable of DatasetBags.
 

@@ -633,6 +633,46 @@ class Execution:
         # for `execution_start`/`execution_stop` compatibility.
         self._logger.info("Initialize status finished.")
 
+    def _get_registry_row(self) -> dict:
+        """Read this execution's row from the workspace SQLite registry.
+
+        Shared helper for the four read-through properties (``status``,
+        ``error``, ``start_time``, ``stop_time``). No caching — a
+        mutation from another process (e.g., ``deriva-ml upload``
+        running in a shell) is visible on the next read.
+
+        Returns:
+            The row dict from ``ExecutionStateStore.get_execution``.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd, never created, or dry-run).
+        """
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        return row
+
+    @staticmethod
+    def _coerce_utc(value: "datetime | None") -> "datetime | None":
+        """Coerce a SQLite-returned datetime to UTC-aware.
+
+        SQLite may return naive datetimes even though we store them
+        timezone-aware. Re-attach the UTC tzinfo when missing.
+        """
+        from datetime import timezone
+
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
     @property
     def status(self) -> "ExecutionStatus":
         """Current execution status, read from SQLite on every access.
@@ -652,17 +692,7 @@ class Execution:
             >>> exe.status  # doctest: +SKIP
             <ExecutionStatus.Stopped>
         """
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        return ExecutionStatus(row["status"])
+        return ExecutionStatus(self._get_registry_row()["status"])
 
     @property
     def error(self) -> str | None:
@@ -686,17 +716,7 @@ class Execution:
             >>> exe.error  # doctest: +SKIP
             'RuntimeError: boom'
         """
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        return row["error"]
+        return self._get_registry_row()["error"]
 
     @property
     def start_time(self) -> "datetime | None":
@@ -721,22 +741,7 @@ class Execution:
             >>> if exe.start_time is not None:  # doctest: +SKIP
             ...     print(f"started at {exe.start_time}")  # doctest: +SKIP
         """
-        from datetime import timezone
-
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        value = row["start_time"]
-        if value is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value
+        return self._coerce_utc(self._get_registry_row()["start_time"])
 
     @property
     def stop_time(self) -> "datetime | None":
@@ -760,22 +765,7 @@ class Execution:
             >>> if exe.stop_time is not None:  # doctest: +SKIP
             ...     print(f"stopped at {exe.stop_time}")  # doctest: +SKIP
         """
-        from datetime import timezone
-
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        value = row["stop_time"]
-        if value is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value
+        return self._coerce_utc(self._get_registry_row()["stop_time"])
 
     @property
     def datasets(self) -> "DatasetCollection":

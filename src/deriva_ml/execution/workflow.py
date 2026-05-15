@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from deriva_ml.interfaces import DerivaMLCatalog
 
 
+__all__ = ["Workflow"]
+
+
 class Workflow(BaseModel):
     """Represents a computational workflow in DerivaML.
 
