@@ -18,12 +18,11 @@ import contextlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
+from deriva.bag import sqlite_helpers as sh
 from sqlalchemy.engine import Connection, Engine
 
-from deriva.bag import sqlite_helpers as sh
-
-from deriva_ml.local_db import paths as p
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.local_db import paths as p
 
 if TYPE_CHECKING:
     from datetime import timedelta

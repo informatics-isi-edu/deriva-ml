@@ -22,6 +22,7 @@ from typing import Any, Iterable, Protocol
 
 from sqlalchemy import Table, insert, select
 from sqlalchemy.engine import Engine
+
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)

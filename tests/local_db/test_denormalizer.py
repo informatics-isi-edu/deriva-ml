@@ -448,7 +448,7 @@ class TestNoSink:
 
         model = populated_denorm["model"]
         with pytest.raises(DerivaMLDenormalizeNoSink):
-            model._determine_row_per(include_tables=[], via=[], row_per=None)
+            model._planner._determine_row_per(include_tables=[], via=[], row_per=None)
 
 
 class TestDescribe:

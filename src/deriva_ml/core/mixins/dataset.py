@@ -20,6 +20,7 @@ from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.core.sort import SortSpec, resolve_sort
+from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.dataset.validation import (
     AssetSpecResult,
@@ -29,7 +30,6 @@ from deriva_ml.dataset.validation import (
     ExecutionConfigurationValidationReport,
     WorkflowSpecResult,
 )
-from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset import Dataset
@@ -446,7 +446,9 @@ class DatasetMixin:
 
         # _prepare_wide_table doesn't actually use dataset or dataset_rid
         # in its body — it only traverses the schema. Pass None for both.
-        element_tables, column_specs, multi_schema = model._prepare_wide_table(None, None, list(include_tables))
+        element_tables, column_specs, multi_schema = model._planner._prepare_wide_table(
+            None, None, list(include_tables)
+        )
 
         # Build columns list
         columns = [

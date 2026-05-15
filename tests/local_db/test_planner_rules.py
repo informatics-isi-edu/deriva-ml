@@ -30,7 +30,7 @@ class TestSinkFinding:
     def test_linear_chain_sink(self, denorm_diamond_deriva_model) -> None:
         """Subject ← Observation ← Image: Image is the sink."""
         model = denorm_diamond_deriva_model
-        sinks = model._find_sinks(
+        sinks = model._planner._find_sinks(
             include_tables=["Subject", "Observation", "Image"],
             via=[],
         )
@@ -39,17 +39,17 @@ class TestSinkFinding:
     def test_single_sink_simple(self, denorm_deriva_model) -> None:
         """Image points to Subject. Image is the sink."""
         model = denorm_deriva_model
-        sinks = model._find_sinks(include_tables=["Subject", "Image"], via=[])
+        sinks = model._planner._find_sinks(include_tables=["Subject", "Image"], via=[])
         assert sinks == ["Image"]
 
     def test_multi_leaf_raises(self, denorm_deriva_model) -> None:
         """If two requested tables have no FK between them, both are sinks."""
         model = denorm_deriva_model
-        sinks = model._find_sinks(include_tables=["Dataset", "Subject"], via=[])
+        sinks = model._planner._find_sinks(include_tables=["Dataset", "Subject"], via=[])
         assert len(sinks) >= 2
         assert "Dataset" in sinks or "Subject" in sinks
         with pytest.raises(DerivaMLDenormalizeMultiLeaf) as excinfo:
-            model._determine_row_per(include_tables=["Dataset", "Subject"], via=[], row_per=None)
+            model._planner._determine_row_per(include_tables=["Dataset", "Subject"], via=[], row_per=None)
         assert "Dataset" in str(excinfo.value)
         assert "Subject" in str(excinfo.value)
 
@@ -61,7 +61,7 @@ class TestDownstreamLeafRejection:
         """row_per=Subject with Image (downstream) → error."""
         model = denorm_deriva_model
         with pytest.raises(DerivaMLDenormalizeDownstreamLeaf) as excinfo:
-            model._determine_row_per(
+            model._planner._determine_row_per(
                 include_tables=["Subject", "Image"],
                 via=[],
                 row_per="Subject",
@@ -72,7 +72,7 @@ class TestDownstreamLeafRejection:
     def test_downstream_leaf_accepted_if_no_downstream(self, denorm_deriva_model) -> None:
         """row_per=Image is fine because Image IS the sink (nothing downstream)."""
         model = denorm_deriva_model
-        result = model._determine_row_per(
+        result = model._planner._determine_row_per(
             include_tables=["Subject", "Image"],
             via=[],
             row_per="Image",
@@ -89,7 +89,7 @@ class TestPathAmbiguity:
         Uses the non-diamond fixture; Image→Subject is a single FK path.
         """
         model = denorm_deriva_model
-        result = model._find_path_ambiguities(
+        result = model._planner._find_path_ambiguities(
             row_per="Image",
             include_tables=["Image", "Subject"],
             via=[],
@@ -99,7 +99,7 @@ class TestPathAmbiguity:
     def test_ambiguity_raises(self, denorm_diamond_deriva_model) -> None:
         """With diamond Image→Subject, raise for bare include_tables."""
         model = denorm_diamond_deriva_model
-        result = model._find_path_ambiguities(
+        result = model._planner._find_path_ambiguities(
             row_per="Image",
             include_tables=["Image", "Subject"],
             via=[],
@@ -113,7 +113,7 @@ class TestPathAmbiguity:
     def test_ambiguity_resolved_by_intermediate(self, denorm_diamond_deriva_model) -> None:
         """Including the intermediate in include_tables removes ambiguity."""
         model = denorm_diamond_deriva_model
-        result = model._find_path_ambiguities(
+        result = model._planner._find_path_ambiguities(
             row_per="Image",
             include_tables=["Image", "Observation", "Subject"],
             via=[],
@@ -123,7 +123,7 @@ class TestPathAmbiguity:
     def test_ambiguity_resolved_by_via(self, denorm_diamond_deriva_model) -> None:
         """via=[Observation] removes ambiguity without adding Observation columns."""
         model = denorm_diamond_deriva_model
-        result = model._find_path_ambiguities(
+        result = model._planner._find_path_ambiguities(
             row_per="Image",
             include_tables=["Image", "Subject"],
             via=["Observation"],
@@ -152,7 +152,7 @@ class TestPathAmbiguity:
         direct FK.
         """
         model = denorm_diamond_deriva_model
-        result = model._find_path_ambiguities(
+        result = model._planner._find_path_ambiguities(
             row_per="Image",
             include_tables=["Image", "Observation"],
             via=[],
@@ -175,7 +175,7 @@ class TestPrepareWideTableIntegration:
         """_prepare_wide_table raises AmbiguousPath when diamond is unrouted."""
         model = denorm_diamond_deriva_model
         with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
-            model._prepare_wide_table(
+            model._planner._prepare_wide_table(
                 dataset=None,
                 dataset_rid="DS-001",
                 include_tables=["Image", "Subject"],
@@ -186,7 +186,7 @@ class TestPrepareWideTableIntegration:
         model = denorm_diamond_deriva_model
         # Planner should not raise; we don't inspect the plan shape here
         # (left to the integration test_denormalize tests).
-        element_tables, denormalized_columns, _ = model._prepare_wide_table(
+        element_tables, denormalized_columns, _ = model._planner._prepare_wide_table(
             dataset=None,
             dataset_rid="DS-001",
             include_tables=["Image", "Subject"],

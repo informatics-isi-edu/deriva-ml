@@ -33,6 +33,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.engine import Engine
+
 from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:

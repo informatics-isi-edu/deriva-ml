@@ -43,9 +43,9 @@ from sqlalchemy import and_, event, literal, select, union
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.local_db.paged_fetcher import PagedClient, PagedFetcher
 from deriva_ml.model.catalog import DerivaModel, denormalize_column_name
-from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -271,7 +271,7 @@ def _denormalize_impl(
     if dataset is None:
         dataset = _MinimalDatasetMock(dataset_rid=dataset_rid)
 
-    join_tables, column_specs, multi_schema = model._prepare_wide_table(
+    join_tables, column_specs, multi_schema = model._planner._prepare_wide_table(
         dataset,
         dataset_rid,
         include_tables,
