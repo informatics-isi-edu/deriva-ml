@@ -444,27 +444,9 @@ def test_restore_execution_symbol_removed(test_ml):
     )
 
 
-def test_resume_execution_per_rid_lease_reconcile(test_ml, monkeypatch):
-    from deriva_ml.execution.state_store import ExecutionStatus
-
-    _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
-
-    # Stub the preceding reconcile step — our synthetic EXE-A is not
-    # in the catalog, so the real reconcile_with_catalog would blow up
-    # and the F6 hook would never run.
-    monkeypatch.setattr(
-        "deriva_ml.core.mixins.execution.reconcile_with_catalog",
-        lambda *, store, catalog, execution_rid: None,
-    )
-
-    calls: list[str | None] = []
-
-    def _spy(*, store, catalog, execution_rid):
-        calls.append(execution_rid)
-
-    from deriva_ml.execution import lease_orchestrator
-
-    monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
-
-    test_ml.resume_execution("EXE-A")
-    assert "EXE-A" in calls  # scoped reconciliation for this execution
+# NOTE: ``test_resume_execution_per_rid_lease_reconcile`` was deleted in
+# the Phase 3 core cleanup (audit §1.2) along with the
+# ``reconcile_pending_leases`` call site it spied on. With the
+# pending-rows write surface retired (Phase 3 execution audit §1.5)
+# and the post-resume reconcile call removed (Phase 3 core audit §1.2),
+# there is no reconcile to spy on.
