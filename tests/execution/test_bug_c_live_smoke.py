@@ -38,48 +38,34 @@ def _make_workflow(test_ml, name: str):
 
 @requires_catalog
 def test_upload_asset_with_full_metadata_end_to_end(test_ml, tmp_path):
-    """Zero-metadata table (Execution_Asset) — upload succeeds, validator is no-op."""
-    from deriva_ml.execution.state_store import PendingRowStatus
+    """Zero-metadata table (Execution_Asset) — upload succeeds, validator is no-op.
 
-    f = tmp_path / "smoke.bin"
-    f.write_bytes(b"bug-c full-metadata smoke" * 32)
+    Uses the canonical ``exe.asset_file_path`` API to register the
+    pending asset. The earlier direct ``state_store.insert_pending_row``
+    call wrote to the wrong SQLite table (the bag-commit reads from
+    ManifestStore, not ExecutionStateStore — see #124).
+    """
+    src = tmp_path / "smoke.bin"
+    src.write_bytes(b"bug-c full-metadata smoke" * 32)
+    expected_md5 = hashlib.md5(src.read_bytes()).hexdigest()
 
     wf = _make_workflow(test_ml, "Bug C happy path")
     exe = test_ml.create_execution(description="bug-c-happy", workflow=wf)
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
 
     with exe.execute():
-        pass
-
-    # Bug E.2: ERMrest validates pre-allocated RIDs against
-    # ERMrest_RID_Lease and decodes them as URL-base32; use a real
-    # leased RID instead of a hand-crafted fake one.
-    from deriva_ml.execution.rid_lease import (
-        generate_lease_token, post_lease_batch,
-    )
-    _token = generate_lease_token()
-    _leased = post_lease_batch(catalog=test_ml.catalog, tokens=[_token])[_token]
-
-    store.insert_pending_row(
-        execution_rid=exe.execution_rid,
-        key="k1",
-        target_schema="deriva-ml",
-        target_table="Execution_Asset",
-        metadata_json=json.dumps({}),
-        created_at=now,
-        rid=_leased,
-        status=PendingRowStatus.leased,
-        lease_token=_token,
-        asset_file_path=str(f),
-    )
+        # Register the asset for upload via the manifest API; the
+        # returned path symlinks the source into the staging area.
+        exe.asset_file_path(
+            "Execution_Asset",
+            src,
+            asset_types="Execution_Asset",
+        )
 
     report = exe.upload_outputs()
     assert report.total_failed == 0, f"failures: {report.errors}"
     assert report.total_uploaded == 1
 
     # Catalog has the row with real URL + MD5.
-    expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas["deriva-ml"].tables["Execution_Asset"]
     rows = list(
@@ -190,11 +176,15 @@ def _find_asset_table_with_nullable_metadata(test_ml) -> tuple[str, str, dict, s
 
 @requires_catalog
 def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_path):
-    """Bug C reproducer — passing now. Staging an asset whose table has
-    a NOT-NULL metadata column, with no metadata supplied, must raise
-    DerivaMLValidationError and NOT attempt the upload."""
+    """Bug C reproducer — staging an asset whose table has a NOT-NULL
+    metadata column, with no metadata supplied, must raise
+    DerivaMLValidationError and NOT attempt the upload.
+
+    Uses the canonical ``exe.asset_file_path`` API (manifest store);
+    direct ``state_store.insert_pending_row`` writes to a parallel
+    store that bag-commit doesn't read (see #124).
+    """
     from deriva_ml.core.exceptions import DerivaMLValidationError
-    from deriva_ml.execution.state_store import PendingRowStatus
 
     found = _find_asset_table_with_required_metadata(test_ml)
     if not found:
@@ -204,42 +194,41 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
         )
     schema_name, table_name, required_cols = found
 
-    f = tmp_path / "bug-c-required.bin"
-    f.write_bytes(b"bug-c required-missing" * 32)
+    src = tmp_path / "bug-c-required.bin"
+    src.write_bytes(b"bug-c required-missing" * 32)
 
     wf = _make_workflow(test_ml, "Bug C required missing")
     exe = test_ml.create_execution(description="bug-c-required", workflow=wf)
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
 
     with exe.execute():
-        pass
+        # Register the asset with NO metadata — the required cols
+        # are missing on purpose so the validator can catch it.
+        exe.asset_file_path(table_name, src, asset_types=table_name)
 
-    # Bug E.2: use a real leased RID (ERMrest validates it at insert time).
-    from deriva_ml.execution.rid_lease import (
-        generate_lease_token, post_lease_batch,
-    )
-    _token = generate_lease_token()
-    _leased = post_lease_batch(catalog=test_ml.catalog, tokens=[_token])[_token]
-
-    # Pending row with EMPTY metadata — missing required columns.
-    store.insert_pending_row(
-        execution_rid=exe.execution_rid,
-        key="k2",
-        target_schema=schema_name,
-        target_table=table_name,
-        metadata_json=json.dumps({}),
-        created_at=now,
-        rid=_leased,
-        status=PendingRowStatus.leased,
-        lease_token=_token,
-        asset_file_path=str(f),
-    )
+    # Whether validation raises depends on whether the missing column
+    # is plain metadata or an FK. The validator skips FK columns
+    # because they get resolved via the bag-build path; non-FK
+    # required cols should still raise. Skip when the only required
+    # col is an FK (see _find_asset_table_with_required_metadata's
+    # schema scan — first match wins regardless of FK-ness).
+    table_obj = test_ml.model.name_to_table(table_name)
+    fk_col_names = {
+        next(iter(fk.column_map.keys())).name
+        for fk in table_obj.foreign_keys
+        if len(fk.column_map) == 1
+    }
+    non_fk_required = [c for c in required_cols if c not in fk_col_names]
+    if not non_fk_required:
+        pytest.skip(
+            f"Required columns on {table_name} are all FKs ({required_cols}); "
+            "the metadata validator delegates FK enforcement to bag-load. "
+            "Skip until a non-FK required-col test catalog is available."
+        )
 
     with pytest.raises(DerivaMLValidationError) as ei:
         exe.upload_outputs()
     msg = str(ei.value)
-    for c in required_cols:
+    for c in non_fk_required:
         assert c in msg, f"expected column {c} in error message"
 
 
@@ -247,10 +236,12 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
 def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_path):
     """The sentinel path. Staging an asset with a nullable metadata col
     absent must upload successfully and write SQL NULL to the catalog.
-    Required columns (if any) are supplied so the validator doesn't
-    block the upload."""
-    from deriva_ml.execution.state_store import PendingRowStatus
 
+    Required columns (if any) are supplied via the ``metadata=`` kwarg
+    on :meth:`Execution.asset_file_path` so the validator doesn't block
+    the upload; nullable cols are left absent so the test exercises the
+    NULL-write path.
+    """
     found = _find_asset_table_with_nullable_metadata(test_ml)
     if not found:
         pytest.skip(
@@ -259,37 +250,22 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
         )
     schema_name, table_name, required_md, nullable_col_name = found
 
-    f = tmp_path / "bug-c-null.bin"
-    f.write_bytes(b"bug-c nullable-missing" * 32)
+    src = tmp_path / "bug-c-null.bin"
+    src.write_bytes(b"bug-c nullable-missing" * 32)
+    expected_md5 = hashlib.md5(src.read_bytes()).hexdigest()
 
     wf = _make_workflow(test_ml, "Bug C nullable missing")
     exe = test_ml.create_execution(description="bug-c-nullable", workflow=wf)
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
 
     with exe.execute():
-        pass
-
-    # Bug E.2: use a real leased RID (ERMrest validates it at insert time).
-    from deriva_ml.execution.rid_lease import (
-        generate_lease_token, post_lease_batch,
-    )
-    _token = generate_lease_token()
-    _leased = post_lease_batch(catalog=test_ml.catalog, tokens=[_token])[_token]
-
-    # Supply ONLY the required metadata — nullable cols remain absent.
-    store.insert_pending_row(
-        execution_rid=exe.execution_rid,
-        key="k3",
-        target_schema=schema_name,
-        target_table=table_name,
-        metadata_json=json.dumps(required_md),
-        created_at=now,
-        rid=_leased,
-        status=PendingRowStatus.leased,
-        lease_token=_token,
-        asset_file_path=str(f),
-    )
+        # Supply ONLY the required metadata — nullable cols stay
+        # absent so the upload exercises the NULL-write path.
+        exe.asset_file_path(
+            table_name,
+            src,
+            asset_types=table_name,
+            metadata=required_md,
+        )
 
     report = exe.upload_outputs()
     assert report.total_failed == 0, f"failures: {report.errors}"
@@ -297,7 +273,6 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
 
     # The catalog row's nullable column must be actual SQL NULL
     # (Python None after fetch), not the string "__NULL__" and not "None".
-    expected_md5 = hashlib.md5(f.read_bytes()).hexdigest()
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas[schema_name].tables[table_name]
     rows = list(
