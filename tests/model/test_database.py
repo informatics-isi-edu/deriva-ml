@@ -2,7 +2,7 @@ from pprint import pformat
 
 from deriva.core.datapath import Any
 
-from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.aux_classes import DatasetSpec, VersionPart
 from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 from tests.test_utils import DatasetDescription, DerivaML, MLDatasetCatalog
@@ -143,10 +143,28 @@ class TestDataBaseModel:
         self.compare_catalogs(ml_instance, dataset_test, dataset_spec)
 
     def test_table_versions(self, dataset_test):
+        """Two bags taken across an add-members mutation differ by the added rows.
+
+        Per ADR-0003 dev rows are mutable: only released versions
+        pin to a stable snapshot. The demo fixture leaves the
+        dataset on a dev row, so we promote to a release before
+        snapping v1 — that gives a stable, downloadable v1 bag that
+        the subsequent ``add_dataset_members`` won't overwrite.
+        """
         ml_instance = DerivaML(dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, use_minid=False)
         dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
 
-        current_version = dataset_description.dataset.current_version
+        # Promote the fixture's initial dev row to a release so v1
+        # has a stable snapshot. A captured dev label would be
+        # overwritten by the next mutation (ADR-0003 lazy-mutable
+        # dev row); the subsequent add_dataset_members would then
+        # break the v1 bag download.
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="v1 baseline for versions test")
+        current_version = dataset.current_version
+        assert not current_version.is_devrelease
+
         current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         self.compare_catalogs(
             ml_instance, dataset_test, DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
