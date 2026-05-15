@@ -307,8 +307,11 @@ def create_ml_schema(
     """Create or recreate the DerivaML schema in the given catalog.
 
     WARNING: If the schema already exists, it will be DROPPED with CASCADE,
-    destroying all data in the schema. Use _post_clone_operations guard when
-    calling from clone context.
+    destroying all data in the schema. The bag-pipeline clone path
+    (:func:`~deriva_ml.catalog.clone_via_bag.clone_via_bag`) **does not**
+    call this function — it loads catalog content via
+    :class:`BagCatalogLoader` instead. Direct callers (e.g., fresh-catalog
+    bootstrap in the model template) own the destructive-call contract.
 
     Args:
         catalog: An ErmrestCatalog connection to the target catalog.
