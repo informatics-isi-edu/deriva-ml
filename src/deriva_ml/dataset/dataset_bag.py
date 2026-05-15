@@ -62,7 +62,6 @@ if TYPE_CHECKING:
     from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
 
-
 class DatasetBag:
     """Read-only interface to a downloaded dataset bag.
 
@@ -396,7 +395,6 @@ class DatasetBag:
         recurse: bool = False,
         limit: int | None = None,
         _visited: set[RID] | None = None,
-        version: Any = None,
         **kwargs: Any,
     ) -> dict[str, list[dict[str, Any]]]:
         """Return all members of this dataset bag grouped by table name.
@@ -412,13 +410,10 @@ class DatasetBag:
                 (default) returns all rows.
             _visited: Internal parameter to track visited datasets and prevent
                 infinite recursion. Callers should not pass this.
-            version: Dataset version string (e.g. ``"1.2.0"``) to query.
-                When ``None`` (default), uses the latest materialized version
-                in the bag. This parameter exists for API symmetry with the
-                live-catalog ``Dataset.list_dataset_members``; bag contents
-                are immutable so changing ``version`` only filters which
-                version's membership snapshot is read.
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
+            **kwargs: Accepted for ``DatasetLike`` protocol compatibility.
+                ``Dataset`` honours a ``version=`` keyword to pin the
+                catalog snapshot; bags are immutable, so any extras
+                (including ``version=``) are silently ignored.
 
         Returns:
             Dict mapping table name to list of row dicts. Empty dict if
@@ -597,20 +592,14 @@ class DatasetBag:
         # target row isn't in the bag is dangling: drop it so the bag's
         # feature_values matches what the bag actually contains.
         try:
-            target_rids = {
-                r["RID"] for r in self.model.get_table_contents(target_col)
-            }
+            target_rids = {r["RID"] for r in self.model.get_table_contents(target_col)}
         except Exception:
             # If the target table is missing from the bag entirely,
             # fall through with the unfiltered set — the cache fetch
             # would have raised anyway. Defensive only.
             target_rids = None
         if target_rids is not None:
-            records = [
-                r
-                for r in records
-                if getattr(r, target_col, None) in target_rids
-            ]
+            records = [r for r in records if getattr(r, target_col, None) in target_rids]
 
         # Apply execution_rids filter (Python-side; the bag cache doesn't
         # have a server-side query layer to push this into). Empty list
@@ -687,7 +676,7 @@ class DatasetBag:
             "Use feature_values(table, feature_name, selector=...) instead."
         )
 
-    def lookup_feature(self, table: str | Table, feature_name: str) -> "Feature":
+    def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """Look up a feature definition from bag metadata — works fully offline.
 
         Returns a ``Feature`` object with the same shape as the one returned by
@@ -798,7 +787,6 @@ class DatasetBag:
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
-        version: Any = None,
         **kwargs: Any,
     ) -> list[Self]:
         """Return directly nested (child) datasets of this bag.
@@ -811,9 +799,10 @@ class DatasetBag:
                 Default is ``False``.
             _visited: Internal parameter tracking visited RIDs to guard
                 against circular references. Callers should not pass this.
-            version: Ignored (bags are immutable snapshots; present for
-                API symmetry with ``Dataset.list_dataset_children``).
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
+            **kwargs: Accepted for ``DatasetLike`` protocol compatibility.
+                ``Dataset`` honours a ``version=`` keyword to pin the
+                catalog snapshot; bags are immutable, so any extras
+                (including ``version=``) are silently ignored.
 
         Returns:
             List of ``DatasetBag`` instances for each direct child dataset,
@@ -859,7 +848,6 @@ class DatasetBag:
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
-        version: Any = None,
         **kwargs: Any,
     ) -> list[Self]:
         """Return the parent datasets that contain this dataset as a nested member.
@@ -872,9 +860,10 @@ class DatasetBag:
                 to the root. Default is ``False``.
             _visited: Internal parameter tracking visited RIDs to guard against
                 circular references. Callers should not pass this.
-            version: Ignored (bags are immutable snapshots; present for
-                API symmetry with ``Dataset.list_dataset_parents``).
-            **kwargs: Additional arguments (ignored, for protocol compatibility).
+            **kwargs: Accepted for ``DatasetLike`` protocol compatibility.
+                ``Dataset`` honours a ``version=`` keyword to pin the
+                catalog snapshot; bags are immutable, so any extras
+                (including ``version=``) are silently ignored.
 
         Returns:
             List of ``DatasetBag`` instances for each direct parent dataset.
@@ -1124,7 +1113,6 @@ class DatasetBag:
     # =========================================================================
     # Asset Restructuring Methods
     # =========================================================================
-
 
     def as_torch_dataset(
         self,
@@ -1460,7 +1448,6 @@ class DatasetBag:
             missing=missing,
             output_signature=output_signature,
         )
-
 
     def restructure_assets(
         self,

@@ -62,7 +62,7 @@ from __future__ import annotations
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generator, Iterable, Protocol, Self, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Protocol, Self, runtime_checkable
 
 import pandas as pd
 
@@ -135,31 +135,24 @@ class DatasetLike(Protocol):
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
-        version: Any = None,
-        sort: SortSpec = None,
         **kwargs: Any,
     ) -> list[Self]:
         """Get nested child datasets.
 
         Args:
             recurse: Whether to recursively include children of children.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Dataset version to list children from (Dataset only, ignored by DatasetBag).
-            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
-                ``None`` (default) preserves backend order. ``True`` applies
-                the method's default. A callable receives the path-builder
-                context and returns sort keys. Currently reserved for
-                forward-compat — concrete ``Dataset`` and ``DatasetBag``
-                implementations may ignore this parameter (it is accepted
-                via ``**kwargs``).
-            **kwargs: Additional implementation-specific arguments.
+            _visited: Internal parameter to track visited datasets and
+                prevent infinite recursion.
+            **kwargs: Implementation-specific arguments. ``Dataset``
+                accepts ``version: DatasetVersion | str | None`` to
+                query a historical catalog snapshot; ``DatasetBag``
+                ignores any extras since bags are immutable snapshots
+                of a fixed version. Code polymorphic over
+                ``DatasetLike`` should not rely on those extras.
 
         Returns:
-            List of child datasets (Dataset or DatasetBag depending on implementation).
-
-        Note:
-            Both Dataset and DatasetBag have `recurse` as the first parameter.
-            Dataset uses the `version` parameter to query historical versions.
+            List of child datasets — concrete type matches ``self``
+            (``Dataset`` or ``DatasetBag``).
         """
         ...
 
@@ -167,31 +160,22 @@ class DatasetLike(Protocol):
         self,
         recurse: bool = False,
         _visited: set[RID] | None = None,
-        version: Any = None,
-        sort: SortSpec = None,
         **kwargs: Any,
     ) -> list[Self]:
         """Get parent datasets that contain this dataset.
 
         Args:
             recurse: Whether to recursively include parents of parents.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Dataset version to list parents from (Dataset only, ignored by DatasetBag).
-            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
-                ``None`` (default) preserves backend order. ``True`` applies
-                the method's default. A callable receives the path-builder
-                context and returns sort keys. Currently reserved for
-                forward-compat — concrete ``Dataset`` and ``DatasetBag``
-                implementations may ignore this parameter (it is accepted
-                via ``**kwargs``).
-            **kwargs: Additional implementation-specific arguments.
+            _visited: Internal parameter to track visited datasets and
+                prevent infinite recursion.
+            **kwargs: Implementation-specific arguments. ``Dataset``
+                accepts ``version: DatasetVersion | str | None`` to
+                query a historical catalog snapshot; ``DatasetBag``
+                ignores any extras.
 
         Returns:
-            List of parent datasets (Dataset or DatasetBag depending on implementation).
-
-        Note:
-            Both Dataset and DatasetBag have `recurse` as the first parameter.
-            Dataset uses the `version` parameter to query historical versions.
+            List of parent datasets — concrete type matches ``self``
+            (``Dataset`` or ``DatasetBag``).
         """
         ...
 
@@ -200,32 +184,23 @@ class DatasetLike(Protocol):
         recurse: bool = False,
         limit: int | None = None,
         _visited: set[RID] | None = None,
-        version: Any = None,
-        sort: SortSpec = None,
         **kwargs: Any,
     ) -> dict[str, list[dict[str, Any]]]:
         """List members of the dataset.
 
         Args:
             recurse: Whether to include members of nested datasets.
-            limit: Maximum number of members per type. None for no limit.
-            _visited: Internal parameter to track visited datasets and prevent infinite recursion.
-            version: Dataset version to list members from (Dataset only, ignored by DatasetBag).
-            sort: Optional sort spec — see :class:`deriva_ml.core.sort.SortSpec`.
-                ``None`` (default) preserves backend order. ``True`` applies
-                the method's default. A callable receives the path-builder
-                context and returns sort keys. Currently reserved for
-                forward-compat — concrete ``Dataset`` and ``DatasetBag``
-                implementations may ignore this parameter (it is accepted
-                via ``**kwargs``).
-            **kwargs: Additional implementation-specific arguments.
+            limit: Maximum number of members per type. ``None`` (the
+                default) means no limit.
+            _visited: Internal parameter to track visited datasets and
+                prevent infinite recursion.
+            **kwargs: Implementation-specific arguments. ``Dataset``
+                accepts ``version: DatasetVersion | str | None`` to
+                query a historical catalog snapshot; ``DatasetBag``
+                ignores any extras.
 
         Returns:
             Dictionary mapping member types to lists of member records.
-
-        Note:
-            Both Dataset and DatasetBag have `recurse` as the first parameter.
-            Dataset uses the `version` parameter to query historical versions.
         """
         ...
 
@@ -265,9 +240,9 @@ class DatasetLike(Protocol):
 
     def feature_values(
         self,
-        table: Table | str,
+        table: str | Table,
         feature_name: str,
-        selector: Any = None,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
         materialize_limit: int | None = None,
         execution_rids: list[str] | None = None,
     ) -> Iterable[FeatureRecord]:
