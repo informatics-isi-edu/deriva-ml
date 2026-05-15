@@ -15,7 +15,6 @@ import pytest
 
 from deriva_ml.catalog.localize import LocalizeResult, _extract_hatrac_path
 
-
 # ---------------------------------------------------------------------------
 # LocalizeResult — Pydantic round-trip + defaults
 # ---------------------------------------------------------------------------

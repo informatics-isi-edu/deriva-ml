@@ -20,7 +20,6 @@ from deriva_ml.catalog.provenance import (
     set_catalog_provenance,
 )
 
-
 # ---------------------------------------------------------------------------
 # CloneDetails — Pydantic round-trip + defaults
 # ---------------------------------------------------------------------------
