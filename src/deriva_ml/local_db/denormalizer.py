@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any, Generator
 
 import pandas as pd
 
-from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl
 
 if TYPE_CHECKING:
     from deriva_ml.interfaces import DatasetLike
@@ -526,7 +526,7 @@ class Denormalizer:
         # the Rule 2/5/6 guards and returns the column spec list. Walking
         # that list with denormalize_column_name gives us the final
         # dot-prefixed output labels without touching any data.
-        element_tables, column_specs, multi_schema = self._model._prepare_wide_table(
+        element_tables, column_specs, multi_schema = self._model._planner._prepare_wide_table(
             self._dataset,
             self._dataset_rid,
             list(include_tables),
@@ -618,11 +618,11 @@ class Denormalizer:
         # be computed.
         row_per_source = "explicit" if row_per else "auto-inferred"
         try:
-            row_per_candidates = self._model._find_sinks(include, via_list)
+            row_per_candidates = self._model._planner._find_sinks(include, via_list)
         except Exception:
             row_per_candidates = []
         try:
-            resolved_row_per: str | None = self._model._determine_row_per(
+            resolved_row_per: str | None = self._model._planner._determine_row_per(
                 include_tables=include,
                 via=via_list,
                 row_per=row_per,
@@ -635,7 +635,7 @@ class Denormalizer:
 
         # ── columns (may raise if row_per is None or ambiguity) ────────────
         try:
-            element_tables, column_specs, multi_schema = self._model._prepare_wide_table(
+            element_tables, column_specs, multi_schema = self._model._planner._prepare_wide_table(
                 self._dataset,
                 self._dataset_rid,
                 include,
@@ -651,7 +651,7 @@ class Denormalizer:
         ambiguities_raw: list[dict] = []
         if resolved_row_per is not None:
             try:
-                ambiguities_raw = self._model._find_path_ambiguities(
+                ambiguities_raw = self._model._planner._find_path_ambiguities(
                     row_per=resolved_row_per,
                     include_tables=include,
                     via=via_list,
@@ -772,8 +772,8 @@ class Denormalizer:
             - ``reachable_tables``: ``{anchor_table: [reachable tables
               downstream via FK, sorted]}``.
             - ``association_tables``: sorted list of pure M:N association
-              tables in the schema (detected via
-              :meth:`DerivaModel.is_topological_association`).
+              tables in the schema (detected via the planner's
+              ``_is_topological_association`` predicate).
             - ``feature_tables``: sorted list of feature tables
               (via :meth:`DerivaModel.find_features`). Empty if the
               model doesn't expose ``find_features`` or has no features.
@@ -825,11 +825,11 @@ class Denormalizer:
         # reachable via FK (using the whole schema as the subgraph).
         reachable_tables: dict[str, list[str]] = {}
         for t in anchor_types:
-            reach = model._outbound_reachable(t, all_table_names)
+            reach = model._planner._outbound_reachable(t, all_table_names)
             reachable_tables[t] = sorted(reach)
 
         # association_tables: pure M-to-N linking tables
-        association_tables = sorted(t for t in all_table_names if model.is_topological_association(t))
+        association_tables = sorted(t for t in all_table_names if model._planner._is_topological_association(t))
 
         # feature_tables: derive from DerivaModel.find_features (the canonical
         # feature-discovery API — see model/catalog.py:510). Each Feature's
@@ -853,7 +853,7 @@ class Denormalizer:
             for target in reachable_tables.get(source, []):
                 if tables is not None and source not in tables and target not in tables:
                     continue
-                paths = model._enumerate_paths(source, target, all_table_names)
+                paths = model._planner._enumerate_paths(source, target, all_table_names)
                 # Deduplicate
                 unique = list({tuple(p): p for p in paths}.values())
                 schema_paths[(source, target)] = [{"path": p, "direct": len(p) == 2} for p in unique]
@@ -917,7 +917,7 @@ class Denormalizer:
         # (raising DownstreamLeaf if a downstream table is in
         # include_tables) or auto-infers via sink-finding (raising
         # MultiLeaf / NoSink if ambiguous or cyclic).
-        resolved_row_per = self._model._determine_row_per(
+        resolved_row_per = self._model._planner._determine_row_per(
             include_tables=list(include_tables),
             via=list(via or []),
             row_per=row_per,
@@ -925,7 +925,7 @@ class Denormalizer:
         # Rule 6: check every (row_per, T) pair for multiple FK paths.
         # Unlike describe(), we raise on the first ambiguity detected so
         # callers get a clear error rather than a silently-wrong join.
-        ambiguities = self._model._find_path_ambiguities(
+        ambiguities = self._model._planner._find_path_ambiguities(
             row_per=resolved_row_per,
             include_tables=list(include_tables),
             via=list(via or []),
@@ -1144,13 +1144,13 @@ class Denormalizer:
             # over row_per rows. The current engine's join generation
             # handles both via dataset-membership scoping and FK-chain
             # traversal.
-            downstream_from_anchor = self._model._outbound_reachable(table, subgraph | {table})
+            downstream_from_anchor = self._model._planner._outbound_reachable(table, subgraph | {table})
             reaches_row_per_downstream = row_per in downstream_from_anchor
             # For the upstream side: does row_per's downstream-reach set
             # contain the anchor? (row_per's outbound set = everything
             # row_per hoists OR reaches; that is symmetric to "anchor
             # can reach row_per via along-FK chain" modulo direction.)
-            downstream_from_row_per = self._model._outbound_reachable(row_per, subgraph | {table})
+            downstream_from_row_per = self._model._planner._outbound_reachable(row_per, subgraph | {table})
             reaches_row_per_upstream = table in downstream_from_row_per
             reaches_row_per = reaches_row_per_downstream or reaches_row_per_upstream
 
@@ -1179,7 +1179,7 @@ class Denormalizer:
                 for s in subgraph:
                     if s == row_per or s == table:
                         continue
-                    if table in self._model._outbound_reachable(s, subgraph | {table}):
+                    if table in self._model._planner._outbound_reachable(s, subgraph | {table}):
                         connected_upstream = True
                         break
             if connected_downstream or connected_upstream:
@@ -1247,7 +1247,7 @@ class Denormalizer:
         orphan_rows: list[dict[str, Any]] = []
 
         # Get the full column spec so we know what keys to populate.
-        _, column_specs, multi_schema = self._model._prepare_wide_table(
+        _, column_specs, multi_schema = self._model._planner._prepare_wide_table(
             self._dataset,
             self._dataset_rid,
             list(include_tables),

@@ -173,7 +173,7 @@ class TestCompositeFKDenormalize:
         # _table_relationship should return ALL column pairs of the composite FK
         # Need to refresh the model to pick up newly created tables
         test_ml.model.refresh_model()
-        col_pairs = test_ml.model._table_relationship("Child", "Parent")
+        col_pairs = test_ml.model._planner._table_relationship("Child", "Parent")
 
         # With a composite FK (Parent_RID, Parent_Group) → (RID, Group),
         # we expect 2 column pairs
