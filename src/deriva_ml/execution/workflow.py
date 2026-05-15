@@ -381,37 +381,47 @@ class Workflow(BaseModel):
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":
-        """Creates a workflow from the current execution context.
+        """Pydantic post-construction validator that fills in ``url`` and ``checksum``.
 
-        Identifies the currently executing program (script or notebook) and creates
-        a workflow definition. Automatically determines the Git repository information
-        and source code checksum.
+        Runs automatically after every ``Workflow(...)`` construction
+        (it is a ``@model_validator(mode="after")``). For any field
+        the caller did not provide, the validator derives a value from
+        the current execution context:
 
-        The behavior can be configured using environment variables:
-            - DERIVA_ML_WORKFLOW_URL: Override the detected workflow URL
-            - DERIVA_ML_WORKFLOW_CHECKSUM: Override the computed checksum
-            - DERIVA_MCP_IN_DOCKER: Set to "true" to use Docker metadata instead of git
+        - ``url`` — set to the resolved source URL of the calling
+          script/notebook. Resolution prefers a Docker image
+          identifier (when ``DERIVA_MCP_IN_DOCKER=true``), then falls
+          back to git remote + commit + path, then to a file:// path.
+        - ``checksum`` — set to the git commit SHA of the calling
+          script (or the Docker image digest when running in Docker).
+        - ``version`` — set from ``DERIVA_MCP_VERSION`` when present.
 
-        Docker environment variables (used when DERIVA_MCP_IN_DOCKER=true):
-            - DERIVA_MCP_VERSION: Semantic version of the Docker image
-            - DERIVA_MCP_GIT_COMMIT: Git commit hash at build time
-            - DERIVA_MCP_IMAGE_DIGEST: Docker image digest (unique identifier)
-            - DERIVA_MCP_IMAGE_NAME: Docker image name (e.g., ghcr.io/org/repo)
+        Caller-supplied values are never overwritten — this is a
+        "fill in the blanks" validator, not a re-derivation.
 
-        Args:
+        Environment variable overrides:
+            - ``DERIVA_ML_WORKFLOW_URL``: force-set ``url``.
+            - ``DERIVA_ML_WORKFLOW_CHECKSUM``: force-set ``checksum``.
+            - ``DERIVA_MCP_IN_DOCKER=true``: use Docker image metadata
+              instead of git.
+
+        Docker-only environment variables (consulted when
+        ``DERIVA_MCP_IN_DOCKER=true``):
+            - ``DERIVA_MCP_VERSION``: semantic version of the Docker image.
+            - ``DERIVA_MCP_GIT_COMMIT``: git commit hash at image build time.
+            - ``DERIVA_MCP_IMAGE_DIGEST``: image digest (unique identifier).
+            - ``DERIVA_MCP_IMAGE_NAME``: image name (e.g.
+              ``ghcr.io/informatics-isi-edu/deriva-ml-mcp``).
 
         Returns:
-            Workflow: New workflow instance with detected Git information.
+            Workflow: ``self`` (the same instance, mutated in place).
+            Pydantic ``mode="after"`` validators must return the
+            model.
 
         Raises:
-            DerivaMLException: If not in a Git repository or detection fails (non-Docker).
-
-        Example:
-            >>> workflow = Workflow.create_workflow(  # doctest: +SKIP
-            ...     name="Sample Analysis",
-            ...     workflow_type="python_script",
-            ...     description="Process sample data"
-            ... )
+            DerivaMLException: If the validator cannot determine a
+                URL or checksum from any source (e.g. not in a git
+                repo, Docker env vars missing, no explicit overrides).
         """
         self._logger = get_logger(__name__)
         # Check if running in Docker container (no git repo available)

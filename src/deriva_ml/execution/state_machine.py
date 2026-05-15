@@ -204,7 +204,6 @@ def transition(
             ALLOWED_TRANSITIONS.
         ValueError: If mode=offline but catalog is not None, or
             mode=online but catalog is None. These are caller bugs.
-        NotImplementedError: Online-mode path is implemented in Task C3.
 
     Example:
         >>> transition(  # doctest: +SKIP

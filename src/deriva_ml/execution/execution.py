@@ -1324,14 +1324,19 @@ class Execution:
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
-            max_retries: Maximum number of retry attempts for failed uploads (default: 3).
-            retry_delay: Initial delay in seconds between retries, doubles with each attempt
-                (default: 5.0). Doubles on each successive retry.
-            timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (600, 600).
-                Note: urllib3 uses connect_timeout as the socket timeout during request body
-                writes, so it must be large enough for a full chunk upload.
-            chunk_size: Optional chunk size in bytes for Hatrac uploads. Increase for large
-                files on high-bandwidth connections.
+            max_retries: Accepted but currently a no-op — the bag-commit
+                upload path does not wrap retries around the
+                ``BagCatalogLoader`` call. Parameter retained for
+                signature stability; will be removed in a follow-up.
+            retry_delay: Accepted but currently a no-op — see ``max_retries``.
+            timeout: Accepted but currently a no-op — bag-commit
+                inherits the catalog session's timeout. Parameter
+                retained for signature stability; will be removed in a
+                follow-up.
+            chunk_size: Accepted but currently a no-op — bag-commit
+                inherits the catalog session's chunk size. Parameter
+                retained for signature stability; will be removed in a
+                follow-up.
 
         Returns:
             Dict mapping asset table name to list of uploaded ``AssetFilePath`` objects, e.g.
