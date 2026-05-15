@@ -3,6 +3,11 @@
 import pytest
 
 from deriva_ml import MLVocab
+from deriva_ml.dataset.restructure import (
+    _build_dataset_type_path_map,
+    _get_asset_dataset_mapping,
+    _get_reachable_assets,
+)
 from deriva_ml.execution.execution import ExecutionConfiguration
 
 
@@ -445,7 +450,7 @@ class TestRestructureForeignKeyPaths:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # _get_reachable_assets should find Images through Subject -> Image FK
-        reachable_images = bag._get_reachable_assets("Image")
+        reachable_images = _get_reachable_assets(bag, "Image")
 
         assert len(reachable_images) > 0, "Expected to find Images reachable through Subject FK path."
 
@@ -541,7 +546,7 @@ class TestRestructureForeignKeyPaths:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # Get the asset-to-dataset mapping
-        asset_map = bag._get_asset_dataset_mapping("Image")
+        asset_map = _get_asset_dataset_mapping(bag, "Image")
 
         # Images should be mapped to the dataset
         assert len(asset_map) > 0, "Expected images to be mapped to dataset"
@@ -561,7 +566,7 @@ class TestRestructureHelperMethods:
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        type_map = bag._build_dataset_type_path_map()
+        type_map = _build_dataset_type_path_map(bag)
 
         # Should include at least the root dataset
         assert bag.dataset_rid in type_map
@@ -576,7 +581,7 @@ class TestRestructureHelperMethods:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # Use a selector that returns a fixed value
-        type_map = bag._build_dataset_type_path_map(type_selector=lambda types: "FIXED_TYPE")
+        type_map = _build_dataset_type_path_map(bag, type_selector=lambda types: "FIXED_TYPE")
 
         # All paths should contain "FIXED_TYPE"
         for rid, path in type_map.items():
@@ -587,7 +592,7 @@ class TestRestructureHelperMethods:
         dataset = dataset_test.dataset_description.dataset
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        asset_map = bag._get_asset_dataset_mapping("Image")
+        asset_map = _get_asset_dataset_mapping(bag, "Image")
 
         # Should have mappings for images
         members = bag.list_dataset_members(recurse=True)
