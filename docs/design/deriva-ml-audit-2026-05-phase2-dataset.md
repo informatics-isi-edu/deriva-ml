@@ -1023,6 +1023,17 @@ performance. Decision point: lift the optimisation upstream to
 formalise `estimate_bag_size` as an opt-out path. The current
 "opportunistic copy-paste" is the worst of both worlds.
 
+**Update (Phase 3 follow-up):** decision recorded in
+[ADR-0008](../adr/0008-estimate-bag-size-bypasses-bag-pipeline.md):
+the bypass is **formalised as a deliberate opt-out**, not lifted
+upstream. The estimator continues to share the *walker* via
+`DatasetBagBuilder.aggregate_queries` and bypasses
+`CatalogBagBuilder` only for *execution* (the async parallel
+queries). The docstring on `Dataset.estimate_bag_size` now points
+at the ADR. The "lift upstream" alternative remains open as future
+work; ADR-0008 documents what it would entail and why we haven't
+done it yet.
+
 ### 3.E `BagCacheIndex` semantics for multi-anchor bags
 
 The cutover doc (D1) noted that pre-cutover MINIDs may become
