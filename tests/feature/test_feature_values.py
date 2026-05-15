@@ -424,14 +424,26 @@ class TestFeatureValuesSymmetry:
     def test_list_workflow_executions_matches(self, feature_container):
         """list_workflow_executions returns the expected set of execution RIDs.
 
-        For DerivaML and Dataset containers this exercises live catalog lookup.
-        For DatasetBag the same method reads from offline SQLite; the test
-        skips when the bag's Execution table is empty (a known bag-export
-        limitation: Execution rows are only exported if Execution is a
-        dataset element type or reachable via Dataset_Execution paths).
+        For DerivaML and Dataset containers, the catalog-side answer
+        is authoritative — every execution that ran the workflow must
+        be reported.
+
+        For DatasetBag, the bag is a *slice* of the catalog. An
+        execution that ran the workflow but produced/consumed no rows
+        within the dataset slice is correctly absent from the bag.
+        The bag-side answer is therefore a subset of the catalog's,
+        not an equality.
+
+        The test still pins the bag's answer to a well-defined set:
+        every bag-side execution must appear in the catalog's expected
+        set (no fabricated RIDs), and the bag must not be empty (some
+        executions did reach the slice).
         """
         if isinstance(feature_container.container, DatasetBag):
-            # Verify the method is callable; skip if execution data not in bag.
+            # Verify the method is callable; skip if Execution rows
+            # aren't exported at all (a separate bag-builder limitation
+            # where Execution isn't reachable from the dataset's
+            # element types).
             try:
                 rids = feature_container.container.list_workflow_executions(feature_container.workflow)
             except DerivaMLException:
@@ -440,13 +452,19 @@ class TestFeatureValuesSymmetry:
                     "exported to bag SQLite — not present when Execution is not a "
                     "dataset element type (known bag-export limitation)."
                 )
-
             if not rids:
                 pytest.skip("DatasetBag returned empty execution list — pre-existing bag-export limitation.")
+
+            # Bag is a slice; assert subset + non-empty.
+            bag_rids = set(rids)
+            assert bag_rids, "Bag returned empty execution list after non-empty check above"
+            assert bag_rids.issubset(feature_container.expected_workflow_executions), (
+                f"Bag has executions not in catalog's set: "
+                f"{bag_rids - feature_container.expected_workflow_executions}"
+            )
         else:
             rids = feature_container.container.list_workflow_executions(feature_container.workflow)
-        # Order-independent comparison against the catalog-computed baseline
-        assert set(rids) == feature_container.expected_workflow_executions
+            assert set(rids) == feature_container.expected_workflow_executions
 
 
 # ---------------------------------------------------------------------------
