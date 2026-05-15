@@ -10,21 +10,23 @@ Three-stage flow:
    then upload it to the local Hatrac namespace.
 3. Update the catalog row's URL to point to the new local Hatrac path.
 
-The ``LocalizeResult`` dataclass summarizes counts of processed/skipped/failed
+The ``LocalizeResult`` model summarizes counts of processed/skipped/failed
 assets and provides the old-to-new URL mapping for auditing.
 """
 
 from __future__ import annotations
 
 import tempfile
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote as urlquote
 from urllib.parse import urlparse
 
 from deriva.core import ErmrestCatalog, HatracStore, get_credential
+from pydantic import BaseModel, Field
+
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
@@ -32,8 +34,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-@dataclass
-class LocalizeResult:
+class LocalizeResult(BaseModel):
     """Result of an asset localization operation.
 
     Attributes:
@@ -41,14 +42,17 @@ class LocalizeResult:
         assets_skipped: Number of assets skipped (already local or errors).
         assets_failed: Number of assets that failed to localize.
         errors: List of error messages for failed assets.
-        localized_assets: List of (RID, old_url, new_url) tuples for successfully localized assets.
+        localized_assets: List of (RID, old_url, new_url) tuples for
+            successfully localized assets.
     """
+
+    model_config = VALIDATION_CONFIG
 
     assets_processed: int = 0
     assets_skipped: int = 0
     assets_failed: int = 0
-    errors: list[str] = field(default_factory=list)
-    localized_assets: list[tuple[str, str, str]] = field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    localized_assets: list[tuple[str, str, str]] = Field(default_factory=list)
 
 
 def localize_assets(

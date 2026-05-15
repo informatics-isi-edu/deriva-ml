@@ -26,14 +26,15 @@ Public surface:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
 
 from deriva.core import ErmrestCatalog
 from deriva.core.utils.core_utils import urlquote
+from pydantic import BaseModel, Field
+
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 logger = get_logger(__name__)
 #: ERMrest annotation URL used to attach the provenance payload to
@@ -42,8 +43,12 @@ logger = get_logger(__name__)
 CATALOG_PROVENANCE_URL = "tag:deriva-ml.org,2025:catalog-provenance"
 
 
-class CatalogCreationMethod(Enum):
-    """How a catalog was created."""
+class CatalogCreationMethod(str, Enum):
+    """How a catalog was created.
+
+    Inherits from ``str`` so values serialize naturally inside the
+    Pydantic annotation payload without needing custom encoders.
+    """
 
     CLONE = "clone"
     """Cloned from another catalog (legacy or bag-pipeline)."""
@@ -58,8 +63,7 @@ class CatalogCreationMethod(Enum):
     """Pre-existing catalog or unknown provenance."""
 
 
-@dataclass
-class CloneDetails:
+class CloneDetails(BaseModel):
     """Clone-specific provenance details.
 
     Populated only when :attr:`CatalogProvenance.creation_method`
@@ -74,7 +78,28 @@ class CloneDetails:
     full record lives in the bag's ``metadata/`` provenance file
     — but the schema stays in place so older clone artifacts
     parse correctly.
+
+    The localization-leg fields (``assets_localized``,
+    ``assets_localized_at``, ``asset_source_hostname``,
+    ``assets_copied``, ``assets_skipped``, ``assets_failed``)
+    record the split-phase asset-copy step
+    (:func:`~deriva_ml.catalog.localize.localize_assets`). They
+    are populated when phase two completes — phase one (clone via
+    bag) leaves them at their defaults.
+
+    Example:
+        >>> details = CloneDetails(
+        ...     source_hostname="src.example.org",
+        ...     source_catalog_id="1",
+        ...     orphan_strategy="delete",
+        ... )
+        >>> details.source_hostname
+        'src.example.org'
+        >>> details.assets_localized
+        False
     """
+
+    model_config = VALIDATION_CONFIG
 
     source_hostname: str
     source_catalog_id: str
@@ -85,86 +110,50 @@ class CloneDetails:
     prune_hidden_fkeys: bool = False
     schema_only: bool = False
     asset_mode: str = "refs"
-    exclude_schemas: list[str] = field(default_factory=list)
-    exclude_objects: list[str] = field(default_factory=list)
+    exclude_schemas: list[str] = Field(default_factory=list)
+    exclude_objects: list[str] = Field(default_factory=list)
     add_ml_schema: bool = False
     copy_annotations: bool = True
     copy_policy: bool = True
     reinitialize_dataset_versions: bool = True
     rows_copied: int = 0
     rows_skipped: int = 0
-    skipped_rids: list[str] = field(default_factory=list)
+    skipped_rids: list[str] = Field(default_factory=list)
     truncated_count: int = 0
     orphan_rows_removed: int = 0
     orphan_rows_nullified: int = 0
     fkeys_pruned: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize to a JSON-friendly dict for the annotation."""
-        result = {
-            "source_hostname": self.source_hostname,
-            "source_catalog_id": self.source_catalog_id,
-            "source_snapshot": self.source_snapshot,
-            "source_schema_url": self.source_schema_url,
-            "orphan_strategy": self.orphan_strategy,
-            "truncate_oversized": self.truncate_oversized,
-            "prune_hidden_fkeys": self.prune_hidden_fkeys,
-            "schema_only": self.schema_only,
-            "asset_mode": self.asset_mode,
-            "exclude_schemas": self.exclude_schemas,
-            "exclude_objects": self.exclude_objects,
-            "add_ml_schema": self.add_ml_schema,
-            "copy_annotations": self.copy_annotations,
-            "copy_policy": self.copy_policy,
-            "reinitialize_dataset_versions": self.reinitialize_dataset_versions,
-            "rows_copied": self.rows_copied,
-            "rows_skipped": self.rows_skipped,
-            "truncated_count": self.truncated_count,
-            "orphan_rows_removed": self.orphan_rows_removed,
-            "orphan_rows_nullified": self.orphan_rows_nullified,
-            "fkeys_pruned": self.fkeys_pruned,
-        }
-        if self.skipped_rids:
-            result["skipped_rids"] = self.skipped_rids
-        return result
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "CloneDetails":
-        """Reconstruct from the dict form stored on the annotation."""
-        return cls(
-            source_hostname=data.get("source_hostname", ""),
-            source_catalog_id=data.get("source_catalog_id", ""),
-            source_snapshot=data.get("source_snapshot"),
-            source_schema_url=data.get("source_schema_url"),
-            orphan_strategy=data.get("orphan_strategy", "fail"),
-            truncate_oversized=data.get("truncate_oversized", False),
-            prune_hidden_fkeys=data.get("prune_hidden_fkeys", False),
-            schema_only=data.get("schema_only", False),
-            asset_mode=data.get("asset_mode", "refs"),
-            exclude_schemas=data.get("exclude_schemas", []),
-            exclude_objects=data.get("exclude_objects", []),
-            add_ml_schema=data.get("add_ml_schema", False),
-            copy_annotations=data.get("copy_annotations", True),
-            copy_policy=data.get("copy_policy", True),
-            reinitialize_dataset_versions=data.get("reinitialize_dataset_versions", True),
-            rows_copied=data.get("rows_copied", 0),
-            rows_skipped=data.get("rows_skipped", 0),
-            skipped_rids=data.get("skipped_rids", []),
-            truncated_count=data.get("truncated_count", 0),
-            orphan_rows_removed=data.get("orphan_rows_removed", 0),
-            orphan_rows_nullified=data.get("orphan_rows_nullified", 0),
-            fkeys_pruned=data.get("fkeys_pruned", 0),
-        )
+    # Split-phase asset-localization leg (phase 2). Populated by
+    # localize_assets() after the bytes have been moved server-to-
+    # server. Phase 1 (clone_via_bag) leaves these at defaults.
+    assets_localized: bool = False
+    assets_localized_at: str | None = None  # ISO8601 UTC
+    asset_source_hostname: str | None = None
+    assets_copied: int = 0
+    assets_skipped: int = 0
+    assets_failed: int = 0
 
 
-@dataclass
-class CatalogProvenance:
+class CatalogProvenance(BaseModel):
     """Catalog-level provenance annotation payload.
 
     Stored on the catalog model under
     :data:`CATALOG_PROVENANCE_URL`. Records who/when/how/with-what
     a catalog came into being.
+
+    Example:
+        >>> prov = CatalogProvenance(
+        ...     creation_method=CatalogCreationMethod.CREATE,
+        ...     created_at="2026-05-15T12:00:00+00:00",
+        ...     hostname="example.org",
+        ...     catalog_id="42",
+        ... )
+        >>> prov.is_clone
+        False
     """
+
+    model_config = VALIDATION_CONFIG
 
     creation_method: CatalogCreationMethod
     created_at: str
@@ -177,49 +166,15 @@ class CatalogProvenance:
     workflow_version: str | None = None
     clone_details: CloneDetails | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        result = {
-            "creation_method": self.creation_method.value,
-            "created_at": self.created_at,
-            "hostname": self.hostname,
-            "catalog_id": self.catalog_id,
-            "created_by": self.created_by,
-            "name": self.name,
-            "description": self.description,
-            "workflow_url": self.workflow_url,
-            "workflow_version": self.workflow_version,
-        }
-        if self.clone_details:
-            result["clone_details"] = self.clone_details.to_dict()
-        return result
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "CatalogProvenance":
-        clone_details = None
-        if data.get("clone_details"):
-            clone_details = CloneDetails.from_dict(data["clone_details"])
-        method_str = data.get("creation_method", "unknown")
-        try:
-            creation_method = CatalogCreationMethod(method_str)
-        except ValueError:
-            creation_method = CatalogCreationMethod.UNKNOWN
-        return cls(
-            creation_method=creation_method,
-            created_at=data.get("created_at", ""),
-            hostname=data.get("hostname", ""),
-            catalog_id=data.get("catalog_id", ""),
-            created_by=data.get("created_by"),
-            name=data.get("name"),
-            description=data.get("description"),
-            workflow_url=data.get("workflow_url"),
-            workflow_version=data.get("workflow_version"),
-            clone_details=clone_details,
-        )
-
     @property
     def is_clone(self) -> bool:
         """``True`` when the catalog was cloned from another."""
-        return self.creation_method == CatalogCreationMethod.CLONE and self.clone_details is not None
+        # use_enum_values=True stores the value, not the enum member,
+        # so compare against the string form.
+        return (
+            self.creation_method == CatalogCreationMethod.CLONE.value
+            and self.clone_details is not None
+        )
 
 
 def set_catalog_provenance(
@@ -229,6 +184,7 @@ def set_catalog_provenance(
     workflow_url: str | None = None,
     workflow_version: str | None = None,
     creation_method: CatalogCreationMethod = CatalogCreationMethod.CREATE,
+    clone_details: CloneDetails | None = None,
 ) -> CatalogProvenance:
     """Attach a :class:`CatalogProvenance` annotation to a catalog.
 
@@ -242,9 +198,25 @@ def set_catalog_provenance(
         workflow_version: Optional version tag of the workflow.
         creation_method: How the catalog was created. Defaults to
             :attr:`CatalogCreationMethod.CREATE`.
+        clone_details: Clone-specific provenance details. Should
+            be supplied when ``creation_method == CLONE``; ignored
+            (left as ``None``) otherwise.
 
     Returns:
         The :class:`CatalogProvenance` object that was written.
+
+    Example:
+        >>> from deriva_ml.catalog.provenance import (  # doctest: +SKIP
+        ...     set_catalog_provenance, CatalogCreationMethod, CloneDetails,
+        ... )
+        >>> set_catalog_provenance(  # doctest: +SKIP
+        ...     catalog,
+        ...     creation_method=CatalogCreationMethod.CLONE,
+        ...     clone_details=CloneDetails(
+        ...         source_hostname="src.example.org",
+        ...         source_catalog_id="1",
+        ...     ),
+        ... )
     """
     created_by = None
     try:
@@ -253,14 +225,14 @@ def set_catalog_provenance(
             client = session_info["client"]
             created_by = client.get("display_name") or client.get("id")
     except Exception as e:
-        logger.debug(f"Could not retrieve session info for provenance: {e}")
+        logger.debug("Could not retrieve session info for provenance: %s", e)
 
     try:
         catalog_info = catalog.get("/").json()
         hostname = catalog_info.get("meta", {}).get("host", "")
         catalog_id = str(catalog.catalog_id)
     except Exception as e:
-        logger.debug(f"Could not retrieve catalog info for provenance: {e}")
+        logger.debug("Could not retrieve catalog info for provenance: %s", e)
         hostname = ""
         catalog_id = str(catalog.catalog_id)
 
@@ -274,6 +246,7 @@ def set_catalog_provenance(
         description=description,
         workflow_url=workflow_url,
         workflow_version=workflow_version,
+        clone_details=clone_details,
     )
 
     _write_provenance_annotation(catalog, provenance)
@@ -283,14 +256,27 @@ def set_catalog_provenance(
 def get_catalog_provenance(
     catalog: ErmrestCatalog,
 ) -> CatalogProvenance | None:
-    """Return the catalog's provenance annotation, or ``None``."""
+    """Return the catalog's provenance annotation, or ``None``.
+
+    Args:
+        catalog: The catalog to read.
+
+    Returns:
+        Parsed :class:`CatalogProvenance` if the annotation is
+        present and well-formed; ``None`` otherwise.
+
+    Example:
+        >>> prov = get_catalog_provenance(catalog)  # doctest: +SKIP
+        >>> if prov is not None and prov.is_clone:  # doctest: +SKIP
+        ...     print(prov.clone_details.source_hostname)
+    """
     try:
         model = catalog.getCatalogModel()
         provenance_data = model.annotations.get(CATALOG_PROVENANCE_URL)
         if provenance_data:
-            return CatalogProvenance.from_dict(provenance_data)
+            return CatalogProvenance.model_validate(provenance_data)
     except Exception as e:
-        logger.debug(f"Could not get catalog provenance: {e}")
+        logger.debug("Could not get catalog provenance: %s", e)
     return None
 
 
@@ -302,11 +288,11 @@ def _write_provenance_annotation(
     try:
         catalog.put(
             f"/annotation/{urlquote(CATALOG_PROVENANCE_URL)}",
-            json=provenance.to_dict(),
+            json=provenance.model_dump(mode="json"),
         )
         logger.info("Set catalog provenance annotation")
     except Exception as e:
-        logger.warning(f"Failed to set catalog provenance annotation: {e}")
+        logger.warning("Failed to set catalog provenance annotation: %s", e)
 
 
 __all__ = [

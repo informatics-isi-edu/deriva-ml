@@ -53,13 +53,12 @@ Legacy parameter            Bag-path mapping   Notes
 from __future__ import annotations
 
 import zipfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from deriva.bag.anchors import Anchor, RIDAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
-from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
+from deriva.bag.catalog_loader import BagCatalogLoader
 from deriva.bag.traversal import (
     AssetMode,
     DanglingFKStrategy,
@@ -67,7 +66,10 @@ from deriva.bag.traversal import (
     VocabExport,
 )
 from deriva.core import DerivaServer, get_credential
+from pydantic import BaseModel
+
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 logger = get_logger(__name__)
 
@@ -214,8 +216,7 @@ def _materialize_bag_assets(bag_path: Path) -> None:
     bdb.materialize(str(bag_path))
 
 
-@dataclass
-class CloneViaBagResult:
+class CloneViaBagResult(BaseModel):
     """Outcome of a :func:`clone_via_bag` invocation.
 
     Attributes:
@@ -227,13 +228,17 @@ class CloneViaBagResult:
             Left on disk after the clone so the artifact is
             inspectable / re-usable.
         load_report: Per-table load statistics from
-            :class:`BagCatalogLoader`.
+            :class:`BagCatalogLoader` (a :class:`LoadReport`).
+            Typed ``Any`` here because it's an opaque carrier from
+            ``deriva.bag``; Pydantic doesn't need to validate it.
     """
+
+    model_config = VALIDATION_CONFIG
 
     source_catalog_id: str
     dest_catalog_id: str
     bag_path: Path
-    load_report: LoadReport
+    load_report: Any
 
 
 def clone_via_bag(

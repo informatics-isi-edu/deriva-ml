@@ -11,11 +11,9 @@ network connection.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from deriva.bag.anchors import RIDAnchor, TableAnchor
 from deriva.bag.traversal import (
     AssetMode,
@@ -23,6 +21,7 @@ from deriva.bag.traversal import (
     FKTraversalPolicy,
     VocabExport,
 )
+
 from deriva_ml.catalog.clone_via_bag import (
     CloneViaBagResult,
     clone_via_bag,

@@ -58,7 +58,11 @@ from typing import Any, Callable
 
 from deriva.bag.traversal import (
     AssetMode as _AssetMode,
+)
+from deriva.bag.traversal import (
     DanglingFKStrategy as _DanglingFKStrategy,
+)
+from deriva.bag.traversal import (
     FKTraversalPolicy,
 )
 
@@ -341,11 +345,6 @@ def _warn_about_legacy_params(**kwargs: Any) -> None:
 
 
 __all__ = [
-    "CatalogCreationMethod",
-    "CatalogProvenance",
-    "CloneDetails",
     "OrphanStrategy",
     "create_ml_workspace",
-    "get_catalog_provenance",
-    "set_catalog_provenance",
 ]
