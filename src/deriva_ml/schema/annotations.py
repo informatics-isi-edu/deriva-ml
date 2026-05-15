@@ -10,14 +10,11 @@ Public entry points:
 - ``asset_annotation``: Apply upload and display annotations to a single asset table.
 - ``generate_annotation``: Return the full annotation dict for a catalog model
   (used by ``create_ml_schema``).
-- ``main``: CLI wrapper — apply annotations to a live catalog.
 """
 
-import argparse
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
-import sys
 
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 _core_utils = importlib.import_module("deriva.core.utils.core_utils")
@@ -629,21 +626,3 @@ def generate_annotation(model: Model, schema: str) -> dict:
     }
 
 
-def main():
-    """Main entry point for the annotations CLI.
-
-    Applies annotations to the ML schema based on command line arguments.
-
-    Returns:
-        None. Executes the CLI.
-    """
-    parser = argparse.ArgumentParser(description="Apply annotations to ML schema")
-    parser.add_argument("hostname", help="Hostname for the catalog")
-    parser.add_argument("catalog_id", help="Catalog ID")
-    parser.add_argument("schema-name", default="deriva-ml", help="Schema name (default: deriva-ml)")
-    args = parser.parse_args()
-    generate_annotation(args.catalog_id, args.schema_name)
-
-
-if __name__ == "__main__":
-    sys.exit(main())

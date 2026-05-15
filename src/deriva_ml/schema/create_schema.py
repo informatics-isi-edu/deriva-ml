@@ -11,7 +11,6 @@ ERMrest catalog. The main entry points are:
 - ``create_ml_catalog``: Create a brand-new catalog and install the schema.
 """
 
-import argparse
 import subprocess
 import sys
 from importlib.resources import files
@@ -30,10 +29,10 @@ from deriva.core.typed import (
     VocabularyTableDef,
 )
 
-from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
+from deriva_ml.core.definitions import MLTable, MLVocab
 from deriva_ml.core.exceptions import DerivaMLConfigurationError
-from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 logger = get_logger(__name__)
 
@@ -623,30 +622,3 @@ def create_ml_catalog(
     return catalog
 
 
-def main():
-    """Main entry point for the schema creation CLI.
-
-    Creates ML schema and catalog based on command line arguments.
-
-    Returns:
-        None. Executes the CLI.
-    """
-    scheme = "https"
-    parser = argparse.ArgumentParser(description="Create ML schema and catalog")
-    parser.add_argument("hostname", help="Hostname for the catalog")
-    parser.add_argument("project_name", help="Project name for the catalog")
-    parser.add_argument("schema-name", default="deriva-ml", help="Schema name (default: deriva-ml)")
-    parser.add_argument("curie_prefix", type=str, required=True)
-
-    args = parser.parse_args()
-    credentials = get_credential(args.hostname)
-    server = DerivaServer(scheme, args.hostname, credentials)
-    model = server.connect_ermrest(args.catalog_id).getCatalogModel()
-    create_ml_schema(model, args.schema_name)
-
-    print(f"Created ML catalog at {args.hostname} with project {args.project_name}")
-    print(f"Schema '{args.schema_name}' initialized successfully")
-
-
-if __name__ == "__main__":
-    sys.exit(main())
