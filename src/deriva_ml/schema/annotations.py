@@ -619,3 +619,9 @@ def generate_annotation(model: Model, schema: str) -> dict:
     }
 
 
+__all__ = [
+    "asset_annotation",
+    "build_navbar_menu",
+    "catalog_annotation",
+    "generate_annotation",
+]

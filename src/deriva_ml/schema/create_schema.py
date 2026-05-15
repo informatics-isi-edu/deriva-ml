@@ -627,3 +627,8 @@ def create_ml_catalog(
     return catalog
 
 
+__all__ = [
+    "create_ml_catalog",
+    "create_ml_schema",
+    "initialize_ml_schema",
+]
