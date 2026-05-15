@@ -1,31 +1,53 @@
-"""RID-keyed mapping + iterable over DatasetBag instances.
+"""RID-keyed lookup + iterable over DatasetBag instances.
 
 Per spec §2.8. Returned by Execution.datasets so users can write
 `bag = exe.datasets["1-XYZ"]` (primary access pattern) or iterate
 with `for bag in exe.datasets:`. Replaces the previous
 list[DatasetBag] exposure (hard cutover per R5.1).
+
+Why not :class:`collections.abc.Mapping`?
+    An earlier revision inherited from ``Mapping`` and overrode
+    ``__iter__`` to yield values instead of keys. That is a
+    silent contract violation — ``Mapping``'s default
+    ``__iter__`` yields keys, and any caller that types a
+    parameter ``Mapping[str, DatasetBag]`` then writes
+    ``for k in m: m[k]`` would break. The audit at
+    ``docs/design/deriva-ml-audit-2026-05-phase3-execution.md``
+    §4.7 flagged the violation. We chose the value-iteration
+    ergonomics (overwhelmingly what callers want), so we drop
+    the ``Mapping`` advertisement instead of restoring the
+    default. Use ``.keys()`` / ``.values()`` / ``.items()``
+    when key/(key,value) access is needed.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset_bag import DatasetBag
 
 
-class DatasetCollection(Mapping):
-    """Immutable RID-keyed mapping plus iterable of DatasetBags.
+class DatasetCollection:
+    """Immutable RID-keyed lookup plus iterable of DatasetBags.
 
     Backed by a list — the bags are already materialized when the
     collection is constructed. No lazy loading; no mutation after
     construction.
 
-    Iteration yields bags (not keys, which is the Mapping default).
-    This matches the intuition "iterate the datasets I materialized",
-    which is overwhelmingly what callers want. Use ``.keys()`` for
-    RIDs and ``.items()`` for (rid, bag) pairs.
+    Iteration yields **bags** (not keys). This matches the intuition
+    "iterate the datasets I materialized", which is overwhelmingly
+    what callers want. Use ``.keys()`` for RIDs and ``.items()``
+    for (rid, bag) pairs.
+
+    This class is **not** a :class:`collections.abc.Mapping`. It
+    deliberately does not inherit from ``Mapping`` because the
+    value-iteration ergonomics conflict with the ``Mapping``
+    default of key-iteration. Callers that need ``Mapping``-typed
+    parameters should pass ``coll.items()`` (a list of ``(rid,
+    bag)`` pairs) and reconstruct a ``dict`` if they need
+    mapping semantics.
 
     Example:
         >>> for bag in exe.datasets:
@@ -70,8 +92,8 @@ class DatasetCollection(Mapping):
             raise KeyError(f"dataset {rid!r} not in this execution's inputs. Available: {available}") from None
 
     def __iter__(self) -> "Iterator[DatasetBag]":
-        # Mapping's default would iterate keys; we override to iterate
-        # values (bags) because that's the overwhelmingly common use.
+        # Iterate bags directly — the overwhelmingly common use.
+        # ``keys()`` is available when callers need RIDs.
         return iter(self._bags)
 
     def __len__(self) -> int:

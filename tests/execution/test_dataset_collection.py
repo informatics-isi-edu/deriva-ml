@@ -8,6 +8,7 @@ import pytest
 
 class _FakeBag:
     """Stand-in for DatasetBag for isolated unit tests."""
+
     def __init__(self, rid: str):
         self.dataset_rid = rid
 
@@ -68,9 +69,33 @@ def test_collection_keys_values():
     assert list(coll.values()) == bags
 
 
+def test_collection_is_not_a_mapping():
+    """``DatasetCollection`` deliberately does not inherit from ``Mapping``.
+
+    The class iterates values, which conflicts with the ``Mapping``
+    contract (default key-iteration). Inheriting from ``Mapping``
+    would silently break any caller that types a parameter
+    ``Mapping[str, DatasetBag]`` and writes ``for k in m: m[k]``.
+
+    Pinning the negative contract here so a future "fix" that
+    re-introduces the inheritance fails this test loudly. See
+    audit §4.7 / §6.5.
+    """
+    from collections.abc import Mapping
+
+    from deriva_ml.execution.dataset_collection import DatasetCollection
+
+    coll = DatasetCollection([_FakeBag("1-AAA")])
+    assert not isinstance(coll, Mapping), (
+        "DatasetCollection must NOT be a Mapping — its __iter__ yields values, "
+        "which would violate the Mapping contract if it claimed to be one."
+    )
+
+
 def test_datasets_property_returns_collection():
     """The public datasets property returns a DatasetCollection."""
     import inspect
+
     from deriva_ml.execution.dataset_collection import DatasetCollection
     from deriva_ml.execution.execution import Execution
 
