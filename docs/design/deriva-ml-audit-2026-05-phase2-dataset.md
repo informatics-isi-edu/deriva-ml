@@ -1058,3 +1058,90 @@ checksum.
 `xfail` — it pins the new accumulation behaviour positively.
 Issue [#142](https://github.com/informatics-isi-edu/deriva-ml/issues/142)
 closed.
+
+---
+
+## Phase 2 audit — closing inventory (2026-05-15)
+
+Cross-checked every ranked action and Phase-3 candidate against the
+live source. **All ten ranked actions and all five §3.A–§3.E
+follow-up candidates have shipped or been intentionally deferred
+with documentation.** This audit is closed.
+
+### Ranked actions (1–10)
+
+| # | Action | Status | Where it landed |
+|---|---|---|---|
+| 1 | Delete `_create_dataset_bag_client`; route through `CatalogBagBuilder.build()` | ✅ shipped | PR #111 (commit `6658137a`). One historical reference remains in a comment in `bag_download.py:374`. |
+| 2 | Cache-layout cutover: write through `BagCacheIndex`, delete `validated_check.txt`, drop legacy-glob fallback | ✅ shipped | PR #111. `validated_check.txt`, the legacy `{rid}_{spec_hash}_{snapshot}/` layout, and the glob fallback are all gone. |
+| 3 | Fold `_load_feature_values_cache` into `_resolve_targets` | ✅ shipped via different decomposition | The duplicate path collapsed into `BagFeatureCache` (`dataset/bag_feature_cache.py`), a per-feature SQLite denorm cache. `_resolve_targets` (in `target_resolution.py`) is the single label-resolution path. The audit's specific proposed merge didn't happen — a cleaner factoring did. |
+| 4 | Delete `Dataset._bag_is_fully_materialized`; call `BagCache._is_fully_materialized` | ✅ shipped | Symbol is gone from `dataset.py`. `BagCache._is_fully_materialized` is the single source. |
+| 5 | Move `upload.py` out of `dataset/` | ✅ shipped | Now at `src/deriva_ml/core/upload_layout.py` (commit `33717b14`). |
+| 6 | Single `_association_map` helper | ⚠️ shipped via different decomposition; worth a deeper check | `DerivaModel.get_association_class` is the bag's single source. `Dataset._get_dataset_type_association_table` is a *different* lookup (dataset-type → table, not element-type → assoc) and legitimately stands alone. The audit's complaint about "four parallel implementations" doesn't survive; whether the remaining factoring is right is a Phase 3+ question. |
+| 7 | Pure dead-code sweep (§1.1–§1.10, §4.5, §4.7, §5.6, §5.8, §5.9, §6.3, §6.6, §6.9) | ✅ mostly shipped | Spot-checked the major ones: `migrate_legacy_cache`, `LoggerMixin`, `DerivaMLNoExecutionContext`, `AssetRID`, `Dataset.prefetch`, `_list_dataset_*_current`, the `icecream` debug fallback — all gone. §1.7 (`fetch_table_features`, `list_feature_values`) is intentionally retained as a **raising stub** with a migration message rather than fully deleted; this is a deliberate UX choice. |
+| 8 | URI substring parser → `dp.path`; lift async loop to `CatalogBagBuilder` | ✅ deferred deliberately | Recorded as [ADR-0008](../adr/0008-estimate-bag-size-bypasses-bag-pipeline.md): the `_extract_path` URI trick remains in `Dataset.estimate_bag_size` as the deliberate opt-out from `CatalogBagBuilder`. The upstream-lift alternative remains open future work. |
+| 9 | Phase 3 — share `list_dataset_children` / `list_dataset_parents` body between `Dataset` and `DatasetBag` | partially | The Phase 3 §3.A extraction (`bag_download.py`) and §3.B extraction (`restructure.py`) reduced surface but did not unify the live-vs-bag walkers. The protocol-parity work from §3.C (`test_dataset_like_signature_parity.py`) now enforces signature parity, which is most of the audit's actual ask. |
+| 10 | Phase 3 — split `dataset.py` and `dataset_bag.py` | ✅ shipped | PRs #139 (denormalize planner extracted to `model/denormalize_planner.py`), #140 (`bag_download.py`), and #141 (`restructure.py`). `dataset.py` dropped from 3 579 → 2 804 LoC; `dataset_bag.py` from 2 385 → 1 494 LoC. |
+
+### Phase 3 follow-up candidates (§3.A–§3.E)
+
+| § | Topic | Status |
+|---|---|---|
+| 3.A | `dataset.py` structural split | ✅ PR #140 — `bag_download.py` extracted (688 LoC). |
+| 3.B | `dataset_bag.py` structural split | ✅ PR #141 — `restructure.py` extracted (751 LoC). |
+| 3.C | `DatasetLike` interface harmonization | ✅ PR #144 — protocol tightened; 38-test CI parity check (`tests/test_dataset_like_signature_parity.py`). |
+| 3.D | `estimate_bag_size` opt-out vs. lift upstream | ✅ PR #145 — [ADR-0008](../adr/0008-estimate-bag-size-bypasses-bag-pipeline.md) records the opt-out decision. Docstring on `Dataset.estimate_bag_size` points at the ADR. |
+| 3.E | `BagCacheIndex` multi-anchor semantics | ✅ PR #143 (test) + deriva-py PR #254 (fix) + deriva-ml PR #146 (lockstep). Anchor accumulation now works; issue [#142](https://github.com/informatics-isi-edu/deriva-ml/issues/142) closed. |
+
+### LoC reduction achieved
+
+Combining shipped PRs across both phases:
+
+- `upload_engine.py` (883) + `upload_job.py` (137) + three test files
+  (1 207) — total **−2 227 LoC** retired via PR #111's bag-pipeline
+  consolidation.
+- `_create_dataset_bag_client` — **−231 LoC** (PR #111).
+- `_load_feature_values_cache` and friends — **−~125 LoC** (via the
+  `BagFeatureCache` decomposition).
+- Phase 3 structural splits — moved code, did not net-reduce, but
+  `dataset.py` is **−775 LoC** and `dataset_bag.py` is **−891 LoC**
+  vs. the audit baseline.
+
+### Items intentionally NOT done
+
+These appeared in the audit but were consciously deferred or
+declined:
+
+1. **Lift `estimate_bag_size`'s async-query loop into
+   `CatalogBagBuilder`** (audit §2.6, action 8 second half). ADR-0008
+   explains why: cross-repo coordination cost, different query
+   shapes, no current performance crisis. Tracked as a future-work
+   item in the ADR.
+2. **Fully delete the `fetch_table_features` / `list_feature_values`
+   raising stubs** (audit §1.7). Kept as user-guidance stubs that
+   raise with a migration message instead of returning `None`. UX
+   beats minimalism here.
+3. **Unify `_assoc_map` across `Dataset` and `DatasetBag`** (audit
+   §4.2 / action 6) — the bag uses `DerivaModel.get_association_class`,
+   `Dataset` uses a domain-specific lookup. The audit's "four
+   parallel implementations" claim didn't survive contact with the
+   current code; what's left isn't accidental duplication.
+
+### Closing posture
+
+Phase 2 audit is closed. The dataset subsystem is in the shape the
+audit recommended:
+
+- **One** cache-write path (`bag_download` → `BagCacheIndex`); **one**
+  bag-producer (`CatalogBagBuilder`); **one** upload path
+  (`bag_commit`).
+- The "god modules" (`dataset.py`, `dataset_bag.py`) are
+  substantially split into named submodules.
+- The `DatasetLike` protocol is now load-bearing, enforced in CI.
+- Two architectural decisions that didn't follow the audit's
+  default recommendation are documented as ADRs: ADR-0007
+  (annotations as a public API for `deriva-skills`) and ADR-0008
+  (`estimate_bag_size` opt-out).
+
+Any new structural concerns in `dataset/` should start with a
+fresh audit, not a continuation of this one.
