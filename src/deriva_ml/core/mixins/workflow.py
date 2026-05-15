@@ -278,21 +278,23 @@ class WorkflowMixin:
     def _find_workflow_rid_by_url(self, url_or_checksum: str) -> RID | None:
         """Internal method to find a workflow RID by URL or checksum.
 
+        Server-side filter on ``(URL == X) | (Checksum == X)``; one
+        catalog round-trip with one row in the response on a match,
+        zero on a miss. Replaces the historical full-scan + Python
+        filter that dominated ``create_execution`` on catalogs with
+        hundreds of workflows.
+
         Args:
             url_or_checksum: URL or checksum of the workflow to find.
 
         Returns:
             RID: Resource Identifier of the workflow if found, None otherwise.
         """
-        # Get a workflow table path
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
-        workflow_rid = None
-        for w in workflow_path.path.entities().fetch():
-            if w["URL"] == url_or_checksum or w["Checksum"] == url_or_checksum:
-                workflow_rid = w["RID"]
-                break
-
-        return workflow_rid
+        match = workflow_path.filter((workflow_path.URL == url_or_checksum) | (workflow_path.Checksum == url_or_checksum))
+        for row in match.attributes(workflow_path.RID).fetch():
+            return row["RID"]
+        return None
 
     def lookup_workflow_by_url(self, url_or_checksum: str) -> Workflow:
         """Look up a workflow by URL or checksum and return the full Workflow object.
