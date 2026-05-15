@@ -4,55 +4,42 @@
 Background
 ----------
 
-After the deriva.bag write-side cutover, every cached bag is keyed by
-its BDBag checksum. The reverse index ``bag_anchor_rids`` answers
-"which bags reference this RID?". The audit asked us to test the
-following user story explicitly:
+Every cached bag is keyed by its BDBag checksum. The reverse index
+``bag_anchor_rids`` (in deriva-py's
+:class:`deriva.bag.cache_index.BagCacheIndex`) answers "which bags
+reference this RID?". The audit asked us to test the following user
+story explicitly:
 
     User runs ``download_dataset_bag(rid=A)`` then
     ``download_dataset_bag(rid=B)`` on **overlapping content** (i.e.,
     the export produces the same checksum). The audit's hypothesis:
     "they will be storing one bag, not two".
 
-Findings from this test file
-----------------------------
+History
+-------
 
-The hypothesis is *half-true* against the current
-:func:`deriva.bag.cache_index.BagCacheIndex.record` implementation
-(deriva-py): there is exactly **one row** in the ``bags`` table — but
-``record()`` *replaces* the anchor list on every call (its docstring
-is explicit: "the most recent producer's claim wins"), so the first
-anchor RID is silently erased.
+When this test file was first added (PR #143), the user story was
+**half-broken**: storage was correctly shared (one ``bags`` row), but
+``BagCacheIndex.record()`` *replaced* the anchor list on every call,
+so the first anchor RID was silently erased. The desired behaviour
+was pinned with ``xfail(strict=True)`` while the fix was scoped
+(see issue #142).
 
-The practical consequence in :class:`deriva_ml.dataset.bag_cache.BagCache`:
+The fix landed upstream in deriva-py PR #254 (commit ``cc5b141``):
+``record()`` now **accumulates** anchors via ``INSERT OR IGNORE`` on
+the existing ``PRIMARY KEY (checksum, "table", rid)`` constraint.
+This file's tests now pin the **fixed** behaviour positively: both
+RIDs resolve after the A→B round trip, the bag row stays unique,
+and the deriva-ml ``BagCache`` surface honours both anchors.
 
-- After ``download(rid=A)`` then ``download(rid=B)``:
-  - ``cache_status("A")`` returns ``not_cached``.
-  - ``cache_status("B")`` returns ``cached_materialized`` (or
-    ``cached_holey`` depending on fetch.txt).
-- A second invocation of ``download(rid=A)`` cannot reuse the cached
-  bytes via the index lookup; it has to re-extract.
-
-The test class :class:`TestMultiAnchorRoundTripPinsCurrentBehaviour`
-pins this *current* behaviour so any future change to
-``BagCacheIndex.record`` semantics (e.g. switching to anchor
-accumulation) is caught explicitly. The test class
-:class:`TestMultiAnchorRoundTripDesiredBehaviour` is marked
-``xfail(strict=True)`` and documents the **desired** behaviour the
-audit's user story implies — both RID lookups should succeed after
-the round-trip. When the upstream semantics change, that test will
-flip to passing and CI will demand we flip the xfail off.
-
-This file deliberately tests :class:`BagCache` and
-:class:`BagCacheIndex` directly (no live catalog) so the round-trip
-story is testable in unit-test time and on CI without ``DERIVA_HOST``.
+The tests run without ``DERIVA_HOST`` (pure-local
+``BagCacheIndex`` / ``BagCache`` exercise).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from bdbag import bdbag_api as bdb
 from deriva.bag.cache_index import BagCacheIndex
 
@@ -88,126 +75,76 @@ def _register(cache_dir: Path, checksum: str, rid: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Current behaviour: anchor replacement on re-record
+# Reverse-index behaviour
 # ---------------------------------------------------------------------------
 
 
-class TestMultiAnchorRoundTripPinsCurrentBehaviour:
-    """Pin the current ``BagCacheIndex.record`` semantics.
+class TestMultiAnchorAccumulation:
+    """``BagCacheIndex.record`` accumulates anchors across re-records.
 
-    These tests describe what the cache layer **does today** for the
-    A→B round-trip the audit asked about. They are *not* the desired
-    behaviour — they exist so any upstream change that fixes the
-    anchor-erasure problem trips an obvious test failure and forces
-    a deliberate sweep of dependent code in deriva-ml.
+    Pins the post-#254 semantic at the deriva-py boundary: a single
+    content-addressed bag may legitimately be anchored from multiple
+    RIDs, and each ``record()`` call adds to the reverse index
+    without dropping prior entries.
     """
 
-    def test_second_record_with_same_checksum_replaces_anchors(self, tmp_path):
-        """Re-recording the same checksum with a new anchor erases the old anchor.
-
-        Surfaces the upstream contract documented in
-        :meth:`BagCacheIndex.record`: "if the anchor RIDs differ for
-        the same checksum, the most recent producer's claim wins".
-        """
+    def test_second_record_with_same_checksum_keeps_prior_anchor(self, tmp_path):
+        """``record(X, [A])`` then ``record(X, [B])`` → both A and B resolve."""
         with BagCacheIndex(tmp_path) as index:
             index.record(checksum="deadbeef", anchors=[("Dataset", "A")])
             assert index.find_bags_for_rid(table="Dataset", rid="A") == ["deadbeef"]
 
             index.record(checksum="deadbeef", anchors=[("Dataset", "B")])
-            # B wins; A is gone.
+            # Both anchors resolve; A was not erased.
+            assert index.find_bags_for_rid(table="Dataset", rid="A") == ["deadbeef"]
             assert index.find_bags_for_rid(table="Dataset", rid="B") == ["deadbeef"]
-            assert index.find_bags_for_rid(table="Dataset", rid="A") == []
 
             # And there is exactly one bag row — the storage is shared.
             assert len(index.list_bags()) == 1
 
-    def test_cache_status_after_round_trip_loses_first_anchor(self, tmp_path):
-        """``cache_status("A")`` is ``not_cached`` after ``download(B)`` lands.
+    def test_repeated_anchor_is_deduped_silently(self, tmp_path):
+        """Re-inserting an existing ``(checksum, table, rid)`` row is a no-op.
 
-        End-to-end view of the same issue through the deriva-ml-facing
-        :class:`BagCache` surface. After a second download with the
-        same checksum but a different anchor RID, the first dataset's
-        ``cache_status`` cannot find the bag.
+        Exercises the ``INSERT OR IGNORE`` guard. Without it, a re-record
+        with an overlapping anchor would raise on the
+        ``PRIMARY KEY (checksum, "table", rid)`` constraint.
         """
+        with BagCacheIndex(tmp_path) as index:
+            index.record(checksum="deadbeef", anchors=[("Dataset", "A")])
+            index.record(checksum="deadbeef", anchors=[("Dataset", "A"), ("Dataset", "B")])
+            assert index.find_bags_for_rid(table="Dataset", rid="A") == ["deadbeef"]
+            assert index.find_bags_for_rid(table="Dataset", rid="B") == ["deadbeef"]
+
+    def test_one_bag_row_per_checksum_across_many_downloads(self, tmp_path):
+        """Three downloads of the same content → one bag row, three anchors."""
         checksum = "deadbeef"
-        # First download: rid=A.
-        bag_dir_a = _register(tmp_path, checksum=checksum, rid="A")
-        _make_valid_bag(bag_dir_a)
-
-        # Sanity: A is cached at this point.
-        cache = BagCache(tmp_path)
-        try:
-            assert cache.cache_status("A")["status"] == CacheStatus.cached_materialized.value
-        finally:
-            cache.dispose()
-
-        # Second download: rid=B, same checksum (overlapping content).
-        bag_dir_b = _register(tmp_path, checksum=checksum, rid="B")
-        _make_valid_bag(bag_dir_b)
-
-        cache = BagCache(tmp_path)
-        try:
-            # B is now cached…
-            assert cache.cache_status("B")["status"] == CacheStatus.cached_materialized.value
-            # …but A's reverse-index entry was clobbered.
-            assert cache.cache_status("A")["status"] == CacheStatus.not_cached.value
-        finally:
-            cache.dispose()
-
-    def test_one_bag_row_per_checksum_even_after_multiple_downloads(self, tmp_path):
-        """Storage is content-addressed: same checksum → one ``bags`` row.
-
-        This part of the audit's hypothesis ("storing one bag, not
-        two") *is* correct — only the reverse-index claim about both
-        RIDs being findable is broken.
-        """
-        checksum = "deadbeef"
-        _register(tmp_path, checksum=checksum, rid="A")
-        _register(tmp_path, checksum=checksum, rid="B")
-        _register(tmp_path, checksum=checksum, rid="C")
+        for rid in ("A", "B", "C"):
+            _register(tmp_path, checksum=checksum, rid=rid)
 
         with BagCacheIndex(tmp_path) as index:
             rows = index.list_bags()
-        assert len(rows) == 1
-        assert rows[0]["checksum"] == checksum
+            assert len(rows) == 1
+            assert rows[0]["checksum"] == checksum
+            # All three anchors resolve.
+            for rid in ("A", "B", "C"):
+                assert index.find_bags_for_rid(table="Dataset", rid=rid) == [checksum]
 
 
 # ---------------------------------------------------------------------------
-# Desired behaviour: anchor accumulation (audit's user story)
+# deriva-ml-facing BagCache surface
 # ---------------------------------------------------------------------------
 
 
-class TestMultiAnchorRoundTripDesiredBehaviour:
-    """The behaviour the audit's user story implies.
+class TestMultiAnchorRoundTripViaBagCache:
+    """The audit's literal user story, exercised through :class:`BagCache`.
 
-    Marked ``xfail(strict=True)`` because today's
-    :meth:`BagCacheIndex.record` replaces anchors. When the upstream
-    semantics change (or when deriva-ml grows a merge wrapper that
-    accumulates anchors before delegating to ``record``), these tests
-    will start passing and ``strict=True`` will demand we drop the
-    xfail.
-
-    Tracked in https://github.com/informatics-isi-edu/deriva-ml/issues/142
-    (decision between upstream deriva-py fix and a deriva-ml merge wrapper
-    lives there).
+    ``download(rid=A)`` then ``download(rid=B)`` on overlapping content
+    leaves both RIDs cached. Storage is shared; both
+    :meth:`BagCache.cache_status` calls report ``cached_materialized``.
     """
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "BagCacheIndex.record currently replaces anchors on re-record; "
-            "see TestMultiAnchorRoundTripPinsCurrentBehaviour and "
-            "https://github.com/informatics-isi-edu/deriva-ml/issues/142. "
-            "Flip this to passing once anchor accumulation lands."
-        ),
-    )
     def test_both_rids_resolve_after_round_trip(self, tmp_path):
-        """``download(A); download(B)`` → both ``cache_status`` calls succeed.
-
-        The audit's literal user story: "they will be storing one
-        bag, not two". The current implementation stores one bag but
-        only the most-recently-downloaded RID resolves.
-        """
+        """End-to-end: A→B round trip → both cache_status calls succeed."""
         checksum = "deadbeef"
         bag_dir_a = _register(tmp_path, checksum=checksum, rid="A")
         _make_valid_bag(bag_dir_a)
