@@ -2417,6 +2417,18 @@ class Dataset:
         For asset tables, ``(RID, Length)`` pairs are fetched and deduplicated
         by RID so that ``asset_bytes`` reflects the true total.
 
+        Note:
+            This is the one place in ``dataset/`` that bypasses
+            :class:`~deriva.bag.catalog_builder.CatalogBagBuilder` for
+            execution (it still shares the walker via
+            :meth:`~DatasetBagBuilder.aggregate_queries`). The bypass
+            is **deliberate** — see
+            :doc:`docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline`
+            for the design decision, the rejected alternatives
+            (lifting parallelism upstream vs. leaving the divergence
+            undocumented), and practical contributor guidance. Do
+            not "fix" the duplication without reading the ADR first.
+
         Note: this fetches complete RID lists rather than using server-side
         aggregates, which gives exact union counts but uses O(N) memory where
         N is the total rows across all paths.  This is suitable for datasets
