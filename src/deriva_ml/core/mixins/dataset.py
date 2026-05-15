@@ -68,11 +68,10 @@ class DatasetMixin:
     s3_bucket: str | None
     use_minid: bool
     pathBuilder: Callable[[], Any]
-
-    @property
-    def _dataset_table(self) -> Table:
-        """Get the Dataset table. Must be provided by host class."""
-        raise NotImplementedError
+    # Provided by the host class (DerivaML). Declared here so type
+    # checkers see the contract; the real implementation is a
+    # @property in the host that returns the catalog's Dataset table.
+    _dataset_table: Table
 
     def find_datasets(self, deleted: bool = False, sort: SortSpec = None) -> Iterable["Dataset"]:
         """List all datasets in the catalog.
