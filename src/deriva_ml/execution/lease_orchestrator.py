@@ -1,8 +1,13 @@
-"""Orchestrator for the two-phase RID lease protocol.
+"""Crash-recovery entry point for the two-phase RID lease protocol.
 
-Composes ExecutionStateStore's lease helpers with rid_lease's POST
-machinery. One entry point: acquire_leases_for_execution. Called by
-handle.rid property and by the upload-engine drain.
+Exposes :func:`reconcile_pending_leases` — workspace-open and
+``resume_execution`` call sites — for the case where a prior
+process crashed between writing ``leasing`` rows to SQLite and
+finalizing them after the ERMrest_RID_Lease POST. With the
+production-dead acquire path retired (audit §1.6), the function
+exists for crash-recovery completeness; in practice the
+``leasing`` table never grows because no production writer
+populates it.
 """
 
 from __future__ import annotations
@@ -10,13 +15,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from deriva_ml.execution.rid_lease import (
-    PENDING_ROWS_LEASE_CHUNK,
-    generate_lease_token,
-    post_lease_batch,
-)
-from deriva_ml.execution.state_store import PendingRowStatus
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.execution.rid_lease import PENDING_ROWS_LEASE_CHUNK
 
 if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog
@@ -24,127 +24,6 @@ if TYPE_CHECKING:
     from deriva_ml.execution.state_store import ExecutionStateStore
 
 logger = get_logger(__name__)
-
-
-def acquire_leases_for_execution(
-    *,
-    store: "ExecutionStateStore",
-    catalog: "ErmrestCatalog",
-    execution_rid: str,
-    pending_ids: list[int],
-) -> None:
-    """Transition the given pending rows from 'staged' to 'leased',
-    assigning server-issued RIDs.
-
-    Skips rows already in status='leased' (idempotent). Rows in
-    other intermediate states (leasing, uploading, uploaded, failed)
-    are also skipped — the orchestrator only promotes staged→leased.
-
-    Two-phase protocol:
-      1. Generate tokens, mark rows 'leasing' in SQLite (committed
-         before the POST).
-      2. POST batch to ERMrest_RID_Lease.
-      3. On success: finalize each row with its assigned RID
-         (status → 'leased').
-      4. On POST failure: revert all rows we marked in step 1
-         (status → 'staged'; token cleared).
-
-    Crash recovery is handled in Task F4 (reconcile at startup).
-
-    Args:
-        store: The ExecutionStateStore holding SQLite state.
-        catalog: Live ErmrestCatalog for POSTing to ERMrest_RID_Lease.
-        execution_rid: For logging + scoping; all pending_ids must
-            belong to this execution (not enforced here; caller's
-            concern).
-        pending_ids: pending_rows.id values to lease.
-
-    Raises:
-        Exception: Whatever the catalog POST raises. Before
-            propagating, the orchestrator reverts any rows it had
-            marked 'leasing' back to 'staged'.
-
-    Example:
-        >>> acquire_leases_for_execution(
-        ...     store=store, catalog=ml.catalog,
-        ...     execution_rid="EXE-A",
-        ...     pending_ids=[1, 2, 3],
-        ... )
-    """
-    if not pending_ids:
-        return
-
-    # Filter to rows actually in 'staged'. Build a (pending_id, token)
-    # list; the order maps to the POST body order, which maps to the
-    # response order in _MockLeaseCatalog and in real ERMrest.
-    rows_to_lease: list[tuple[int, str]] = []
-    all_rows = {r["id"]: r for r in store.list_pending_rows(execution_rid=execution_rid)}
-    for pid in pending_ids:
-        row = all_rows.get(pid)
-        if row is None:
-            logger.warning(
-                "acquire_leases: pending_id %d not in execution %s; skipping",
-                pid,
-                execution_rid,
-            )
-            continue
-        if row["status"] != str(PendingRowStatus.staged):
-            # Already leased or past; skip silently.
-            continue
-        rows_to_lease.append((pid, generate_lease_token()))
-
-    if not rows_to_lease:
-        return
-
-    # Phase 1: write 'leasing' + token to SQLite, committed.
-    # This MUST happen before the POST so that if we crash, the token
-    # is in SQLite and we can look it up on the server at reconcile.
-    # Single transaction covers the entire batch — see
-    # ExecutionStateStore.mark_pending_leasing_batch for the perf
-    # rationale (one WAL fsync vs. N).
-    store.mark_pending_leasing_batch(rows_to_lease)
-
-    # Phase 2: POST the batch. On failure, revert all.
-    tokens = [t for _, t in rows_to_lease]
-    try:
-        assigned = post_lease_batch(catalog=catalog, tokens=tokens)
-    except Exception:
-        logger.warning(
-            "acquire_leases: POST failed for execution %s; reverting %d rows to staged",
-            execution_rid,
-            len(rows_to_lease),
-        )
-        # Revert every leasing row in one transaction. revert is
-        # rare (only fires when ERMrest's lease POST fails) so the
-        # per-row loop here is bounded by N anyway, but a single
-        # transaction matches the phase-1 commit semantics.
-        for _, token in rows_to_lease:
-            store.revert_pending_leasing(lease_token=token)
-        raise
-
-    # Phase 3: finalize each successfully-leased row in one
-    # batched transaction; revert each token the server didn't echo.
-    finalize_items: list[tuple[str, str]] = []
-    for _, token in rows_to_lease:
-        assigned_rid = assigned.get(token)
-        if assigned_rid is None:
-            # Server response missing this token. Revert just this
-            # row; leave the others (they did succeed).
-            logger.warning(
-                "acquire_leases: token %s missing from server response for execution %s; reverting that row",
-                token,
-                execution_rid,
-            )
-            store.revert_pending_leasing(lease_token=token)
-        else:
-            finalize_items.append((token, assigned_rid))
-    store.finalize_pending_leases_batch(finalize_items)
-
-    logger.debug(
-        "acquire_leases: %d rows leased for execution %s",
-        len(rows_to_lease),
-        execution_rid,
-    )
 
 
 def reconcile_pending_leases(
