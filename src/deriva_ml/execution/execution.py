@@ -1098,10 +1098,16 @@ class Execution:
     def execution_stop(self) -> None:
         """Marks the execution as stopped (algorithm finished successfully).
 
-        Records the stop time in SQLite and updates the execution's
-        status to 'Stopped'. This should be called after all execution
-        work is finished; upload of outputs is a separate phase that
-        moves status from Stopped → Pending_Upload → Uploaded.
+        Computes the wall-clock duration against ``start_time`` and
+        transitions Running → Stopped through the state machine,
+        writing ``stop_time`` and ``duration`` atomically with the
+        status change. Online callers see a single catalog PUT that
+        carries both Status and Duration (the historical second
+        catalog write is gone — audit §4.5).
+
+        This should be called after all execution work is finished;
+        upload of outputs is a separate phase that moves status from
+        Stopped → Pending_Upload → Uploaded.
 
         Example:
             >>> try:  # doctest: +SKIP
@@ -1114,13 +1120,10 @@ class Execution:
 
         now = datetime.now(timezone.utc)
 
-        # Persist stop_time to SQLite (authoritative source for the
-        # `stop_time` read-through property). Skip for dry-run.
-        if not self._dry_run:
-            store = self._ml_object.workspace.execution_state_store()
-            store.update_execution(self.execution_rid, stop_time=now)
-
         # Compute duration against the start_time read-through property.
+        # Falls back to "0H 0min 0.0sec" if start_time is missing
+        # (shouldn't happen in practice — Running → Stopped requires
+        # __enter__/execution_start to have set start_time).
         start = self.start_time
         if start is not None:
             # Coerce any naive datetime from SQLite to UTC so arithmetic
@@ -1134,11 +1137,24 @@ class Execution:
         else:
             duration_str = "0H 0min 0.0sec"
 
-        self.update_status(ExecutionStatus.Stopped)
-        if not self._dry_run:
-            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-                [{"RID": self.execution_rid, "Duration": duration_str}]
-            )
+        if self._dry_run:
+            return
+
+        # Single atomic transition: SQLite write (status + stop_time +
+        # duration) followed by online catalog PUT (Status + Duration
+        # via _catalog_body_for_execution). Replaces the historical
+        # two-write design that left Duration vulnerable to a partial
+        # failure between writes (audit §4.5).
+        current = self.status
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=ExecutionStatus.Stopped,
+            mode=self._ml_object._mode,
+            extra_fields={"stop_time": now, "duration": duration_str},
+        )
 
     @validate_call(config=VALIDATION_CONFIG)
     def download_asset(
@@ -2109,11 +2125,12 @@ class Execution:
     def __enter__(self) -> "Execution":
         """Begin the execution: status created → running.
 
-        Routes through ``state_machine.transition()`` so the SQLite
-        write, online-mode catalog sync, and allowed-transition
-        validation all run in a single atomic step. Sets
-        ``start_time`` in the same transaction (read back via the
-        ``start_time`` property).
+        Context-manager wrapper around :meth:`execution_start`. The
+        actual transition (Created → Running, with ``start_time``
+        atomically set in the same SQLite write and an online-mode
+        catalog sync) lives in ``execution_start``; this method just
+        delegates so the imperative and context-manager paths share
+        one implementation.
 
         Dry-run executions skip the transition entirely — there is no
         SQLite registry row for a dry-run (sentinel RID), so there is
@@ -2132,24 +2149,7 @@ class Execution:
             ...     e.status  # doctest: +SKIP
             <ExecutionStatus.Running>
         """
-        from datetime import datetime, timezone
-
-        if self._dry_run:
-            # No SQLite row for dry-run executions, so start_time read
-            # through the property returns None. That's acceptable —
-            # dry-runs are transient and not observed via start_time.
-            return self
-
-        current = self.status  # read-through from SQLite
-        transition(
-            store=self._ml_object.workspace.execution_state_store(),
-            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
-            execution_rid=self.execution_rid,
-            current=current,
-            target=ExecutionStatus.Running,
-            mode=self._ml_object._mode,
-            extra_fields={"start_time": datetime.now(timezone.utc)},
-        )
+        self.execution_start()
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> bool:

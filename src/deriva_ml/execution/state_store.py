@@ -115,6 +115,9 @@ class ExecutionStateStore:
         # executions — see spec §2.5.1 for column purposes.
         # status values: created|running|stopped|failed|pending_upload|uploaded|aborted
         # mode values: online|offline
+        # duration: pre-formatted "Hh Mmin Ssec" string set during the
+        #     Running → Stopped transition; mirrored to the catalog's
+        #     Execution.Duration column via the state machine.
         self.executions = Table(
             EXECUTIONS_TABLE,
             self.metadata,
@@ -127,6 +130,7 @@ class ExecutionStateStore:
             Column("working_dir_rel", String, nullable=False),
             Column("start_time", DateTime(timezone=True), nullable=True),
             Column("stop_time", DateTime(timezone=True), nullable=True),
+            Column("duration", String, nullable=True),
             Column("last_activity", DateTime(timezone=True), nullable=False),
             Column("error", Text, nullable=True),
             Column("sync_pending", Boolean, nullable=False, default=False),

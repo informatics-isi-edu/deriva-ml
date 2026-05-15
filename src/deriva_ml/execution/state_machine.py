@@ -335,16 +335,19 @@ def _catalog_body_for_execution(
     # Catalog Execution schema has: Workflow, Description, Duration,
     # Status, Status_Detail (see src/deriva_ml/schema/create_schema.py).
     # Start/stop times are NOT catalog columns — they live in SQLite
-    # only. Duration is computed elsewhere (in execution_stop) and
-    # written directly; don't echo it here.
-    return [
-        {
-            "RID": row["rid"],
-            "Status": row["status"],
-            # Status_Detail: prefer error if present, else description.
-            "Status_Detail": row["error"] or row["description"],
-        }
-    ]
+    # only. Duration IS a catalog column; we project it when SQLite
+    # has it set (execution_stop writes it during the Running →
+    # Stopped transition; pre-Stopped rows have duration=NULL and
+    # leave the catalog column unchanged via the body's omission).
+    body: dict = {
+        "RID": row["rid"],
+        "Status": row["status"],
+        # Status_Detail: prefer error if present, else description.
+        "Status_Detail": row["error"] or row["description"],
+    }
+    if row.get("duration") is not None:
+        body["Duration"] = row["duration"]
+    return [body]
 
 
 def flush_pending_sync(
