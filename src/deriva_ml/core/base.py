@@ -1026,11 +1026,11 @@ class DerivaML(
             CatalogProvenance if available, None otherwise.
 
         Example:
-            >>> ml = DerivaML('localhost', '45')
-            >>> prov = ml.catalog_provenance
-            >>> if prov:
+            >>> ml = DerivaML('localhost', '45')  # doctest: +SKIP
+            >>> prov = ml.catalog_provenance  # doctest: +SKIP
+            >>> if prov:  # doctest: +SKIP
             ...     print(f"Created: {prov.created_at} by {prov.created_by}")
-            ...     print(f"Method: {prov.creation_method.value}")
+            ...     print(f"Method: {prov.creation_method}")
             ...     if prov.is_clone:
             ...         print(f"Cloned from: {prov.clone_details.source_hostname}")
         """

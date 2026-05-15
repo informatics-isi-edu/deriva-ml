@@ -54,7 +54,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deriva.bag.anchors import Anchor, RIDAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
@@ -75,6 +75,12 @@ from deriva_ml.catalog.provenance import (
 )
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
+
+if TYPE_CHECKING:
+    # Only used in forward-referenced annotations on the helper
+    # functions below. Kept under TYPE_CHECKING so ``deriva.core``'s
+    # import cost only lands when an annotation actually needs it.
+    from deriva.core import ErmrestCatalog
 
 logger = get_logger(__name__)
 
@@ -167,6 +173,10 @@ def _collect_nested_dataset_rids(seed_rids: list[str], source_catalog: "ErmrestC
     new children are found. For the typical 1-3 levels of nesting in
     deriva-ml datasets this is at most a handful of round trips.
     """
+    # Lazy import of the datapath exception type — keeps the
+    # module importable without datapath being fully loaded.
+    from deriva.core.datapath import DataPathException
+
     pb = source_catalog.getPathBuilder()
     dd = pb.schemas["deriva-ml"].tables["Dataset_Dataset"]
 
@@ -175,7 +185,11 @@ def _collect_nested_dataset_rids(seed_rids: list[str], source_catalog: "ErmrestC
     while frontier:
         try:
             rows = list(dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch())
-        except Exception as e:
+        except (DataPathException, KeyError, ConnectionError) as e:
+            # KeyError catches missing schema/table (catalog doesn't
+            # have nested-dataset infrastructure); ConnectionError
+            # catches transient transport failures. Anything else
+            # is unexpected and should propagate.
             logger.warning(
                 "Could not expand nested datasets from %s: %s; proceeding with the seed RID set only",
                 sorted(frontier),

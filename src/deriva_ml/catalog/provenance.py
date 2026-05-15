@@ -30,7 +30,6 @@ from datetime import datetime, timezone
 from enum import Enum
 
 from deriva.core import ErmrestCatalog
-from deriva.core.utils.core_utils import urlquote
 from pydantic import BaseModel, Field
 
 from deriva_ml.core.logging_config import get_logger
@@ -284,12 +283,19 @@ def _write_provenance_annotation(
     catalog: ErmrestCatalog,
     provenance: CatalogProvenance,
 ) -> None:
-    """Write the annotation to the catalog. Best-effort."""
+    """Write the annotation to the catalog. Best-effort.
+
+    Uses the deriva-py model API
+    (``model.annotations[URL] = ...`` + ``model.apply()``) rather
+    than a raw ``catalog.put`` so the in-memory model stays in
+    sync with the catalog state — subsequent ``getCatalogModel()``
+    calls in the same process see the new value without an extra
+    round-trip.
+    """
     try:
-        catalog.put(
-            f"/annotation/{urlquote(CATALOG_PROVENANCE_URL)}",
-            json=provenance.model_dump(mode="json"),
-        )
+        model = catalog.getCatalogModel()
+        model.annotations[CATALOG_PROVENANCE_URL] = provenance.model_dump(mode="json")
+        model.apply()
         logger.info("Set catalog provenance annotation")
     except Exception as e:
         logger.warning("Failed to set catalog provenance annotation: %s", e)

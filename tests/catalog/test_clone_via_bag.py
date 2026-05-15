@@ -51,9 +51,7 @@ def test_clone_via_bag_root_rid_maps_to_rid_anchor(tmp_path: Path) -> None:
     fake_load_report = MagicMock()
 
     with (
-        patch(
-            "deriva_ml.catalog.clone_via_bag.DerivaServer"
-        ) as MockServer,
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
         patch(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
