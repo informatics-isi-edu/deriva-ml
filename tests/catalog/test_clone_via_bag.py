@@ -11,11 +11,9 @@ network connection.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from deriva.bag.anchors import RIDAnchor, TableAnchor
 from deriva.bag.traversal import (
     AssetMode,
@@ -23,6 +21,7 @@ from deriva.bag.traversal import (
     FKTraversalPolicy,
     VocabExport,
 )
+
 from deriva_ml.catalog.clone_via_bag import (
     CloneViaBagResult,
     clone_via_bag,
@@ -52,9 +51,7 @@ def test_clone_via_bag_root_rid_maps_to_rid_anchor(tmp_path: Path) -> None:
     fake_load_report = MagicMock()
 
     with (
-        patch(
-            "deriva_ml.catalog.clone_via_bag.DerivaServer"
-        ) as MockServer,
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
         patch(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
@@ -299,6 +296,117 @@ def test_clone_via_bag_merges_defaults_into_partial_policy(
         assert merged.dangling_fk_strategy == DanglingFKStrategy.DELETE
         assert ("deriva-ml", "Execution") in merged.terminal_tables
         assert ("deriva-ml", "Workflow") in merged.terminal_tables
+
+
+def test_clone_via_bag_preserves_explicit_fail_strategy(
+    tmp_path: Path,
+) -> None:
+    """Explicit ``DanglingFKStrategy.FAIL`` survives the merge.
+
+    Regression test for the audit §6.2 finding: the old merge
+    used value comparison (``policy.dangling_fk_strategy ==
+    DanglingFKStrategy.FAIL``) which silently overrode an
+    explicit FAIL because FAIL is also the library default. The
+    fix uses ``model_fields_set`` to distinguish "left at
+    default" from "explicitly chose FAIL."
+
+    A DBA running a strict-mode clone (any orphan should abort)
+    must be able to pass ``dangling_fk_strategy=FAIL`` and have
+    it stick.
+    """
+    fake_bag_path = tmp_path / "fake-bag"
+    fake_bag_path.mkdir()
+
+    user_policy = FKTraversalPolicy(
+        dangling_fk_strategy=DanglingFKStrategy.FAIL,
+    )
+
+    with (
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.get_credential",
+            return_value={},
+        ),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
+        ) as MockBuilder,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
+        ) as MockLoader,
+    ):
+        MockBuilder.return_value.build.return_value = fake_bag_path
+        loader = MagicMock()
+        loader.run.return_value = MagicMock()
+        MockLoader.return_value.__enter__.return_value = loader
+
+        clone_via_bag(
+            source_hostname="src.example.org",
+            source_catalog_id="1",
+            dest_hostname="dst.example.org",
+            dest_catalog_id="42",
+            root_rid="ABC",
+            policy=user_policy,
+            output_dir=tmp_path,
+        )
+
+        _, b_kwargs = MockBuilder.call_args
+        merged = b_kwargs["policy"]
+
+        # Explicit FAIL must NOT be overridden by the clone default.
+        assert merged.dangling_fk_strategy == DanglingFKStrategy.FAIL
+
+
+def test_clone_via_bag_preserves_explicit_referenced_only_vocab(
+    tmp_path: Path,
+) -> None:
+    """Explicit ``VocabExport.REFERENCED_ONLY`` survives the merge.
+
+    Regression test for the audit §6.2 finding: same trap as
+    explicit FAIL, applied to ``vocab_export``. ``REFERENCED_ONLY``
+    is the library default; the old value-comparison merge
+    silently overrode it with ``FULL``. The ``model_fields_set``
+    form respects the explicit choice.
+    """
+    fake_bag_path = tmp_path / "fake-bag"
+    fake_bag_path.mkdir()
+
+    user_policy = FKTraversalPolicy(
+        vocab_export=VocabExport.REFERENCED_ONLY,
+    )
+
+    with (
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.get_credential",
+            return_value={},
+        ),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
+        ) as MockBuilder,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
+        ) as MockLoader,
+    ):
+        MockBuilder.return_value.build.return_value = fake_bag_path
+        loader = MagicMock()
+        loader.run.return_value = MagicMock()
+        MockLoader.return_value.__enter__.return_value = loader
+
+        clone_via_bag(
+            source_hostname="src.example.org",
+            source_catalog_id="1",
+            dest_hostname="dst.example.org",
+            dest_catalog_id="42",
+            root_rid="ABC",
+            policy=user_policy,
+            output_dir=tmp_path,
+        )
+
+        _, b_kwargs = MockBuilder.call_args
+        merged = b_kwargs["policy"]
+
+        # Explicit REFERENCED_ONLY survives.
+        assert merged.vocab_export == VocabExport.REFERENCED_ONLY
 
 
 def test_clone_via_bag_uses_get_credential_when_creds_absent(

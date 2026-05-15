@@ -53,13 +53,12 @@ Legacy parameter            Bag-path mapping   Notes
 from __future__ import annotations
 
 import zipfile
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deriva.bag.anchors import Anchor, RIDAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
-from deriva.bag.catalog_loader import BagCatalogLoader, LoadReport
+from deriva.bag.catalog_loader import BagCatalogLoader
 from deriva.bag.traversal import (
     AssetMode,
     DanglingFKStrategy,
@@ -67,7 +66,21 @@ from deriva.bag.traversal import (
     VocabExport,
 )
 from deriva.core import DerivaServer, get_credential
+from pydantic import BaseModel
+
+from deriva_ml.catalog.provenance import (
+    CatalogCreationMethod,
+    CloneDetails,
+    set_catalog_provenance,
+)
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
+
+if TYPE_CHECKING:
+    # Only used in forward-referenced annotations on the helper
+    # functions below. Kept under TYPE_CHECKING so ``deriva.core``'s
+    # import cost only lands when an annotation actually needs it.
+    from deriva.core import ErmrestCatalog
 
 logger = get_logger(__name__)
 
@@ -160,6 +173,10 @@ def _collect_nested_dataset_rids(seed_rids: list[str], source_catalog: "ErmrestC
     new children are found. For the typical 1-3 levels of nesting in
     deriva-ml datasets this is at most a handful of round trips.
     """
+    # Lazy import of the datapath exception type — keeps the
+    # module importable without datapath being fully loaded.
+    from deriva.core.datapath import DataPathException
+
     pb = source_catalog.getPathBuilder()
     dd = pb.schemas["deriva-ml"].tables["Dataset_Dataset"]
 
@@ -168,7 +185,11 @@ def _collect_nested_dataset_rids(seed_rids: list[str], source_catalog: "ErmrestC
     while frontier:
         try:
             rows = list(dd.filter(dd.Dataset.in_(sorted(frontier))).entities().fetch())
-        except Exception as e:
+        except (DataPathException, KeyError, ConnectionError) as e:
+            # KeyError catches missing schema/table (catalog doesn't
+            # have nested-dataset infrastructure); ConnectionError
+            # catches transient transport failures. Anything else
+            # is unexpected and should propagate.
             logger.warning(
                 "Could not expand nested datasets from %s: %s; proceeding with the seed RID set only",
                 sorted(frontier),
@@ -214,8 +235,7 @@ def _materialize_bag_assets(bag_path: Path) -> None:
     bdb.materialize(str(bag_path))
 
 
-@dataclass
-class CloneViaBagResult:
+class CloneViaBagResult(BaseModel):
     """Outcome of a :func:`clone_via_bag` invocation.
 
     Attributes:
@@ -227,13 +247,17 @@ class CloneViaBagResult:
             Left on disk after the clone so the artifact is
             inspectable / re-usable.
         load_report: Per-table load statistics from
-            :class:`BagCatalogLoader`.
+            :class:`BagCatalogLoader` (a :class:`LoadReport`).
+            Typed ``Any`` here because it's an opaque carrier from
+            ``deriva.bag``; Pydantic doesn't need to validate it.
     """
+
+    model_config = VALIDATION_CONFIG
 
     source_catalog_id: str
     dest_catalog_id: str
     bag_path: Path
-    load_report: LoadReport
+    load_report: Any
 
 
 def clone_via_bag(
@@ -359,19 +383,27 @@ def clone_via_bag(
         # The merge rule: clone-required fields (vocab_export=FULL,
         # terminal_tables ⊇ {Execution, Workflow},
         # dangling_fk_strategy=DELETE) are applied when the caller
-        # left them at their library defaults. A caller who
+        # left them at the library defaults. A caller who
         # explicitly set vocab_export=REFERENCED_ONLY or supplied
         # their own terminal_tables or chose a different
         # dangling-FK strategy keeps their choice — the merge only
         # fills in defaults that weren't customized.
+        #
+        # We use ``model_fields_set`` (the set of field names the
+        # caller actually passed at construction) instead of
+        # comparing field values against library defaults. The
+        # value-comparison form silently overrides a DBA who
+        # explicitly chose ``DanglingFKStrategy.FAIL`` because
+        # FAIL is also the library default — there is no way to
+        # tell "I left it default" from "I deliberately chose FAIL"
+        # by inspecting the value alone.
+        explicit = policy.model_fields_set
         merge_kwargs: dict[str, Any] = {}
-        if policy.vocab_export == VocabExport.REFERENCED_ONLY:
+        if "vocab_export" not in explicit:
             merge_kwargs["vocab_export"] = VocabExport.FULL
-        if not policy.terminal_tables:
+        if "terminal_tables" not in explicit:
             merge_kwargs["terminal_tables"] = default_terminal_tables
-        if policy.dangling_fk_strategy == DanglingFKStrategy.FAIL:
-            # The library default. Caller almost certainly didn't
-            # think about it; replace with the clone default.
+        if "dangling_fk_strategy" not in explicit:
             merge_kwargs["dangling_fk_strategy"] = DanglingFKStrategy.DELETE
         if merge_kwargs:
             policy = policy.model_copy(update=merge_kwargs)
@@ -446,12 +478,82 @@ def clone_via_bag(
     ) as loader:
         report = loader.run()
 
+    # Record the clone in the destination's provenance annotation.
+    # Phase 1 of the split-phase model: metadata is copied; assets
+    # carry source-server URLs (if policy.asset_mode is REFERENCES /
+    # ROWS_ONLY) and are later moved by localize_assets which
+    # updates the same annotation with the phase-2 stats.
+    _record_clone_provenance(
+        dest_catalog=dest_catalog,
+        source_hostname=source_hostname,
+        source_catalog_id=source_catalog_id,
+        policy=policy,
+        report=report,
+    )
+
     return CloneViaBagResult(
         source_catalog_id=source_catalog_id,
         dest_catalog_id=dest_catalog_id,
         bag_path=bag_path,
         load_report=report,
     )
+
+
+def _record_clone_provenance(
+    *,
+    dest_catalog: "ErmrestCatalog",
+    source_hostname: str,
+    source_catalog_id: str,
+    policy: FKTraversalPolicy,
+    report: Any,
+) -> None:
+    """Write a phase-1 clone provenance annotation on the destination.
+
+    Best-effort: failures are logged but do not block the clone
+    result. The annotation is later updated by
+    :func:`~deriva_ml.catalog.localize.localize_assets` when phase
+    two completes.
+
+    Args:
+        dest_catalog: Live ERMrest catalog handle for the destination.
+        source_hostname: The hostname clone-via-bag pulled from.
+        source_catalog_id: The catalog ID on that host.
+        policy: The merged FKTraversalPolicy that drove the clone.
+        report: deriva.bag :class:`LoadReport` from the load step.
+            Typed ``Any`` to mirror :class:`CloneViaBagResult` — the
+            field set used here is documented inline.
+    """
+    try:
+        # Aggregate orphan stats per dangling_fk_strategy outcome.
+        # LoadReport.table_stats[*].rows_skipped_orphan counts
+        # rows deleted under DELETE; rows_nullified_orphan counts
+        # rows whose FK was set NULL under NULLIFY.
+        orphan_removed = 0
+        orphan_nullified = 0
+        for stats in report.table_stats.values():
+            orphan_removed += getattr(stats, "rows_skipped_orphan", 0)
+            orphan_nullified += getattr(stats, "rows_nullified_orphan", 0)
+
+        clone_details = CloneDetails(
+            source_hostname=source_hostname,
+            source_catalog_id=source_catalog_id,
+            orphan_strategy=str(policy.dangling_fk_strategy).split(".")[-1].lower(),
+            asset_mode=str(policy.asset_mode).split(".")[-1].lower(),
+            rows_copied=report.total_rows_inserted,
+            orphan_rows_removed=orphan_removed,
+            orphan_rows_nullified=orphan_nullified,
+        )
+        set_catalog_provenance(
+            dest_catalog,
+            creation_method=CatalogCreationMethod.CLONE,
+            clone_details=clone_details,
+        )
+    except Exception as e:
+        # set_catalog_provenance is already best-effort internally,
+        # but the LoadReport access above can also fail on a mock or
+        # an unexpected report shape. Don't let provenance write
+        # failures break a successful clone.
+        logger.warning("clone_via_bag: failed to write provenance: %s", e)
 
 
 __all__ = ["CloneViaBagResult", "clone_via_bag"]

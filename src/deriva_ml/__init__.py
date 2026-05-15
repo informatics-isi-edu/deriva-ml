@@ -83,23 +83,23 @@ def __getattr__(name: str) -> type:
 
         return validate_ml_schema
     elif name == "CatalogProvenance":
-        from deriva_ml.catalog.clone import CatalogProvenance
+        from deriva_ml.catalog.provenance import CatalogProvenance
 
         return CatalogProvenance
     elif name == "CatalogCreationMethod":
-        from deriva_ml.catalog.clone import CatalogCreationMethod
+        from deriva_ml.catalog.provenance import CatalogCreationMethod
 
         return CatalogCreationMethod
     elif name == "CloneDetails":
-        from deriva_ml.catalog.clone import CloneDetails
+        from deriva_ml.catalog.provenance import CloneDetails
 
         return CloneDetails
     elif name == "get_catalog_provenance":
-        from deriva_ml.catalog.clone import get_catalog_provenance
+        from deriva_ml.catalog.provenance import get_catalog_provenance
 
         return get_catalog_provenance
     elif name == "set_catalog_provenance":
-        from deriva_ml.catalog.clone import set_catalog_provenance
+        from deriva_ml.catalog.provenance import set_catalog_provenance
 
         return set_catalog_provenance
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
