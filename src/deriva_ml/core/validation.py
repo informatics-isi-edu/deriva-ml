@@ -34,7 +34,7 @@ Example (RID validation):
 from __future__ import annotations
 
 
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from deriva_ml.core.logging_config import get_logger
 
@@ -71,7 +71,6 @@ __all__ = [
     "STRICT_VALIDATION_CONFIG",
     "ValidationResult",
     "validate_rids",
-    "validate_vocabulary_terms",
     "validate_execution_config",
 ]
 
@@ -80,20 +79,22 @@ __all__ = [
 # RID Validation
 # =============================================================================
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
 
 
-@dataclass
-class ValidationResult:
+class ValidationResult(BaseModel):
     """Result of configuration validation.
 
-    When printed, displays a formatted summary of validation results including
-    any errors and warnings. This makes it easy to inspect validation results
-    in interactive sessions.
+    Pydantic model — provides ``.model_dump()`` for JSON output and
+    ``.model_dump_json()`` for one-line serialization, aligning with
+    every other user-facing return type in deriva-ml (CLAUDE.md
+    "Class idiom choice" guidance).
+
+    When printed, displays a formatted summary of validation results
+    including any errors and warnings.
 
     Attributes:
         is_valid: True if all validations passed, False otherwise.
@@ -102,23 +103,25 @@ class ValidationResult:
         validated_rids: Dictionary mapping RID to its resolved table info.
 
     Example:
-        >>> result = validate_rids(ml, dataset_rids=["1-ABC"])
-        >>> print(result)
-        ✓ Validation passed
+        >>> result = validate_rids(ml, dataset_rids=["1-ABC"])  # doctest: +SKIP
+        >>> print(result)  # doctest: +SKIP
+        OK Validation passed
           Validated 1 RIDs
 
-        >>> result = validate_rids(ml, dataset_rids=["INVALID"])
-        >>> print(result)
-        ✗ Validation failed with 1 error(s)
+        >>> result = validate_rids(ml, dataset_rids=["INVALID"])  # doctest: +SKIP
+        >>> print(result)  # doctest: +SKIP
+        FAIL Validation failed with 1 error(s)
 
         Errors:
-          • Dataset RID 'INVALID' does not exist in catalog
+          - Dataset RID 'INVALID' does not exist in catalog
     """
 
+    model_config = VALIDATION_CONFIG
+
     is_valid: bool = True
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    validated_rids: dict[str, dict[str, Any]] = field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    validated_rids: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     def add_error(self, message: str) -> None:
         """Add an error message and mark result as invalid."""
@@ -143,23 +146,23 @@ class ValidationResult:
         lines = []
 
         if self.is_valid:
-            lines.append("✓ Validation passed")
+            lines.append("OK Validation passed")
             if self.validated_rids:
                 lines.append(f"  Validated {len(self.validated_rids)} RID(s)")
         else:
-            lines.append(f"✗ Validation failed with {len(self.errors)} error(s)")
+            lines.append(f"FAIL Validation failed with {len(self.errors)} error(s)")
 
         if self.errors:
             lines.append("")
             lines.append("Errors:")
             for error in self.errors:
-                lines.append(f"  • {error}")
+                lines.append(f"  - {error}")
 
         if self.warnings:
             lines.append("")
             lines.append("Warnings:")
             for warning in self.warnings:
-                lines.append(f"  ⚠ {warning}")
+                lines.append(f"  WARN {warning}")
 
         return "\n".join(lines)
 
@@ -204,8 +207,8 @@ def validate_rids(
         ...     dataset_versions={"1-ABC": "0.4.0"},
         ...     asset_rids=["3-GHI"],
         ... )
-        >>> print(result)
-        ✓ Validation passed
+        >>> print(result)  # doctest: +SKIP
+        OK Validation passed
           Validated 3 RID(s)
     """
     from deriva_ml.core.exceptions import DerivaMLException
@@ -343,50 +346,6 @@ def validate_rids(
                         result.add_warning(f"Dataset '{rid}' has no description")
                 except Exception as e:
                     logger.debug(f"Could not check description for dataset {rid}: {e}")
-
-    return result
-
-
-def validate_vocabulary_terms(
-    ml: "DerivaML",
-    vocabulary_name: str,
-    terms: list[str],
-) -> ValidationResult:
-    """Validate that terms exist in a vocabulary.
-
-    Args:
-        ml: Connected DerivaML instance.
-        vocabulary_name: Name of the vocabulary table.
-        terms: List of term names to validate.
-
-    Returns:
-        ValidationResult with validation status and details.
-
-    Example:
-        >>> result = validate_vocabulary_terms(ml, "Dataset_Type", ["Training", "Testing"])
-        >>> if not result.is_valid:
-        ...     for error in result.errors:
-        ...         print(f"  - {error}")
-    """
-    result = ValidationResult()
-
-    try:
-        existing_terms = ml.list_terms(vocabulary_name)
-        existing_names = {t.name for t in existing_terms}
-
-        for term in terms:
-            if term not in existing_names:
-                result.add_error(
-                    f"Term '{term}' not found in vocabulary '{vocabulary_name}'. "
-                    f"Available terms: {sorted(existing_names)}"
-                )
-            else:
-                result.validated_rids[f"{vocabulary_name}:{term}"] = {
-                    "vocabulary": vocabulary_name,
-                    "term": term,
-                }
-    except Exception as e:
-        result.add_error(f"Failed to validate vocabulary '{vocabulary_name}': {e}")
 
     return result
 

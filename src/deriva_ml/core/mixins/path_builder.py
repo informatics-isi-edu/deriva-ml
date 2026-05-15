@@ -15,7 +15,6 @@ datapath = importlib.import_module("deriva.core.datapath")
 _ermrest_catalog = importlib.import_module("deriva.core.ermrest_catalog")
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 
-SchemaWrapper = datapath._SchemaWrapper
 ErmrestCatalog = _ermrest_catalog.ErmrestCatalog
 ErmrestSnapshot = _ermrest_catalog.ErmrestSnapshot
 Table = _ermrest_model.Table
@@ -29,12 +28,15 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["PathBuilderMixin"]
+
+
 class PathBuilderMixin:
     """Mixin providing path building and table access utilities.
 
     This mixin requires the host class to have:
         - catalog: ErmrestCatalog or ErmrestSnapshot instance
-        - domain_schema: str - name of the domain schema
+        - domain_schemas: frozenset[str] - names of the domain schemas
         - model: DerivaModel instance
         - working_dir: Path - working directory path
 
@@ -53,7 +55,7 @@ class PathBuilderMixin:
     model: "DerivaModel"
     working_dir: Path
 
-    def pathBuilder(self) -> SchemaWrapper:
+    def pathBuilder(self) -> "datapath._CatalogWrapper":
         """Returns catalog path builder for queries.
 
         The path builder provides a fluent interface for constructing complex queries against the catalog.

@@ -44,6 +44,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["ExecutionMixin"]
+
+
 class ExecutionMixin:
     """Mixin providing execution management operations.
 
@@ -471,28 +474,9 @@ class ExecutionMixin:
                 execution_rid=execution_rid,
             )
 
-            # Scoped reconciliation. Cheaper than the workspace-wide sweep
-            # we did at DerivaML init, and guarantees this specific
-            # execution's pending rows are consistent before we hand out
-            # the Execution object.
-            from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
-
-            try:
-                reconcile_pending_leases(
-                    store=store,
-                    catalog=self.catalog,
-                    execution_rid=execution_rid,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "per-execution lease reconciliation failed for %s (%s); continuing",
-                    execution_rid,
-                    exc,
-                )
-
         # Construct Execution bound to this DerivaML — it reads lifecycle
         # fields from SQLite via read-through properties (Group E).
-        return Execution._from_registry(
+        return Execution.from_registry(
             ml_object=self,
             execution_rid=execution_rid,
         )

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+__all__ = ["ConnectionMode"]
+
 
 class ConnectionMode(StrEnum):
     """How a DerivaML instance interacts with the catalog.

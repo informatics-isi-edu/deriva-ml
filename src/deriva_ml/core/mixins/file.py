@@ -28,6 +28,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["FileMixin"]
+
+
 class FileMixin:
     """Mixin providing file management operations.
 

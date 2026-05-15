@@ -78,38 +78,38 @@ warnings.filterwarnings(
 
 
 # =============================================================================
-# Compatibility Aliases
+# Definition aliases
 # =============================================================================
-# These aliases maintain backwards compatibility with existing DerivaML code
-# that uses the old Pydantic-based class names.
+# DerivaML's public API uses the long names (``ColumnDefinition`` etc.)
+# in roughly half its call sites and the short deriva-py names
+# (``ColumnDef`` etc.) in the other half. Both forms are canonical and
+# both are exported from this module. The names below are aliases — they
+# resolve to the same underlying deriva-py classes, so callers can use
+# whichever reads better at the call site.
 
 ColumnDefinition = ColumnDef
-"""Alias for ColumnDef from deriva.core.typed.
+"""Alias for ``ColumnDef`` from deriva-py's ``deriva.core.typed``.
 
-This maintains backwards compatibility with existing DerivaML code.
-New code should use ColumnDef directly.
-"""
+Both ``ColumnDef`` and ``ColumnDefinition`` are part of deriva-ml's
+public API; they resolve to the same class."""
 
 KeyDefinition = KeyDef
-"""Alias for KeyDef from deriva.core.typed.
+"""Alias for ``KeyDef`` from deriva-py's ``deriva.core.typed``.
 
-This maintains backwards compatibility with existing DerivaML code.
-New code should use KeyDef directly.
-"""
+Both ``KeyDef`` and ``KeyDefinition`` are part of deriva-ml's
+public API; they resolve to the same class."""
 
 ForeignKeyDefinition = ForeignKeyDef
-"""Alias for ForeignKeyDef from deriva.core.typed.
+"""Alias for ``ForeignKeyDef`` from deriva-py's ``deriva.core.typed``.
 
-This maintains backwards compatibility with existing DerivaML code.
-New code should use ForeignKeyDef directly.
-"""
+Both ``ForeignKeyDef`` and ``ForeignKeyDefinition`` are part of
+deriva-ml's public API; they resolve to the same class."""
 
 TableDefinition = TableDef
-"""Alias for TableDef from deriva.core.typed.
+"""Alias for ``TableDef`` from deriva-py's ``deriva.core.typed``.
 
-This maintains backwards compatibility with existing DerivaML code.
-New code should use TableDef directly.
-"""
+Both ``TableDef`` and ``TableDefinition`` are part of deriva-ml's
+public API; they resolve to the same class."""
 
 
 # =============================================================================

@@ -1,9 +1,7 @@
 """Lease RIDs for manifest-pending asset entries.
 
-Parallel to :func:`~deriva_ml.execution.lease_orchestrator.acquire_leases_for_execution`
-(which operates on SQLite pending rows), this helper operates on
-:class:`~deriva_ml.asset.manifest.AssetManifest` entries. The
-bag-based commit path
+Operates on :class:`~deriva_ml.asset.manifest.AssetManifest`
+entries. The bag-based commit path
 (:func:`deriva_ml.execution.bag_commit.build_execution_bag`) calls
 this to ensure every pending asset has a pre-allocated RID before
 the bag staging step writes asset rows whose ``RID`` column already

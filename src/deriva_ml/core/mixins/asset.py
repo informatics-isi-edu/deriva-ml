@@ -35,13 +35,16 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["AssetMixin"]
+
+
 class AssetMixin:
     """Mixin providing asset management operations.
 
     This mixin requires the host class to have:
         - model: DerivaModel instance
         - ml_schema: str - name of the ML schema
-        - domain_schema: str - name of the domain schema
+        - domain_schemas: frozenset[str] - names of the domain schemas
         - pathBuilder(): method returning catalog path builder
         - add_term(): method for adding vocabulary terms (from VocabularyMixin)
         - apply_catalog_annotations(): method to update navbar (from DerivaML base class)
@@ -317,22 +320,22 @@ class AssetMixin:
         """
         from deriva_ml.asset.asset import Asset
 
-        # Resolve the RID to find which table it belongs to
+        # Resolve the RID; ``resolve_rid`` returns a datapath already
+        # filtered to this RID so we can fetch the record in one
+        # round-trip instead of a second .filter() pass.
         rid_info = self.resolve_rid(asset_rid)  # type: ignore[attr-defined]
         asset_table = rid_info.table
 
         if not self.model.is_asset(asset_table):
             raise DerivaMLException(f"RID {asset_rid} is not an asset (table: {asset_table.name})")
 
-        # Query the asset table for this record
-        pb = self.pathBuilder()
-        asset_path = pb.schemas[asset_table.schema.name].tables[asset_table.name]
-
-        records = list(asset_path.filter(asset_path.RID == asset_rid).entities().fetch())
+        records = list(rid_info.datapath.entities().fetch())
         if not records:
             raise DerivaMLException(f"Asset {asset_rid} not found in table {asset_table.name}")
 
         record = records[0]
+        # Keep ``pb`` available for the asset-type lookup below.
+        pb = self.pathBuilder()
 
         # Get asset types
         asset_types = []

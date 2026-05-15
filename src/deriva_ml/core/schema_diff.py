@@ -15,6 +15,18 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 
+__all__ = [
+    "SchemaDiff",
+    "AddedTable",
+    "RemovedTable",
+    "AddedColumn",
+    "RemovedColumn",
+    "ColumnTypeChange",
+    "AddedForeignKey",
+    "RemovedForeignKey",
+]
+
+
 class AddedTable(BaseModel):
     """A table present in the live schema but absent from the cached schema."""
 

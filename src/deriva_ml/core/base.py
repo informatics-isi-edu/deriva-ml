@@ -79,6 +79,9 @@ logger = get_logger(__name__)
 ml: DerivaML
 
 
+__all__ = ["DerivaML"]
+
+
 class DerivaML(
     PathBuilderMixin,
     RidResolutionMixin,
@@ -100,7 +103,7 @@ class DerivaML(
     Attributes:
         host_name (str): Hostname of the Deriva server (e.g., 'deriva.example.org').
         catalog_id (Union[str, int]): Catalog identifier or name.
-        domain_schema (str): Schema name for domain-specific tables and relationships.
+        domain_schemas (frozenset[str]): Schema names for domain-specific tables and relationships.
         model (DerivaModel): ERMRest model for the catalog.
         working_dir (Path): Directory for storing computation data and results.
         cache_dir (Path): Directory for caching downloaded datasets.
@@ -147,7 +150,7 @@ class DerivaML(
             >>> conf = DerivaMLConf(
             ...     hostname='deriva.example.org',
             ...     catalog_id='42',
-            ...     domain_schema='my_domain',
+            ...     domain_schemas={'my_domain'},
             ... )
             >>>
             >>> # Instantiate the config to get a DerivaMLConfig object
@@ -356,27 +359,6 @@ class DerivaML(
         self.project_name = project_name or self.default_schema or "deriva-ml"
         self.start_time = datetime.now()
         self.clean_execution_dir = clean_execution_dir
-
-        # Reconcile any pending_rows stuck in 'leasing' from a prior
-        # crash. Workspace-wide sweep; per-execution reconciliation
-        # runs additionally on resume_execution (Group D).
-        if self._mode is ConnectionMode.online:
-            from deriva_ml.execution.lease_orchestrator import reconcile_pending_leases
-
-            try:
-                reconcile_pending_leases(
-                    store=self.workspace.execution_state_store(),
-                    catalog=self.catalog,
-                    execution_rid=None,
-                )
-            except Exception as exc:
-                # Best-effort. If reconciliation itself fails, log and
-                # move on — the user's operation can still proceed;
-                # the next acquire_leases call will retry.
-                logger.warning(
-                    "startup lease reconciliation failed (%s); continuing",
-                    exc,
-                )
 
     def __del__(self) -> None:
         """Cleanup method to handle incomplete executions.

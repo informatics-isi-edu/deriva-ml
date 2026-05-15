@@ -11,9 +11,9 @@ Key exports:
     - Definitions: Type definitions, enums, and constants used throughout the package.
 
 Example:
-    >>> from deriva_ml.core import DerivaML, DerivaMLConfig
-    >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-    >>> datasets = ml.find_datasets()
+    >>> from deriva_ml.core import DerivaML, DerivaMLConfig  # doctest: +SKIP
+    >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+    >>> datasets = ml.find_datasets()  # doctest: +SKIP
 """
 
 from deriva_ml.core.base import DerivaML

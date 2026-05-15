@@ -36,6 +36,12 @@ from pydantic import BaseModel, ConfigDict
 from deriva_ml.core.exceptions import DerivaMLConfigurationError
 
 
+__all__ = [
+    "PinStatus",
+    "SchemaCache",
+]
+
+
 class PinStatus(BaseModel):
     """Current pin state of a :class:`SchemaCache`. Frozen Pydantic snapshot.
 

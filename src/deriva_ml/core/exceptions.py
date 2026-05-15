@@ -48,6 +48,37 @@ Example:
     ...     print(f"DerivaML error: {e}")
 """
 
+__all__ = [
+    "DerivaMLException",
+    "DerivaMLConfigurationError",
+    "DerivaMLSchemaError",
+    "DerivaMLSchemaRefreshBlocked",
+    "DerivaMLSchemaPinned",
+    "DerivaMLAuthenticationError",
+    "DerivaMLOfflineError",
+    "DerivaMLDataError",
+    "DerivaMLNotFoundError",
+    "DerivaMLDatasetNotFound",
+    "DerivaMLTableNotFound",
+    "DerivaMLInvalidTerm",
+    "DerivaMLTableTypeError",
+    "DerivaMLValidationError",
+    "DerivaMLMaterializeLimitExceeded",
+    "DerivaMLCycleError",
+    "DerivaMLStateInconsistency",
+    "DerivaMLExecutionError",
+    "DerivaMLWorkflowError",
+    "DerivaMLDirtyWorkflowError",
+    "DerivaMLUploadError",
+    "DerivaMLReadOnlyError",
+    "DerivaMLDenormalizeError",
+    "DerivaMLDenormalizeMultiLeaf",
+    "DerivaMLDenormalizeNoSink",
+    "DerivaMLDenormalizeDownstreamLeaf",
+    "DerivaMLDenormalizeAmbiguousPath",
+    "DerivaMLDenormalizeUnrelatedAnchor",
+]
+
 
 class DerivaMLException(Exception):
     """Base exception class for all DerivaML errors.

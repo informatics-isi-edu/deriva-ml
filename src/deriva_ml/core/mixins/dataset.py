@@ -38,13 +38,16 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["DatasetMixin"]
+
+
 class DatasetMixin:
     """Mixin providing dataset management operations.
 
     This mixin requires the host class to have:
         - model: DerivaModel instance
         - ml_schema: str - name of the ML schema
-        - domain_schema: str - name of the domain schema
+        - domain_schemas: frozenset[str] - names of the domain schemas
         - s3_bucket: str | None - S3 bucket URL for dataset storage
         - use_minid: bool - whether to use MINIDs
         - pathBuilder(): method returning catalog path builder
@@ -68,11 +71,10 @@ class DatasetMixin:
     s3_bucket: str | None
     use_minid: bool
     pathBuilder: Callable[[], Any]
-
-    @property
-    def _dataset_table(self) -> Table:
-        """Get the Dataset table. Must be provided by host class."""
-        raise NotImplementedError
+    # Provided by the host class (DerivaML). Declared here so type
+    # checkers see the contract; the real implementation is a
+    # @property in the host that returns the catalog's Dataset table.
+    _dataset_table: Table
 
     def find_datasets(self, deleted: bool = False, sort: SortSpec = None) -> Iterable["Dataset"]:
         """List all datasets in the catalog.

@@ -36,6 +36,9 @@ import deriva.core.utils.hash_utils as hash_utils
 from pydantic import BaseModel, Field, field_validator, validate_call
 
 
+__all__ = ["FileSpec"]
+
+
 class FileSpec(BaseModel):
     """Specification for a file to be added to the Deriva catalog.
 

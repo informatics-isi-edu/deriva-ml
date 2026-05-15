@@ -51,6 +51,19 @@ DRY_RUN_RID = "0000"
 SYSTEM_SCHEMAS: frozenset[str] = frozenset({"public", "www", "WWW"})
 
 
+__all__ = [
+    "ML_SCHEMA",
+    "DRY_RUN_RID",
+    "SYSTEM_SCHEMAS",
+    "RID",
+    "DerivaSystemColumns",
+    "DerivaAssetColumns",
+    "rid_part",
+    "snapshot_part",
+    "rid_regex",
+]
+
+
 def _is_system_schema(schema_name: str, ml_schema: str = ML_SCHEMA) -> bool:
     """Check if a schema is a system or ML schema (not a domain schema).
 

@@ -31,13 +31,16 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["FeatureMixin"]
+
+
 class FeatureMixin:
     """Mixin providing feature management operations.
 
     This mixin requires the host class to have:
         - model: DerivaModel instance
         - ml_schema: str - name of the ML schema
-        - domain_schema: str - name of the domain schema
+        - domain_schemas: frozenset[str] - names of the domain schemas
         - pathBuilder(): method returning catalog path builder
         - add_term(): method for adding vocabulary terms (from VocabularyMixin)
         - apply_catalog_annotations(): method to update navbar (from DerivaML base class)

@@ -45,6 +45,9 @@ COLUMN_DISPLAY_TAG = "tag:isrd.isi.edu,2016:column-display"
 STRICT_PREALLOCATED_RID_TAG = "tag:isrd.isi.edu,2026:strict-preallocated-rid"
 
 
+__all__ = ["AnnotationMixin"]
+
+
 class AnnotationMixin:
     """Mixin providing annotation management operations.
 

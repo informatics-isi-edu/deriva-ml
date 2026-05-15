@@ -65,6 +65,8 @@ from pydantic import BaseModel, model_validator
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import ML_SCHEMA
 
+__all__ = ["DerivaMLConfig"]
+
 
 class DerivaMLConfig(BaseModel):
     """Configuration model for DerivaML instances.
