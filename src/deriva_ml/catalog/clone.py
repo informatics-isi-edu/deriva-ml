@@ -27,8 +27,8 @@ What's preserved for back-compat:
 - Provenance API (:class:`CatalogProvenance`,
   :class:`CatalogCreationMethod`, :class:`CloneDetails`,
   :func:`set_catalog_provenance`, :func:`get_catalog_provenance`) —
-  unchanged. These move to :mod:`deriva_ml.catalog.provenance`
-  and are re-exported here.
+  unchanged. These live in :mod:`deriva_ml.catalog.provenance`;
+  import them from there.
 
 What's deleted:
 
@@ -62,14 +62,6 @@ from deriva.bag.traversal import (
     FKTraversalPolicy,
 )
 
-# Provenance API: re-export so historical import paths keep working.
-from deriva_ml.catalog.provenance import (  # noqa: F401  (re-export)
-    CatalogCreationMethod,
-    CatalogProvenance,
-    CloneDetails,
-    get_catalog_provenance,
-    set_catalog_provenance,
-)
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)

@@ -67,7 +67,7 @@ from deriva_ml.core.schema_cache import PinStatus, SchemaCache
 from deriva_ml.interfaces import DerivaMLCatalog
 
 if TYPE_CHECKING:
-    from deriva_ml.catalog.clone import CatalogProvenance
+    from deriva_ml.catalog.provenance import CatalogProvenance
     from deriva_ml.core.schema_diff import SchemaDiff
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
@@ -1034,7 +1034,7 @@ class DerivaML(
             ...     if prov.is_clone:
             ...         print(f"Cloned from: {prov.clone_details.source_hostname}")
         """
-        from deriva_ml.catalog.clone import get_catalog_provenance
+        from deriva_ml.catalog.provenance import get_catalog_provenance
 
         return get_catalog_provenance(self.catalog)
 
