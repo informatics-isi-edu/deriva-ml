@@ -31,16 +31,11 @@ dependencies = [
 ]
 
 [project.scripts]
-deriva-ml-table-comments-utils = "deriva_ml.schema_setup.table_comments_utils:main"
-deriva-ml-create-schema = "deriva_ml.schema_setup.create_schema:main"
-deriva-ml-alter-annotation = "deriva_ml.schema_setup.alter_annotation:main"
 deriva-ml-run-notebook = "deriva_ml.run_notebook:main"
 deriva-ml-run = "deriva_ml.run_model:main"
 deriva-ml-install-kernel = "deriva_ml.install_kernel:main"
 bump-version = "deriva_ml.bump_version:main"
 create-demo-catalog = "deriva_ml.demo_catalog:main"
-
-deriva-ml-check-catalog-schema = "deriva_ml.schema.check_schema:main"
 deriva-ml-split-dataset = "deriva_ml.dataset.split:main"
 deriva-ml-storage = "deriva_ml.cache_tui:main"
 deriva-ml-upload = "deriva_ml.cli.upload:main"
