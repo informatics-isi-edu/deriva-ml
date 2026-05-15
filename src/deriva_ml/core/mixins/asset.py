@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["AssetMixin"]
+
+
 class AssetMixin:
     """Mixin providing asset management operations.
 

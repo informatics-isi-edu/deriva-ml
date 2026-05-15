@@ -29,6 +29,8 @@ from typing import Any, Awaitable, TypeVar
 
 T = TypeVar("T")
 
+__all__ = ["run_async"]
+
 
 def run_async(coro: Awaitable[T]) -> T:
     """Run ``coro`` to completion from a sync caller.

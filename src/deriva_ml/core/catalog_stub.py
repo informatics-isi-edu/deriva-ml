@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from deriva_ml.core.exceptions import DerivaMLReadOnlyError
 
+__all__ = ["CatalogStub"]
+
 
 class CatalogStub:
     """Placeholder for ErmrestCatalog in offline mode."""

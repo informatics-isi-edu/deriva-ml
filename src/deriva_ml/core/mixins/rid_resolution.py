@@ -31,6 +31,12 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = [
+    "RidResolutionMixin",
+    "BatchRidResult",
+]
+
+
 @dataclass
 class BatchRidResult:
     """Result of batch RID resolution.

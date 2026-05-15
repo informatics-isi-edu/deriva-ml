@@ -79,6 +79,9 @@ logger = get_logger(__name__)
 ml: DerivaML
 
 
+__all__ = ["DerivaML"]
+
+
 class DerivaML(
     PathBuilderMixin,
     RidResolutionMixin,

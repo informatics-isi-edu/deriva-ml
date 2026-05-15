@@ -27,6 +27,17 @@ Both ``BuiltinType`` and ``BuiltinTypes`` are part of deriva-ml's
 public API; they resolve to the same class."""
 
 
+__all__ = [
+    "BuiltinTypes",
+    "UploadState",
+    "MLVocab",
+    "MLAsset",
+    "MLTable",
+    "ExecMetadataType",
+    "ExecAssetType",
+]
+
+
 class UploadState(Enum):
     """File upload operation states.
 

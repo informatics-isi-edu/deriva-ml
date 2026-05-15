@@ -31,6 +31,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["FeatureMixin"]
+
+
 class FeatureMixin:
     """Mixin providing feature management operations.
 

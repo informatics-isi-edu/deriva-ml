@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["DatasetMixin"]
+
+
 class DatasetMixin:
     """Mixin providing dataset management operations.
 

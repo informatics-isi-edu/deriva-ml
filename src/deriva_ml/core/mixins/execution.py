@@ -44,6 +44,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["ExecutionMixin"]
+
+
 class ExecutionMixin:
     """Mixin providing execution management operations.
 

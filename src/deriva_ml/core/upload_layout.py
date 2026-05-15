@@ -87,6 +87,21 @@ asset_file_regex = r"(?P<file>[-\w]+)[.](?P<ext>[a-z0-9]*)$"
 table_regex = exec_dir_regex + rf"{SEP}table{SEP}(?P<schema>[-\w]+){SEP}(?P<table>[-\w]+){SEP}(?P=table)[.](csv|json)$"
 
 
+__all__ = [
+    "NULL_SENTINEL",
+    "upload_root",
+    "execution_rids",
+    "execution_root",
+    "asset_root",
+    "flat_asset_dir",
+    "manifest_path",
+    "table_path",
+    "asset_type_path",
+    "asset_table_upload_spec",
+    "bulk_upload_configuration",
+]
+
+
 def upload_root(prefix: Path | str) -> Path:
     """Return the top level directory of where to put files to be uploaded."""
     path = Path(prefix) / "deriva-ml"

@@ -35,6 +35,12 @@ if TYPE_CHECKING:
 VocabCache = dict[tuple[str, str], dict[str, VocabularyTermHandle]]
 
 
+__all__ = [
+    "VocabularyMixin",
+    "VocabCache",
+]
+
+
 class VocabularyMixin:
     """Mixin providing vocabulary/term management operations.
 

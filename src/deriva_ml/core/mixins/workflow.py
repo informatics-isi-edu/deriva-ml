@@ -20,6 +20,9 @@ if TYPE_CHECKING:
     pass
 
 
+__all__ = ["WorkflowMixin"]
+
+
 class WorkflowMixin:
     """Mixin providing workflow management operations.
 
@@ -291,7 +294,9 @@ class WorkflowMixin:
             RID: Resource Identifier of the workflow if found, None otherwise.
         """
         workflow_path = self.pathBuilder().schemas[self.ml_schema].Workflow
-        match = workflow_path.filter((workflow_path.URL == url_or_checksum) | (workflow_path.Checksum == url_or_checksum))
+        match = workflow_path.filter(
+            (workflow_path.URL == url_or_checksum) | (workflow_path.Checksum == url_or_checksum)
+        )
         for row in match.attributes(workflow_path.RID).fetch():
             return row["RID"]
         return None

@@ -35,6 +35,12 @@ See the module docstring for the three-state semantics.
 """
 
 
+__all__ = [
+    "SortSpec",
+    "resolve_sort",
+]
+
+
 def resolve_sort(
     sort: SortSpec,
     default_callable: Callable[[Any], Any],

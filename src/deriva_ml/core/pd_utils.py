@@ -12,6 +12,9 @@ from typing import Any, Iterable
 import pandas as pd
 
 
+__all__ = ["rows_to_dataframe"]
+
+
 def rows_to_dataframe(rows: Iterable[dict[str, Any]]) -> pd.DataFrame:
     """Build a DataFrame from an iterable of row dicts.
 

@@ -28,6 +28,9 @@ if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
 
 
+__all__ = ["PathBuilderMixin"]
+
+
 class PathBuilderMixin:
     """Mixin providing path building and table access utilities.
 
