@@ -71,7 +71,6 @@ __all__ = [
     "STRICT_VALIDATION_CONFIG",
     "ValidationResult",
     "validate_rids",
-    "validate_vocabulary_terms",
     "validate_execution_config",
 ]
 
@@ -343,50 +342,6 @@ def validate_rids(
                         result.add_warning(f"Dataset '{rid}' has no description")
                 except Exception as e:
                     logger.debug(f"Could not check description for dataset {rid}: {e}")
-
-    return result
-
-
-def validate_vocabulary_terms(
-    ml: "DerivaML",
-    vocabulary_name: str,
-    terms: list[str],
-) -> ValidationResult:
-    """Validate that terms exist in a vocabulary.
-
-    Args:
-        ml: Connected DerivaML instance.
-        vocabulary_name: Name of the vocabulary table.
-        terms: List of term names to validate.
-
-    Returns:
-        ValidationResult with validation status and details.
-
-    Example:
-        >>> result = validate_vocabulary_terms(ml, "Dataset_Type", ["Training", "Testing"])
-        >>> if not result.is_valid:
-        ...     for error in result.errors:
-        ...         print(f"  - {error}")
-    """
-    result = ValidationResult()
-
-    try:
-        existing_terms = ml.list_terms(vocabulary_name)
-        existing_names = {t.name for t in existing_terms}
-
-        for term in terms:
-            if term not in existing_names:
-                result.add_error(
-                    f"Term '{term}' not found in vocabulary '{vocabulary_name}'. "
-                    f"Available terms: {sorted(existing_names)}"
-                )
-            else:
-                result.validated_rids[f"{vocabulary_name}:{term}"] = {
-                    "vocabulary": vocabulary_name,
-                    "term": term,
-                }
-    except Exception as e:
-        result.add_error(f"Failed to validate vocabulary '{vocabulary_name}': {e}")
 
     return result
 
