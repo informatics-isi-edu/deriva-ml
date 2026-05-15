@@ -331,6 +331,18 @@ def localize_assets(
                     logger.error(error_msg)
                     result.errors.append(error_msg)
 
+    # Phase 2 of split-phase clone: record asset-localization stats
+    # on the catalog's provenance annotation so an operator can see
+    # that the asset bytes have been moved (and from where). The
+    # clone_via_bag step wrote phase-1 provenance; we mutate it
+    # rather than replace.
+    if not dry_run:
+        _record_localize_provenance(
+            ermrest_catalog,
+            result=result,
+            asset_source_hostname=source_hostname,
+        )
+
     return result
 
 
@@ -466,3 +478,95 @@ def _ensure_hatrac_namespace(hatrac: HatracStore, namespace: str) -> None:
     except Exception:
         # Namespace likely already exists
         pass
+
+
+def _record_localize_provenance(
+    catalog: ErmrestCatalog,
+    *,
+    result: LocalizeResult,
+    asset_source_hostname: str | None,
+) -> None:
+    """Update the destination's provenance annotation with phase-2 stats.
+
+    Phase 1 (:func:`~deriva_ml.catalog.clone_via_bag.clone_via_bag`)
+    writes a ``CatalogProvenance`` annotation with
+    ``creation_method=CLONE`` and partially-populated
+    ``CloneDetails``. This function fills in the localization-leg
+    fields (``assets_localized``, ``assets_localized_at``,
+    ``asset_source_hostname``, ``assets_copied``,
+    ``assets_skipped``, ``assets_failed``) so a future reader can
+    see that the bytes have been moved server-to-server and from
+    where.
+
+    Best-effort: a missing or malformed phase-1 annotation does
+    not block localization. In that case we write a fresh
+    annotation with ``creation_method=CLONE`` and only the
+    phase-2 stats populated — the catalog was clearly cloned
+    (we just localized assets in it) but we don't know the
+    phase-1 details.
+
+    Args:
+        catalog: Destination ERMrest catalog handle.
+        result: The completed :class:`LocalizeResult`.
+        asset_source_hostname: The hostname the assets were
+            moved *from*. ``None`` is preserved as ``None`` on
+            the annotation — useful when the caller couldn't
+            determine a single source (e.g., mixed-source slice).
+    """
+    # Lazy import: avoids a circular reference between
+    # catalog/localize.py and catalog/provenance.py if either ever
+    # grows a dependency in the other direction.
+    from datetime import datetime, timezone
+
+    from deriva_ml.catalog.provenance import (
+        CatalogCreationMethod,
+        CloneDetails,
+        get_catalog_provenance,
+        set_catalog_provenance,
+    )
+
+    try:
+        existing = get_catalog_provenance(catalog)
+        if existing is not None and existing.clone_details is not None:
+            # Phase 1 already wrote a CloneDetails; update its
+            # localization-leg fields in place.
+            details = existing.clone_details
+            updated = details.model_copy(
+                update={
+                    "assets_localized": True,
+                    "assets_localized_at": datetime.now(timezone.utc).isoformat(),
+                    "asset_source_hostname": asset_source_hostname,
+                    "assets_copied": result.assets_processed,
+                    "assets_skipped": result.assets_skipped,
+                    "assets_failed": result.assets_failed,
+                }
+            )
+        else:
+            # No phase-1 details (catalog wasn't cloned via
+            # clone_via_bag, or the annotation was lost). Write a
+            # fresh CloneDetails with only the phase-2 fields.
+            updated = CloneDetails(
+                source_hostname=asset_source_hostname or "",
+                source_catalog_id="",
+                assets_localized=True,
+                assets_localized_at=datetime.now(timezone.utc).isoformat(),
+                asset_source_hostname=asset_source_hostname,
+                assets_copied=result.assets_processed,
+                assets_skipped=result.assets_skipped,
+                assets_failed=result.assets_failed,
+            )
+
+        set_catalog_provenance(
+            catalog,
+            creation_method=CatalogCreationMethod.CLONE,
+            clone_details=updated,
+            # Preserve descriptive fields from the existing annotation
+            # if they were set; otherwise leave None.
+            name=existing.name if existing else None,
+            description=existing.description if existing else None,
+            workflow_url=existing.workflow_url if existing else None,
+            workflow_version=existing.workflow_version if existing else None,
+        )
+    except Exception as e:
+        # Provenance failures must not break localization.
+        logger.warning("localize_assets: failed to update provenance: %s", e)
