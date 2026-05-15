@@ -359,19 +359,27 @@ def clone_via_bag(
         # The merge rule: clone-required fields (vocab_export=FULL,
         # terminal_tables ⊇ {Execution, Workflow},
         # dangling_fk_strategy=DELETE) are applied when the caller
-        # left them at their library defaults. A caller who
+        # left them at the library defaults. A caller who
         # explicitly set vocab_export=REFERENCED_ONLY or supplied
         # their own terminal_tables or chose a different
         # dangling-FK strategy keeps their choice — the merge only
         # fills in defaults that weren't customized.
+        #
+        # We use ``model_fields_set`` (the set of field names the
+        # caller actually passed at construction) instead of
+        # comparing field values against library defaults. The
+        # value-comparison form silently overrides a DBA who
+        # explicitly chose ``DanglingFKStrategy.FAIL`` because
+        # FAIL is also the library default — there is no way to
+        # tell "I left it default" from "I deliberately chose FAIL"
+        # by inspecting the value alone.
+        explicit = policy.model_fields_set
         merge_kwargs: dict[str, Any] = {}
-        if policy.vocab_export == VocabExport.REFERENCED_ONLY:
+        if "vocab_export" not in explicit:
             merge_kwargs["vocab_export"] = VocabExport.FULL
-        if not policy.terminal_tables:
+        if "terminal_tables" not in explicit:
             merge_kwargs["terminal_tables"] = default_terminal_tables
-        if policy.dangling_fk_strategy == DanglingFKStrategy.FAIL:
-            # The library default. Caller almost certainly didn't
-            # think about it; replace with the clone default.
+        if "dangling_fk_strategy" not in explicit:
             merge_kwargs["dangling_fk_strategy"] = DanglingFKStrategy.DELETE
         if merge_kwargs:
             policy = policy.model_copy(update=merge_kwargs)
