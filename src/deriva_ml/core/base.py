@@ -100,7 +100,7 @@ class DerivaML(
     Attributes:
         host_name (str): Hostname of the Deriva server (e.g., 'deriva.example.org').
         catalog_id (Union[str, int]): Catalog identifier or name.
-        domain_schema (str): Schema name for domain-specific tables and relationships.
+        domain_schemas (frozenset[str]): Schema names for domain-specific tables and relationships.
         model (DerivaModel): ERMRest model for the catalog.
         working_dir (Path): Directory for storing computation data and results.
         cache_dir (Path): Directory for caching downloaded datasets.
@@ -147,7 +147,7 @@ class DerivaML(
             >>> conf = DerivaMLConf(
             ...     hostname='deriva.example.org',
             ...     catalog_id='42',
-            ...     domain_schema='my_domain',
+            ...     domain_schemas={'my_domain'},
             ... )
             >>>
             >>> # Instantiate the config to get a DerivaMLConfig object

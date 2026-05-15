@@ -18,13 +18,13 @@ from enum import Enum, StrEnum
 # Import BuiltinType from deriva.core.typed
 from deriva.core.typed import BuiltinType
 
-# Backwards compatibility alias - DerivaML uses plural form
+# DerivaML's public API also exports ``BuiltinTypes`` (plural). Both
+# names resolve to the same deriva-py class.
 BuiltinTypes = BuiltinType
-"""Alias for BuiltinType from deriva.core.typed.
+"""Alias for ``BuiltinType`` from deriva-py's ``deriva.core.typed``.
 
-This maintains backwards compatibility with existing DerivaML code that uses
-the plural form 'BuiltinTypes'. New code should use BuiltinType directly.
-"""
+Both ``BuiltinType`` and ``BuiltinTypes`` are part of deriva-ml's
+public API; they resolve to the same class."""
 
 
 class UploadState(Enum):

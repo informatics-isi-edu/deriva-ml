@@ -101,17 +101,17 @@ class ValidationResult:
         validated_rids: Dictionary mapping RID to its resolved table info.
 
     Example:
-        >>> result = validate_rids(ml, dataset_rids=["1-ABC"])
-        >>> print(result)
-        ✓ Validation passed
+        >>> result = validate_rids(ml, dataset_rids=["1-ABC"])  # doctest: +SKIP
+        >>> print(result)  # doctest: +SKIP
+        OK Validation passed
           Validated 1 RIDs
 
-        >>> result = validate_rids(ml, dataset_rids=["INVALID"])
-        >>> print(result)
-        ✗ Validation failed with 1 error(s)
+        >>> result = validate_rids(ml, dataset_rids=["INVALID"])  # doctest: +SKIP
+        >>> print(result)  # doctest: +SKIP
+        FAIL Validation failed with 1 error(s)
 
         Errors:
-          • Dataset RID 'INVALID' does not exist in catalog
+          - Dataset RID 'INVALID' does not exist in catalog
     """
 
     is_valid: bool = True
@@ -142,23 +142,23 @@ class ValidationResult:
         lines = []
 
         if self.is_valid:
-            lines.append("✓ Validation passed")
+            lines.append("OK Validation passed")
             if self.validated_rids:
                 lines.append(f"  Validated {len(self.validated_rids)} RID(s)")
         else:
-            lines.append(f"✗ Validation failed with {len(self.errors)} error(s)")
+            lines.append(f"FAIL Validation failed with {len(self.errors)} error(s)")
 
         if self.errors:
             lines.append("")
             lines.append("Errors:")
             for error in self.errors:
-                lines.append(f"  • {error}")
+                lines.append(f"  - {error}")
 
         if self.warnings:
             lines.append("")
             lines.append("Warnings:")
             for warning in self.warnings:
-                lines.append(f"  ⚠ {warning}")
+                lines.append(f"  WARN {warning}")
 
         return "\n".join(lines)
 
@@ -203,8 +203,8 @@ def validate_rids(
         ...     dataset_versions={"1-ABC": "0.4.0"},
         ...     asset_rids=["3-GHI"],
         ... )
-        >>> print(result)
-        ✓ Validation passed
+        >>> print(result)  # doctest: +SKIP
+        OK Validation passed
           Validated 3 RID(s)
     """
     from deriva_ml.core.exceptions import DerivaMLException

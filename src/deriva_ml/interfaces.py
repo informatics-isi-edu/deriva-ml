@@ -670,7 +670,7 @@ class DerivaMLCatalogReader(Protocol):
 
     Attributes:
         ml_schema: Name of the ML schema (typically 'deriva-ml').
-        domain_schema: Name of the domain-specific schema.
+        domain_schemas: Names of the domain-specific schemas.
         model: The catalog model containing schema information.
         cache_dir: Directory for caching downloaded data.
         working_dir: Directory for working files.

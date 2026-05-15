@@ -44,7 +44,7 @@ class DatasetMixin:
     This mixin requires the host class to have:
         - model: DerivaModel instance
         - ml_schema: str - name of the ML schema
-        - domain_schema: str - name of the domain schema
+        - domain_schemas: frozenset[str] - names of the domain schemas
         - s3_bucket: str | None - S3 bucket URL for dataset storage
         - use_minid: bool - whether to use MINIDs
         - pathBuilder(): method returning catalog path builder

@@ -230,7 +230,6 @@ Import from: `from deriva_ml.interfaces import ...`
 **Logging** (`deriva_ml.core.logging_config`):
 - `get_logger(name)`: Get a deriva_ml logger
 - `configure_logging(level)`: Configure logging for all components
-- `LoggerMixin`: Mixin providing `_logger` attribute
 
 ## Catalog Cloning
 
