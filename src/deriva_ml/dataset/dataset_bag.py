@@ -639,6 +639,28 @@ class DatasetBag:
         target_col = table if isinstance(table, str) else table.name
         records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
 
+        # Filter to target rows that actually live in the bag. The bag
+        # walker can over-reach association tables (e.g. include
+        # Execution_Subject_Health rows whose Subject FK points at a
+        # Subject outside the dataset slice — see #126). A value whose
+        # target row isn't in the bag is dangling: drop it so the bag's
+        # feature_values matches what the bag actually contains.
+        try:
+            target_rids = {
+                r["RID"] for r in self.model.get_table_contents(target_col)
+            }
+        except Exception:
+            # If the target table is missing from the bag entirely,
+            # fall through with the unfiltered set — the cache fetch
+            # would have raised anyway. Defensive only.
+            target_rids = None
+        if target_rids is not None:
+            records = [
+                r
+                for r in records
+                if getattr(r, target_col, None) in target_rids
+            ]
+
         # Apply execution_rids filter (Python-side; the bag cache doesn't
         # have a server-side query layer to push this into). Empty list
         # short-circuits to an empty result.
