@@ -28,23 +28,15 @@ Typical usage example:
 
 from __future__ import annotations
 
-import hashlib
-import json
-import os
-import shutil
 from collections import defaultdict
 
 # Standard library imports
 from graphlib import TopologicalSorter
-from pathlib import Path
 
 # Local imports
-from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Iterator, Self
-from urllib.parse import urlparse
 
 # Deriva imports
-import deriva.core.utils.hash_utils as hash_utils
 from deriva.core.asyncio import AsyncErmrestCatalog
 from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
 
@@ -54,19 +46,7 @@ if TYPE_CHECKING:
 
 # Third-party imports
 import pandas as pd
-import requests
-from bdbag import bdbag_api as bdb
-from bdbag.fetch.fetcher import fetch_single_file
 from deriva.core.ermrest_model import Table
-from deriva.core.utils.core_utils import format_exception
-from deriva.transfer.download import (
-    DerivaDownloadAuthenticationError,
-    DerivaDownloadAuthorizationError,
-    DerivaDownloadConfigurationError,
-    DerivaDownloadError,
-    DerivaDownloadTimeoutError,
-)
-from deriva.transfer.download.deriva_export import DerivaExport
 from pydantic import validate_call
 
 from deriva_ml.core.async_helpers import run_async
@@ -76,10 +56,11 @@ from deriva_ml.core.definitions import (
     VocabularyTerm,
 )
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.mixins.rid_resolution import AnyQuantifier
+from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.dataset.aux_classes import (
     DatasetHistory,
-    DatasetMinid,
     DatasetSpec,
     DatasetVersion,
     VersionPart,
@@ -89,27 +70,6 @@ from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.feature import Feature
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
-from deriva_ml.core.validation import VALIDATION_CONFIG
-from deriva_ml.core.logging_config import get_logger
-
-
-def _hash_spec(spec: Any) -> str:
-    """SHA-256 hex digest of a download spec, keyed by sorted-JSON form.
-
-    Used to key the bag cache and to compare a freshly computed spec
-    against the ``Minid_Spec_Hash`` recorded on a historical version.
-    ``sort_keys=True`` makes the hash order-insensitive across dict
-    renderings so semantically-equal specs always hash identically.
-
-    Args:
-        spec: The download spec (any JSON-serializable Python object,
-            typically the dict returned by
-            ``DatasetBagBuilder.generate_dataset_download_spec``).
-
-    Returns:
-        Lowercase hex-digest string (64 chars).
-    """
-    return hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()
 
 
 class Dataset:
@@ -2414,14 +2374,25 @@ class Dataset:
                 "Configure s3_bucket when creating the DerivaML instance to enable MINID support."
             )
 
-        minid = self._get_dataset_minid(
-            version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout
+        # The bag-download orchestration lives in ``bag_download.py``
+        # (extracted Phase 3, audit §3.A). ``download_dataset_bag``
+        # stays on ``Dataset`` because users call it via
+        # ``dataset.download_dataset_bag(...)``; the cluster of
+        # private helpers it composes is now a free-function module.
+        from deriva_ml.dataset.bag_download import (
+            download_dataset_minid,
+            get_dataset_minid,
+            materialize_dataset_bag,
+        )
+
+        minid = get_dataset_minid(
+            self, version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout
         )
 
         bag_path = (
-            self._materialize_dataset_bag(minid, use_minid=use_minid, fetch_concurrency=fetch_concurrency)
+            materialize_dataset_bag(self, minid, use_minid=use_minid, fetch_concurrency=fetch_concurrency)
             if materialize
-            else self._download_dataset_minid(minid, use_minid)
+            else download_dataset_minid(self, minid, use_minid)
         )
         from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
 
@@ -2820,567 +2791,3 @@ class Dataset:
             else self._ml_instance.catalog.catalog_id
         )
 
-    def _download_dataset_minid(self, minid: DatasetMinid, use_minid: bool) -> Path:
-        """Download and extract a dataset bag archive into the local cache.
-
-        Handles three source types based on how the bag was obtained:
-
-        1. **Local cache hit** (``minid.checksum`` set by Tier 1 in ``_get_dataset_minid``):
-           The index already records this checksum and the bag directory
-           exists at ``{cache_root}/bags/{checksum}/Dataset_{rid}`` → return
-           immediately.
-
-        2. **S3 download** (``use_minid=True``):
-           Download the bag archive from S3 via ``minid.bag_url``.
-
-        3. **Client-side bag** (``use_minid=False``):
-           The bag was already generated locally by
-           :meth:`_create_dataset_minid` driving
-           :meth:`DatasetBagBuilder.build_bag` and is referenced via a
-           ``file://`` URI.
-
-        After obtaining the archive, this method:
-
-        - Extracts it under a staging directory (atomic — prevents corrupt caches).
-        - Validates the BDBag structure.
-        - Moves the staging directory to its final cache location under
-          ``{cache_root}/bags/{checksum}/Dataset_{rid}/``.
-        - Records the bag in :class:`~deriva.bag.cache_index.BagCacheIndex`
-          so Tier-1 lookups can find it on the next call.
-        - Cleans up temporary files (including any ``client_export``
-          intermediate produced by the non-MINID path).
-
-        Cache layout (post-Phase-2 cutover):
-            ``{cache_root}/bags/{checksum}/Dataset_{rid}/``
-
-            ``checksum`` is the deterministic ``{spec_hash[:16]}_{snapshot}``
-            string for non-MINID downloads (set by Tier 1/3) or the SHA-256
-            of the S3 archive (set by Tier 2).
-
-        Args:
-            minid: DatasetMinid with bag URL and cache key (in checksum field).
-            use_minid: If True, source is S3. If False, source is local file://.
-
-        Returns:
-            Path to the extracted bag directory:
-            ``{cache_root}/bags/{checksum}/Dataset_{rid}``.
-        """
-        from deriva.bag.cache_index import BagCacheIndex
-
-        index = BagCacheIndex(self._ml_instance.cache_dir)
-
-        # Tier-1 hit: the index lookup in _get_dataset_minid set minid.checksum;
-        # the bag may already exist on disk from a prior download.
-        bag_root = index.bag_dir_for(minid.checksum)
-        bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
-        if bag_dir.exists():
-            self._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
-            return bag_dir
-
-        # ----- Download the archive -------------------------------------------
-        with TemporaryDirectory() as tmp_dir:
-            if use_minid:
-                # Tier 2: Download bag archive from S3
-                bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
-                archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
-            elif minid.bag_url.startswith("file://"):
-                # Tier 3: Client-side bag — already on local filesystem
-                archive_path = urlparse(minid.bag_url).path
-            else:
-                # Legacy: Download from catalog export endpoint
-                exporter = DerivaExport(host=self._ml_instance.catalog.deriva_server.server, output_dir=tmp_dir)
-                archive_path = exporter.retrieve_file(minid.bag_url)
-
-            # For non-MINID downloads without a pre-computed cache key (legacy
-            # code path), fall back to SHA-256 of the archive as cache key.
-            if not use_minid and not minid.checksum:
-                hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
-                checksum = hashes["sha256"][0]
-                bag_root = index.bag_dir_for(checksum)
-                bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
-                if bag_dir.exists():
-                    self._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
-                    return bag_dir
-                # Rebind minid.checksum so the index record at the end of this
-                # method uses the SHA-256 cache key. ``DatasetMinid`` is
-                # immutable; rebuild it with the derived checksum.
-                minid = minid.model_copy(update={"checksums": [{"function": "sha256", "value": checksum}]})
-
-            # ----- Extract to staging directory (atomic cache population) ------
-            # Write to a temporary staging directory first. Only rename to the
-            # final cache location after successful extraction and validation.
-            # This prevents partial/corrupt cache entries if the process crashes.
-            staging_dir = bag_root.parent / f"{bag_root.name}_staging"
-            if staging_dir.exists():
-                shutil.rmtree(staging_dir)
-            staging_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                extracted_bag_path = bdb.extract_bag(archive_path, staging_dir.as_posix())
-                bdb.validate_bag_structure(extracted_bag_path)
-            except Exception:
-                shutil.rmtree(staging_dir, ignore_errors=True)
-                raise
-
-        # Atomic move: staging → final cache location. The bag directory's
-        # parent (``cache_root/bags/{checksum}``) is created by the rename.
-        bag_root.parent.mkdir(parents=True, exist_ok=True)
-        staging_dir.rename(bag_root)
-
-        # Record the bag in the index so the next Tier-1 lookup finds it.
-        try:
-            index.record(
-                checksum=minid.checksum,
-                anchors=[("Dataset", minid.dataset_rid)],
-                anchor_summary={"version": str(minid.dataset_version)},
-            )
-        finally:
-            index.dispose()
-
-        # Clean up the client_export temp directory for local file:// bags.
-        # After extraction to cache, the original archive is no longer needed.
-        if not use_minid and minid.bag_url.startswith("file://"):
-            export_dir = Path(archive_path).parent
-            if "client_export" in export_dir.parts:
-                shutil.rmtree(export_dir, ignore_errors=True)
-
-        return bag_dir
-
-    def _create_dataset_minid(
-        self,
-        version: DatasetVersion,
-        use_minid: bool = True,
-        exclude_tables: set[str] | None = None,
-        spec: dict | None = None,
-        spec_hash: str | None = None,
-        timeout: tuple[int, int] | None = None,
-    ) -> str:
-        """Create a new MINID (Minimal Viable Identifier) for the dataset.
-
-        This method generates a BDBag export of the dataset and optionally
-        registers it with a MINID service for persistent identification.
-        The bag is uploaded to S3 storage when using MINIDs.
-
-        Args:
-            version: The dataset version to create a MINID for.
-            use_minid: If True, register with MINID service and upload to S3.
-                If False, just generate the bag and return a local URL.
-            exclude_tables: Optional set of table names to exclude from FK traversal.
-            spec: Optional pre-computed download spec dict. If None, the spec is
-                generated from the snapshot catalog.
-            spec_hash: Optional pre-computed SHA-256 hash of the spec. If None and
-                spec is provided, it is computed from the spec.
-            timeout: Optional (connect_timeout, read_timeout) in seconds for network
-                requests. Defaults to (10, 610).
-
-        Returns:
-            str: URL to the MINID landing page (if use_minid=True) or
-                the direct bag download URL.
-        """
-        with TemporaryDirectory() as tmp_dir:
-            # Generate spec if not supplied (allows callers to reuse a spec they already computed).
-            if spec is None:
-                version_snapshot_catalog = self._version_snapshot_catalog(version)
-                downloader = DatasetBagBuilder(
-                    ml_instance=version_snapshot_catalog,
-                    s3_bucket=self._ml_instance.s3_bucket,
-                    use_minid=use_minid,
-                    exclude_tables=exclude_tables,
-                )
-                spec = downloader.generate_dataset_download_spec(self)
-
-            if spec_hash is None:
-                spec_hash = _hash_spec(spec)
-
-            spec_file = Path(tmp_dir) / "download_spec.json"
-            with spec_file.open("w", encoding="utf-8") as ds:
-                json.dump(spec, ds)
-
-            self._logger.info(
-                "Downloading dataset %s for catalog: %s@%s"
-                % (
-                    "minid" if use_minid else "bag",
-                    self.dataset_rid,
-                    str(version),
-                )
-            )
-
-            if use_minid:
-                # Server-side export: generates bag, uploads to S3, registers MINID.
-                try:
-                    exporter = DerivaExport(
-                        host=self._ml_instance.catalog.deriva_server.server,
-                        config_file=spec_file,
-                        output_dir=tmp_dir,
-                        defer_download=True,
-                        timeout=timeout or (10, 610),
-                        envars={"RID": self.dataset_rid},
-                    )
-                    minid_page_url = exporter.export()[0]
-                except (
-                    DerivaDownloadError,
-                    DerivaDownloadConfigurationError,
-                    DerivaDownloadAuthenticationError,
-                    DerivaDownloadAuthorizationError,
-                    DerivaDownloadTimeoutError,
-                ) as e:
-                    raise DerivaMLException(format_exception(e))
-                # Update version table with MINID and spec hash.
-                version_path = (
-                    self._ml_instance.pathBuilder().schemas[self._ml_instance.ml_schema].tables["Dataset_Version"]
-                )
-                version_rid = [h for h in self.dataset_history() if str(h.dataset_version) == str(version)][
-                    0
-                ].version_rid
-                version_path.update([{"RID": version_rid, "Minid": minid_page_url, "Minid_Spec_Hash": spec_hash}])
-                return minid_page_url
-            else:
-                # Client-side bag construction: drive CatalogBagBuilder.build()
-                # via DatasetBagBuilder.build_bag against the snapshot catalog.
-                # The pre-computed ``spec`` argument is vestigial on this arm
-                # (CatalogBagBuilder recomputes its own spec from the same
-                # anchors/policy); we keep the parameter on the method signature
-                # because the MINID arm above still consumes it.
-                #
-                # The bag is built into a working subdirectory under
-                # ``working_dir/client_export/`` (NOT ``tmp_dir``) so the zip
-                # survives the ``TemporaryDirectory`` cleanup at the end of
-                # this method — the caller (``_download_dataset_minid``)
-                # consumes the file:// URI returned here. The cleanup path in
-                # ``_download_dataset_minid`` recognizes ``client_export`` in
-                # the archive's parent and removes it after extraction.
-                version_snapshot_catalog = self._version_snapshot_catalog(version)
-                builder = DatasetBagBuilder(
-                    ml_instance=version_snapshot_catalog,
-                    s3_bucket=self._ml_instance.s3_bucket,
-                    use_minid=False,
-                    exclude_tables=exclude_tables,
-                )
-                client_export_dir = (
-                    Path(self._ml_instance.working_dir) / "client_export" / spec_hash[:8]
-                )
-                client_export_dir.mkdir(parents=True, exist_ok=True)
-                try:
-                    zip_path = builder.build_bag(self, output_dir=client_export_dir, timeout=timeout)
-                except (
-                    DerivaDownloadError,
-                    DerivaDownloadConfigurationError,
-                    DerivaDownloadAuthenticationError,
-                    DerivaDownloadAuthorizationError,
-                    DerivaDownloadTimeoutError,
-                ) as e:
-                    # Preserve the actionable-message contract callers relied on
-                    # from the legacy _create_dataset_bag_client. The original
-                    # advice (add direct dataset members for tables whose deep
-                    # FK joins timed out) still applies — surface it alongside
-                    # the deriva-py error so users have a fix to try.
-                    raise DerivaMLException(
-                        f"Dataset bag export failed: {format_exception(e)}. "
-                        "This typically happens when deep multi-table joins "
-                        "exceed server query time limits. To fix this, add the "
-                        "desired records as direct dataset members using "
-                        "add_dataset_members() with the relevant table's RIDs."
-                    )
-
-                return zip_path.as_uri()
-
-    def _get_dataset_minid(
-        self,
-        version: DatasetVersion,
-        create: bool,
-        use_minid: bool,
-        exclude_tables: set[str] | None = None,
-        timeout: tuple[int, int] | None = None,
-    ) -> DatasetMinid | None:
-        """Locate or create a dataset bag, using a three-tier caching strategy.
-
-        The download algorithm proceeds through three tiers, stopping at the
-        first success. This applies identically to both MINID and non-MINID paths:
-
-        **Tier 1 — Local deterministic cache (filesystem lookup, no network beyond spec)**
-
-        The cache key is ``{rid}_{spec_hash[:16]}_{snapshot}``, combining:
-        - **spec_hash**: SHA-256 of the download spec (captures FK traversal plan).
-          Changes when the schema changes (new tables, new FKs).
-        - **snapshot**: Immutable catalog snapshot ID (captures data state).
-
-        Both must match for a cache hit — a snapshot-only match would return
-        stale bags created before schema changes.
-
-        Cost: one schema introspection query (to compute spec_hash) + one stat.
-
-        **Tier 2 — MINID / S3 (when ``use_minid=True``)**
-
-        If no local cache exists, check whether a MINID (Minimal Viable
-        Identifier) was previously registered for this version.  The stored
-        ``Minid_Spec_Hash`` is compared to the current download spec hash:
-
-        - Match → fetch MINID metadata (HTTP GET), download bag from S3.
-        - Mismatch or missing → regenerate bag server-side, upload to S3,
-          register new MINID.
-
-        The spec hash detects schema or FK-path changes that would alter bag
-        contents even for the same snapshot.
-
-        **Tier 3 — Client-side bag generation (when ``use_minid=False``)**
-
-        Build the bag locally by running ERMrest queries against the snapshot
-        catalog. The bag is stored under ``{rid}_{spec_hash[:16]}_{snapshot}``
-        so Tier 1 finds it on subsequent calls.
-
-        Args:
-            version: The dataset version to download.
-            create: If True, create a new bag/MINID when none is cached.
-                If False, raise an exception when nothing is available.
-            use_minid: If True, use S3 + MINID service (Tier 2) on cache miss.
-                If False, generate bag client-side (Tier 3) on cache miss.
-            exclude_tables: Table names to exclude from FK path traversal.
-            timeout: Optional (connect_timeout, read_timeout) in seconds.
-
-        Returns:
-            DatasetMinid with the bag URL (local ``file://`` or S3) and a
-            checksum that doubles as the cache directory suffix.
-
-        Raises:
-            DerivaMLException: If the version doesn't exist, or if
-                ``create=False`` and no cached/registered bag is available.
-        """
-        # ----- Resolve version record -----------------------------------------
-        version_str = str(version)
-        history = self.dataset_history()
-        try:
-            version_record = next(v for v in history if str(v.dataset_version) == version_str)
-        except StopIteration:
-            raise DerivaMLException(f"Version {version_str} does not exist for RID {self.dataset_rid}")
-
-        snapshot = version_record.snapshot
-        minid_url = version_record.minid
-
-        # =====================================================================
-        # Compute spec_hash upfront (required for all tiers).
-        #
-        # The download spec defines which FK paths and tables are included in
-        # the bag. If the schema changes (new tables, new FKs), the spec_hash
-        # changes even for the same snapshot. We MUST include the spec_hash in
-        # the cache key to avoid returning stale bags that are missing tables
-        # added after the cached bag was created.
-        #
-        # Cost: one schema introspection query (no data queries). This is
-        # cheap and necessary for correctness.
-        # =====================================================================
-        version_snapshot_catalog = self._version_snapshot_catalog(version)
-        downloader = DatasetBagBuilder(
-            ml_instance=version_snapshot_catalog,
-            s3_bucket=self._ml_instance.s3_bucket,
-            use_minid=use_minid,
-            exclude_tables=exclude_tables,
-        )
-        spec = downloader.generate_dataset_download_spec(self)
-        spec_hash = _hash_spec(spec)
-
-        # The deterministic cache key: {spec_hash[:16]}_{snapshot}
-        # - spec_hash[:16] captures the FK traversal plan (schema-dependent)
-        # - snapshot captures the catalog data state (immutable point-in-time)
-        # Together they uniquely identify the bag contents.
-        cache_suffix = f"{spec_hash[:16]}_{snapshot}"
-
-        # =====================================================================
-        # Tier 1: Local deterministic cache (index lookup, no network).
-        #
-        # Look for a cached bag with BOTH the same spec_hash and snapshot.
-        # A snapshot-only match would return stale bags created before schema
-        # changes (e.g., new tables added to the FK traversal).
-        #
-        # Post-cutover layout (docs/design/bag-client-cutover-2026-05.md):
-        # bags are recorded in ``BagCacheIndex`` (SQLite reverse index) and
-        # stored at ``{cache_dir}/bags/{checksum}/Dataset_{rid}/``.
-        # =====================================================================
-        from deriva.bag.cache_index import BagCacheIndex
-
-        index = BagCacheIndex(self._ml_instance.cache_dir)
-        try:
-            cached_checksums = index.find_bags_for_rid(table="Dataset", rid=self.dataset_rid)
-        finally:
-            index.dispose()
-
-        if cache_suffix in cached_checksums:
-            # Re-open the index in a short scope to compute the bag path.
-            cached_bag_path = (
-                BagCacheIndex(self._ml_instance.cache_dir).bag_dir_for(cache_suffix)
-                / f"Dataset_{self.dataset_rid}"
-            )
-            if cached_bag_path.exists():
-                self._logger.info(
-                    "Local cache hit for %s version %s (spec+snapshot match: %s)",
-                    self.dataset_rid,
-                    version,
-                    cache_suffix,
-                )
-                # ``DatasetVersion.snapshot`` is ``str | None`` — a
-                # version without an associated snapshot is legitimate
-                # (e.g. an in-progress dataset that hasn't been
-                # snapshotted yet). The ``DatasetMinid.RID`` pattern
-                # accepts both ``{rid}`` and ``{rid}@{snap}``; only
-                # append the snapshot segment when there's a real
-                # snapshot to point at. Without this guard the
-                # f-string produces ``{rid}@None`` which fails the
-                # pattern validator with a cryptic regex error.
-                version_rid = f"{self.dataset_rid}@{snapshot}" if snapshot is not None else self.dataset_rid
-                return DatasetMinid(
-                    dataset_version=version,
-                    RID=version_rid,
-                    location=cached_bag_path.parent.as_uri(),
-                    checksums=[{"function": "sha256", "value": cache_suffix}],
-                )
-
-        # =====================================================================
-        # Tier 2: MINID / S3 download (use_minid=True only).
-        #
-        # Compare spec_hash to the stored Minid_Spec_Hash. If they match,
-        # the S3 bag is still current. If not, regenerate.
-        # =====================================================================
-        if use_minid:
-            if minid_url and version_record.spec_hash == spec_hash:
-                # S3 bag is current — download it (populates local cache for Tier 1).
-                return self._fetch_minid_metadata(version, minid_url)
-
-            # No MINID, or spec has changed — need to regenerate.
-            if not create:
-                raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-            if minid_url:
-                self._logger.info(
-                    "Spec hash changed for dataset %s version %s — regenerating MINID bag.",
-                    self.dataset_rid,
-                    version,
-                )
-            else:
-                self._logger.info("Creating new MINID for dataset %s", self.dataset_rid)
-            minid_url = self._create_dataset_minid(
-                version,
-                use_minid=True,
-                exclude_tables=exclude_tables,
-                spec=spec,
-                spec_hash=spec_hash,
-                timeout=timeout,
-            )
-            return self._fetch_minid_metadata(version, minid_url)
-
-        # =====================================================================
-        # Tier 3: Client-side bag generation (use_minid=False).
-        #
-        # Build the bag locally. Store under the deterministic cache key
-        # {rid}_{spec_hash[:16]}_{snapshot} so Tier 1 finds it next time.
-        # =====================================================================
-        if not create and not minid_url:
-            raise DerivaMLException(f"Minid for dataset {self.dataset_rid} doesn't exist")
-
-        self._logger.info(
-            "Cache miss for %s version %s — generating bag client-side",
-            self.dataset_rid,
-            version,
-        )
-        minid_url = self._create_dataset_minid(
-            version,
-            use_minid=False,
-            exclude_tables=exclude_tables,
-            spec=spec,
-            spec_hash=spec_hash,
-            timeout=timeout,
-        )
-        # See the cache-hit branch above for why this guard is
-        # needed — ``snapshot`` is ``str | None`` and the
-        # ``DatasetMinid.RID`` pattern requires either ``{rid}`` or
-        # ``{rid}@{snap}``, not ``{rid}@None``.
-        version_rid = f"{self.dataset_rid}@{snapshot}" if snapshot is not None else self.dataset_rid
-        return DatasetMinid(
-            dataset_version=version,
-            RID=version_rid,
-            location=minid_url,
-            checksums=[{"function": "sha256", "value": cache_suffix}],
-        )
-
-    def _fetch_minid_metadata(self, version: DatasetVersion, url: str) -> DatasetMinid:
-        """Fetch MINID metadata from the MINID service.
-
-        Args:
-            version: The dataset version associated with this MINID.
-            url: The MINID landing page URL.
-
-        Returns:
-            DatasetMinid: Parsed metadata including bag URL, checksum, and identifiers.
-
-        Raises:
-            requests.HTTPError: If the MINID service request fails.
-        """
-        r = requests.get(url, headers={"accept": "application/json"})
-        r.raise_for_status()
-        return DatasetMinid(dataset_version=version, **r.json())
-
-    def _materialize_dataset_bag(
-        self,
-        minid: DatasetMinid,
-        use_minid: bool,
-        fetch_concurrency: int = 1,
-    ) -> Path:
-        """Materialize a dataset bag by downloading all referenced files.
-
-        This method downloads a BDBag and then "materializes" it by fetching
-        all files referenced in the bag's ``fetch.txt`` manifest. This
-        includes data files, assets, and any other content referenced by
-        the bag.
-
-        Progress is reported through callbacks that update the execution
-        status if this download is associated with an execution.
-
-        Materialization status is determined by directly inspecting whether
-        every ``fetch.txt`` entry has a corresponding local file (via
-        :meth:`BagCache._is_fully_materialized`) — there is no separate
-        marker file. A cache that says "materialized" but is missing files
-        is treated as not-materialized and re-fetched.
-
-        Args:
-            minid: DatasetMinid containing the bag URL and metadata.
-            use_minid: If True, download from S3 using the MINID URL.
-
-        Returns:
-            Path: The path to the fully materialized bag directory.
-        """
-
-        def fetch_progress_callback(current, total):
-            msg = f"Materializing bag: {current} of {total} file(s) downloaded."
-            self._logger.info(msg)
-            return True
-
-        def validation_progress_callback(current, total):
-            msg = f"Validating bag: {current} of {total} file(s) validated."
-            self._logger.info(msg)
-            return True
-
-        bag_path = self._download_dataset_minid(minid, use_minid)
-
-        # If the bag already has every fetch.txt entry resolved, skip the
-        # materialize call — there's nothing to download.
-        from deriva_ml.dataset.bag_cache import BagCache
-
-        if BagCache._is_fully_materialized(bag_path):
-            self._logger.info(
-                f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} already materialized."
-            )
-            return Path(bag_path)
-
-        self._logger.info(f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}")
-        # Ensure parent directories exist for all fetch entries
-        fetch_file = bag_path / "fetch.txt"
-        if fetch_file.exists():
-            with fetch_file.open("r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.strip().split("\t")
-                    if len(parts) >= 3:
-                        rel_path = parts[2]
-                        (bag_path / rel_path).parent.mkdir(parents=True, exist_ok=True)
-        bdb.materialize(
-            bag_path.as_posix(),
-            fetch_callback=fetch_progress_callback,
-            validation_callback=validation_progress_callback,
-            fetch_concurrency=fetch_concurrency,
-        )
-        return Path(bag_path)
