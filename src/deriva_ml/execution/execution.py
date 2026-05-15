@@ -1302,10 +1302,6 @@ class Execution:
         self,
         clean_folder: bool | None = None,
         progress_callback: Callable[[UploadProgress], None] | None = None,
-        max_retries: int = 3,
-        retry_delay: float = 5.0,
-        timeout: tuple[int, int] | None = None,
-        chunk_size: int | None = None,
     ) -> dict[str, list[AssetFilePath]]:
         """Upload all registered output assets to Hatrac and record provenance.
 
@@ -1324,19 +1320,6 @@ class Execution:
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
-            max_retries: Accepted but currently a no-op — the bag-commit
-                upload path does not wrap retries around the
-                ``BagCatalogLoader`` call. Parameter retained for
-                signature stability; will be removed in a follow-up.
-            retry_delay: Accepted but currently a no-op — see ``max_retries``.
-            timeout: Accepted but currently a no-op — bag-commit
-                inherits the catalog session's timeout. Parameter
-                retained for signature stability; will be removed in a
-                follow-up.
-            chunk_size: Accepted but currently a no-op — bag-commit
-                inherits the catalog session's chunk size. Parameter
-                retained for signature stability; will be removed in a
-                follow-up.
 
         Returns:
             Dict mapping asset table name to list of uploaded ``AssetFilePath`` objects, e.g.

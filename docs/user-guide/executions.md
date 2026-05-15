@@ -247,27 +247,9 @@ exe.upload_execution_outputs()
 # Status: Stopped → Pending_Upload → Uploaded
 ```
 
-For large files or slow connections, tune the upload parameters:
-
-```python
-exe.upload_execution_outputs(
-    timeout=(1800, 1800),         # 30 min per chunk (connect and read)
-    chunk_size=25 * 1024 * 1024,  # 25 MB chunks
-    max_retries=5,
-    retry_delay=10.0,             # seconds; doubles each retry
-)
-```
-
-**Upload parameter reference:**
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `timeout` | `(600, 600)` | `(connect_timeout, read_timeout)` in seconds per chunk |
-| `chunk_size` | 50 MB | Chunk size in bytes for Hatrac uploads |
-| `max_retries` | `3` | Maximum retry attempts for failed uploads |
-| `retry_delay` | `5.0` | Initial delay between retries (seconds; doubles each attempt) |
-
 **Upload ordering.** Asset files are uploaded first. Only after all asset uploads succeed does `_flush_staged_features()` run. This ordering is required because feature records that reference asset files need the uploaded-asset RIDs before the INSERT.
+
+**Tuning for large files / slow connections.** Bag-commit (the post-cutover upload path) inherits the catalog session's HTTP timeout and Hatrac chunk size; tune those on the `DerivaML` instance rather than at the call site. There is no upload-level retry — the bag is uploaded in a single attempt and a failure raises ``DerivaMLUploadError``. Resumability comes from the manifest: a re-run of ``upload_execution_outputs()`` picks up only the entries marked ``pending``.
 
 **Notes:**
 
