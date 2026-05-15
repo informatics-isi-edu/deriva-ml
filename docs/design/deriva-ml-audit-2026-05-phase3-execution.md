@@ -1697,3 +1697,114 @@ primitives are `rid_lease.generate_lease_token` and
 `rid_lease.post_lease_batch`. `manifest_lease` becomes the only
 consumer. Consider folding `manifest_lease.lease_manifest_pending_assets`
 into a method on `AssetManifest` itself.
+
+---
+
+## Phase 3 audit — closing inventory (2026-05-15)
+
+Cross-checked every ranked action and Phase-4 follow-up candidate
+against the live source. **All 15 ranked actions and one Phase-4
+follow-up candidate (4.E lease unification) have shipped or been
+intentionally deferred with documentation.** This audit is closed.
+
+### Ranked actions (1–15)
+
+| # | Action | Status | Where it landed |
+|---|---|---|---|
+| 1 | Retire `state_store.py`'s pending-rows / directory-rules surface (+ matching tests) | ✅ shipped | PR #149 (commits `21b8ede7` + `314d8e7b` + `e4231ebb`). ~656 src LoC + ~650 test LoC retired. Three reader methods kept as no-op stubs so production callers (`core/base.py`, `core/mixins/execution.py`, `execution.py:2149/2278/2354`) continue to compile and truthfully report "nothing pending". |
+| 2 | Delete `lease_orchestrator.acquire_leases_for_execution` (+ 8 tests) | ✅ shipped | PR #149 (commit `21b8ede7`). `reconcile_pending_leases` retained as a no-op stub for two production call sites. |
+| 3 | Delete `Execution._flush_staged_features` (+ comment cleanup) | ✅ shipped | PR #149 (commit `b258d78a`). −110 LoC; the "retained for tests" docstring claim was false. |
+| 4 | Pure dead-code + stale-comment sweep | ✅ shipped | PR #149 (commit `576397a1`). `_engine_harness.py`, `Execution.upload_assets`, `environment.localeconv` / `locale_module`, IPython display fallback, stale task-id docstring refs (Group D/E/Task C3/F2/WI2). |
+| 5 | Fix three lying docstrings (`Workflow.setup_url_checksum`, `state_machine.transition.Raises`, `Execution.upload_execution_outputs.max_retries`) | ✅ shipped | PR #149 (commit `d0eef601`). |
+| 6 | Implement or remove `max_retries` / `retry_delay` on `upload_execution_outputs` | ✅ shipped | PR #149 (commit `c8a5c092`). Removed (no-ops). |
+| 7 | Add `tests/execution/conftest.py` with autouse `reset_multirun_state()` fixture | ✅ shipped | PR #149 (commit `9458620a`). Closes the §C.S6 state-leakage hole. |
+| 8 | Resolve `DatasetCollection`'s `Mapping.__iter__` contract violation | ✅ shipped | PR #149 (commit `714a524b`). Dropped `Mapping` inheritance; negative-contract regression test added. |
+| 9 | Factor `Execution.status` / `error` / `start_time` / `stop_time` to share `_get_registry_row`; add `__all__` to six high-traffic modules | ✅ shipped | PR #149 (commit `d7f46445`). |
+| 10 | Add bag-commit unit tests (`_add_asset_rows_to_bag`, `_add_staged_feature_rows_to_bag`, `load_execution_bag` with mocked `BagBuilder` + `BagCatalogLoader`) and `__exit__` exception-propagation tests | ✅ shipped (pragmatic subset) | PR #151. 9 tests covering `report_to_asset_map` shape + filtering and `_add_asset_rows_to_bag` lease batching. `_add_staged_feature_rows_to_bag` / `load_execution_bag` deferred (called out in the test file's module docstring). `__exit__` "exception during work" already covered by `test_execute_exit_with_exception_transitions_to_failed`. |
+| 11 | Delegate `Execution.__enter__` to `execution_start()` | ✅ shipped | PR #149 (commit `984fe2b4`). |
+| 12 | Consolidate IPython/Jupyter notebook-path detection in `find_caller.py` | ✅ shipped | PR #149 (commit `746cdc09`). −93 LoC. |
+| 13 | Address the Duration double-write in `Execution.execution_stop` | ✅ shipped | PR #149 (commit `984fe2b4`). Folded into the state-machine transition; added `duration` column to SQLite, projected as `Duration` in `_catalog_body_for_execution`. |
+| 14 | Make `Execution.uploaded_assets` a computed property reading from the manifest | ✅ shipped | PR #150 (commit `9433e9b7` after fix-up). Property reads from `report_to_asset_map(keys=None)`; five attribute write sites removed. `test_additive_upload_after_uploaded` was rewritten to pin the new full-manifest semantics. |
+| 15 | Swap raw ERMrest URLs in `state_machine.reconcile_with_catalog` (§2.2) and `lease_orchestrator.reconcile_pending_leases` (§2.5) for datapath calls | ✅ shipped | PR #149 (commit `396df9cd`). §2.5 was already addressed by C8b1's stub-out of `reconcile_pending_leases`. |
+
+### Items intentionally NOT done (explicit deferrals)
+
+1. **`_add_staged_feature_rows_to_bag` and `load_execution_bag`
+   mock-based unit tests.** Within audit #10's scope but in the
+   long tail of the ~400-LoC target. The 9 tests landing in PR #151
+   cover the highest-leverage subset (`report_to_asset_map`,
+   `_add_asset_rows_to_bag` lease batching). Adding the remaining
+   tests would require substantial mock-setup costs for marginal
+   coverage gain. Tracked.
+
+2. **`__exit__` exception-propagation: "exception in the upload"
+   and "double-exception" scenarios** (audit §C.2). Both require
+   substantial fixture mocking. The "exception during work"
+   scenario is already covered by
+   `test_execute_exit_with_exception_transitions_to_failed`.
+
+3. **Audit §1.3 — proposed `Execution._from_registry` deletion** —
+   **rejected after re-verification**. The audit claimed zero
+   callers, but `core/mixins/execution.py:495` (`resume_execution`)
+   clearly calls it. The function stays; only its stale-task-id
+   docstring was updated under §1.10.
+
+4. **Phase-4 candidate 4.A — `execution.py` structural split.**
+   The audit flagged this as motivation, not as in-scope. After
+   the Phase-3 deletions, `execution.py` is still substantial
+   (~2 800 LoC remaining after action #1 / #3 deletions). A future
+   Phase-4 PR can revisit if the split's value clearly exceeds the
+   diff cost.
+
+5. **Phase-4 candidates 4.B (state_store split), 4.C (byte-streaming
+   progress callback), 4.D (concurrent-execution safety review),
+   4.E (lease primitive unification).** All out of audit's
+   delivery scope; flagged as motivation for future work.
+
+### LoC reduction achieved
+
+| Source of reduction | LoC |
+|---|---:|
+| Action #1 — pending_rows / directory_rules surface retirement (PR #149) | ~−1 300 (src + tests) |
+| Action #3 — `_flush_staged_features` deletion | ~−110 |
+| Action #4 — dead-code + stale-comment sweep | ~−140 |
+| Action #12 — Jupyter-path consolidation | ~−95 |
+| Action #2 — lease orchestrator acquire-path | ~−195 |
+| Other (signature trimming, double-write, docstrings) | ~−100 |
+| **Total reduction in `execution/` subsystem** | **~−1 900 LoC** |
+
+PR #150 (#14) and PR #151 (#10) added small amounts of code
+(property body + test infrastructure) that the LoC tally doesn't
+include — both are net-positive value for net-near-zero LoC.
+
+### Closing posture
+
+Phase 3 `execution/` audit is closed. The subsystem is in the shape
+the audit recommended:
+
+- **One** asset-upload path (`bag_commit` via
+  `Execution._bag_commit_upload`). The pending-rows / directory-rules
+  architecture is gone.
+- **One** RID-lease primitive set (`rid_lease.generate_lease_token` +
+  `rid_lease.post_lease_batch`) consumed by `manifest_lease` and
+  `bag_commit`. The lease orchestrator's acquire path is gone.
+- **One** state machine (`state_machine.transition`) with Duration
+  folded into its `extra_fields` and a single catalog PUT per
+  transition (the historical double-write fragility is gone).
+- **Read-through properties** for every Execution lifecycle field
+  (`status`, `error`, `start_time`, `stop_time`, `uploaded_assets`)
+  — no in-memory caches. `_get_registry_row` factored.
+- **`DatasetCollection`** no longer claims to be a `Mapping`; the
+  contract is honest.
+- **No raw ERMrest URLs** in `execution/`; everything goes through
+  the datapath API.
+- **`DatasetLike`-style signature parity** enforced for the
+  Execution lifecycle (`__enter__` delegates to `execution_start`;
+  `__exit__` returns False unconditionally).
+- **Test coverage** rationalised: pending-rows-staging tests
+  retired with their writer; `report_to_asset_map` and
+  `_add_asset_rows_to_bag` lease batching pinned at the function
+  level.
+
+Any new structural concerns in `execution/` should start with a
+fresh audit, not a continuation of this one.
