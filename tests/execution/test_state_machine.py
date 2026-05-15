@@ -27,8 +27,7 @@ def test_allowed_transitions_cover_failure_paths():
 
 def test_allowed_transitions_cover_abort():
     # Abort legal from created, running, stopped, failed
-    for start in [ExecutionStatus.Created, ExecutionStatus.Running,
-                  ExecutionStatus.Stopped, ExecutionStatus.Failed]:
+    for start in [ExecutionStatus.Created, ExecutionStatus.Running, ExecutionStatus.Stopped, ExecutionStatus.Failed]:
         assert (start, ExecutionStatus.Aborted) in ALLOWED_TRANSITIONS
 
 
@@ -78,6 +77,7 @@ def test_validate_transition_rejects_disallowed():
 
 def test_invalid_transition_error_is_deriva_ml_exception():
     from deriva_ml.core.exceptions import DerivaMLException
+
     assert issubclass(InvalidTransitionError, DerivaMLException)
 
 
@@ -88,7 +88,8 @@ def test_transition_writes_sqlite(tmp_path):
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import transition
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -96,16 +97,21 @@ def test_transition_writes_sqlite(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Created,
-        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Created,
+        mode=ConnectionMode.offline,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
     )
 
     # Offline mode: no catalog argument, no sync attempt.
     transition(
         store=store,
-        catalog=None,                # offline → skip catalog sync
+        catalog=None,  # offline → skip catalog sync
         execution_rid="EXE-A",
         current=ExecutionStatus.Created,
         target=ExecutionStatus.Running,
@@ -126,10 +132,12 @@ def test_transition_rejects_invalid(tmp_path):
 
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import (
-        InvalidTransitionError, transition,
+        InvalidTransitionError,
+        transition,
     )
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -137,15 +145,22 @@ def test_transition_rejects_invalid(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Uploaded,
-        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Uploaded,
+        mode=ConnectionMode.offline,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
     )
 
     with pytest.raises(InvalidTransitionError):
         transition(
-            store=store, catalog=None, execution_rid="EXE-A",
+            store=store,
+            catalog=None,
+            execution_rid="EXE-A",
             current=ExecutionStatus.Uploaded,
             target=ExecutionStatus.Running,
             mode=ConnectionMode.offline,
@@ -160,7 +175,8 @@ def test_transition_running_to_pending_upload_on_crash_recovery(tmp_path):
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import transition
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -172,10 +188,15 @@ def test_transition_running_to_pending_upload_on_crash_recovery(tmp_path):
     # Created → Running transition that the crashed process completed
     # before dying).
     store.insert_execution(
-        rid="EXE-CRASH", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Running,
-        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-CRASH",
-        created_at=now, last_activity=now,
+        rid="EXE-CRASH",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Running,
+        mode=ConnectionMode.offline,
+        working_dir_rel="execution/EXE-CRASH",
+        created_at=now,
+        last_activity=now,
     )
 
     transition(
@@ -194,6 +215,7 @@ def test_transition_running_to_pending_upload_on_crash_recovery(tmp_path):
 
 class _MockTable:
     """Records update() calls for assertion."""
+
     def __init__(self, owner: "_MockCatalog"):
         self._owner = owner
 
@@ -238,6 +260,7 @@ class _MockCatalog:
     Records both raw `put` calls and pathBuilder `update` calls in
     `put_calls` for backward-compat with existing assertions.
     """
+
     def __init__(self, *, put_should_fail: bool = False):
         self.put_should_fail = put_should_fail
         self.put_calls: list[dict] = []
@@ -259,7 +282,8 @@ def test_online_transition_syncs_catalog(tmp_path):
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import transition
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -267,17 +291,26 @@ def test_online_transition_syncs_catalog(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Created,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Created,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
     )
 
     cat = _MockCatalog()
     transition(
-        store=store, catalog=cat, execution_rid="EXE-A",
-        current=ExecutionStatus.Created, target=ExecutionStatus.Running,
-        mode=ConnectionMode.online, extra_fields={"start_time": now},
+        store=store,
+        catalog=cat,
+        execution_rid="EXE-A",
+        current=ExecutionStatus.Created,
+        target=ExecutionStatus.Running,
+        mode=ConnectionMode.online,
+        extra_fields={"start_time": now},
     )
 
     row = store.get_execution("EXE-A")
@@ -299,7 +332,8 @@ def test_online_transition_soft_fails_on_catalog_error(tmp_path):
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import transition
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -307,18 +341,26 @@ def test_online_transition_soft_fails_on_catalog_error(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Created,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Created,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
     )
 
     cat = _MockCatalog(put_should_fail=True)
     # SQLite transition must still succeed; the catalog failure is
     # soft — user gets sync_pending=True for the next pass to flush.
     transition(
-        store=store, catalog=cat, execution_rid="EXE-A",
-        current=ExecutionStatus.Created, target=ExecutionStatus.Running,
+        store=store,
+        catalog=cat,
+        execution_rid="EXE-A",
+        current=ExecutionStatus.Created,
+        target=ExecutionStatus.Running,
         mode=ConnectionMode.online,
     )
 
@@ -334,7 +376,8 @@ def test_flush_pending_sync_pushes_catalog(tmp_path):
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import flush_pending_sync, transition
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -342,15 +385,23 @@ def test_flush_pending_sync_pushes_catalog(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Created,
-        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Created,
+        mode=ConnectionMode.offline,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
     )
     # Do an offline transition: SQLite has sync_pending=True.
     transition(
-        store=store, catalog=None, execution_rid="EXE-A",
-        current=ExecutionStatus.Created, target=ExecutionStatus.Running,
+        store=store,
+        catalog=None,
+        execution_rid="EXE-A",
+        current=ExecutionStatus.Created,
+        target=ExecutionStatus.Running,
         mode=ConnectionMode.offline,
     )
     assert store.get_execution("EXE-A")["sync_pending"] is True
@@ -370,7 +421,8 @@ def test_flush_pending_sync_noop_when_not_pending(tmp_path):
     from deriva_ml.core.connection_mode import ConnectionMode
     from deriva_ml.execution.state_machine import flush_pending_sync
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
 
     eng = create_engine(f"sqlite:///{tmp_path}/t.db")
@@ -378,10 +430,15 @@ def test_flush_pending_sync_noop_when_not_pending(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Stopped,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Stopped,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
         sync_pending=False,
     )
 
@@ -390,23 +447,94 @@ def test_flush_pending_sync_noop_when_not_pending(tmp_path):
     assert len(cat.put_calls) == 0
 
 
+class _MockColumn:
+    """Stand-in for a datapath column reference (e.g. ``table.RID``).
+
+    The production code writes ``table.filter(table.RID == rid)`` —
+    the mock ignores the criterion, so the column just needs to
+    support ``==`` (and return any sentinel object that the parent
+    filter call can swallow).
+    """
+
+    def __eq__(self, _other):
+        return self  # criterion is ignored by the mock filter
+
+    def __hash__(self):
+        return id(self)
+
+
+class _MockFetchableFilter:
+    """Filter handle that returns a canned row list from `.entities().fetch()`.
+
+    Mirrors the datapath shape used by ``reconcile_with_catalog`` after
+    the Phase 3 §2.2 swap (raw URL GET → datapath filter/fetch).
+    """
+
+    def __init__(self, owner: "_MockCatalogWithGet"):
+        self._owner = owner
+        # Expose ``.RID`` so the production-code expression
+        # ``table.filter(table.RID == rid)`` doesn't AttributeError.
+        self.RID = _MockColumn()
+
+    def filter(self, _criterion):
+        return self
+
+    def entities(self):
+        return self
+
+    def fetch(self):
+        if self._owner._get_row == "raise":
+            raise RuntimeError("simulated 500")
+        return [self._owner._get_row] if self._owner._get_row is not None else []
+
+
+class _MockTablesContainerWithFetch(_MockTablesContainer):
+    """Tables container whose `Execution` slot supports filter/fetch."""
+
+    def __init__(self, owner: "_MockCatalogWithGet"):
+        super().__init__(owner)
+        self._owner = owner
+
+    def __getitem__(self, name):
+        # Defer to the parent for non-Execution tables (kept for the
+        # transition-side update() shape).
+        if name == "Execution":
+            return _MockFetchableFilter(self._owner)
+        return super().__getitem__(name)
+
+
+class _MockSchemaWithFetch(_MockSchema):
+    def __init__(self, owner: "_MockCatalogWithGet"):
+        super().__init__(owner)
+        self.tables = _MockTablesContainerWithFetch(owner)
+
+
+class _MockSchemasWithFetch(_MockSchemas):
+    def __getitem__(self, name):
+        return _MockSchemaWithFetch(self._owner)
+
+
+class _MockPathBuilderWithFetch(_MockPathBuilder):
+    def __init__(self, owner: "_MockCatalogWithGet"):
+        self.schemas = _MockSchemasWithFetch(owner)
+
+
 class _MockCatalogWithGet(_MockCatalog):
-    """Extends the mock with a configurable GET response."""
+    """Extends the mock with a configurable GET response.
+
+    After the Phase 3 §2.2 cleanup, ``reconcile_with_catalog`` reads
+    rows via the datapath API instead of a raw URL GET; this mock
+    routes the canned row through ``pb.schemas[...].tables["Execution"]
+    .filter(...).entities().fetch()``.
+    """
+
     def __init__(self, *, get_row: dict | None | str = None, **kw):
         super().__init__(**kw)
         # get_row: dict = returned row, None = 404/no row, "raise" = raise
         self._get_row = get_row
 
-    def get(self, path: str, **_kw):
-        if self._get_row == "raise":
-            raise RuntimeError("simulated 500")
-        class _R:
-            def __init__(self, row):
-                self._row = row
-            def json(self):
-                return [self._row] if self._row is not None else []
-            status_code = 200
-        return _R(self._get_row)
+    def getPathBuilder(self):
+        return _MockPathBuilderWithFetch(self)
 
 
 def test_reconcile_no_disagreement(tmp_path):
@@ -415,7 +543,8 @@ def test_reconcile_no_disagreement(tmp_path):
 
     from deriva_ml.execution.state_machine import reconcile_with_catalog
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
     from deriva_ml.core.connection_mode import ConnectionMode
 
@@ -424,10 +553,16 @@ def test_reconcile_no_disagreement(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Stopped,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now, sync_pending=False,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Stopped,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
+        sync_pending=False,
     )
 
     cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Stopped"})
@@ -443,7 +578,8 @@ def test_reconcile_catalog_says_aborted(tmp_path):
 
     from deriva_ml.execution.state_machine import reconcile_with_catalog
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
     from deriva_ml.core.connection_mode import ConnectionMode
 
@@ -452,10 +588,16 @@ def test_reconcile_catalog_says_aborted(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Running,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now, sync_pending=False,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Running,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
+        sync_pending=False,
     )
 
     cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Aborted"})
@@ -470,7 +612,8 @@ def test_reconcile_catalog_says_uploaded(tmp_path):
 
     from deriva_ml.execution.state_machine import reconcile_with_catalog
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
     from deriva_ml.core.connection_mode import ConnectionMode
 
@@ -479,10 +622,16 @@ def test_reconcile_catalog_says_uploaded(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Pending_Upload,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now, sync_pending=False,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Pending_Upload,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
+        sync_pending=False,
     )
 
     cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Uploaded"})
@@ -497,7 +646,8 @@ def test_reconcile_sqlite_stopped_catalog_running(tmp_path):
 
     from deriva_ml.execution.state_machine import reconcile_with_catalog
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
     from deriva_ml.core.connection_mode import ConnectionMode
 
@@ -506,10 +656,16 @@ def test_reconcile_sqlite_stopped_catalog_running(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Stopped,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now, sync_pending=False,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Stopped,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
+        sync_pending=False,
     )
 
     cat = _MockCatalogWithGet(get_row={"RID": "EXE-A", "Status": "Running"})
@@ -527,7 +683,8 @@ def test_reconcile_catalog_missing_raises(tmp_path):
     from deriva_ml.core.exceptions import DerivaMLStateInconsistency
     from deriva_ml.execution.state_machine import reconcile_with_catalog
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
     from deriva_ml.core.connection_mode import ConnectionMode
 
@@ -536,10 +693,15 @@ def test_reconcile_catalog_missing_raises(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Stopped,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Stopped,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
     )
 
     cat = _MockCatalogWithGet(get_row=None)
@@ -554,7 +716,8 @@ def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
 
     from deriva_ml.execution.state_machine import reconcile_with_catalog
     from deriva_ml.execution.state_store import (
-        ExecutionStateStore, ExecutionStatus,
+        ExecutionStateStore,
+        ExecutionStatus,
     )
     from deriva_ml.core.connection_mode import ConnectionMode
 
@@ -563,14 +726,21 @@ def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-A", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Stopped,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-A",
-        created_at=now, last_activity=now, sync_pending=False,
+        rid="EXE-A",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Stopped,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-A",
+        created_at=now,
+        last_activity=now,
+        sync_pending=False,
     )
 
     cat = _MockCatalogWithGet(get_row="raise")
     import logging
+
     with caplog.at_level(logging.WARNING):
         reconcile_with_catalog(store=store, catalog=cat, execution_rid="EXE-A")
     # SQLite unchanged.
@@ -580,6 +750,7 @@ def test_reconcile_catalog_error_logs_and_returns(tmp_path, caplog):
 
 class _MockCatalogWithInsert(_MockCatalog):
     """Mock that records POSTs to Execution and returns a fake RID."""
+
     def __init__(self, *, assigned_rid: str = "EXE-NEW", **kw):
         super().__init__(**kw)
         self.assigned_rid = assigned_rid
@@ -587,10 +758,16 @@ class _MockCatalogWithInsert(_MockCatalog):
 
     def post(self, path: str, json=None, **_kw):
         self.post_calls.append({"path": path, "json": json})
+
         class _R:
-            def __init__(self, rid): self._rid = rid
-            def json(self): return [{"RID": self._rid, **(json[0] if json else {})}]
+            def __init__(self, rid):
+                self._rid = rid
+
+            def json(self):
+                return [{"RID": self._rid, **(json[0] if json else {})}]
+
             status_code = 201
+
         return _R(self.assigned_rid)
 
 
@@ -612,6 +789,7 @@ def test_create_catalog_execution_posts_and_returns_rid():
 
 def test_public_api_exported():
     import deriva_ml.execution.state_machine as sm
+
     expected = {
         "ALLOWED_TRANSITIONS",
         "InvalidTransitionError",

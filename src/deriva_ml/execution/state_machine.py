@@ -482,9 +482,12 @@ def reconcile_with_catalog(
     sqlite_status = ExecutionStatus(sqlite_row["status"])
 
     try:
-        # URL filter on RID — returns a list of 0 or 1 rows.
-        response = catalog.get(f"/entity/deriva-ml:Execution/RID={execution_rid}")
-        rows = response.json()
+        # Datapath filter on RID — returns a list of 0 or 1 rows.
+        # Matches the rest of the codebase's catalog-read idiom; the
+        # raw-URL form here was the lone outlier (audit §2.2).
+        pb = catalog.getPathBuilder()
+        execution_table = pb.schemas["deriva-ml"].tables["Execution"]
+        rows = list(execution_table.filter(execution_table.RID == execution_rid).entities().fetch())
     except Exception as exc:
         logger.warning(
             "reconcile %s: catalog GET failed (%s); leaving SQLite as-is",
