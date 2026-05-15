@@ -1,13 +1,22 @@
-"""Tests for DatasetBag.restructure_assets, focusing on file_transformer and manifest return."""
+"""Tests for restructure_assets, focusing on file_transformer and manifest return.
 
-import shutil
+After the Phase 3 §3.B split, the implementation lives in
+:mod:`deriva_ml.dataset.restructure` as module-level functions
+taking a :class:`DatasetBag`. We mock the helper functions in that
+module (via ``monkeypatch``) and call :func:`restructure_assets`
+directly. The :meth:`DatasetBag.restructure_assets` sugar method is
+still tested incidentally because the new public ``restructure_assets``
+free function is what the bag method now delegates to.
+"""
+
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
+from deriva_ml.dataset import restructure as restructure_mod
 from deriva_ml.dataset.dataset_bag import DatasetBag
-
+from deriva_ml.dataset.restructure import restructure_assets
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -17,19 +26,46 @@ ASSET_RID = "1-ABC"
 DATASET_RID = "1-DS1"
 
 
+@pytest.fixture(autouse=True)
+def stub_restructure_helpers(monkeypatch: pytest.MonkeyPatch):
+    """Patch the module-level helpers used by ``restructure_assets``.
+
+    The implementation calls ``_detect_asset_table(bag)`` (etc.) as
+    free functions in :mod:`deriva_ml.dataset.restructure`. Each test
+    sets up the per-test return values via the ``configure_bag``
+    helper below; this fixture installs the no-op defaults so the
+    helpers don't try to talk to a real bag.
+    """
+    monkeypatch.setattr(restructure_mod, "_detect_asset_table", lambda bag: "Image")
+    monkeypatch.setattr(
+        restructure_mod, "_build_dataset_type_path_map", lambda bag, sel=None: {DATASET_RID: ["train"]}
+    )
+    monkeypatch.setattr(restructure_mod, "_get_asset_dataset_mapping", lambda bag, asset_table: {})
+    monkeypatch.setattr(restructure_mod, "_get_reachable_assets", lambda bag, asset_table: [])
+    yield
+
+
 def _make_bag(tmp_path: Path, assets: list[dict]) -> MagicMock:
-    """Return a MagicMock[DatasetBag] with internal methods pre-configured."""
+    """Return a MagicMock[DatasetBag] paired with helper stubs for the given assets.
+
+    The mock bag itself doesn't need methods configured anymore (the helpers
+    are at module level). Instead we re-bind the two helpers that vary per
+    test — ``_get_asset_dataset_mapping`` and ``_get_reachable_assets`` —
+    on the restructure module so they return values keyed off ``assets``.
+    """
     bag = MagicMock(spec=DatasetBag)
-    bag._detect_asset_table.return_value = "Image"
-    bag._build_dataset_type_path_map.return_value = {DATASET_RID: ["train"]}
-    bag._get_asset_dataset_mapping.return_value = {a["RID"]: DATASET_RID for a in assets}
-    bag._get_reachable_assets.return_value = assets
+    # The module-level helper stubs need to know about *this* test's assets.
+    # The autouse fixture installed no-op defaults; override them for this test.
+    import deriva_ml.dataset.restructure as r
+
+    r._get_asset_dataset_mapping = lambda b, asset_table: {a["RID"]: DATASET_RID for a in assets}
+    r._get_reachable_assets = lambda b, asset_table: assets
     return bag
 
 
 def _call(bag: MagicMock, output_dir: Path, **kwargs) -> dict[Path, Path]:
-    """Call restructure_assets as an unbound method so the mock is used as self."""
-    return DatasetBag.restructure_assets(bag, output_dir=output_dir, **kwargs)
+    """Call restructure_assets as a free function with the mock bag."""
+    return restructure_assets(bag, output_dir=output_dir, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -210,13 +246,13 @@ def test_split_parent_transparent_in_type_path(tmp_path: Path, src_file: Path) -
     get their own clean paths via their own types.
     """
     out_dir = tmp_path / "output"
-    SPLIT_RID = "1-SPL"
     TRAIN_RID = "1-TRN"
 
     assets = [{"RID": ASSET_RID, "Filename": str(src_file)}]
     bag = _make_bag(tmp_path, assets)
-    bag._build_dataset_type_path_map.return_value = {TRAIN_RID: ["train"]}
-    bag._get_asset_dataset_mapping.return_value = {ASSET_RID: TRAIN_RID}
+    # Override module-level helpers for this test's split-parent scenario.
+    restructure_mod._build_dataset_type_path_map = lambda b, sel=None: {TRAIN_RID: ["train"]}
+    restructure_mod._get_asset_dataset_mapping = lambda b, asset_table: {ASSET_RID: TRAIN_RID}
 
     manifest = _call(
         bag,
@@ -246,8 +282,8 @@ def test_split_parent_transparent_with_default_type_map(tmp_path: Path, src_file
     assets = [{"RID": ASSET_RID, "Filename": str(src_file)}]
     bag = _make_bag(tmp_path, assets)
     # Simulate: Split parent has no path component; Training child maps to ["training"]
-    bag._build_dataset_type_path_map.return_value = {TRAIN_RID: ["training"]}
-    bag._get_asset_dataset_mapping.return_value = {ASSET_RID: TRAIN_RID}
+    restructure_mod._build_dataset_type_path_map = lambda b, sel=None: {TRAIN_RID: ["training"]}
+    restructure_mod._get_asset_dataset_mapping = lambda b, asset_table: {ASSET_RID: TRAIN_RID}
 
     # Call without explicit type_to_dir_map — uses the built-in default
     manifest = _call(bag, out_dir)
@@ -275,8 +311,8 @@ def test_transformer_multiple_assets(tmp_path: Path) -> None:
     out_dir = tmp_path / "output"
     assets = [{"RID": f"1-A{i}", "Filename": str(files[i])} for i in range(3)]
     bag = _make_bag(tmp_path, assets)
-    # Fix the dataset mapping for all three RIDs
-    bag._get_asset_dataset_mapping.return_value = {a["RID"]: DATASET_RID for a in assets}
+    # _make_bag already wires _get_asset_dataset_mapping to return the
+    # right mapping for all three RIDs; nothing extra needed here.
 
     converted: list[Path] = []
 
