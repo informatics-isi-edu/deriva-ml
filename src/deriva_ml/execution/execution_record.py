@@ -47,6 +47,9 @@ if TYPE_CHECKING:
     from deriva_ml.interfaces import DerivaMLCatalog
 
 
+__all__ = ["ExecutionRecord"]
+
+
 class ExecutionRecord(BaseModel):
     """Represents a catalog record for an execution.
 

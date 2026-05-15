@@ -204,7 +204,6 @@ def transition(
             ALLOWED_TRANSITIONS.
         ValueError: If mode=offline but catalog is not None, or
             mode=online but catalog is None. These are caller bugs.
-        NotImplementedError: Online-mode path is implemented in Task C3.
 
     Example:
         >>> transition(  # doctest: +SKIP
@@ -336,16 +335,19 @@ def _catalog_body_for_execution(
     # Catalog Execution schema has: Workflow, Description, Duration,
     # Status, Status_Detail (see src/deriva_ml/schema/create_schema.py).
     # Start/stop times are NOT catalog columns — they live in SQLite
-    # only. Duration is computed elsewhere (in execution_stop) and
-    # written directly; don't echo it here.
-    return [
-        {
-            "RID": row["rid"],
-            "Status": row["status"],
-            # Status_Detail: prefer error if present, else description.
-            "Status_Detail": row["error"] or row["description"],
-        }
-    ]
+    # only. Duration IS a catalog column; we project it when SQLite
+    # has it set (execution_stop writes it during the Running →
+    # Stopped transition; pre-Stopped rows have duration=NULL and
+    # leave the catalog column unchanged via the body's omission).
+    body: dict = {
+        "RID": row["rid"],
+        "Status": row["status"],
+        # Status_Detail: prefer error if present, else description.
+        "Status_Detail": row["error"] or row["description"],
+    }
+    if row.get("duration") is not None:
+        body["Duration"] = row["duration"]
+    return [body]
 
 
 def flush_pending_sync(
@@ -480,9 +482,12 @@ def reconcile_with_catalog(
     sqlite_status = ExecutionStatus(sqlite_row["status"])
 
     try:
-        # URL filter on RID — returns a list of 0 or 1 rows.
-        response = catalog.get(f"/entity/deriva-ml:Execution/RID={execution_rid}")
-        rows = response.json()
+        # Datapath filter on RID — returns a list of 0 or 1 rows.
+        # Matches the rest of the codebase's catalog-read idiom; the
+        # raw-URL form here was the lone outlier (audit §2.2).
+        pb = catalog.getPathBuilder()
+        execution_table = pb.schemas["deriva-ml"].tables["Execution"]
+        rows = list(execution_table.filter(execution_table.RID == execution_rid).entities().fetch())
     except Exception as exc:
         logger.warning(
             "reconcile %s: catalog GET failed (%s); leaving SQLite as-is",

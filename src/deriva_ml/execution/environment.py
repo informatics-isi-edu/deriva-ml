@@ -18,7 +18,6 @@ Typical usage example:
 """
 
 import importlib.metadata
-import locale
 import os
 import platform
 import site
@@ -235,56 +234,4 @@ def get_sys_info() -> Dict[str, Any]:
             values[func] = getattr(sys, func)()
         except (OSError, AttributeError) as exc:
             values[func] = exc
-    return values
-
-
-def localeconv() -> list[str]:
-    """Gets locale convention information.
-
-    Returns formatted strings containing locale-specific formatting information
-    for numbers, currency, and other locale-dependent values.
-
-    Returns:
-        List[str]: Formatted strings with locale convention information.
-
-    Example:
-        >>> info = localeconv()
-        >>> for item in info:
-        ...     print(item)  # e.g., "decimal_point: ."
-    """
-    values: list[str] = []
-    for key, value in sorted(locale.localeconv().items()):
-        if isinstance(value, bytes):
-            value = value.decode("ascii", errors="replace")
-        if key == "currency_symbol":
-            value = repr(value)
-        values.append("%s: %s" % (key, value))
-    return values
-
-
-def locale_module() -> list[str]:
-    """Gets locale settings information.
-
-    Returns formatted strings containing information about the current locale
-    settings for various categories (e.g., numeric formatting, time, etc.).
-
-    Returns:
-        List[str]: Formatted strings with locale settings.
-
-    Example:
-        >>> info = locale_module()
-        >>> for item in info:
-        ...     print(item)  # e.g., "LC_NUMERIC: en_US.UTF-8"
-    """
-    values: list[str] = []
-    values.append("getdefaultlocale(): {}".format(locale.getdefaultlocale()))
-    for category in [
-        "LC_CTYPE",
-        "LC_COLLATE",
-        "LC_TIME",
-        "LC_MONETARY",
-        "LC_MESSAGES",
-        "LC_NUMERIC",
-    ]:
-        values.append("getlocale(locale.{}): {}".format(category, locale.getlocale(getattr(locale, category))))
     return values

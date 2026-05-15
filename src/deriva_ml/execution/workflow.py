@@ -21,55 +21,21 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import requests
 from pydantic import BaseModel, PrivateAttr, field_validator, model_validator
-from requests import RequestException
 
 from deriva_ml.core.definitions import RID, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError, DerivaMLException
-from deriva_ml.execution.find_caller import _get_calling_module
-from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.execution.find_caller import _get_calling_module
 
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from deriva_ml.interfaces import DerivaMLCatalog
 
-try:
-    from IPython.core.getipython import get_ipython
-except ImportError:  # Graceful fallback if IPython isn't installed.
 
-    def get_ipython() -> None:
-        return None
-
-
-try:
-    from jupyter_server.serverapp import list_running_servers
-
-    def get_servers() -> list[Any]:
-        return list(list_running_servers())
-except ImportError:
-
-    def list_running_servers():
-        return []
-
-    def get_servers() -> list[Any]:
-        return list_running_servers()
-
-
-try:
-    from ipykernel.connect import get_connection_file
-
-    def get_kernel_connection() -> str:
-        return get_connection_file()
-except ImportError:
-
-    def get_connection_file():
-        return ""
-
-    def get_kernel_connection() -> str:
-        return get_connection_file()
+__all__ = ["Workflow"]
 
 
 class Workflow(BaseModel):
@@ -381,37 +347,47 @@ class Workflow(BaseModel):
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":
-        """Creates a workflow from the current execution context.
+        """Pydantic post-construction validator that fills in ``url`` and ``checksum``.
 
-        Identifies the currently executing program (script or notebook) and creates
-        a workflow definition. Automatically determines the Git repository information
-        and source code checksum.
+        Runs automatically after every ``Workflow(...)`` construction
+        (it is a ``@model_validator(mode="after")``). For any field
+        the caller did not provide, the validator derives a value from
+        the current execution context:
 
-        The behavior can be configured using environment variables:
-            - DERIVA_ML_WORKFLOW_URL: Override the detected workflow URL
-            - DERIVA_ML_WORKFLOW_CHECKSUM: Override the computed checksum
-            - DERIVA_MCP_IN_DOCKER: Set to "true" to use Docker metadata instead of git
+        - ``url`` — set to the resolved source URL of the calling
+          script/notebook. Resolution prefers a Docker image
+          identifier (when ``DERIVA_MCP_IN_DOCKER=true``), then falls
+          back to git remote + commit + path, then to a file:// path.
+        - ``checksum`` — set to the git commit SHA of the calling
+          script (or the Docker image digest when running in Docker).
+        - ``version`` — set from ``DERIVA_MCP_VERSION`` when present.
 
-        Docker environment variables (used when DERIVA_MCP_IN_DOCKER=true):
-            - DERIVA_MCP_VERSION: Semantic version of the Docker image
-            - DERIVA_MCP_GIT_COMMIT: Git commit hash at build time
-            - DERIVA_MCP_IMAGE_DIGEST: Docker image digest (unique identifier)
-            - DERIVA_MCP_IMAGE_NAME: Docker image name (e.g., ghcr.io/org/repo)
+        Caller-supplied values are never overwritten — this is a
+        "fill in the blanks" validator, not a re-derivation.
 
-        Args:
+        Environment variable overrides:
+            - ``DERIVA_ML_WORKFLOW_URL``: force-set ``url``.
+            - ``DERIVA_ML_WORKFLOW_CHECKSUM``: force-set ``checksum``.
+            - ``DERIVA_MCP_IN_DOCKER=true``: use Docker image metadata
+              instead of git.
+
+        Docker-only environment variables (consulted when
+        ``DERIVA_MCP_IN_DOCKER=true``):
+            - ``DERIVA_MCP_VERSION``: semantic version of the Docker image.
+            - ``DERIVA_MCP_GIT_COMMIT``: git commit hash at image build time.
+            - ``DERIVA_MCP_IMAGE_DIGEST``: image digest (unique identifier).
+            - ``DERIVA_MCP_IMAGE_NAME``: image name (e.g.
+              ``ghcr.io/informatics-isi-edu/deriva-ml-mcp``).
 
         Returns:
-            Workflow: New workflow instance with detected Git information.
+            Workflow: ``self`` (the same instance, mutated in place).
+            Pydantic ``mode="after"`` validators must return the
+            model.
 
         Raises:
-            DerivaMLException: If not in a Git repository or detection fails (non-Docker).
-
-        Example:
-            >>> workflow = Workflow.create_workflow(  # doctest: +SKIP
-            ...     name="Sample Analysis",
-            ...     workflow_type="python_script",
-            ...     description="Process sample data"
-            ... )
+            DerivaMLException: If the validator cannot determine a
+                URL or checksum from any source (e.g. not in a git
+                repo, Docker env vars missing, no explicit overrides).
         """
         self._logger = get_logger(__name__)
         # Check if running in Docker container (no git repo available)
@@ -580,73 +556,6 @@ class Workflow(BaseModel):
             logger.warning("nbstripout is not found. Please install it with: pip install nbstripout")
 
     @staticmethod
-    def _get_notebook_path() -> Path | None:
-        """Gets the path of the currently executing notebook.
-
-        Returns:
-            Path | None: Absolute path to current notebook, or None if not in notebook.
-        """
-
-        server, session = Workflow._get_notebook_session()
-
-        if server and session:
-            relative_path = session["notebook"]["path"]
-            # Join the notebook directory with the relative path
-            return Path(server["root_dir"]) / relative_path
-        else:
-            return None
-
-    @staticmethod
-    def _get_notebook_session() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-        """Return the absolute path of the current notebook."""
-        # Get the kernel's connection file and extract the kernel ID
-        try:
-            if not (connection_file := Path(get_kernel_connection()).name):
-                return None, None
-        except RuntimeError:
-            return None, None
-
-        # Extract kernel ID from connection filename.
-        # Standard Jupyter format: "kernel-<kernel_id>.json"
-        # PyCharm/other formats may vary: "<kernel_id>.json" or other patterns
-        kernel_id = None
-        if connection_file.startswith("kernel-") and "-" in connection_file:
-            # Standard format: kernel-<uuid>.json
-            parts = connection_file.split("-", 1)
-            if len(parts) > 1:
-                kernel_id = parts[1].rsplit(".", 1)[0]
-        else:
-            # Fallback: assume filename (without extension) is the kernel ID
-            kernel_id = connection_file.rsplit(".", 1)[0]
-
-        if not kernel_id:
-            return None, None
-
-        # Look through the running server sessions to find the matching kernel ID
-        for server in get_servers():
-            try:
-                # If a token is required for authentication, include it in headers
-                token = server.get("token", "")
-                headers = {}
-                if token:
-                    headers["Authorization"] = f"token {token}"
-
-                try:
-                    sessions_url = server["url"] + "api/sessions"
-                    response = requests.get(sessions_url, headers=headers)
-                    response.raise_for_status()
-                    sessions = response.json()
-                except RequestException as e:
-                    raise e
-                for sess in sessions:
-                    if sess["kernel"]["id"] == kernel_id:
-                        return server, sess
-            except Exception as _e:
-                # Ignore servers we can't connect to.
-                pass
-        return None, None
-
-    @staticmethod
     def _in_repl():
         # Standard Python interactive mode
         if hasattr(sys, "ps1"):
@@ -669,8 +578,19 @@ class Workflow(BaseModel):
 
     @staticmethod
     def _get_python_script() -> tuple[Path, bool]:
-        """Return the path to the currently executing script"""
-        is_notebook = Workflow._get_notebook_path() is not None
+        """Return the path to the currently executing script.
+
+        Returns:
+            ``(script_path, is_notebook)`` — ``script_path`` is the
+            resolved absolute path; ``is_notebook`` is ``True`` when
+            running inside a Jupyter notebook (``.ipynb`` path
+            resolves).
+        """
+        # ``find_caller._get_notebook_path()`` is the single source
+        # of truth for Jupyter session lookup (audit §2.7 / §4.6).
+        from deriva_ml.execution.find_caller import _get_notebook_path
+
+        is_notebook = _get_notebook_path() is not None
         return Path(_get_calling_module()), is_notebook
 
     @staticmethod

@@ -42,6 +42,9 @@ if TYPE_CHECKING:
     from deriva_ml.execution.upload_report import UploadReport
 
 
+__all__ = ["ExecutionSnapshot"]
+
+
 class ExecutionSnapshot(BaseModel):
     """Frozen snapshot of an execution's registry row plus pending counts.
 

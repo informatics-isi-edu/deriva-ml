@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 
 def _make_exe(test_ml, description: str):
     """Helper: build a test workflow + execution for readthrough tests."""
@@ -78,6 +76,7 @@ def test_status_raises_if_registry_gone(test_ml):
     """If the SQLite registry row is deleted (gc), the read-through
     property surfaces clearly rather than returning stale cache."""
     import pytest
+
     from deriva_ml.core.exceptions import DerivaMLStateInconsistency
 
     exe = _make_exe(test_ml, "gone")
@@ -108,6 +107,7 @@ def test_execute_exit_with_exception_transitions_to_failed(test_ml):
     `failed` and captures the error message. The exception propagates
     (new __exit__ returns False, unlike the legacy True-suppression)."""
     import pytest
+
     from deriva_ml.execution.state_store import ExecutionStatus
 
     exe = _make_exe(test_ml, "E2 failure test")
@@ -149,20 +149,19 @@ def test_start_stop_time_readthrough(test_ml):
     assert exe.stop_time >= exe.start_time
 
 
-def test_repr_includes_status_and_pending(test_ml):
-    """__repr__ shows the rid + status + pending counts."""
-    from datetime import datetime, timezone
+def test_repr_includes_rid_and_status(test_ml):
+    """__repr__ shows the rid + status.
 
+    The pending-counts suffix is only present when
+    ``count_pending_by_kind`` returns non-zero counts. After the
+    Phase 3 retirement of the pending-rows write surface (audit
+    §1.5) the counts are always zero, so the suffix is always
+    omitted; we pin the rid+status shape instead.
+    """
     exe = _make_exe(test_ml, "repr")
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
-    store.insert_pending_row(
-        execution_rid=exe.execution_rid, key="k",
-        target_schema="s", target_table="t",
-        metadata_json="{}", created_at=now,
-    )
-
     r = repr(exe)
     assert exe.execution_rid in r
-    assert "Created" in r   # status (SQLite is title-case ExecutionStatus)
-    assert "1" in r         # pending count
+    assert "Created" in r  # status (SQLite is title-case ExecutionStatus)
+    # The pending-counts suffix is omitted when counts are zero;
+    # the stubbed pending readers always report zero.
+    assert "pending=" not in r

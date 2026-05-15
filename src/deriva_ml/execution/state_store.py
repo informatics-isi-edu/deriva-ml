@@ -1,9 +1,24 @@
 """SQLite-backed store for execution state.
 
-Defines three tables in the workspace main.db:
-- execution_state__executions: per-execution registry row
-- execution_state__pending_rows: rows staged for catalog insert
-- execution_state__directory_rules: registered asset directories
+Defines the executions table in the workspace main.db:
+
+- ``execution_state__executions``: per-execution registry row.
+
+The earlier design (per ``2026-04-18-sqlite-execution-state-design.md``)
+also defined ``execution_state__pending_rows`` and
+``execution_state__directory_rules`` tables for an upload-engine
+that was superseded by the bag-commit path before its writer
+shipped. That surface was retired in the Phase 3 cleanup
+(audit ``docs/design/deriva-ml-audit-2026-05-phase3-execution.md``
+§1.5). Three reader methods —
+:meth:`ExecutionStateStore.count_pending_rows`,
+:meth:`~ExecutionStateStore.count_pending_by_kind`,
+:meth:`~ExecutionStateStore.pending_summary_rows` — survive as
+no-op stubs so the production call sites that consume their output
+(``count`` for the schema-refresh guard, ``by_kind`` for
+``find_executions`` / ``Execution.pending_summary``,
+``summary_rows`` for the ``PendingSummary`` rendering) continue to
+compile and report "nothing pending".
 
 Uses SQLAlchemy Core (no ORM) matching the codebase pattern for
 library-bookkeeping tables (ManifestStore, ResultCache). See spec
@@ -25,21 +40,18 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    ForeignKey,
     Index,
-    Integer,
     MetaData,
     String,
     Table,
     Text,
-    case,
     delete,
-    func,
     insert,
     select,
     update,
 )
 from sqlalchemy.engine import Engine
+
 from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -72,57 +84,21 @@ class ExecutionStatus(StrEnum):
     Aborted = "Aborted"
 
 
-class PendingRowStatus(StrEnum):
-    """Per-pending-row status (see spec §2.5.2).
-
-    Transitions are:
-        staged → leasing → leased → uploading → {uploaded, failed}
-    """
-
-    staged = "staged"
-    leasing = "leasing"
-    leased = "leased"
-    uploading = "uploading"
-    uploaded = "uploaded"
-    failed = "failed"
-
-
-class DirectoryRuleStatus(StrEnum):
-    """Per-directory-rule status (see spec §2.5.3).
-
-    A rule is `active` until `close()` is called; closed rules reject
-    further register/scan calls but their existing pending_rows can
-    still drain.
-    """
-
-    active = "active"
-    closed = "closed"
-
-
 EXECUTIONS_TABLE = "execution_state__executions"
-PENDING_ROWS_TABLE = "execution_state__pending_rows"
-DIRECTORY_RULES_TABLE = "execution_state__directory_rules"
 
 
 class ExecutionStateStore:
-    """SQLAlchemy Core wrapper for the three execution-state tables.
+    """SQLAlchemy Core wrapper for the executions registry table.
 
-    Owns the MetaData and Table definitions but not the engine — the
-    engine is provided by the caller (typically ``Workspace.engine``)
-    so all library-bookkeeping tables live in a single main.db.
-
-    Usage:
+    Example:
         >>> store = ExecutionStateStore(engine=workspace.engine)  # doctest: +SKIP
         >>> store.ensure_schema()
-        >>> # then use store.executions, store.pending_rows,
-        >>> # store.directory_rules for queries.
+        >>> # then use store.executions for queries.
 
     Attributes:
-        engine: The shared SQLAlchemy Engine.
-        metadata: MetaData object holding the three table definitions.
-        executions: The sqlalchemy.Table for executions.
-        pending_rows: The sqlalchemy.Table for pending_rows.
-        directory_rules: The sqlalchemy.Table for directory_rules.
+        engine: The SQLAlchemy Engine (owned by the caller).
+        metadata: SQLAlchemy MetaData for the executions table.
+        executions: The sqlalchemy.Table for the executions registry.
     """
 
     def __init__(self, engine: Engine) -> None:
@@ -139,6 +115,9 @@ class ExecutionStateStore:
         # executions — see spec §2.5.1 for column purposes.
         # status values: created|running|stopped|failed|pending_upload|uploaded|aborted
         # mode values: online|offline
+        # duration: pre-formatted "Hh Mmin Ssec" string set during the
+        #     Running → Stopped transition; mirrored to the catalog's
+        #     Execution.Duration column via the state machine.
         self.executions = Table(
             EXECUTIONS_TABLE,
             self.metadata,
@@ -151,6 +130,7 @@ class ExecutionStateStore:
             Column("working_dir_rel", String, nullable=False),
             Column("start_time", DateTime(timezone=True), nullable=True),
             Column("stop_time", DateTime(timezone=True), nullable=True),
+            Column("duration", String, nullable=True),
             Column("last_activity", DateTime(timezone=True), nullable=False),
             Column("error", Text, nullable=True),
             Column("sync_pending", Boolean, nullable=False, default=False),
@@ -168,77 +148,8 @@ class ExecutionStateStore:
             ),
         )
 
-        # pending_rows — see spec §2.5.2. status values:
-        # staged|leasing|leased|uploading|uploaded|failed
-        self.pending_rows = Table(
-            PENDING_ROWS_TABLE,
-            self.metadata,
-            Column("id", Integer, primary_key=True, autoincrement=True),
-            Column(
-                "execution_rid",
-                String,
-                ForeignKey(
-                    f"{EXECUTIONS_TABLE}.rid",
-                    name="fk_pending_rows_execution_rid_fkey",
-                ),
-                nullable=False,
-            ),
-            Column("key", String, nullable=False),
-            Column("target_schema", String, nullable=False),
-            Column("target_table", String, nullable=False),
-            Column("rid", String, nullable=True),
-            Column("lease_token", String, nullable=True),
-            Column("metadata_json", Text, nullable=False),
-            Column("asset_file_path", String, nullable=True),
-            Column("asset_types_json", Text, nullable=True),
-            Column("description", Text, nullable=True),
-            Column("status", String, nullable=False),
-            Column("error", Text, nullable=True),
-            Column("created_at", DateTime(timezone=True), nullable=False),
-            Column("leased_at", DateTime(timezone=True), nullable=True),
-            Column("uploaded_at", DateTime(timezone=True), nullable=True),
-            Column(
-                "rule_id",
-                Integer,
-                ForeignKey(
-                    f"{DIRECTORY_RULES_TABLE}.id",
-                    name="fk_pending_rows_rule_id_fkey",
-                ),
-                nullable=True,
-            ),
-            Index("ix_pending_execution_rid_status", "execution_rid", "status"),
-            Index("ix_pending_execution_rid_target_table", "execution_rid", "target_table"),
-        )
-
-        # directory_rules — see spec §2.5.3.
-        # status values: active|closed
-        self.directory_rules = Table(
-            DIRECTORY_RULES_TABLE,
-            self.metadata,
-            Column("id", Integer, primary_key=True, autoincrement=True),
-            Column(
-                "execution_rid",
-                String,
-                ForeignKey(
-                    f"{EXECUTIONS_TABLE}.rid",
-                    name="fk_directory_rules_execution_rid_fkey",
-                ),
-                nullable=False,
-            ),
-            Column("target_schema", String, nullable=False),
-            Column("target_table", String, nullable=False),
-            Column("source_dir", String, nullable=False),
-            Column("glob", String, nullable=False),
-            Column("recurse", Boolean, nullable=False, default=False),
-            Column("copy_files", Boolean, nullable=False, default=False),
-            Column("asset_types_json", Text, nullable=True),
-            Column("status", String, nullable=False),
-            Column("created_at", DateTime(timezone=True), nullable=False),
-            Index("ix_directory_rules_execution", "execution_rid"),
-        )
-
     def ensure_schema(self) -> None:
-        """Create the three tables if they don't already exist.
+        """Create the executions table if it doesn't already exist.
 
         Idempotent — safe to call on every DerivaML construction. Uses
         SQLAlchemy's ``create_all`` which issues ``CREATE TABLE IF
@@ -248,7 +159,7 @@ class ExecutionStateStore:
         Example:
             >>> store = ExecutionStateStore(engine=workspace.engine)  # doctest: +SKIP
             >>> store.ensure_schema()
-            >>> # Tables now exist; safe to insert/select.
+            >>> # Table now exists; safe to insert/select.
         """
         self.metadata.create_all(self.engine)
         logger.debug("execution_state schema ensured on %s", self.engine.url)
@@ -412,651 +323,80 @@ class ExecutionStateStore:
             rows = conn.execute(stmt).mappings().all()
         return [dict(r) for r in rows]
 
-    # ─── pending_rows CRUD ──────────────────────────────────────────
+    # ─── pending-rows readers — vestigial stubs ────────────────────
+    #
+    # The pending-rows write surface was retired in Phase 3 cleanup
+    # (audit §1.5). Three reader methods survive as no-op stubs so
+    # the four production call sites continue to compile and
+    # truthfully report "nothing pending". Replace these with real
+    # implementations only if a future writer ships.
 
-    def insert_pending_row(
-        self,
-        *,
-        execution_rid: str,
-        key: str,
-        target_schema: str,
-        target_table: str,
-        metadata_json: str,
-        created_at: datetime,
-        rid: str | None = None,
-        lease_token: str | None = None,
-        asset_file_path: str | None = None,
-        asset_types_json: str | None = None,
-        description: str | None = None,
-        status: PendingRowStatus = PendingRowStatus.staged,
-        rule_id: int | None = None,
-    ) -> int:
-        """Insert one pending_rows entry.
+    def count_pending_rows(self) -> int:
+        """Count of non-terminal pending rows across all executions.
 
-        Args:
-            execution_rid: FK to executions.rid.
-            key: Stable identifier for dedup (auto-hash for ad-hoc
-                rows; rule_id+filename for directory-sourced rows).
-            target_schema / target_table: Catalog target.
-            metadata_json: Serialized column values.
-            created_at: UTC timestamp.
-            rid: Leased RID, None until leased.
-            lease_token: Token for two-phase lease reconciliation.
-            asset_file_path: Local file path, None for plain rows.
-            asset_types_json: Serialized asset-type terms.
-            description: Optional human-readable description.
-            status: Initial status, defaults to 'staged'.
-            rule_id: FK to directory_rules.id, None if not from a rule.
-
-        Returns:
-            The auto-assigned integer id of the new pending_rows row.
+        Always returns ``0`` — the pending-rows write surface was
+        retired in Phase 3 cleanup (audit §1.5). Kept for the
+        schema-refresh guard in ``core/base.py``.
         """
-        with self.engine.begin() as conn:
-            result = conn.execute(
-                insert(self.pending_rows).values(
-                    execution_rid=execution_rid,
-                    key=key,
-                    target_schema=target_schema,
-                    target_table=target_table,
-                    rid=rid,
-                    lease_token=lease_token,
-                    metadata_json=metadata_json,
-                    asset_file_path=asset_file_path,
-                    asset_types_json=asset_types_json,
-                    description=description,
-                    status=str(status),
-                    created_at=created_at,
-                    rule_id=rule_id,
-                )
-            )
-            # SQLite returns the auto-increment id via lastrowid.
-            return int(result.inserted_primary_key[0])
-
-    def update_pending_row(self, pending_id: int, **fields: object) -> None:
-        """Partial update of a pending_rows entry.
-
-        Single-row convenience wrapper over
-        :meth:`update_pending_rows_batch`. Status / token / rid /
-        timestamps are the common callers; enum values are coerced to
-        strings by the bulk path.
-
-        Args:
-            pending_id: The integer id of the row to update.
-            **fields: Columns to set.
-
-        Raises:
-            KeyError: If a kwarg doesn't match a pending_rows column.
-        """
-        self.update_pending_rows_batch([(pending_id, dict(fields))])
-
-    def update_pending_rows_batch(
-        self,
-        updates: "list[tuple[int, dict]]",
-    ) -> None:
-        """Bulk variant of :meth:`update_pending_row`.
-
-        Writes one UPDATE per ``(pending_id, fields)`` pair, but inside a
-        single ``engine.begin()`` so the entire batch lands as one WAL
-        transaction with one fsync. Used by the upload-engine callback
-        path: ``status_callback()`` fires per file and would otherwise
-        commit a separate transaction for every uploaded asset — on a
-        10K-file upload that's the difference between thousands of
-        fsyncs and a handful (the callback flushes in chunks).
-
-        Each entry's ``fields`` dict is validated against the
-        ``pending_rows`` schema; ``PendingRowStatus`` enums are coerced
-        to strings exactly as in the per-row method, so callers can
-        reuse the same call shape.
-
-        Args:
-            updates: List of ``(pending_id, fields)`` tuples. Empty
-                list is a no-op.
-
-        Raises:
-            KeyError: If any ``fields`` dict references an unknown
-                ``pending_rows`` column. Validation happens before any
-                write so the batch either applies entirely or not at
-                all (no partial transaction).
-        """
-        if not updates:
-            return
-
-        valid_cols = {c.name for c in self.pending_rows.columns}
-        # Validate all entries up-front so a bad row doesn't half-commit
-        # the rest of the batch.
-        prepared: list[tuple[int, dict]] = []
-        for pending_id, fields in updates:
-            unknown = set(fields) - valid_cols
-            if unknown:
-                raise KeyError(f"unknown columns on pending_rows: {unknown}")
-            coerced = {k: str(v) if isinstance(v, PendingRowStatus) else v for k, v in fields.items()}
-            prepared.append((pending_id, coerced))
-
-        with self.engine.begin() as conn:
-            for pending_id, coerced in prepared:
-                conn.execute(update(self.pending_rows).where(self.pending_rows.c.id == pending_id).values(**coerced))
-
-    def list_pending_rows(
-        self,
-        *,
-        execution_rid: str,
-        status: "PendingRowStatus | list[PendingRowStatus] | None" = None,
-        target_table: str | None = None,
-    ) -> list[dict]:
-        """Return pending_rows entries scoped to one execution.
-
-        Args:
-            execution_rid: Required — pending rows are always scoped
-                to a specific execution.
-            status: Filter to a status or list of statuses.
-            target_table: Filter to a single target table.
-
-        Returns:
-            List of dicts — empty if nothing matches.
-        """
-        stmt = select(self.pending_rows).where(self.pending_rows.c.execution_rid == execution_rid)
-        if status is not None:
-            if isinstance(status, PendingRowStatus):
-                statuses = [str(status)]
-            else:
-                statuses = [str(s) for s in status]
-            stmt = stmt.where(self.pending_rows.c.status.in_(statuses))
-        if target_table is not None:
-            stmt = stmt.where(self.pending_rows.c.target_table == target_table)
-
-        with self.engine.connect() as conn:
-            rows = conn.execute(stmt).mappings().all()
-        return [dict(r) for r in rows]
+        return 0
 
     def count_pending_by_kind(
         self,
         *,
         execution_rid: str,
     ) -> dict[str, int]:
-        """Return per-kind counts of non-terminal pending rows.
+        """Per-kind counts of non-terminal / failed pending rows.
 
-        A "pending" row is in one of staged/leasing/leased/uploading
-        (not yet terminally uploaded or failed). A "failed" row is
-        specifically in status='failed'. Rows in status='uploaded'
-        are excluded from both counts.
-
-        "plain" vs "asset" is determined by asset_file_path — non-null
-        means it's an asset row.
+        Always returns all-zero counts — the pending-rows write
+        surface was retired in Phase 3 cleanup (audit §1.5). Kept
+        for ``find_executions`` and ``Execution.pending_summary``.
 
         Args:
-            execution_rid: Scoping. Required — pending rows are
-                execution-scoped.
+            execution_rid: Ignored; kept for signature stability.
 
         Returns:
-            A dict with keys pending_rows, failed_rows, pending_files,
-            failed_files. All four keys are always present; empty
-            tables yield zero for each (via COALESCE).
-
-        Example:
-            >>> store.count_pending_by_kind(execution_rid="EXE-A")  # doctest: +SKIP
-            {'pending_rows': 5, 'failed_rows': 0,
-             'pending_files': 12, 'failed_files': 1}
+            ``{"pending_rows": 0, "failed_rows": 0,
+              "pending_files": 0, "failed_files": 0}``.
         """
-        # Single aggregate query, branched by asset_file_path IS NULL.
-        # case() produces 1 or 0 per row matching the branch; sum
-        # gives the count. This is ~4x faster than 4 separate
-        # queries for large pending_rows tables.
-        pending_statuses = [
-            str(PendingRowStatus.staged),
-            str(PendingRowStatus.leasing),
-            str(PendingRowStatus.leased),
-            str(PendingRowStatus.uploading),
-        ]
-        failed_status = str(PendingRowStatus.failed)
-
-        is_plain = self.pending_rows.c.asset_file_path.is_(None)
-        is_asset = self.pending_rows.c.asset_file_path.isnot(None)
-        status_col = self.pending_rows.c.status
-
-        stmt = select(
-            func.coalesce(
-                func.sum(case((is_plain & status_col.in_(pending_statuses), 1), else_=0)),
-                0,
-            ).label("pending_rows"),
-            func.coalesce(
-                func.sum(case((is_plain & (status_col == failed_status), 1), else_=0)),
-                0,
-            ).label("failed_rows"),
-            func.coalesce(
-                func.sum(case((is_asset & status_col.in_(pending_statuses), 1), else_=0)),
-                0,
-            ).label("pending_files"),
-            func.coalesce(
-                func.sum(case((is_asset & (status_col == failed_status), 1), else_=0)),
-                0,
-            ).label("failed_files"),
-        ).where(self.pending_rows.c.execution_rid == execution_rid)
-
-        with self.engine.connect() as conn:
-            row = conn.execute(stmt).mappings().first()
         return {
-            "pending_rows": int(row["pending_rows"]),
-            "failed_rows": int(row["failed_rows"]),
-            "pending_files": int(row["pending_files"]),
-            "failed_files": int(row["failed_files"]),
+            "pending_rows": 0,
+            "failed_rows": 0,
+            "pending_files": 0,
+            "failed_files": 0,
         }
-
-    def count_pending_rows(self) -> int:
-        """Count non-terminal pending rows across ALL executions.
-
-        Non-terminal means status is one of staged/leasing/leased/
-        uploading/failed. Rows in status='uploaded' are excluded.
-
-        Used by ``DerivaML.refresh_schema()`` to decide whether to
-        refuse a schema refresh: a non-zero count means staged work
-        may reference columns/types that would disappear from the
-        refreshed schema, so the refresh is blocked unless
-        ``force=True``.
-
-        Returns:
-            Integer count; 0 if the pending_rows table is empty.
-        """
-        non_terminal = [
-            str(PendingRowStatus.staged),
-            str(PendingRowStatus.leasing),
-            str(PendingRowStatus.leased),
-            str(PendingRowStatus.uploading),
-            str(PendingRowStatus.failed),
-        ]
-        stmt = select(func.count()).select_from(self.pending_rows).where(self.pending_rows.c.status.in_(non_terminal))
-        with self.engine.begin() as conn:
-            return int(conn.scalar(stmt) or 0)
 
     def pending_summary_rows(
         self,
         *,
         execution_rid: str,
     ) -> dict:
-        """Return the data needed to build a PendingSummary.
+        """Per-(target_table, status) rollup data for ``PendingSummary``.
+
+        Always returns the empty rollup
+        (``{"rows": [], "assets": [], "diagnostics": []}``) — the
+        pending-rows write surface was retired in Phase 3 cleanup
+        (audit §1.5). The ``PendingSummary`` rendering path
+        (``Execution.pending_summary``, ``DerivaML.pending_summary``)
+        continues to work; it just sees every execution as having
+        nothing pending.
+
+        Args:
+            execution_rid: Ignored; kept for signature stability.
 
         Returns:
-            Dict with keys 'rows' (list of per-row-table counts),
-            'assets' (list of per-asset-table counts with bytes), and
-            'diagnostics' (list of error messages from failed rows).
-
-            rows entries: {table, pending, failed, uploaded}
-            assets entries: {table, pending_files, failed_files,
-                             uploaded_files, total_bytes_pending}
-
-        Example:
-            >>> data = store.pending_summary_rows(execution_rid="EXE-A")  # doctest: +SKIP
-            >>> # Caller builds PendingSummary from this.
+            ``{"rows": [], "assets": [], "diagnostics": []}``.
         """
-        from pathlib import Path
+        return {"rows": [], "assets": [], "diagnostics": []}
 
-        from sqlalchemy import and_
-
-        pending_statuses = [
-            str(PendingRowStatus.staged),
-            str(PendingRowStatus.leasing),
-            str(PendingRowStatus.leased),
-            str(PendingRowStatus.uploading),
-        ]
-        failed_status = str(PendingRowStatus.failed)
-        uploaded_status = str(PendingRowStatus.uploaded)
-
-        is_asset = self.pending_rows.c.asset_file_path.isnot(None)
-
-        stmt = (
-            select(
-                self.pending_rows.c.target_schema,
-                self.pending_rows.c.target_table,
-                is_asset.label("is_asset"),
-                func.sum(case((self.pending_rows.c.status.in_(pending_statuses), 1), else_=0)).label("pending"),
-                func.sum(case((self.pending_rows.c.status == failed_status, 1), else_=0)).label("failed"),
-                func.sum(case((self.pending_rows.c.status == uploaded_status, 1), else_=0)).label("uploaded"),
-            )
-            .where(self.pending_rows.c.execution_rid == execution_rid)
-            .group_by(
-                self.pending_rows.c.target_schema,
-                self.pending_rows.c.target_table,
-                is_asset,
-            )
-        )
-
-        rows_out: list[dict] = []
-        assets_out: list[dict] = []
-        missing_file_diagnostics: list[str] = []
-        with self.engine.connect() as conn:
-            for r in conn.execute(stmt).mappings().all():
-                table_fqn = f"{r['target_schema']}:{r['target_table']}"
-                if r["is_asset"]:
-                    bytes_stmt = select(self.pending_rows.c.asset_file_path).where(
-                        and_(
-                            self.pending_rows.c.execution_rid == execution_rid,
-                            self.pending_rows.c.target_schema == r["target_schema"],
-                            self.pending_rows.c.target_table == r["target_table"],
-                            self.pending_rows.c.status.in_(pending_statuses),
-                        )
-                    )
-                    total_bytes = 0
-                    for (p,) in conn.execute(bytes_stmt).all():
-                        try:
-                            total_bytes += Path(p).stat().st_size
-                        except OSError:
-                            # File missing — surface as diagnostic,
-                            # don't crash the summary.
-                            missing_file_diagnostics.append(f"{table_fqn} asset file missing on disk: {p}")
-                    assets_out.append(
-                        {
-                            "table": table_fqn,
-                            "pending_files": int(r["pending"]),
-                            "failed_files": int(r["failed"]),
-                            "uploaded_files": int(r["uploaded"]),
-                            "total_bytes_pending": int(total_bytes),
-                        }
-                    )
-                else:
-                    rows_out.append(
-                        {
-                            "table": table_fqn,
-                            "pending": int(r["pending"]),
-                            "failed": int(r["failed"]),
-                            "uploaded": int(r["uploaded"]),
-                        }
-                    )
-
-            diag_stmt = (
-                select(
-                    self.pending_rows.c.target_table,
-                    self.pending_rows.c.rid,
-                    self.pending_rows.c.error,
-                )
-                .where(
-                    and_(
-                        self.pending_rows.c.execution_rid == execution_rid,
-                        self.pending_rows.c.status == failed_status,
-                    )
-                )
-                .limit(20)
-            )
-            diagnostics: list[str] = []
-            for dr in conn.execute(diag_stmt).mappings().all():
-                ident = dr["rid"] or "(unleased)"
-                diagnostics.append(f"{dr['target_table']} row {ident} failed: {dr['error']}")
-
-            # Missing files are added after the cap is applied to the
-            # failed-row diagnostics. In practice, missing files are rare
-            # and it's more useful to surface all of them than to silently
-            # drop some.
-            diagnostics.extend(missing_file_diagnostics)
-
-        return {
-            "rows": rows_out,
-            "assets": assets_out,
-            "diagnostics": diagnostics,
-        }
-
-    # ─── lease two-phase protocol ───────────────────────────────────
-
-    def mark_pending_leasing(self, pending_id: int, *, lease_token: str) -> None:
-        """Phase 1 of RID leasing: write lease_token + status='leasing'.
-
-        Single-row convenience wrapper over
-        :meth:`mark_pending_leasing_batch`. Must be committed BEFORE
-        the POST to ERMrest_RID_Lease so that a crash between this
-        write and the POST is recoverable via revert_pending_leasing
-        (token wasn't yet sent, so no server state to reconcile).
-
-        Args:
-            pending_id: pending_rows.id to transition.
-            lease_token: UUID string. Same token goes in the POST body.
-
-        Example:
-            >>> token = generate_lease_token()  # doctest: +SKIP
-            >>> store.mark_pending_leasing(pid, lease_token=token)
-            >>> # Now POST the token to ERMrest_RID_Lease.
-        """
-        self.mark_pending_leasing_batch([(pending_id, lease_token)])
-
-    def mark_pending_leasing_batch(self, items: "list[tuple[int, str]]") -> None:
-        """Phase 1 of RID leasing for a batch.
-
-        Writes ``status='leasing'`` + ``lease_token`` for every supplied
-        ``(pending_id, lease_token)`` pair inside a single SQLite
-        transaction — the entire batch must be committed before the
-        POST to ``ERMrest_RID_Lease`` so a crash between SQLite-commit
-        and POST leaves every row in a recoverable state. The bulk
-        path collapses N WAL fsyncs into 1 for an N-asset upload
-        (matches the pattern used in ``mark_assets_uploaded``).
-
-        Args:
-            items: List of ``(pending_id, lease_token)`` tuples. Empty
-                list is a no-op.
-        """
-        if not items:
-            return
-        self.update_pending_rows_batch(
-            [
-                (pending_id, {"status": PendingRowStatus.leasing, "lease_token": lease_token})
-                for pending_id, lease_token in items
-            ]
-        )
-
-    def finalize_pending_lease(
-        self,
-        *,
-        lease_token: str,
-        assigned_rid: str,
-    ) -> None:
-        """Phase 2: POST succeeded, assign the server RID and flip to
-        'leased'.
-
-        Single-row convenience wrapper over
-        :meth:`finalize_pending_leases_batch`. Identified by
-        lease_token (not pending_id) so this works for batched lease
-        responses without requiring the caller to hold pending_id↔token
-        mappings.
-
-        Args:
-            lease_token: The token we POSTed and got a RID back for.
-            assigned_rid: The server-assigned RID from the response.
-
-        Example:
-            >>> store.finalize_pending_lease(  # doctest: +SKIP
-            ...     lease_token="uuid...", assigned_rid="1-ABCD"
-            ... )
-        """
-        self.finalize_pending_leases_batch([(lease_token, assigned_rid)])
-
-    def finalize_pending_leases_batch(self, items: "list[tuple[str, str]]") -> None:
-        """Phase 2 for a batch of leases.
-
-        Writes the assigned RID and ``status='leased'`` for every
-        ``(lease_token, assigned_rid)`` pair in a single SQLite
-        transaction. The leased_at timestamp is captured once at
-        transaction entry and shared by every row (so all rows in a
-        single batched lease share an identical leased_at — true to
-        the wire batch they came from).
-
-        Note: this method matches by ``lease_token``, not ``id``, so
-        it does not go through ``update_pending_rows_batch``. The
-        single-tx semantics are still preserved.
-
-        Args:
-            items: List of ``(lease_token, assigned_rid)`` tuples.
-                Empty list is a no-op.
-        """
-        if not items:
-            return
-        from datetime import datetime, timezone
-
-        leased_at = datetime.now(timezone.utc)
-        leased = str(PendingRowStatus.leased)
-        with self.engine.begin() as conn:
-            for lease_token, assigned_rid in items:
-                conn.execute(
-                    update(self.pending_rows)
-                    .where(self.pending_rows.c.lease_token == lease_token)
-                    .values(
-                        rid=assigned_rid,
-                        status=leased,
-                        leased_at=leased_at,
-                    )
-                )
-
-    def revert_pending_leasing(self, *, lease_token: str) -> None:
-        """Rollback: clear lease_token and flip back to 'staged'.
-
-        Called either:
-          (a) right after a failed POST (token never landed on server), or
-          (b) during startup reconciliation when the token query to
-              ERMrest_RID_Lease returns nothing (POST failed silently
-              or was dropped before persisting).
-
-        Args:
-            lease_token: The token to clear.
-
-        Example:
-            >>> store.revert_pending_leasing(lease_token="uuid...")  # doctest: +SKIP
-            >>> # Row is now back to status='staged', ready to re-issue.
-        """
-        with self.engine.begin() as conn:
-            conn.execute(
-                update(self.pending_rows)
-                .where(self.pending_rows.c.lease_token == lease_token)
-                .values(
-                    lease_token=None,
-                    status=str(PendingRowStatus.staged),
-                )
-            )
-
-    def list_leasing_rows(
-        self,
-        *,
-        execution_rid: str | None = None,
-    ) -> list[dict]:
-        """Return rows currently in status='leasing' — candidates for
-        startup reconciliation.
-
-        Args:
-            execution_rid: If set, scope to one execution; if None,
-                return all leasing rows across all executions
-                (workspace-wide reconciliation).
-
-        Returns:
-            List of pending_rows dicts.
-
-        Example:
-            >>> # Workspace-wide sweep at startup:
-            >>> for r in store.list_leasing_rows():
-            ...     print(r["lease_token"], r["execution_rid"])
-        """
-        stmt = select(self.pending_rows).where(self.pending_rows.c.status == str(PendingRowStatus.leasing))
-        if execution_rid is not None:
-            stmt = stmt.where(self.pending_rows.c.execution_rid == execution_rid)
-        with self.engine.connect() as conn:
-            rows = conn.execute(stmt).mappings().all()
-        return [dict(r) for r in rows]
-
-    # ─── directory_rules CRUD ───────────────────────────────────────
-
-    def insert_directory_rule(
-        self,
-        *,
-        execution_rid: str,
-        target_schema: str,
-        target_table: str,
-        source_dir: str,
-        glob: str,
-        recurse: bool,
-        copy_files: bool,
-        asset_types_json: str | None,
-        created_at: datetime,
-        status: DirectoryRuleStatus = DirectoryRuleStatus.active,
-    ) -> int:
-        """Insert one directory_rules entry; return its auto id.
-
-        Args:
-            execution_rid: FK to executions.rid.
-            target_schema / target_table: Catalog target for rows
-                produced by this rule.
-            source_dir: Local directory to scan.
-            glob: Pattern for files under source_dir.
-            recurse: Whether to scan recursively.
-            copy_files: Whether to copy files into workspace staging
-                or reference in place.
-            asset_types_json: Serialized asset-type terms applied
-                to every file registered under this rule.
-            created_at: UTC timestamp.
-            status: Initial status, defaults to 'active'.
-
-        Returns:
-            The auto-assigned integer id.
-        """
-        with self.engine.begin() as conn:
-            result = conn.execute(
-                insert(self.directory_rules).values(
-                    execution_rid=execution_rid,
-                    target_schema=target_schema,
-                    target_table=target_table,
-                    source_dir=source_dir,
-                    glob=glob,
-                    recurse=recurse,
-                    copy_files=copy_files,
-                    asset_types_json=asset_types_json,
-                    status=str(status),
-                    created_at=created_at,
-                )
-            )
-            return int(result.inserted_primary_key[0])
-
-    def update_directory_rule(self, rule_id: int, **fields: object) -> None:
-        """Partial update of a directory_rules entry.
-
-        Args:
-            rule_id: The integer id of the rule to update.
-            **fields: Columns to set.
-
-        Raises:
-            KeyError: If a kwarg doesn't match a directory_rules column.
-        """
-        valid_cols = {c.name for c in self.directory_rules.columns}
-        unknown = set(fields) - valid_cols
-        if unknown:
-            raise KeyError(f"unknown columns on directory_rules: {unknown}")
-        coerced = {k: str(v) if isinstance(v, DirectoryRuleStatus) else v for k, v in fields.items()}
-
-        with self.engine.begin() as conn:
-            conn.execute(update(self.directory_rules).where(self.directory_rules.c.id == rule_id).values(**coerced))
-
-    def list_directory_rules(
-        self,
-        *,
-        execution_rid: str,
-        status: "DirectoryRuleStatus | None" = None,
-    ) -> list[dict]:
-        """List directory_rules for one execution, optionally filtered.
-
-        Args:
-            execution_rid: Required scoping.
-            status: Filter to this status, or None for all.
-
-        Returns:
-            List of dicts — empty if nothing matches.
-        """
-        stmt = select(self.directory_rules).where(self.directory_rules.c.execution_rid == execution_rid)
-        if status is not None:
-            stmt = stmt.where(self.directory_rules.c.status == str(status))
-
-        with self.engine.connect() as conn:
-            rows = conn.execute(stmt).mappings().all()
-        return [dict(r) for r in rows]
+    # ─── lifecycle ─────────────────────────────────────────────────
 
     def delete_execution(self, execution_rid: str) -> None:
-        """Delete an execution row and all its pending_rows /
-        directory_rules.
+        """Delete an execution row.
 
-        Foreign keys cascade via ON DELETE, but SQLite only honors
-        that with PRAGMA foreign_keys=ON (which the workspace sets).
-        Belt-and-suspenders: we explicitly delete children first, so
-        the ORDER of deletions is predictable and so callers running
-        without FK-on get sensible behavior.
+        The earlier design also cascade-deleted the pending_rows and
+        directory_rules children, but those tables were retired in
+        Phase 3 (audit §1.5). The executions row is now the only
+        per-execution state SQLite carries.
 
         Args:
             execution_rid: Which execution to remove.
@@ -1067,6 +407,4 @@ class ExecutionStateStore:
             True
         """
         with self.engine.begin() as conn:
-            conn.execute(delete(self.pending_rows).where(self.pending_rows.c.execution_rid == execution_rid))
-            conn.execute(delete(self.directory_rules).where(self.directory_rules.c.execution_rid == execution_rid))
             conn.execute(delete(self.executions).where(self.executions.c.rid == execution_rid))

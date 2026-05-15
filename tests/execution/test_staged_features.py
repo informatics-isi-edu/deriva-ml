@@ -147,9 +147,9 @@ def test_mark_feature_records_uploaded_bulk(tmp_path: Path) -> None:
     """Bulk mark-uploaded flips every supplied stage_id in one transaction.
 
     Regression test for the perf fix that replaced a per-row
-    engine.begin() loop in _flush_staged_features. After a successful
-    bulk insert into ermrest, every staged-row's status must flip to
-    'uploaded' and uploaded_at must be set.
+    engine.begin() loop with a single batched UPDATE. After a
+    successful bulk insert into the catalog, every staged-row's status
+    must flip to 'uploaded' and uploaded_at must be set.
     """
     engine = create_engine(f"sqlite:///{tmp_path / 'manifest.sqlite'}")
     store = ManifestStore(engine)
@@ -486,10 +486,10 @@ def test_flush_happens_after_assets(populated_catalog, asset_feature) -> None:
 
     Stage a feature record whose asset column holds a local file path. Call
     ``upload_execution_outputs()`` and verify that the ermrest feature row
-    contains the uploaded asset RID (not the local filename).  Because the
-    rewrite only succeeds if the asset has already been uploaded when
-    ``_flush_staged_features`` runs, a correct RID in the row proves
-    ordering: assets first, features second.
+    contains the uploaded asset RID (not the local filename). Because
+    the rewrite only succeeds if the asset has already been uploaded
+    when the bag-commit feature path runs, a correct RID in the row
+    proves ordering: assets first, features second.
     """
     ml = populated_catalog
     cfg = ExecutionConfiguration(description="asset-ordering test", workflow=asset_feature.workflow)

@@ -122,47 +122,13 @@ def test_offline_after_online_succeeds(catalog_manager, tmp_path):
     assert ml_offline.model is not None
 
 
-@pytest.mark.skipif(
-    not os.environ.get("DERIVA_HOST"),
-    reason="requires a live catalog at DERIVA_HOST",
-)
-def test_refresh_schema_refuses_with_pending_rows(test_ml):
-    """Stage a pending row, call refresh_schema() → DerivaMLSchemaRefreshBlocked."""
-    from datetime import datetime, timezone
-
-    from deriva_ml import ConnectionMode
-    from deriva_ml.core.exceptions import DerivaMLSchemaRefreshBlocked
-    from deriva_ml.execution.state_store import (
-        ExecutionStatus,
-        PendingRowStatus,
-    )
-
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
-    # Need an execution row that the pending_row FK can reference.
-    store.insert_execution(
-        rid="EXE-REFRESH-TEST",
-        workflow_rid=None,
-        description="refresh test",
-        config_json="{}",
-        status=ExecutionStatus.Created,
-        mode=ConnectionMode.online,
-        working_dir_rel="execution/EXE-REFRESH-TEST",
-        created_at=now,
-        last_activity=now,
-    )
-    store.insert_pending_row(
-        execution_rid="EXE-REFRESH-TEST",
-        key="k",
-        target_schema="deriva-ml", target_table="Subject",
-        metadata_json="{}",
-        created_at=now,
-        status=PendingRowStatus.staged,
-    )
-
-    with pytest.raises(DerivaMLSchemaRefreshBlocked) as ei:
-        test_ml.refresh_schema()
-    assert "drained" in str(ei.value).lower()
+# NOTE: test_refresh_schema_refuses_with_pending_rows was deleted in
+# the Phase 3 cleanup (audit §1.5). The pending-rows write surface is
+# retired, so ``count_pending_rows()`` always returns 0 and the
+# DerivaMLSchemaRefreshBlocked path is no longer reachable through any
+# in-tree producer. The schema-refresh guard itself survives (it's
+# cheap insurance against future writers), but it cannot be exercised
+# from tests.
 
 
 @pytest.mark.skipif(
@@ -170,37 +136,8 @@ def test_refresh_schema_refuses_with_pending_rows(test_ml):
     reason="requires a live catalog at DERIVA_HOST",
 )
 def test_refresh_schema_force_succeeds(test_ml, caplog):
-    """refresh_schema(force=True) succeeds even with pending rows and logs."""
+    """refresh_schema(force=True) populates the schema cache and logs."""
     import logging
-    from datetime import datetime, timezone
-
-    from deriva_ml import ConnectionMode
-    from deriva_ml.execution.state_store import (
-        ExecutionStatus,
-        PendingRowStatus,
-    )
-
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
-    store.insert_execution(
-        rid="EXE-REFRESH-FORCE",
-        workflow_rid=None,
-        description="refresh force test",
-        config_json="{}",
-        status=ExecutionStatus.Created,
-        mode=ConnectionMode.online,
-        working_dir_rel="execution/EXE-REFRESH-FORCE",
-        created_at=now,
-        last_activity=now,
-    )
-    store.insert_pending_row(
-        execution_rid="EXE-REFRESH-FORCE",
-        key="k",
-        target_schema="deriva-ml", target_table="Subject",
-        metadata_json="{}",
-        created_at=now,
-        status=PendingRowStatus.staged,
-    )
 
     with caplog.at_level(logging.INFO, logger="deriva_ml"):
         test_ml.refresh_schema(force=True)
@@ -208,10 +145,9 @@ def test_refresh_schema_force_succeeds(test_ml, caplog):
     cache_file = Path(test_ml.working_dir) / "schema-cache.json"
     assert cache_file.is_file()
     # Log records the transition
-    assert any(
-        "refreshed" in r.getMessage().lower()
-        for r in caplog.records
-    ), f"expected 'refreshed' in log; got {[r.getMessage() for r in caplog.records]}"
+    assert any("refreshed" in r.getMessage().lower() for r in caplog.records), (
+        f"expected 'refreshed' in log; got {[r.getMessage() for r in caplog.records]}"
+    )
 
 
 @pytest.mark.skipif(

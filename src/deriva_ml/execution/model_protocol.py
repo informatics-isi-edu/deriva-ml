@@ -89,6 +89,9 @@ if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
 
 
+__all__ = ["DerivaMLModel"]
+
+
 @runtime_checkable
 class DerivaMLModel(Protocol):
     """Protocol for model functions compatible with DerivaML's run_model().

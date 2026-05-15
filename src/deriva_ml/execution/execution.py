@@ -59,24 +59,23 @@ from deriva_ml.core.definitions import (
     RID,
     ExecMetadataType,
     FileSpec,
-    FileUploadState,
     MLAsset,
     MLVocab,
     UploadProgress,
 )
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
-from deriva_ml.dataset.dataset import Dataset
-from deriva_ml.dataset.dataset_bag import DatasetBag
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.upload_layout import (
     asset_root,
     asset_type_path,
     execution_root,
     flat_asset_dir,
-    normalize_asset_dir,
     table_path,
-    upload_directory,
 )
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
+from deriva_ml.dataset.dataset import Dataset
+from deriva_ml.dataset.dataset_bag import DatasetBag
 from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
@@ -85,8 +84,6 @@ from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
-from deriva_ml.core.logging_config import get_logger
-from deriva_ml.core.validation import VALIDATION_CONFIG
 
 logger = get_logger(__name__)
 
@@ -94,17 +91,6 @@ logger = get_logger(__name__)
 execution: Execution
 ml: DerivaML
 dataset_spec: DatasetSpec
-
-
-try:
-    from IPython.display import Markdown, display
-except ImportError:
-
-    def display(s):
-        print(s)
-
-    def Markdown(s):
-        return s
 
 
 # Descriptions for execution metadata files, keyed by original filename.
@@ -362,11 +348,13 @@ class Execution:
     def _from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
         """Bind an Execution to an existing SQLite registry row.
 
-        Distinct from create_execution: does NOT contact the catalog and
-        does NOT POST a new row. Called by ml.resume_execution.
+        Distinct from ``create_execution`` — does NOT contact the
+        catalog and does NOT POST a new row. The bound ``Execution``
+        instance reads its lifecycle fields (``status``, ``error``,
+        ``start_time``, ``stop_time``) from SQLite via the
+        read-through property machinery.
 
-        Temporary implementation for Group D — Group E replaces the body
-        to wire up read-through lifecycle properties.
+        Called by :meth:`DerivaML.resume_execution`.
 
         Args:
             ml_object: The DerivaML instance this Execution is bound to.
@@ -376,9 +364,8 @@ class Execution:
             A minimally-initialized Execution with just enough state for
             execution_rid lookup.
         """
-        # Minimal construction: skip the existing __init__'s catalog
-        # interactions. Store the rid and ml_object so Group E has a
-        # starting point.
+        # Minimal construction: skip __init__'s catalog interactions.
+        # The read-through properties handle lifecycle field access.
         instance = cls.__new__(cls)
         instance._ml_object = ml_object
         instance._model = ml_object.model
@@ -633,6 +620,46 @@ class Execution:
         # for `execution_start`/`execution_stop` compatibility.
         self._logger.info("Initialize status finished.")
 
+    def _get_registry_row(self) -> dict:
+        """Read this execution's row from the workspace SQLite registry.
+
+        Shared helper for the four read-through properties (``status``,
+        ``error``, ``start_time``, ``stop_time``). No caching — a
+        mutation from another process (e.g., ``deriva-ml upload``
+        running in a shell) is visible on the next read.
+
+        Returns:
+            The row dict from ``ExecutionStateStore.get_execution``.
+
+        Raises:
+            DerivaMLStateInconsistency: If the executions row for this
+                rid is missing (gc'd, never created, or dry-run).
+        """
+        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
+
+        store = self._ml_object.workspace.execution_state_store()
+        row = store.get_execution(self.execution_rid)
+        if row is None:
+            raise DerivaMLStateInconsistency(
+                f"Execution {self.execution_rid} no longer in workspace registry. "
+                f"It may have been garbage-collected or the workspace was "
+                f"recreated. Use ml.list_executions() to see current state."
+            )
+        return row
+
+    @staticmethod
+    def _coerce_utc(value: "datetime | None") -> "datetime | None":
+        """Coerce a SQLite-returned datetime to UTC-aware.
+
+        SQLite may return naive datetimes even though we store them
+        timezone-aware. Re-attach the UTC tzinfo when missing.
+        """
+        from datetime import timezone
+
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
     @property
     def status(self) -> "ExecutionStatus":
         """Current execution status, read from SQLite on every access.
@@ -652,17 +679,7 @@ class Execution:
             >>> exe.status  # doctest: +SKIP
             <ExecutionStatus.Stopped>
         """
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        return ExecutionStatus(row["status"])
+        return ExecutionStatus(self._get_registry_row()["status"])
 
     @property
     def error(self) -> str | None:
@@ -686,17 +703,7 @@ class Execution:
             >>> exe.error  # doctest: +SKIP
             'RuntimeError: boom'
         """
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        return row["error"]
+        return self._get_registry_row()["error"]
 
     @property
     def start_time(self) -> "datetime | None":
@@ -721,22 +728,7 @@ class Execution:
             >>> if exe.start_time is not None:  # doctest: +SKIP
             ...     print(f"started at {exe.start_time}")  # doctest: +SKIP
         """
-        from datetime import timezone
-
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        value = row["start_time"]
-        if value is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value
+        return self._coerce_utc(self._get_registry_row()["start_time"])
 
     @property
     def stop_time(self) -> "datetime | None":
@@ -760,22 +752,7 @@ class Execution:
             >>> if exe.stop_time is not None:  # doctest: +SKIP
             ...     print(f"stopped at {exe.stop_time}")  # doctest: +SKIP
         """
-        from datetime import timezone
-
-        from deriva_ml.core.exceptions import DerivaMLStateInconsistency
-
-        store = self._ml_object.workspace.execution_state_store()
-        row = store.get_execution(self.execution_rid)
-        if row is None:
-            raise DerivaMLStateInconsistency(
-                f"Execution {self.execution_rid} no longer in workspace registry. "
-                f"It may have been garbage-collected or the workspace was "
-                f"recreated. Use ml.list_executions() to see current state."
-            )
-        value = row["stop_time"]
-        if value is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value
+        return self._coerce_utc(self._get_registry_row()["stop_time"])
 
     @property
     def datasets(self) -> "DatasetCollection":
@@ -1121,10 +1098,16 @@ class Execution:
     def execution_stop(self) -> None:
         """Marks the execution as stopped (algorithm finished successfully).
 
-        Records the stop time in SQLite and updates the execution's
-        status to 'Stopped'. This should be called after all execution
-        work is finished; upload of outputs is a separate phase that
-        moves status from Stopped → Pending_Upload → Uploaded.
+        Computes the wall-clock duration against ``start_time`` and
+        transitions Running → Stopped through the state machine,
+        writing ``stop_time`` and ``duration`` atomically with the
+        status change. Online callers see a single catalog PUT that
+        carries both Status and Duration (the historical second
+        catalog write is gone — audit §4.5).
+
+        This should be called after all execution work is finished;
+        upload of outputs is a separate phase that moves status from
+        Stopped → Pending_Upload → Uploaded.
 
         Example:
             >>> try:  # doctest: +SKIP
@@ -1137,13 +1120,10 @@ class Execution:
 
         now = datetime.now(timezone.utc)
 
-        # Persist stop_time to SQLite (authoritative source for the
-        # `stop_time` read-through property). Skip for dry-run.
-        if not self._dry_run:
-            store = self._ml_object.workspace.execution_state_store()
-            store.update_execution(self.execution_rid, stop_time=now)
-
         # Compute duration against the start_time read-through property.
+        # Falls back to "0H 0min 0.0sec" if start_time is missing
+        # (shouldn't happen in practice — Running → Stopped requires
+        # __enter__/execution_start to have set start_time).
         start = self.start_time
         if start is not None:
             # Coerce any naive datetime from SQLite to UTC so arithmetic
@@ -1157,11 +1137,24 @@ class Execution:
         else:
             duration_str = "0H 0min 0.0sec"
 
-        self.update_status(ExecutionStatus.Stopped)
-        if not self._dry_run:
-            self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema].Execution.update(
-                [{"RID": self.execution_rid, "Duration": duration_str}]
-            )
+        if self._dry_run:
+            return
+
+        # Single atomic transition: SQLite write (status + stop_time +
+        # duration) followed by online catalog PUT (Status + Duration
+        # via _catalog_body_for_execution). Replaces the historical
+        # two-write design that left Duration vulnerable to a partial
+        # failure between writes (audit §4.5).
+        current = self.status
+        transition(
+            store=self._ml_object.workspace.execution_state_store(),
+            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
+            execution_rid=self.execution_rid,
+            current=current,
+            target=ExecutionStatus.Stopped,
+            mode=self._ml_object._mode,
+            extra_fields={"stop_time": now, "duration": duration_str},
+        )
 
     @validate_call(config=VALIDATION_CONFIG)
     def download_asset(
@@ -1262,50 +1255,10 @@ class Execution:
         return asset_path
 
     @validate_call(config=VALIDATION_CONFIG)
-    def upload_assets(
-        self,
-        assets_dir: str | Path,
-    ) -> dict[Any, FileUploadState] | None:
-        """Uploads assets from a directory to the catalog.
-
-        Scans the specified directory for assets and uploads them to the catalog,
-        recording their metadata and types. Assets are organized by their types
-        and associated with the execution.
-
-        Args:
-            assets_dir: Directory containing assets to upload.
-
-        Returns:
-            dict[Any, FileUploadState] | None: Mapping of assets to their upload states,
-                or None if no assets were found.
-
-        Raises:
-            DerivaMLException: If upload fails or assets are invalid.
-
-        Example:
-            >>> states = execution.upload_assets("output/results")  # doctest: +SKIP
-            >>> for asset, state in states.items():  # doctest: +SKIP
-            ...     print(f"{asset}: {state}")  # doctest: +SKIP
-        """
-
-        def path_to_asset(path: str) -> str:
-            """Pull the asset name out of a path to that asset in the filesystem"""
-            components = path.split("/")
-            return components[components.index("asset") + 2]  # Look for asset in the path to find the name
-
-        if not self._model.is_asset(Path(assets_dir).name):
-            raise DerivaMLException("Directory does not have name of an asset table.")
-        results = upload_directory(self._model, assets_dir)
-        return {path_to_asset(p): r for p, r in results.items()}
-
     def upload_execution_outputs(
         self,
         clean_folder: bool | None = None,
         progress_callback: Callable[[UploadProgress], None] | None = None,
-        max_retries: int = 3,
-        retry_delay: float = 5.0,
-        timeout: tuple[int, int] | None = None,
-        chunk_size: int | None = None,
     ) -> dict[str, list[AssetFilePath]]:
         """Upload all registered output assets to Hatrac and record provenance.
 
@@ -1324,14 +1277,6 @@ class Execution:
             progress_callback: Optional callback function to receive upload progress updates.
                 Called with UploadProgress objects containing file name, bytes uploaded,
                 total bytes, percent complete, phase, and status message.
-            max_retries: Maximum number of retry attempts for failed uploads (default: 3).
-            retry_delay: Initial delay in seconds between retries, doubles with each attempt
-                (default: 5.0). Doubles on each successive retry.
-            timeout: Tuple of (connect_timeout, read_timeout) in seconds. Default is (600, 600).
-                Note: urllib3 uses connect_timeout as the socket timeout during request body
-                writes, so it must be large enough for a full chunk upload.
-            chunk_size: Optional chunk size in bytes for Hatrac uploads. Increase for large
-                files on high-bandwidth connections.
 
         Returns:
             Dict mapping asset table name to list of uploaded ``AssetFilePath`` objects, e.g.
@@ -1469,13 +1414,11 @@ class Execution:
             self._logger.error("BagCatalogLoader failed: %s", error)
             # Mark every pending feature record as failed with the
             # loader's error so the user can retry from a known
-            # state. The legacy ``_flush_staged_features`` path
-            # marked per-group failures; the bag path is atomic at
-            # load time, so all pending records share the same
-            # failure mode (the bag's load transaction either
-            # committed or didn't). Preserving the loader error
-            # message in each record's ``error`` column is the
-            # equivalent observability.
+            # state. Bag commit is atomic at load time, so all
+            # pending records share the same failure mode (the
+            # bag's load transaction either committed or didn't).
+            # Preserving the loader error message in each record's
+            # ``error`` column is the right observability shape.
             try:
                 pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
                 if pending_features:
@@ -1565,118 +1508,6 @@ class Execution:
 
         except OSError as e:
             logging.warning(f"Failed to clean folder {folder_path}: {e}")
-
-    def _flush_staged_features(self, uploaded_files: dict[str, list[AssetFilePath]] | None = None) -> None:
-        """Flush all Pending staged-feature rows to ermrest.
-
-        Historically called from ``_upload_execution_dirs()`` after
-        staged-asset upload. The bag-based commit path
-        (:func:`bag_commit._add_staged_feature_rows_to_bag`) carries
-        feature rows inside the bag alongside assets, so this method
-        is retained only for the few remaining direct-flush callers
-        (tests). Per-group failures mark those rows ``Failed`` without
-        aborting the other groups; an overall ``DerivaMLUploadError``
-        is raised at the end if any failure occurred.
-
-        Args:
-            uploaded_files: Map of "{schema}/{table}" → list[AssetFilePath] returned
-                by the asset-upload step. Used to rewrite asset-column values
-                (local filenames → uploaded asset RIDs). May be None when no
-                assets were uploaded.
-
-        See docs/superpowers/specs/2026-04-22-feature-api-consistency-design.md
-        §Data flow — flush order.
-        """
-        from collections import defaultdict as _defaultdict
-
-        from deriva_ml.core.exceptions import DerivaMLUploadError
-
-        pending = self._manifest_store.list_pending_feature_records(self.execution_rid)
-        if not pending:
-            return
-
-        # Build asset lookup maps from the uploaded_files (same logic as _update_feature_table)
-        uploaded_files = uploaded_files or {}
-        asset_map = {
-            (asset_table, asset.file_name): asset.asset_rid
-            for asset_table, assets in uploaded_files.items()
-            for asset in assets
-        }
-        asset_map_by_table = {
-            (asset_table.split("/")[1] if "/" in asset_table else asset_table, asset.file_name): asset.asset_rid
-            for asset_table, assets in uploaded_files.items()
-            for asset in assets
-        }
-
-        # Group pending rows by feature_table for batch insertion
-        groups: dict[str, list] = _defaultdict(list)
-        for row in pending:
-            groups[row.feature_table].append(row)
-
-        failures: list[str] = []
-        for qualified, rows in groups.items():
-            schema_name, table_name = qualified.split(".", 1)
-            feature_name = rows[0].feature_name
-            target_table = rows[0].target_table
-            try:
-                # Build payload dicts directly from staged JSON.
-                payloads = [json.loads(r.record_json) for r in rows]
-                # Remove RCT — server-assigned, causes insert failure if present.
-                for p in payloads:
-                    p.pop("RCT", None)
-
-                # Asset-column rewriting: replace local filenames with uploaded RIDs.
-                # Requires looking up the feature to find which columns are assets.
-                # If lookup_feature raises DerivaMLException (unknown feature / stale
-                # schema), we fail the entire group rather than silently inserting
-                # raw local file paths into asset-RID columns — that would produce
-                # corrupt catalog data with no visible error.
-                try:
-                    feat = self._ml_object.lookup_feature(target_table, feature_name)
-                except DerivaMLException as e:
-                    error_msg = f"lookup_feature failed for {qualified}: {e}"
-                    self._logger.error(error_msg)
-                    # Mark all rows failed in a single bulk transaction.
-                    self._manifest_store.mark_feature_records_failed([(r.stage_id, error_msg) for r in rows])
-                    failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
-                    continue  # skip to next group — do not attempt insert
-
-                asset_col_names = [c.name for c in feat.asset_columns]
-                if asset_col_names:
-                    for p in payloads:
-                        for col in asset_col_names:
-                            val = p.get(col)
-                            if val is None:
-                                continue
-                            # Try the structured-path lookup first (schema/table/file)
-                            key = normalize_asset_dir(val)
-                            if key is not None and key in asset_map:
-                                p[col] = asset_map[key]
-                            else:
-                                # Fall back to flat-path lookup: (table_name, filename)
-                                pv = Path(val)
-                                flat_key = (pv.parent.name, pv.name)
-                                if flat_key in asset_map_by_table:
-                                    p[col] = asset_map_by_table[flat_key]
-                                # If neither map has it, leave the value unchanged —
-                                # it may already be a catalog RID.
-
-                pb = self._ml_object.pathBuilder()
-                pb.schemas[schema_name].tables[table_name].insert(payloads)
-                # Success — mark all rows uploaded in a single
-                # batched UPDATE … WHERE stage_id IN (…). Replaces
-                # one engine.begin() per row.
-                self._manifest_store.mark_feature_records_uploaded([r.stage_id for r in rows])
-            except Exception as e:  # noqa: BLE001 — capture broad, propagate summary
-                error_msg = f"{type(e).__name__}: {e}"
-                # Mark all rows failed in a single bulk transaction.
-                self._manifest_store.mark_feature_records_failed([(r.stage_id, error_msg) for r in rows])
-                failures.append(f"{qualified} ({len(rows)} records): {error_msg}")
-
-        if failures:
-            raise DerivaMLUploadError(
-                f"Feature flush failed for {len(failures)} feature table(s): " + "; ".join(failures)
-            )
 
     def _update_asset_execution_table(
         self,
@@ -1946,8 +1777,9 @@ class Execution:
     def _manifest_store(self) -> "ManifestStore":
         """Return the ManifestStore for this workspace.
 
-        Used by ``add_features`` to stage feature records to SQLite and by
-        ``_flush_staged_features`` to read them back for batch ermrest insert.
+        Used by ``add_features`` to stage feature records to SQLite; the
+        bag-commit path reads them back via
+        ``bag_commit._add_staged_feature_rows_to_bag`` for the catalog insert.
         """
         return self._ml_object.workspace.manifest_store()
 
@@ -2293,11 +2125,12 @@ class Execution:
     def __enter__(self) -> "Execution":
         """Begin the execution: status created → running.
 
-        Routes through ``state_machine.transition()`` so the SQLite
-        write, online-mode catalog sync, and allowed-transition
-        validation all run in a single atomic step. Sets
-        ``start_time`` in the same transaction (read back via the
-        ``start_time`` property).
+        Context-manager wrapper around :meth:`execution_start`. The
+        actual transition (Created → Running, with ``start_time``
+        atomically set in the same SQLite write and an online-mode
+        catalog sync) lives in ``execution_start``; this method just
+        delegates so the imperative and context-manager paths share
+        one implementation.
 
         Dry-run executions skip the transition entirely — there is no
         SQLite registry row for a dry-run (sentinel RID), so there is
@@ -2316,24 +2149,7 @@ class Execution:
             ...     e.status  # doctest: +SKIP
             <ExecutionStatus.Running>
         """
-        from datetime import datetime, timezone
-
-        if self._dry_run:
-            # No SQLite row for dry-run executions, so start_time read
-            # through the property returns None. That's acceptable —
-            # dry-runs are transient and not observed via start_time.
-            return self
-
-        current = self.status  # read-through from SQLite
-        transition(
-            store=self._ml_object.workspace.execution_state_store(),
-            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
-            execution_rid=self.execution_rid,
-            current=current,
-            target=ExecutionStatus.Running,
-            mode=self._ml_object._mode,
-            extra_fields={"start_time": datetime.now(timezone.utc)},
-        )
+        self.execution_start()
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> bool:

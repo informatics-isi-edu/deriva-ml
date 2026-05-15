@@ -15,12 +15,15 @@ def _insert_test_execution(ws, rid, status, mode="online", workflow_rid=None):
     store = ws.execution_state_store()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid=rid, workflow_rid=workflow_rid, description=f"test {rid}",
+        rid=rid,
+        workflow_rid=workflow_rid,
+        description=f"test {rid}",
         config_json="{}",
         status=ExecutionStatus(status) if isinstance(status, str) else status,
         mode=ConnectionMode(mode) if isinstance(mode, str) else mode,
         working_dir_rel=f"execution/{rid}",
-        created_at=now, last_activity=now,
+        created_at=now,
+        last_activity=now,
     )
 
 
@@ -73,20 +76,22 @@ def test_find_incomplete_executions(test_ml):
 
 
 def test_list_executions_carries_pending_counts(test_ml):
+    """``list_executions`` returns rows with pending-count fields.
+
+    After the Phase 3 retirement of the pending-rows write surface
+    (audit §1.5), the pending counts are always zero. The test
+    pins the **shape** — the per-execution snapshots carry the
+    ``pending_rows`` / ``pending_files`` fields — not a specific
+    non-zero count.
+    """
     from deriva_ml.execution.state_store import ExecutionStatus
 
     _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
 
-    store = test_ml.workspace.execution_state_store()
-    now = datetime.now(timezone.utc)
-    store.insert_pending_row(
-        execution_rid="EXE-A", key="k1", target_schema="s",
-        target_table="Subject", metadata_json="{}", created_at=now,
-    )
-
     rows = test_ml.list_executions()
     assert len(rows) == 1
-    assert rows[0].pending_rows == 1
+    # Pending counts are always zero (the writer surface is retired).
+    assert rows[0].pending_rows == 0
     assert rows[0].pending_files == 0
 
 
@@ -108,9 +113,10 @@ def test_resume_execution_reads_from_sqlite(test_ml, monkeypatch):
 
 
 def test_resume_execution_missing_raises(test_ml):
+    import pytest
+
     from deriva_ml.core.exceptions import DerivaMLException
 
-    import pytest
     with pytest.raises(DerivaMLException) as exc:
         test_ml.resume_execution("EXE-NOPE")
     assert "EXE-NOPE" in str(exc.value)
@@ -147,7 +153,10 @@ def test_resume_execution_offline_skips_reconcile(catalog_manager, tmp_path):
         mode=ConnectionMode.offline,
     )
     _insert_test_execution(
-        ml.workspace, "EXE-A", ExecutionStatus.Stopped, mode="offline",
+        ml.workspace,
+        "EXE-A",
+        ExecutionStatus.Stopped,
+        mode="offline",
     )
 
     # Just must not raise — offline reconcile is a no-op.
@@ -162,7 +171,8 @@ def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
     _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Stopped)
     # Simulate prior offline transition.
     test_ml.workspace.execution_state_store().update_execution(
-        "EXE-A", sync_pending=True,
+        "EXE-A",
+        sync_pending=True,
     )
 
     flushed_calls = []
@@ -176,10 +186,12 @@ def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
         reconcile_calls.append(execution_rid)
 
     monkeypatch.setattr(
-        "deriva_ml.core.mixins.execution.flush_pending_sync", _fake_flush,
+        "deriva_ml.core.mixins.execution.flush_pending_sync",
+        _fake_flush,
     )
     monkeypatch.setattr(
-        "deriva_ml.core.mixins.execution.reconcile_with_catalog", _fake_reconcile,
+        "deriva_ml.core.mixins.execution.reconcile_with_catalog",
+        _fake_reconcile,
     )
 
     exe = test_ml.resume_execution("EXE-A")
@@ -190,6 +202,7 @@ def test_resume_execution_online_flushes_sync_pending(test_ml, monkeypatch):
 
 def test_gc_executions_deletes_matching(test_ml):
     from datetime import timedelta
+
     from deriva_ml.execution.state_store import ExecutionStatus
 
     # Three uploaded executions of different ages.
@@ -227,8 +240,9 @@ def test_gc_executions_status_only(test_ml):
 
 
 def test_gc_executions_delete_working_dir(test_ml):
-    from deriva_ml.execution.state_store import ExecutionStatus
     from pathlib import Path
+
+    from deriva_ml.execution.state_store import ExecutionStatus
 
     _insert_test_execution(test_ml.workspace, "EXE-A", ExecutionStatus.Uploaded)
 
@@ -350,10 +364,7 @@ def test_create_execution_rejects_mixed_forms(test_ml):
 
     with pytest.raises(TypeError) as exc:
         test_ml.create_execution(cfg, datasets=["1-ABCD@1.0.0"])
-    assert (
-        "cannot mix" in str(exc.value).lower()
-        or "exactly one" in str(exc.value).lower()
-    )
+    assert "cannot mix" in str(exc.value).lower() or "exactly one" in str(exc.value).lower()
 
 
 def test_create_execution_offline_raises(catalog_manager, tmp_path):
@@ -429,8 +440,7 @@ def test_create_execution_writes_registry_row(test_ml):
 def test_restore_execution_symbol_removed(test_ml):
     """Per R5.1 aggressive deprecation, restore_execution is removed."""
     assert not hasattr(test_ml, "restore_execution"), (
-        "restore_execution should have been removed in D8; "
-        "use resume_execution (see CHANGELOG breaking changes)."
+        "restore_execution should have been removed in D8; use resume_execution (see CHANGELOG breaking changes)."
     )
 
 
@@ -453,6 +463,7 @@ def test_resume_execution_per_rid_lease_reconcile(test_ml, monkeypatch):
         calls.append(execution_rid)
 
     from deriva_ml.execution import lease_orchestrator
+
     monkeypatch.setattr(lease_orchestrator, "reconcile_pending_leases", _spy)
 
     test_ml.resume_execution("EXE-A")

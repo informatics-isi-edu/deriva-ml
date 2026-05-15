@@ -51,8 +51,8 @@ class StagedFeatureRow:
 
     A StagedFeatureRow is one FeatureRecord serialized as JSON, with
     lifecycle status tracked per row. Rows are created by
-    ``Execution.add_features()`` and consumed by
-    ``Execution._flush_staged_features()``.
+    ``Execution.add_features()`` and consumed by the bag-commit path
+    (``bag_commit._add_staged_feature_rows_to_bag``).
 
     Attributes:
         stage_id: Autoincrement primary key.
@@ -654,9 +654,10 @@ class ManifestStore:
 
         Skips the per-row existence check that
         :meth:`mark_feature_record_uploaded` performs via
-        ``_require_feature_record``. The caller (the post-flush loop in
-        ``Execution._flush_staged_features``) already inserted these
-        rows itself; every ``stage_id`` is known to be present.
+        ``_require_feature_record``. The caller (the bag-commit feature
+        path in ``bag_commit._add_staged_feature_rows_to_bag``) already
+        inserted these rows itself; every ``stage_id`` is known to be
+        present.
 
         Args:
             stage_ids: List of staged-row primary keys. Empty list is

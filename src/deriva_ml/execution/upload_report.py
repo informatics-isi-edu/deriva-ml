@@ -1,8 +1,5 @@
 """``UploadReport`` — the public return type of :meth:`DerivaML.upload_pending`.
 
-Lives in its own module (rather than alongside the now-retired
-``upload_engine.py``) so the type can survive independent of the
-engine's life cycle. Post-WI2 the engine is gone and
 :meth:`upload_pending` drives ``Execution._bag_commit_upload`` per
 execution; the report aggregates those per-execution outcomes.
 
