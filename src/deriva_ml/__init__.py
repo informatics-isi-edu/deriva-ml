@@ -74,14 +74,6 @@ def __getattr__(name: str) -> type:
         from deriva_ml.feature import FeatureRecord
 
         return FeatureRecord
-    elif name == "SchemaValidationReport":
-        from deriva_ml.schema.validation import SchemaValidationReport
-
-        return SchemaValidationReport
-    elif name == "validate_ml_schema":
-        from deriva_ml.schema.validation import validate_ml_schema
-
-        return validate_ml_schema
     elif name == "CatalogProvenance":
         from deriva_ml.catalog.provenance import CatalogProvenance
 
@@ -116,9 +108,6 @@ __all__ = [
     "AssetSpecConfig",
     # Feature record for feature values and restructure_assets selectors
     "FeatureRecord",
-    # Schema validation (lazy-loaded)
-    "SchemaValidationReport",
-    "validate_ml_schema",
     # Catalog provenance (lazy-loaded)
     "CatalogProvenance",
     "CatalogCreationMethod",

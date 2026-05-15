@@ -56,7 +56,7 @@ def test_all_vocab_fks_reference_name():
                     )
 
         assert not violations, (
-            f"Vocabulary-FK convention violated:\n"
+            "Vocabulary-FK convention violated:\n"
             + "\n".join(f"  - {v}" for v in violations)
         )
     finally:

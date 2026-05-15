@@ -9,10 +9,8 @@ ERMrest catalog. The main entry points are:
 - ``initialize_ml_schema``: Populate vocabulary tables with standard terms
   after schema creation.
 - ``create_ml_catalog``: Create a brand-new catalog and install the schema.
-- ``reset_ml_schema``: Drop and recreate the schema (test/dev helper).
 """
 
-import argparse
 import subprocess
 import sys
 from importlib.resources import files
@@ -31,10 +29,10 @@ from deriva.core.typed import (
     VocabularyTableDef,
 )
 
-from deriva_ml.core.definitions import ML_SCHEMA, MLTable, MLVocab
+from deriva_ml.core.definitions import MLTable, MLVocab
 from deriva_ml.core.exceptions import DerivaMLConfigurationError
-from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 
 logger = get_logger(__name__)
 
@@ -309,8 +307,11 @@ def create_ml_schema(
     """Create or recreate the DerivaML schema in the given catalog.
 
     WARNING: If the schema already exists, it will be DROPPED with CASCADE,
-    destroying all data in the schema. Use _post_clone_operations guard when
-    calling from clone context.
+    destroying all data in the schema. The bag-pipeline clone path
+    (:func:`~deriva_ml.catalog.clone_via_bag.clone_via_bag`) **does not**
+    call this function — it loads catalog content via
+    :class:`BagCatalogLoader` instead. Direct callers (e.g., fresh-catalog
+    bootstrap in the model template) own the destructive-call contract.
 
     Args:
         catalog: An ErmrestCatalog connection to the target catalog.
@@ -560,9 +561,11 @@ def create_ml_catalog(
         The created ErmrestCatalog instance.
 
     Example:
-        # Create catalog with alias
-        catalog = create_ml_catalog("localhost", "my_project", catalog_alias="my-project")
-        # Now accessible as both /ermrest/catalog/<id> and /ermrest/catalog/my-project
+        >>> # Create catalog with alias
+        >>> catalog = create_ml_catalog(  # doctest: +SKIP
+        ...     "localhost", "my_project", catalog_alias="my-project"
+        ... )
+        >>> # Now accessible as both /ermrest/catalog/<id> and /ermrest/catalog/my-project
     """
     server = DerivaServer("https", hostname, credentials=get_credential(hostname))
     catalog = server.create_ermrest_catalog()
@@ -624,39 +627,8 @@ def create_ml_catalog(
     return catalog
 
 
-def reset_ml_schema(catalog: ErmrestCatalog, ml_schema=ML_SCHEMA) -> None:
-    model = catalog.getCatalogModel()
-    schemas = [schema for sname, schema in model.schemas.items() if sname not in ["public", "WWW"]]
-    for s in schemas:
-        s.drop(cascade=True)
-    model = catalog.getCatalogModel()
-    create_ml_schema(catalog, ml_schema)
-
-
-def main():
-    """Main entry point for the schema creation CLI.
-
-    Creates ML schema and catalog based on command line arguments.
-
-    Returns:
-        None. Executes the CLI.
-    """
-    scheme = "https"
-    parser = argparse.ArgumentParser(description="Create ML schema and catalog")
-    parser.add_argument("hostname", help="Hostname for the catalog")
-    parser.add_argument("project_name", help="Project name for the catalog")
-    parser.add_argument("schema-name", default="deriva-ml", help="Schema name (default: deriva-ml)")
-    parser.add_argument("curie_prefix", type=str, required=True)
-
-    args = parser.parse_args()
-    credentials = get_credential(args.hostname)
-    server = DerivaServer(scheme, args.hostname, credentials)
-    model = server.connect_ermrest(args.catalog_id).getCatalogModel()
-    create_ml_schema(model, args.schema_name)
-
-    print(f"Created ML catalog at {args.hostname} with project {args.project_name}")
-    print(f"Schema '{args.schema_name}' initialized successfully")
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+__all__ = [
+    "create_ml_catalog",
+    "create_ml_schema",
+    "initialize_ml_schema",
+]
