@@ -34,7 +34,7 @@ Example (RID validation):
 from __future__ import annotations
 
 
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from deriva_ml.core.logging_config import get_logger
 
@@ -79,20 +79,22 @@ __all__ = [
 # RID Validation
 # =============================================================================
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML
 
 
-@dataclass
-class ValidationResult:
+class ValidationResult(BaseModel):
     """Result of configuration validation.
 
-    When printed, displays a formatted summary of validation results including
-    any errors and warnings. This makes it easy to inspect validation results
-    in interactive sessions.
+    Pydantic model — provides ``.model_dump()`` for JSON output and
+    ``.model_dump_json()`` for one-line serialization, aligning with
+    every other user-facing return type in deriva-ml (CLAUDE.md
+    "Class idiom choice" guidance).
+
+    When printed, displays a formatted summary of validation results
+    including any errors and warnings.
 
     Attributes:
         is_valid: True if all validations passed, False otherwise.
@@ -114,10 +116,12 @@ class ValidationResult:
           - Dataset RID 'INVALID' does not exist in catalog
     """
 
+    model_config = VALIDATION_CONFIG
+
     is_valid: bool = True
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    validated_rids: dict[str, dict[str, Any]] = field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    validated_rids: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     def add_error(self, message: str) -> None:
         """Add an error message and mark result as invalid."""
