@@ -13,15 +13,8 @@ Public entry points:
 """
 
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
-
-_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
-_core_utils = importlib.import_module("deriva.core.utils.core_utils")
-
-Model = _ermrest_model.Model
-Table = _ermrest_model.Table
-deriva_tags = _core_utils.tag
+from deriva.core.ermrest_model import Model, Table
+from deriva.core.utils.core_utils import tag as deriva_tags
 
 from deriva_ml.core.constants import DerivaAssetColumns
 from deriva_ml.core.upload_layout import bulk_upload_configuration
