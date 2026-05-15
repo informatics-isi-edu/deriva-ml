@@ -46,7 +46,18 @@ class TestDatasetDownload:
         for ds in sorted(reference_datasets, key=lambda d: d.dataset_rid):
             dataset_bag = db_catalog.lookup_dataset(ds.dataset_rid)  # Get nested bag from the dataset.
             snapshot_ds = ml_instance.lookup_dataset(dataset=ds.dataset_rid)
-            catalog_elements = snapshot_ds.list_dataset_members(version=dataset_spec.version, recurse=recurse)
+            # Query each dataset at *its own* current version. Per
+            # ADR-0003, dev rows are mutable and a single dataset's
+            # version doesn't translate across siblings — passing the
+            # outer dataset_spec.version to a nested dataset raises
+            # DerivaMLException ("Version X not found for dataset Y")
+            # whenever the outer was released and the nested wasn't.
+            # The intent of this helper is "what the catalog says now
+            # vs what the bag has", so each ds is queried at its own
+            # latest version.
+            catalog_elements = snapshot_ds.list_dataset_members(
+                version=snapshot_ds.current_version, recurse=recurse,
+            )
             del catalog_elements["File"]  # Files is not in the bag.
             bag_elements = dataset_bag.list_dataset_members(recurse=recurse)
 
@@ -147,13 +158,29 @@ class TestDatasetDownload:
             assert reference_members == member_rids
 
     def test_dataset_download_versions(self, dataset_test, tmp_path):
+        """Two bags taken across an add-members mutation differ by the added rows.
+
+        Per ADR-0003 dev rows are mutable: only released versions
+        pin to a stable snapshot. The demo fixture leaves the
+        dataset on a dev row, so we promote to a release before
+        snapping v1 — that gives a stable, downloadable v1 bag that
+        the subsequent ``add_dataset_members`` won't overwrite.
+        """
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
         dataset = dataset_description.dataset
 
+        # Promote the fixture's initial dev row to a release so v1
+        # has a stable snapshot — a captured dev label would be
+        # overwritten by the next mutation (ADR-0003 lazy-mutable
+        # dev row).
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="v1 baseline for versions test")
         current_version = dataset.current_version
+        assert not current_version.is_devrelease
+
         current_spec = DatasetSpec(rid=dataset_description.dataset.dataset_rid, version=current_version)
         self.compare_datasets(ml_instance, dataset_test, current_spec)
 
@@ -162,9 +189,8 @@ class TestDatasetDownload:
 
         dataset_description.dataset.add_dataset_members(subjects[-2:])
         new_version = dataset_description.dataset.current_version
-        # Per ADR-0003: add_dataset_members lands on a dev version, not a
-        # released minor bump. The dev label is anchored at the previous
-        # release (`current_version`).
+        # Per ADR-0003: add_dataset_members lands on a dev version,
+        # anchored at the previous release.
         assert new_version.is_devrelease
         assert new_version.release == current_version.release
         assert new_version.dev == 1
@@ -180,12 +206,30 @@ class TestDatasetDownload:
         assert len(subjects_new) == len(subjects_current) + 2
 
     def test_dataset_download_schemas(self, dataset_test, tmp_path):
+        """Schema changes between two released versions are reflected in
+        their respective bags.
+
+        Per ADR-0003 dev rows have ``Snapshot=NULL`` and resolve to the
+        *live* catalog state, not a fixed point in time. To compare
+        schemas at two points the dataset must be at released versions
+        on both sides — dev labels can't pin a schema snapshot.
+
+        Setup releases the demo fixture's initial dev row to anchor v1
+        on a stable snapshot, then creates the new table and force-bumps
+        to v2 so v2's snapshot captures the schema change.
+        """
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
 
-        current_version = dataset_description.dataset.current_version
+        # Promote the fixture's dev row to a release so v1's snapshot
+        # is pinned before the schema mutation below.
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="Schema-test v1 baseline")
+        current_version = dataset.current_version
+        assert not current_version.is_devrelease
 
         ml_instance.create_table(
             TableDefinition(
@@ -195,10 +239,10 @@ class TestDatasetDownload:
         )
         # Use the private force-bump primitive: this test stamps a new
         # snapshot to capture a schema change, not to release a dev period.
-        new_version = dataset_description.dataset._increment_dataset_version(component=VersionPart.minor)
+        new_version = dataset._increment_dataset_version(component=VersionPart.minor)
 
-        current_bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
-        new_bag = dataset_description.dataset.download_dataset_bag(new_version, use_minid=False)
+        current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
+        new_bag = dataset.download_dataset_bag(new_version, use_minid=False)
 
         assert "NewTable" in new_bag.model.model.schemas[ml_instance.default_schema].tables
         assert "NewTable" not in current_bag.model.model.schemas[ml_instance.default_schema].tables

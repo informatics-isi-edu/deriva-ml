@@ -68,6 +68,57 @@ from deriva_ml.core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+class _SnapshotAwareCatalogBagBuilder(CatalogBagBuilder):
+    """``CatalogBagBuilder`` that honors the catalog's snapshot in exports.
+
+    Upstream's :class:`CatalogBagBuilder._run_export` passes
+    ``str(self.catalog.catalog_id)`` to the export engine — the bare
+    catalog ID, dropping any snapshot suffix. For an
+    :class:`ErmrestSnapshot` (a snapshot-bound catalog with
+    ``snaptime`` set), this causes the export to query the *live*
+    catalog instead of the snapshot, and the bag's ``schema.json``
+    reflects the live schema rather than the snapshot's. See issue
+    #114.
+
+    This subclass overrides ``_run_export`` to re-attach the snapshot
+    suffix when the catalog has one.
+    """
+
+    def _run_export(self, spec: dict) -> Path:  # type: ignore[override]
+        # Local import — see upstream's note on transitive deps.
+        from deriva.transfer.download.deriva_download import (
+            GenericDownloader,
+        )
+
+        # Restore the snapshot suffix dropped by upstream's
+        # ``str(self.catalog.catalog_id)`` round-trip.
+        catalog_id_str = str(self.catalog.catalog_id)
+        snaptime = getattr(self.catalog, "snaptime", None)
+        if snaptime:
+            catalog_id_str = f"{catalog_id_str}@{snaptime}"
+
+        deriva_server = self.catalog.deriva_server
+        downloader = GenericDownloader(
+            server={
+                "host": deriva_server.server,
+                "protocol": deriva_server.scheme,
+                "catalog_id": catalog_id_str,
+            },
+            config=spec,
+            output_dir=str(self.output_dir),
+            credentials=self.catalog._credentials,
+        )
+        downloader.download()
+
+        bag_path = self.output_dir / self.output_dir.name
+        if not bag_path.exists():
+            # Fall back to scanning for a single sub-directory.
+            children = [p for p in self.output_dir.iterdir() if p.is_dir()]
+            if len(children) == 1:
+                bag_path = children[0]
+        return bag_path
+
+
 class DatasetBagBuilder:
     """Build a download spec for a deriva-ml dataset.
 
@@ -249,7 +300,12 @@ class DatasetBagBuilder:
             new_config["timeout"] = timeout
             catalog._session_config = new_config  # type: ignore[attr-defined]
         try:
-            builder = CatalogBagBuilder(
+            # Use the snapshot-aware subclass so the spec's catalog_id
+            # carries the ``@snaptime`` suffix when applicable. The
+            # upstream CatalogBagBuilder drops it (see #114) and the
+            # bag would otherwise reflect the live catalog's schema
+            # rather than the version-snapshot's.
+            builder = _SnapshotAwareCatalogBagBuilder(
                 catalog=catalog,
                 anchors=anchors,
                 output_dir=cb_output_dir,
