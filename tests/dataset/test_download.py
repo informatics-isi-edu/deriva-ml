@@ -180,12 +180,30 @@ class TestDatasetDownload:
         assert len(subjects_new) == len(subjects_current) + 2
 
     def test_dataset_download_schemas(self, dataset_test, tmp_path):
+        """Schema changes between two released versions are reflected in
+        their respective bags.
+
+        Per ADR-0003 dev rows have ``Snapshot=NULL`` and resolve to the
+        *live* catalog state, not a fixed point in time. To compare
+        schemas at two points the dataset must be at released versions
+        on both sides — dev labels can't pin a schema snapshot.
+
+        Setup releases the demo fixture's initial dev row to anchor v1
+        on a stable snapshot, then creates the new table and force-bumps
+        to v2 so v2's snapshot captures the schema change.
+        """
         hostname = dataset_test.catalog.hostname
         catalog_id = dataset_test.catalog.catalog_id
         ml_instance = DerivaML(hostname, catalog_id, working_dir=tmp_path, use_minid=False)
         dataset_description = dataset_test.dataset_description
+        dataset = dataset_description.dataset
 
-        current_version = dataset_description.dataset.current_version
+        # Promote the fixture's dev row to a release so v1's snapshot
+        # is pinned before the schema mutation below.
+        if dataset.current_version.is_devrelease:
+            dataset.release(bump=VersionPart.minor, description="Schema-test v1 baseline")
+        current_version = dataset.current_version
+        assert not current_version.is_devrelease
 
         ml_instance.create_table(
             TableDefinition(
@@ -195,10 +213,10 @@ class TestDatasetDownload:
         )
         # Use the private force-bump primitive: this test stamps a new
         # snapshot to capture a schema change, not to release a dev period.
-        new_version = dataset_description.dataset._increment_dataset_version(component=VersionPart.minor)
+        new_version = dataset._increment_dataset_version(component=VersionPart.minor)
 
-        current_bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
-        new_bag = dataset_description.dataset.download_dataset_bag(new_version, use_minid=False)
+        current_bag = dataset.download_dataset_bag(current_version, use_minid=False)
+        new_bag = dataset.download_dataset_bag(new_version, use_minid=False)
 
         assert "NewTable" in new_bag.model.model.schemas[ml_instance.default_schema].tables
         assert "NewTable" not in current_bag.model.model.schemas[ml_instance.default_schema].tables
