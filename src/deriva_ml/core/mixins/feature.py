@@ -154,11 +154,22 @@ class FeatureMixin:
             else:
                 return m
 
-        # Validate asset and term tables
-        if not all(map(self.model.is_asset, assets)):
-            raise DerivaMLException("Invalid create_feature asset table.")
-        if not all(map(self.model.is_vocabulary, terms)):
-            raise DerivaMLException("Invalid create_feature asset table.")
+        # Validate asset and term tables. Surface the offending
+        # table names in the error so a user passing the wrong
+        # parameter doesn't have to bisect a list to find the
+        # bad entry.
+        bad_assets = [a for a in assets if not self.model.is_asset(a)]
+        if bad_assets:
+            raise DerivaMLException(
+                f"Invalid create_feature asset table(s): {bad_assets}. "
+                "Each entry of `assets` must be a registered asset table."
+            )
+        bad_terms = [t for t in terms if not self.model.is_vocabulary(t)]
+        if bad_terms:
+            raise DerivaMLException(
+                f"Invalid create_feature vocabulary table(s): {bad_terms}. "
+                "Each entry of `terms` must be a controlled vocabulary table."
+            )
 
         # Get references to required tables
         target_table = self.model.name_to_table(target_table)
