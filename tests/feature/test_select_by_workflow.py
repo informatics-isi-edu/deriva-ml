@@ -3,13 +3,11 @@
 Unit tests using a stub container (no live catalog required).
 """
 
-from dataclasses import dataclass, field
 
 import pytest
 
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.feature import FeatureRecord
-
 
 # ---------------------------------------------------------------------------
 # Stub infrastructure

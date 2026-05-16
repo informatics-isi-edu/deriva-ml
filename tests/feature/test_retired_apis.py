@@ -6,8 +6,6 @@ Silent fallthrough or generic errors are not acceptable.
 """
 from __future__ import annotations
 
-import dataclasses
-
 import pytest
 
 from deriva_ml.core.exceptions import DerivaMLException
