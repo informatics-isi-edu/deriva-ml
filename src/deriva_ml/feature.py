@@ -45,7 +45,7 @@ FindAssociationResult = _ermrest_model.FindAssociationResult
 from pydantic import BaseModel, create_model
 
 if TYPE_CHECKING:
-    from model.catalog import DerivaModel
+    from deriva_ml.model.catalog import DerivaModel
 
 
 class FeatureRecord(BaseModel):
