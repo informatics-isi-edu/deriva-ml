@@ -577,8 +577,8 @@ class Feature:
                     - str for all other types
 
             Example:
-                >>> col = Column(name="score", type="float4")
-                >>> typ = map_type(col)  # Returns float
+                >>> col = Column(name="score", type="float4")  # doctest: +SKIP
+                >>> typ = map_type(col)  # Returns float  # doctest: +SKIP
             """
             if c.name in {c.name for c in self.asset_columns}:
                 return str | Path

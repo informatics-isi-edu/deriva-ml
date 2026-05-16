@@ -106,7 +106,11 @@ __all__ = [
     "AssetFilePath",
     "AssetSpec",
     "AssetSpecConfig",
-    # Feature record for feature values and restructure_assets selectors
+    # FeatureRecord — base class for dynamically-generated feature
+    # rows. Used in user code for typing (FeatureRecord subclasses
+    # returned by Feature.feature_record_class()) and as the type
+    # for selector functions passed to feature_values() and
+    # restructure_assets().
     "FeatureRecord",
     # Catalog provenance (lazy-loaded)
     "CatalogProvenance",

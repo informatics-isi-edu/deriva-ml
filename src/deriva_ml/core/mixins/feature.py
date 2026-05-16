@@ -46,6 +46,7 @@ class FeatureMixin:
         lookup_feature: Retrieve a Feature object
         find_features: Find all features in the catalog, optionally filtered by table
         feature_values: Get all values for a feature
+        list_workflow_executions: Resolve a Workflow → list of Execution RIDs
     """
 
     # Type hints for IDE support - actual attributes/methods from host class
@@ -445,24 +446,25 @@ class FeatureMixin:
         Example:
             Get the newest Glaucoma label per image::
 
-                >>> from deriva_ml.feature import FeatureRecord
-                >>> for rec in ml.feature_values(
+                >>> from deriva_ml import DerivaML  # doctest: +SKIP
+                >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
+                >>> for rec in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
                 ... ):
                 ...     print(f"{rec.Image}: {rec.Glaucoma} (by {rec.Execution})")
 
             Filter by a specific workflow — works identically on a downloaded bag::
 
-                >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")
-                >>> sel = FeatureRecord.select_by_workflow(workflow, container=ml)
-                >>> labels = [r.Glaucoma for r in ml.feature_values(
+                >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")  # doctest: +SKIP
+                >>> sel = FeatureRecord.select_by_workflow(workflow, container=ml)  # doctest: +SKIP
+                >>> labels = [r.Glaucoma for r in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=sel,
                 ... )]
 
             Convert to a pandas DataFrame when needed::
 
-                >>> import pandas as pd
-                >>> df = pd.DataFrame(
+                >>> import pandas as pd  # doctest: +SKIP
+                >>> df = pd.DataFrame(  # doctest: +SKIP
                 ...     r.model_dump()
                 ...     for r in ml.feature_values("Image", "Glaucoma")
                 ... )
@@ -592,13 +594,13 @@ class FeatureMixin:
         Example:
             List all executions of a workflow and count them::
 
-                >>> rids = ml.list_workflow_executions("Glaucoma_Training_v2")
-                >>> print(f"{len(rids)} executions of this workflow")
+                >>> rids = ml.list_workflow_executions("Glaucoma_Training_v2")  # doctest: +SKIP
+                >>> print(f"{len(rids)} executions of this workflow")  # doctest: +SKIP
 
             Use as the catalog-backed resolver for the selector factory::
 
-                >>> from deriva_ml.feature import FeatureRecord
-                >>> sel = FeatureRecord.select_by_workflow(
+                >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
+                >>> sel = FeatureRecord.select_by_workflow(  # doctest: +SKIP
                 ...     "Glaucoma_Training_v2", container=ml,
                 ... )
         """
