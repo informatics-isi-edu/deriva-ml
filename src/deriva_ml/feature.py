@@ -366,6 +366,28 @@ class FeatureRecord(BaseModel):
         return _selector
 
     @classmethod
+    def _require_feature(cls) -> "Feature":
+        """Return ``cls.feature``, raising a helpful error if unset.
+
+        The four column-accessor classmethods below all need
+        ``cls.feature`` to be populated, which only happens on
+        subclasses returned by ``Feature.feature_record_class()``.
+        Calling them on the ``FeatureRecord`` base class would
+        otherwise crash with ``AttributeError: 'NoneType' object
+        has no attribute 'feature_columns'`` — this guard
+        substitutes a useful message naming the actual problem.
+        """
+        if cls.feature is None:
+            raise DerivaMLException(
+                f"{cls.__name__}.feature is None — the column-accessor "
+                "classmethods (feature_columns, asset_columns, "
+                "term_columns, value_columns) are only valid on "
+                "subclasses returned by Feature.feature_record_class(), "
+                "not on the FeatureRecord base class."
+            )
+        return cls.feature
+
+    @classmethod
     def feature_columns(cls) -> set[Column]:
         """Return all columns specific to this feature.
 
@@ -379,12 +401,12 @@ class FeatureRecord(BaseModel):
             set[Column]: Feature-specific ERMrest ``Column`` objects. Equivalent
             to ``cls.feature.feature_columns``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.feature_columns
+        return cls._require_feature().feature_columns
 
     @classmethod
     def asset_columns(cls) -> set[Column]:
@@ -398,12 +420,12 @@ class FeatureRecord(BaseModel):
             set[Column]: ERMrest ``Column`` objects that are FK references to
             asset tables. A subset of ``feature_columns()``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.asset_columns
+        return cls._require_feature().asset_columns
 
     @classmethod
     def term_columns(cls) -> set[Column]:
@@ -417,12 +439,12 @@ class FeatureRecord(BaseModel):
             set[Column]: ERMrest ``Column`` objects that are FK references to
             vocabulary tables. A subset of ``feature_columns()``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.term_columns
+        return cls._require_feature().term_columns
 
     @classmethod
     def value_columns(cls) -> set[Column]:
@@ -438,12 +460,12 @@ class FeatureRecord(BaseModel):
             values. Computed as ``feature_columns() - asset_columns() -
             term_columns()``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.value_columns
+        return cls._require_feature().value_columns
 
 
 class Feature:
@@ -558,6 +580,11 @@ class Feature:
             >>> DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
             >>> rec = DiagnosisRecord(Diagnosis="benign")  # doctest: +SKIP
         """
+        # Compute the asset-column-name set once; map_type is called
+        # for every column on the feature, and re-computing this
+        # comprehension on each call is N² for a feature with N
+        # columns.
+        asset_col_names = {c.name for c in self.asset_columns}
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
             """Maps a Deriva column type to a Python/pydantic type.
@@ -580,7 +607,7 @@ class Feature:
                 >>> col = Column(name="score", type="float4")  # doctest: +SKIP
                 >>> typ = map_type(col)  # Returns float  # doctest: +SKIP
             """
-            if c.name in {c.name for c in self.asset_columns}:
+            if c.name in asset_col_names:
                 return str | Path
 
             match c.type.typename:
