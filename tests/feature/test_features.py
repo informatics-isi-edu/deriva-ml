@@ -128,6 +128,43 @@ class TestFeatures:
         assert len(image_quality_feature.term_columns()) == 1
         assert len(image_quality_feature.feature_columns()) == 1
 
+    def test_create_feature_with_non_asset_table_raises(self, test_ml):
+        """create_feature surfaces the bad table name in the error.
+
+        Closes audit Phase 3 feature/ §3.5 — pairs with the §1.4
+        error-message fix in fix(feature): correct duplicated/wrong
+        validation message in create_feature. A user passing a
+        regular domain table as `assets=[...]` should see the
+        offending table name in the exception message.
+        """
+        # Subject is a domain table, not an asset table.
+        with pytest.raises(DerivaMLException, match="asset table"):
+            test_ml.create_feature(
+                target_table="Subject",
+                feature_name="BadAssetFeature",
+                assets=["Subject"],  # ← not an asset table
+                terms=[],
+                metadata=[ColumnDefinition(name="value", type=BuiltinTypes.text)],
+            )
+
+    def test_create_feature_with_non_vocabulary_table_raises(self, test_ml):
+        """create_feature names the right parameter when `terms` is wrong.
+
+        Closes audit Phase 3 feature/ §3.5 — pre-fix, the error
+        said "asset table" even though the failure was on
+        `terms`. Post-fix, the message correctly identifies the
+        vocabulary-table check.
+        """
+        # Subject is a domain table, not a vocabulary table.
+        with pytest.raises(DerivaMLException, match="vocabulary table"):
+            test_ml.create_feature(
+                target_table="Image",
+                feature_name="BadVocabFeature",
+                assets=[],
+                terms=["Subject"],  # ← not a vocabulary
+                metadata=[ColumnDefinition(name="value", type=BuiltinTypes.text)],
+            )
+
     def test_lookup_feature(self, dataset_test, tmp_path):
         ml_instance = DerivaML(
             dataset_test.catalog.hostname, dataset_test.catalog.catalog_id, working_dir=tmp_path, use_minid=False
@@ -344,8 +381,41 @@ class TestFeatures:
                 bag_features.sort(key=lambda x: x[t])
                 assert catalog_features == bag_features
 
-    def test_delete_feature(self, test_ml):
-        pass
+    def test_delete_feature_success(self, test_ml):
+        """delete_feature returns True after a successful drop.
+
+        Closes audit Phase 3 feature/ §1.5 — the placeholder
+        `def test_delete_feature: pass` left both real branches
+        of delete_feature() unexercised. Verify the success
+        path: create a feature, delete it, observe True + the
+        feature is gone from find_features.
+        """
+        self.create_features(test_ml)
+        # Sanity: feature exists before delete
+        assert "Health" in [
+            f.feature_name for f in test_ml.model.find_features("Subject")
+        ]
+
+        result = test_ml.delete_feature("Subject", "Health")
+        assert result is True
+
+        # And it's actually gone
+        assert "Health" not in [
+            f.feature_name for f in test_ml.model.find_features("Subject")
+        ]
+
+    def test_delete_feature_missing_returns_false(self, test_ml):
+        """delete_feature returns False when the feature doesn't exist.
+
+        Closes audit Phase 3 feature/ §1.5 — the StopIteration
+        branch in delete_feature() (line 276) was previously
+        untested.
+        """
+        # The Subject table exists (test_ml fixture provides it)
+        # but a feature named 'NonexistentFeature' has never been
+        # created. delete_feature should return False, not raise.
+        result = test_ml.delete_feature("Subject", "NonexistentFeature")
+        assert result is False
 
     def create_features(self, ml_instance: DerivaML):
         ml_instance.create_vocabulary("SubjectHealth", "A vocab")
