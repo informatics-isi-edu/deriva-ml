@@ -623,20 +623,28 @@ class Dataset:
         return self._ml_instance.lookup_feature(table, feature_name)
 
     def list_workflow_executions(self, workflow: str) -> list[str]:
-        """Dataset-scoped list_workflow_executions — see DerivaML.list_workflow_executions.
+        """Pass-through to ``DerivaML.list_workflow_executions`` (dataset scoping deferred).
 
-        Current implementation returns the full workflow execution list from the
-        catalog. Target-RID filtering at selection time (via ``feature_values``)
-        ensures that records from executions outside the dataset's member set
-        are excluded. A stricter scope (executions whose outputs touch dataset
-        members) is a performance optimization deferred to a later change.
+        Despite the name, the live ``Dataset`` implementation does **not**
+        filter the returned execution list to executions whose outputs touch
+        the dataset's member set — it returns every execution of the
+        workflow. The intended dataset-level scoping is provided downstream
+        by ``feature_values``, which filters feature rows by target RID
+        membership and therefore excludes contributions from out-of-set
+        executions at read time.
+
+        For symmetry: ``DatasetBag.list_workflow_executions`` *is* scoped,
+        because a bag only contains the slice of executions reachable from
+        its member set. A caller relying on dataset-scoped behavior should
+        either use a bag or apply RID-set filtering themselves.
 
         Args:
             workflow: Workflow RID or Workflow_Type name. See
-                ``DerivaML.list_workflow_executions`` for the resolution rules.
+                ``DerivaML.list_workflow_executions`` for resolution rules.
 
         Returns:
-            List of execution RIDs. May be empty.
+            List of execution RIDs for the workflow, **not** filtered to the
+            dataset.
 
         Raises:
             DerivaMLException: If the catalog query fails.

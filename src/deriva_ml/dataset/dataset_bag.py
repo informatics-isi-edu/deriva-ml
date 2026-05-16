@@ -486,7 +486,7 @@ class DatasetBag:
                         members[k].extend(v)
         return dict(members)
 
-    def find_features(self, table: str | Table) -> Iterable[Feature]:
+    def find_features(self, table: str | Table | None = None) -> Iterable[Feature]:
         """Find all features defined on a table within this dataset bag.
 
         Features are measurable properties associated with records in a table,
@@ -503,18 +503,31 @@ class DatasetBag:
         - ``feature_record_class()``: A Pydantic model for reading/writing values
 
         Args:
-            table: The table to find features for (name or Table object).
+            table: The table to find features for (name or Table object). When
+                ``None``, returns every feature in the bag's slice.
 
         Returns:
             An iterable of Feature instances describing each feature
-            defined on the table.
+            defined on the table (or every feature when ``table`` is ``None``).
 
         Example:
             >>> for f in bag.find_features("Image"):  # doctest: +SKIP
             ...     print(f"{f.feature_name}: {len(f.term_columns)} terms, "
             ...           f"{len(f.value_columns)} value columns")
+
+            >>> # Every feature in the bag:
+            >>> for f in bag.find_features():  # doctest: +SKIP
+            ...     print(f"{f.target_table.name}: {f.feature_name}")
         """
-        return self.model.find_features(table)
+        if table is None:
+            # Walk every table in the bag and collect each table's features.
+            # The model's find_features takes a table; iterate to get the
+            # global view. Order is by schema-then-table for determinism.
+            for schema in sorted(self.model.schemas):
+                for t in sorted(self.model.schemas[schema].tables):
+                    yield from self.model.find_features(t)
+            return
+        yield from self.model.find_features(table)
 
     def feature_values(
         self,

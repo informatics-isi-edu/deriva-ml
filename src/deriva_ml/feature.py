@@ -32,20 +32,18 @@ Typical usage:
     >>> record = DiagnosisRecord(Diagnosis="benign", Confidence=0.97)  # doctest: +SKIP
 """
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
+from collections import Counter
 from pathlib import Path
 from types import UnionType
 from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Type
 
-_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
-Column = _ermrest_model.Column
-FindAssociationResult = _ermrest_model.FindAssociationResult
-
+from deriva.core.ermrest_model import Column, FindAssociationResult
 from pydantic import BaseModel, create_model
 
+from deriva_ml.core.exceptions import DerivaMLException
+
 if TYPE_CHECKING:
-    from model.catalog import DerivaModel
+    from deriva_ml.model.catalog import DerivaModel
 
 
 class FeatureRecord(BaseModel):
@@ -176,8 +174,6 @@ class FeatureRecord(BaseModel):
         def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
             filtered = [r for r in records if r.Execution == execution_rid]
             if not filtered:
-                from deriva_ml.core.exceptions import DerivaMLException
-
                 raise DerivaMLException(f"No feature records match execution '{execution_rid}'.")
             return FeatureRecord.select_newest(filtered)
 
@@ -350,25 +346,16 @@ class FeatureRecord(BaseModel):
                     if len(record_cls.feature.term_columns) == 1:
                         col = record_cls.feature.term_columns[0].name
                     else:
-                        from deriva_ml.core.exceptions import (
-                            DerivaMLException,
-                        )
-
                         raise DerivaMLException(
                             "select_majority_vote requires a column name for "
                             "features with multiple term columns. "
                             f"Available: {[c.name for c in record_cls.feature.term_columns]}"
                         )
                 else:
-                    from deriva_ml.core.exceptions import (
-                        DerivaMLException,
-                    )
-
                     raise DerivaMLException(
                         "select_majority_vote requires a column name — could not auto-detect from feature metadata."
                     )
 
-            from collections import Counter
 
             counts = Counter(getattr(r, col, None) for r in records)
             max_count = max(counts.values())
@@ -377,6 +364,28 @@ class FeatureRecord(BaseModel):
             return max(candidates, key=lambda r: r.RCT or "")
 
         return _selector
+
+    @classmethod
+    def _require_feature(cls) -> "Feature":
+        """Return ``cls.feature``, raising a helpful error if unset.
+
+        The four column-accessor classmethods below all need
+        ``cls.feature`` to be populated, which only happens on
+        subclasses returned by ``Feature.feature_record_class()``.
+        Calling them on the ``FeatureRecord`` base class would
+        otherwise crash with ``AttributeError: 'NoneType' object
+        has no attribute 'feature_columns'`` — this guard
+        substitutes a useful message naming the actual problem.
+        """
+        if cls.feature is None:
+            raise DerivaMLException(
+                f"{cls.__name__}.feature is None — the column-accessor "
+                "classmethods (feature_columns, asset_columns, "
+                "term_columns, value_columns) are only valid on "
+                "subclasses returned by Feature.feature_record_class(), "
+                "not on the FeatureRecord base class."
+            )
+        return cls.feature
 
     @classmethod
     def feature_columns(cls) -> set[Column]:
@@ -392,12 +401,12 @@ class FeatureRecord(BaseModel):
             set[Column]: Feature-specific ERMrest ``Column`` objects. Equivalent
             to ``cls.feature.feature_columns``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.feature_columns
+        return cls._require_feature().feature_columns
 
     @classmethod
     def asset_columns(cls) -> set[Column]:
@@ -411,12 +420,12 @@ class FeatureRecord(BaseModel):
             set[Column]: ERMrest ``Column`` objects that are FK references to
             asset tables. A subset of ``feature_columns()``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.asset_columns
+        return cls._require_feature().asset_columns
 
     @classmethod
     def term_columns(cls) -> set[Column]:
@@ -430,12 +439,12 @@ class FeatureRecord(BaseModel):
             set[Column]: ERMrest ``Column`` objects that are FK references to
             vocabulary tables. A subset of ``feature_columns()``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.term_columns
+        return cls._require_feature().term_columns
 
     @classmethod
     def value_columns(cls) -> set[Column]:
@@ -451,12 +460,12 @@ class FeatureRecord(BaseModel):
             values. Computed as ``feature_columns() - asset_columns() -
             term_columns()``.
 
-        Note:
-            Only available on a class returned by ``Feature.feature_record_class()``.
-            Calling this on the ``FeatureRecord`` base class (where ``feature``
-            is ``None``) raises ``AttributeError``.
+        Raises:
+            DerivaMLException: Called on the ``FeatureRecord`` base class
+                rather than a subclass returned by
+                ``Feature.feature_record_class()``.
         """
-        return cls.feature.value_columns
+        return cls._require_feature().value_columns
 
 
 class Feature:
@@ -571,6 +580,11 @@ class Feature:
             >>> DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
             >>> rec = DiagnosisRecord(Diagnosis="benign")  # doctest: +SKIP
         """
+        # Compute the asset-column-name set once; map_type is called
+        # for every column on the feature, and re-computing this
+        # comprehension on each call is N² for a feature with N
+        # columns.
+        asset_col_names = {c.name for c in self.asset_columns}
 
         def map_type(c: Column) -> UnionType | Type[str] | Type[int] | Type[float]:
             """Maps a Deriva column type to a Python/pydantic type.
@@ -590,10 +604,10 @@ class Feature:
                     - str for all other types
 
             Example:
-                >>> col = Column(name="score", type="float4")
-                >>> typ = map_type(col)  # Returns float
+                >>> col = Column(name="score", type="float4")  # doctest: +SKIP
+                >>> typ = map_type(col)  # Returns float  # doctest: +SKIP
             """
-            if c.name in {c.name for c in self.asset_columns}:
+            if c.name in asset_col_names:
                 return str | Path
 
             match c.type.typename:

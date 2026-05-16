@@ -11,10 +11,8 @@ from typing import Any
 
 import pytest
 
-from deriva_ml import BuiltinTypes, ColumnDefinition
 from deriva_ml.dataset.aux_classes import VersionPart
 from deriva_ml.execution import ExecutionConfiguration
-
 
 # ---------------------------------------------------------------------------
 # Bag fixture for retired-API tests

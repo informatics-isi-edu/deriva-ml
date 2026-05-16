@@ -7,25 +7,19 @@ and listing feature values.
 
 from __future__ import annotations
 
-# Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
-import importlib
 from collections import defaultdict
 from functools import reduce
 from itertools import chain
 from operator import or_
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
-datapath = importlib.import_module("deriva.core.datapath")
-_ermrest_model = importlib.import_module("deriva.core.ermrest_model")
-Key = _ermrest_model.Key
-Table = _ermrest_model.Table
-
+from deriva.core.ermrest_model import Key, Table
 from pydantic import validate_call
 
 from deriva_ml.core.definitions import ColumnDefinition, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLMaterializeLimitExceeded
-from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.feature import Feature, FeatureRecord
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -52,6 +46,7 @@ class FeatureMixin:
         lookup_feature: Retrieve a Feature object
         find_features: Find all features in the catalog, optionally filtered by table
         feature_values: Get all values for a feature
+        list_workflow_executions: Resolve a Workflow → list of Execution RIDs
     """
 
     # Type hints for IDE support - actual attributes/methods from host class
@@ -154,11 +149,22 @@ class FeatureMixin:
             else:
                 return m
 
-        # Validate asset and term tables
-        if not all(map(self.model.is_asset, assets)):
-            raise DerivaMLException("Invalid create_feature asset table.")
-        if not all(map(self.model.is_vocabulary, terms)):
-            raise DerivaMLException("Invalid create_feature asset table.")
+        # Validate asset and term tables. Surface the offending
+        # table names in the error so a user passing the wrong
+        # parameter doesn't have to bisect a list to find the
+        # bad entry.
+        bad_assets = [a for a in assets if not self.model.is_asset(a)]
+        if bad_assets:
+            raise DerivaMLException(
+                f"Invalid create_feature asset table(s): {bad_assets}. "
+                "Each entry of `assets` must be a registered asset table."
+            )
+        bad_terms = [t for t in terms if not self.model.is_vocabulary(t)]
+        if bad_terms:
+            raise DerivaMLException(
+                f"Invalid create_feature vocabulary table(s): {bad_terms}. "
+                "Each entry of `terms` must be a controlled vocabulary table."
+            )
 
         # Get references to required tables
         target_table = self.model.name_to_table(target_table)
@@ -306,8 +312,9 @@ class FeatureMixin:
             A Feature schema descriptor.
 
         Raises:
-            DerivaMLException: If the feature doesn't exist on the specified
-                table.
+            DerivaMLFeatureNotFound: If the feature doesn't exist on the
+                specified table. Subclass of DerivaMLException — existing
+                ``except DerivaMLException`` callers still catch it.
 
         Example:
             >>> feature = ml.lookup_feature("Image", "Classification")  # doctest: +SKIP
@@ -440,24 +447,25 @@ class FeatureMixin:
         Example:
             Get the newest Glaucoma label per image::
 
-                >>> from deriva_ml.feature import FeatureRecord
-                >>> for rec in ml.feature_values(
+                >>> from deriva_ml import DerivaML  # doctest: +SKIP
+                >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
+                >>> for rec in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
                 ... ):
                 ...     print(f"{rec.Image}: {rec.Glaucoma} (by {rec.Execution})")
 
             Filter by a specific workflow — works identically on a downloaded bag::
 
-                >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")
-                >>> sel = FeatureRecord.select_by_workflow(workflow, container=ml)
-                >>> labels = [r.Glaucoma for r in ml.feature_values(
+                >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")  # doctest: +SKIP
+                >>> sel = FeatureRecord.select_by_workflow(workflow, container=ml)  # doctest: +SKIP
+                >>> labels = [r.Glaucoma for r in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=sel,
                 ... )]
 
             Convert to a pandas DataFrame when needed::
 
-                >>> import pandas as pd
-                >>> df = pd.DataFrame(
+                >>> import pandas as pd  # doctest: +SKIP
+                >>> df = pd.DataFrame(  # doctest: +SKIP
                 ...     r.model_dump()
                 ...     for r in ml.feature_values("Image", "Glaucoma")
                 ... )
@@ -587,13 +595,13 @@ class FeatureMixin:
         Example:
             List all executions of a workflow and count them::
 
-                >>> rids = ml.list_workflow_executions("Glaucoma_Training_v2")
-                >>> print(f"{len(rids)} executions of this workflow")
+                >>> rids = ml.list_workflow_executions("Glaucoma_Training_v2")  # doctest: +SKIP
+                >>> print(f"{len(rids)} executions of this workflow")  # doctest: +SKIP
 
             Use as the catalog-backed resolver for the selector factory::
 
-                >>> from deriva_ml.feature import FeatureRecord
-                >>> sel = FeatureRecord.select_by_workflow(
+                >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
+                >>> sel = FeatureRecord.select_by_workflow(  # doctest: +SKIP
                 ...     "Glaucoma_Training_v2", container=ml,
                 ... )
         """
