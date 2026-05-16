@@ -32,12 +32,15 @@ Typical usage:
     >>> record = DiagnosisRecord(Diagnosis="benign", Confidence=0.97)  # doctest: +SKIP
 """
 
+from collections import Counter
 from pathlib import Path
 from types import UnionType
 from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Type
 
 from deriva.core.ermrest_model import Column, FindAssociationResult
 from pydantic import BaseModel, create_model
+
+from deriva_ml.core.exceptions import DerivaMLException
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
@@ -171,8 +174,6 @@ class FeatureRecord(BaseModel):
         def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
             filtered = [r for r in records if r.Execution == execution_rid]
             if not filtered:
-                from deriva_ml.core.exceptions import DerivaMLException
-
                 raise DerivaMLException(f"No feature records match execution '{execution_rid}'.")
             return FeatureRecord.select_newest(filtered)
 
@@ -345,25 +346,16 @@ class FeatureRecord(BaseModel):
                     if len(record_cls.feature.term_columns) == 1:
                         col = record_cls.feature.term_columns[0].name
                     else:
-                        from deriva_ml.core.exceptions import (
-                            DerivaMLException,
-                        )
-
                         raise DerivaMLException(
                             "select_majority_vote requires a column name for "
                             "features with multiple term columns. "
                             f"Available: {[c.name for c in record_cls.feature.term_columns]}"
                         )
                 else:
-                    from deriva_ml.core.exceptions import (
-                        DerivaMLException,
-                    )
-
                     raise DerivaMLException(
                         "select_majority_vote requires a column name — could not auto-detect from feature metadata."
                     )
 
-            from collections import Counter
 
             counts = Counter(getattr(r, col, None) for r in records)
             max_count = max(counts.values())
