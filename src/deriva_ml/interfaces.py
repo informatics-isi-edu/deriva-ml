@@ -212,11 +212,13 @@ class DatasetLike(Protocol):
         """
         ...
 
-    def find_features(self, table: str | Table) -> Iterable[Feature]:
-        """Find features associated with a table.
+    def find_features(self, table: str | Table | None = None) -> Iterable[Feature]:
+        """Find features associated with a table, or all features when ``None``.
 
         Args:
-            table: Table to find features for.
+            table: Table to find features for. When ``None``, return every
+                feature defined on the catalog (or every feature in the
+                bag's slice, for ``DatasetBag``).
 
         Returns:
             Iterable of Feature objects.
@@ -758,11 +760,12 @@ class DerivaMLCatalogReader(Protocol):
         """
         ...
 
-    def find_features(self, table: str | Table) -> Iterable[Feature]:
-        """Find features associated with a table.
+    def find_features(self, table: str | Table | None = None) -> Iterable[Feature]:
+        """Find features associated with a table, or all features when ``None``.
 
         Args:
-            table: Table to find features for.
+            table: Table to find features for. When ``None``, return every
+                feature defined on the catalog.
 
         Returns:
             Iterable of Feature objects.
