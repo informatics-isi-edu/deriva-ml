@@ -37,7 +37,12 @@ from deriva_ml.core.definitions import (
     _get_domain_schemas,
     _is_system_schema,
 )
-from deriva_ml.core.exceptions import DerivaMLException, DerivaMLReadOnlyError, DerivaMLTableTypeError
+from deriva_ml.core.exceptions import (
+    DerivaMLException,
+    DerivaMLFeatureNotFound,
+    DerivaMLReadOnlyError,
+    DerivaMLTableTypeError,
+)
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
 
@@ -615,14 +620,15 @@ class DerivaModel:
             The :class:`Feature` wrapper for the matching association.
 
         Raises:
-            DerivaMLException: If ``table`` doesn't exist, or if no
-                feature with ``feature_name`` is defined on it.
+            DerivaMLTableNotFound: If ``table`` doesn't exist.
+            DerivaMLFeatureNotFound: If no feature with
+                ``feature_name`` is defined on ``table``.
         """
         table = self.name_to_table(table)
         try:
             return [f for f in self.find_features(table) if f.feature_name == feature_name][0]
         except IndexError:
-            raise DerivaMLException(f"Feature {table.name}:{feature_name} doesn't exist.")
+            raise DerivaMLFeatureNotFound(table.name, feature_name) from None
 
     def asset_metadata(self, table: TableInput) -> set[str]:
         """Return the non-asset columns of an asset table.

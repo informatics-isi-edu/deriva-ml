@@ -312,8 +312,9 @@ class FeatureMixin:
             A Feature schema descriptor.
 
         Raises:
-            DerivaMLException: If the feature doesn't exist on the specified
-                table.
+            DerivaMLFeatureNotFound: If the feature doesn't exist on the
+                specified table. Subclass of DerivaMLException — existing
+                ``except DerivaMLException`` callers still catch it.
 
         Example:
             >>> feature = ml.lookup_feature("Image", "Classification")  # doctest: +SKIP

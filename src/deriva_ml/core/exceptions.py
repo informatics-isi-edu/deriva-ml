@@ -60,6 +60,7 @@ __all__ = [
     "DerivaMLNotFoundError",
     "DerivaMLDatasetNotFound",
     "DerivaMLTableNotFound",
+    "DerivaMLFeatureNotFound",
     "DerivaMLInvalidTerm",
     "DerivaMLTableTypeError",
     "DerivaMLValidationError",
@@ -269,6 +270,36 @@ class DerivaMLTableNotFound(DerivaMLNotFoundError):
     def __init__(self, table_name: str, msg: str = "Table not found") -> None:
         super().__init__(f"{msg}: {table_name}")
         self.table_name = table_name
+
+
+class DerivaMLFeatureNotFound(DerivaMLNotFoundError):
+    """Exception raised when a feature cannot be found on a table.
+
+    Raised by ``DerivaML.lookup_feature`` when the requested feature
+    is not defined on the target table. Carries the table and
+    feature name so callers can construct precise error messages
+    or do programmatic recovery (e.g., create the feature on the
+    fly).
+
+    Args:
+        table_name: Name of the table the feature was looked up on.
+        feature_name: Name of the feature that was not found.
+        msg: Additional context. Defaults to "Feature not found".
+
+    Example:
+        >>> raise DerivaMLFeatureNotFound("Image", "Glaucoma")  # doctest: +SKIP
+        DerivaMLFeatureNotFound: Feature not found: Glaucoma on Image
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        feature_name: str,
+        msg: str = "Feature not found",
+    ) -> None:
+        super().__init__(f"{msg}: {feature_name} on {table_name}")
+        self.table_name = table_name
+        self.feature_name = feature_name
 
 
 class DerivaMLInvalidTerm(DerivaMLNotFoundError):
