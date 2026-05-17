@@ -66,6 +66,7 @@ from deriva.bag.traversal import (
     FKTraversalPolicy,
 )
 
+from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -248,6 +249,10 @@ def create_ml_workspace(
         exclude_tables=policy_exclude_tables,
         asset_mode=resolved_asset_mode,
         dangling_fk_strategy=resolved_orphan_strategy,
+        # Silence WARNING-level cycle-break log spam for the
+        # known Dataset ↔ Dataset_Version cycle. See
+        # core/constants.py:INTENTIONAL_FK_CYCLES.
+        intentional_cycles=set(INTENTIONAL_FK_CYCLES),
     )
 
     return clone_via_bag(

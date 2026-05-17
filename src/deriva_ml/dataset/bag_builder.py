@@ -61,9 +61,9 @@ from deriva.bag.traversal import FKTraversalPolicy, VocabExport
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 
-from deriva_ml.core.constants import RID
-from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
+from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, RID
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
 logger = get_logger(__name__)
 
@@ -804,6 +804,11 @@ class DatasetBagBuilder:
         return FKTraversalPolicy(
             exclude_tables=exclude_tables,
             vocab_export=vocab_export,
+            # Silence WARNING-level "Breaking cycle in FK
+            # dependencies" log spam for the known
+            # Dataset ↔ Dataset_Version cycle. See
+            # core/constants.py:INTENTIONAL_FK_CYCLES.
+            intentional_cycles=set(INTENTIONAL_FK_CYCLES),
         )
 
     # ------------------------------------------------------------------

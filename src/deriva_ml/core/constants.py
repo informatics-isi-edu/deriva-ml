@@ -50,11 +50,38 @@ DRY_RUN_RID = "0000"
 # These are excluded when auto-detecting domain schemas
 SYSTEM_SCHEMAS: frozenset[str] = frozenset({"public", "www", "WWW"})
 
+# FK cycles that the deriva-ml schema designs in deliberately, and that
+# deriva-py's bag pipeline already knows how to break correctly.
+#
+# Each entry is a frozenset of fully-qualified table names
+# (``{schema}.{table}``) participating in one cycle. Passed to
+# ``deriva.bag.traversal.FKTraversalPolicy(intentional_cycles=...)``
+# at every deriva-ml ``FKTraversalPolicy(...)`` construction site
+# (clone, bag export, execution-commit upload). The loader still
+# breaks these cycles to sort tables — it just logs the break at
+# DEBUG instead of WARNING.
+#
+# Why only these specific cycles are silenced:
+#
+# * ``Dataset ↔ Dataset_Version`` — a Dataset row carries a
+#   ``current_version`` FK to a Dataset_Version row, and each
+#   Dataset_Version carries a ``Dataset`` FK back. Both directions
+#   are operationally needed (per-dataset versioning + per-version
+#   provenance). The cycle is by design and not changing.
+#
+# Cycles **not** in this set should still surface as WARNING in
+# the bag-loader output — those warnings exist to flag accidental
+# schema bugs. Adding to this set is a deliberate opt-in.
+INTENTIONAL_FK_CYCLES: frozenset[frozenset[str]] = frozenset({
+    frozenset({f"{ML_SCHEMA}.Dataset", f"{ML_SCHEMA}.Dataset_Version"}),
+})
+
 
 __all__ = [
     "ML_SCHEMA",
     "DRY_RUN_RID",
     "SYSTEM_SCHEMAS",
+    "INTENTIONAL_FK_CYCLES",
     "RID",
     "DerivaSystemColumns",
     "DerivaAssetColumns",

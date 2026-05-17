@@ -73,6 +73,7 @@ from deriva_ml.catalog.provenance import (
     CloneDetails,
     set_catalog_provenance,
 )
+from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
 
@@ -376,6 +377,10 @@ def clone_via_bag(
             # whole clone — the slice converges on a self-coherent
             # subgraph.
             dangling_fk_strategy=DanglingFKStrategy.DELETE,
+            # Silence WARNING-level cycle-break log spam for the
+            # known Dataset ↔ Dataset_Version cycle. See
+            # core/constants.py:INTENTIONAL_FK_CYCLES.
+            intentional_cycles=set(INTENTIONAL_FK_CYCLES),
         )
     else:
         # Merge deriva-ml clone-required settings into the caller's
@@ -405,6 +410,11 @@ def clone_via_bag(
             merge_kwargs["terminal_tables"] = default_terminal_tables
         if "dangling_fk_strategy" not in explicit:
             merge_kwargs["dangling_fk_strategy"] = DanglingFKStrategy.DELETE
+        if "intentional_cycles" not in explicit:
+            # Silence WARNING-level cycle-break log spam for the
+            # known Dataset ↔ Dataset_Version cycle. See
+            # core/constants.py:INTENTIONAL_FK_CYCLES.
+            merge_kwargs["intentional_cycles"] = set(INTENTIONAL_FK_CYCLES)
         if merge_kwargs:
             policy = policy.model_copy(update=merge_kwargs)
 
