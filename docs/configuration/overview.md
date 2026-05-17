@@ -430,11 +430,13 @@ def train_classifier(
     # Your training code here
     print(f"Training with lr={learning_rate}, epochs={epochs}, batch={batch_size}")
 
-    # Register output files for upload
+    # Register output files for upload. The Output_File asset type
+    # is auto-applied to every uploaded output; pass a more-specific
+    # type (e.g., ExecAssetType.model_file) when one applies.
     model_path = execution.asset_file_path(
         MLAsset.execution_asset,
         "trained_model.pt",
-        ExecAssetType.output_file
+        ExecAssetType.model_file,
     )
     # Save model to model_path...
 ```

@@ -57,6 +57,7 @@ from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import (
     DRY_RUN_RID,
     RID,
+    ExecAssetType,
     ExecMetadataType,
     FileSpec,
     MLAsset,
@@ -1574,18 +1575,61 @@ class Execution:
         uploaded_assets: dict[str, list[AssetFilePath]],
         asset_role: str = "Output",
     ) -> None:
-        """Add entry to the association table connecting an asset to an execution RID
+        """Link assets to this execution and auto-tag them by role.
+
+        Writes two kinds of association rows for each asset:
+
+        1. ``{Asset}_Execution`` — links the asset RID to this
+           execution with the given ``Asset_Role`` (``"Input"`` or
+           ``"Output"``). This is the per-execution-link direction
+           tag; consumers query it via
+           ``execution.list_assets(asset_role="Input")``.
+
+        2. ``{Asset}_Asset_Type`` — auto-tags each asset's content
+           classification:
+
+           - For ``Output``: every user-supplied type from the
+             ``asset_file_path`` calls **plus** ``Output_File``
+             (added automatically if not already in the list).
+             So a model file uploaded with
+             ``ExecAssetType.model_file`` ends up tagged
+             ``["Model_File", "Output_File"]``.
+           - For ``Input``: just ``Input_File`` is added. The
+             asset's existing content types (from when it was
+             originally created) are preserved; we don't overwrite
+             them. So a model file consumed as input ends up
+             tagged ``["Model_File", "Input_File"]``.
+
+           Both inserts use ``on_conflict_skip=True`` so re-running
+           is idempotent — an asset that already has the
+           ``Input_File``/``Output_File`` tag from a prior
+           execution-link is unchanged.
 
         Args:
-            uploaded_assets: Dictionary whose key is the name of an asset table and whose value is a list of RIDs for
-                newly added assets to that table.
-             asset_role: A term or list of terms from the Asset_Role vocabulary.
+            uploaded_assets: ``{schema/table_name: [AssetFilePath, ...]}``.
+                Each ``AssetFilePath`` carries the asset RID and
+                (for outputs) the user-supplied content types.
+            asset_role: ``"Input"`` or ``"Output"`` from the
+                ``Asset_Role`` vocabulary.
         """
         # Make sure the asset role is in the controlled vocabulary table.
         if self._dry_run:
             # Don't do any updates of we are doing a dry run.
             return
         self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
+
+        # Direction-tag for the {Asset}_Asset_Type write below. The
+        # direction is multi-valued alongside content types — a file
+        # uploaded as ExecAssetType.model_file ends up tagged with
+        # both Model_File AND Output_File. The directional tag makes
+        # "give me every asset that's ever served as input" queryable
+        # through Asset_Type alone, regardless of which execution
+        # it was input to.
+        direction_tag = (
+            ExecAssetType.input_file.value
+            if asset_role == "Input"
+            else ExecAssetType.output_file.value
+        )
 
         pb = self._ml_object.pathBuilder()
         for asset_table, asset_list in uploaded_assets.items():
@@ -1605,10 +1649,35 @@ class Execution:
                 on_conflict_skip=True,
             )
 
-            # Now add in the type names via the asset_asset_type association table.
-            # Get the list of types for each file in the asset.
+            # Resolve the {Asset}_Asset_Type association once per
+            # asset_table loop iteration — we need it for both the
+            # Output (user-supplied + Output_File) and Input
+            # (Input_File only) branches below.
+            asset_asset_type, _, _ = self._model.find_association(asset_table_name, "Asset_Type")
+            type_path = pb.schemas[asset_asset_type.schema.name].tables[asset_asset_type.name]
+
             if asset_role == "Input":
-                return
+                # Input branch: auto-tag each downloaded asset with
+                # Input_File. We don't touch the asset's existing
+                # content types — the asset was created by someone
+                # else (likely a prior execution's output); whatever
+                # types it carries should stay. ``on_conflict_skip``
+                # makes re-downloads idempotent.
+                type_path.insert(
+                    [
+                        {asset_table_name: asset_path.asset_rid, "Asset_Type": direction_tag}
+                        for asset_path in asset_list
+                    ],
+                    on_conflict_skip=True,
+                )
+                continue
+
+            # Output branch: read the user-supplied per-file type
+            # map produced during asset_file_path() calls, then
+            # auto-add Output_File to every asset's type list (if
+            # not already present). The user can still explicitly
+            # pass ExecAssetType.output_file; we just don't require
+            # it anymore.
             asset_type_map = {}
             with Path(
                 asset_type_path(
@@ -1619,11 +1688,17 @@ class Execution:
             ).open("r") as asset_type_file:
                 for line in asset_type_file:
                     asset_type_map.update(json.loads(line.strip()))
-            for asset_path in asset_list:
-                asset_path.asset_types = asset_type_map[asset_path.file_name]
 
-            asset_asset_type, _, _ = self._model.find_association(asset_table_name, "Asset_Type")
-            type_path = pb.schemas[asset_asset_type.schema.name].tables[asset_asset_type.name]
+            # Ensure the directional Output_File tag is in every
+            # asset's type list. Use a list (preserving order) +
+            # membership check rather than a set, so user-specified
+            # tag ordering is preserved for any downstream consumer
+            # that cares.
+            for asset_path in asset_list:
+                types = asset_type_map[asset_path.file_name]
+                if direction_tag not in types:
+                    types.append(direction_tag)
+                asset_path.asset_types = types
 
             type_path.insert(
                 [
