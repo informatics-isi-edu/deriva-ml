@@ -67,7 +67,6 @@ class TestPlatformTermsPresent:
             '"Name": "Analysis"',
             '"Name": "Ingest"',
             '"Name": "Data_Cleaning"',
-            '"Name": "Embedding"',
             '"Name": "Dataset_Management"',
         ):
             assert term in src, f"Workflow_Type seed missing: {term}"

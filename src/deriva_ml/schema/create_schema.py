@@ -527,10 +527,6 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
                 "Name": "Data_Cleaning",
                 "Description": "Workflows that clean and preprocess raw data, including standardizing formats, handling missing values, and filtering invalid records.",
             },
-            {
-                "Name": "Embedding",
-                "Description": "Workflows that generate embedding vectors from input data using foundation models.",
-            },
             {"Name": "Dataset_Management", "Description": "Workflows that create, split, version, or manage datasets."},
         ],
     )
