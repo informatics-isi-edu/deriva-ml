@@ -99,6 +99,23 @@ class DerivaML(
     This class provides core functionality for managing ML workflows, features, and datasets in a Deriva catalog.
     It handles data versioning, feature management, vocabulary control, and execution tracking.
 
+    Method naming convention:
+        - ``find_*`` methods search the catalog for entities of a kind, optionally filtered.
+          Examples: ``find_features(table=None)``, ``find_datasets()``, ``find_workflows()``,
+          ``find_executions()``, ``find_experiments()``, ``find_assets()``. ``find_*`` returns
+          everything that matches; pass arguments to narrow the search.
+        - ``list_*`` methods enumerate things scoped to a specific entity passed as the first
+          argument. Examples: ``list_assets(asset_table)``, ``list_dataset_members(dataset)``,
+          ``list_dataset_children(dataset)``, ``list_workflow_executions(workflow)``,
+          ``list_vocabulary_terms(table)``. ``list_*`` always has a "scope" argument; there is
+          no scope-less ``list_*`` flavor for entities of a given kind — use ``find_*`` for that.
+
+        So: "all features on the catalog" → ``find_features()``; "all features on table T" →
+        ``find_features(T)`` (scoping is a filter); "all members of dataset D" →
+        ``list_dataset_members(D)`` (scoping is the parent entity itself). There is no
+        ``list_features()`` because features aren't scoped to a parent entity in the way
+        dataset members are scoped to a dataset.
+
     Attributes:
         host_name (str): Hostname of the Deriva server (e.g., 'deriva.example.org').
         catalog_id (Union[str, int]): Catalog identifier or name.
@@ -112,9 +129,9 @@ class DerivaML(
         start_time (datetime): Timestamp when this instance was created.
 
     Example:
-        >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-        >>> ml.create_feature('my_table', 'new_feature')
-        >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')
+        >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+        >>> ml.create_feature('my_table', 'new_feature')  # doctest: +SKIP
+        >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')  # doctest: +SKIP
     """
 
     # Class-level type annotations for DerivaMLCatalog protocol compliance
