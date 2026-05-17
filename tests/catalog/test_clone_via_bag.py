@@ -194,11 +194,18 @@ def test_clone_via_bag_passes_policy_through(tmp_path: Path) -> None:
     policy that customizes every merge-eligible field — the
     merge is a no-op and the same instance reaches both endpoints.
     """
+    # Include every merge-eligible field so the merge in
+    # clone_via_bag is a no-op and the caller's policy instance
+    # reaches the builder / loader unchanged (by identity). Fields
+    # currently merge-eligible: vocab_export, terminal_tables,
+    # dangling_fk_strategy, intentional_cycles. If you add another
+    # to the merge predicate, set it explicitly here too.
     policy = FKTraversalPolicy(
         asset_mode=AssetMode.ROWS_ONLY,
         dangling_fk_strategy=DanglingFKStrategy.NULLIFY,
         vocab_export=VocabExport.FULL,
         terminal_tables={("deriva-ml", "Execution")},
+        intentional_cycles=set(),
     )
     fake_bag_path = tmp_path / "fake-bag"
     fake_bag_path.mkdir()
@@ -296,6 +303,66 @@ def test_clone_via_bag_merges_defaults_into_partial_policy(
         assert merged.dangling_fk_strategy == DanglingFKStrategy.DELETE
         assert ("deriva-ml", "Execution") in merged.terminal_tables
         assert ("deriva-ml", "Workflow") in merged.terminal_tables
+        # The known Dataset ↔ Dataset_Version cycle is merged in
+        # so the bag-load doesn't spam WARNING-level cycle-break
+        # messages for the deriva-ml core schema's intentional
+        # cycle. See core/constants.py:INTENTIONAL_FK_CYCLES.
+        cycle_table_sets = {frozenset(c) for c in merged.intentional_cycles}
+        assert (
+            frozenset({"deriva-ml.Dataset", "deriva-ml.Dataset_Version"})
+            in cycle_table_sets
+        )
+
+
+def test_clone_via_bag_preserves_explicit_empty_cycles(tmp_path: Path) -> None:
+    """A caller-supplied ``intentional_cycles=set()`` is not overwritten.
+
+    Regression guard: ``intentional_cycles`` is merge-eligible per
+    the model_fields_set predicate. A caller who deliberately
+    passes an empty set (or any explicit value) should keep that
+    choice — the merge only fills in when the field wasn't
+    supplied.
+    """
+    user_policy = FKTraversalPolicy(
+        asset_mode=AssetMode.ROWS_ONLY,
+        intentional_cycles=set(),  # explicit empty
+    )
+    fake_bag_path = tmp_path / "fake-bag"
+    fake_bag_path.mkdir()
+
+    with (
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.get_credential",
+            return_value={},
+        ),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
+        ) as MockBuilder,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
+        ) as MockLoader,
+    ):
+        MockBuilder.return_value.build.return_value = fake_bag_path
+        loader = MagicMock()
+        loader.run.return_value = MagicMock()
+        MockLoader.return_value.__enter__.return_value = loader
+
+        clone_via_bag(
+            source_hostname="src.example.org",
+            source_catalog_id="1",
+            dest_hostname="dst.example.org",
+            dest_catalog_id="42",
+            root_rid="ABC",
+            policy=user_policy,
+            output_dir=tmp_path,
+        )
+
+        _, b_kwargs = MockBuilder.call_args
+        merged = b_kwargs["policy"]
+
+        # Explicit empty set survives — no default cycles injected.
+        assert merged.intentional_cycles == set()
 
 
 def test_clone_via_bag_preserves_explicit_fail_strategy(

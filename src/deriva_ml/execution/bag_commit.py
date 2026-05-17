@@ -63,11 +63,12 @@ from deriva.bag.traversal import (
 from deriva.core.utils.hash_utils import compute_file_hashes
 
 from deriva_ml.asset.aux_classes import AssetFilePath
+from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES
 from deriva_ml.core.definitions import MLVocab
 from deriva_ml.core.ermrest import UploadProgress
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.core.upload_layout import asset_type_path, flat_asset_dir
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.upload_layout import asset_type_path, flat_asset_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -593,6 +594,12 @@ def load_execution_bag(
         # URL-key dedup on asset tables and ``(asset, type)`` dedup
         # on the ``{Asset}_Asset_Type`` association tables.
         match_by_columns=match_by_columns,
+        # Silence the WARNING-level "Breaking cycle in FK dependencies"
+        # log spam for the Dataset ↔ Dataset_Version cycle. See
+        # core/constants.py:INTENTIONAL_FK_CYCLES — the loader still
+        # breaks the cycle to sort tables; it just stops emitting a
+        # WARNING for every read pass.
+        intentional_cycles=set(INTENTIONAL_FK_CYCLES),
     )
     loader = BagCatalogLoader(
         catalog=execution._ml_object.catalog,
