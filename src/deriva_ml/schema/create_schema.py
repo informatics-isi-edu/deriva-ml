@@ -402,9 +402,30 @@ def create_ml_schema(
 def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
     """Initialize the ML schema vocabulary tables with required terms.
 
-    Populates Asset_Type, Asset_Role, Dataset_Type, and Workflow_Type
-    vocabulary tables with their standard terms. Safe to call on catalogs
-    that already have some or all terms — existing terms are skipped.
+    Populates Asset_Type, Asset_Role, Dataset_Type, Workflow_Type, and
+    Execution_Status vocabulary tables with their standard terms. Safe
+    to call on catalogs that already have some or all terms — existing
+    terms are skipped (the helper inserts only names not already
+    present).
+
+    Term-selection principle:
+        Every term seeded here describes a **platform-level** concept
+        — a workflow shape (``Training``, ``Prediction``), an
+        execution state (``Running``, ``Uploaded``), an asset role
+        (``Input``, ``Output``), an asset purpose (``Model_File``,
+        ``Hydra_Config``), or a dataset role (``Training``,
+        ``Validation``, ``Complete``). **Domain-specific terms must
+        not appear here** — specific model architectures
+        (``VGG19``, ``RETFound``), research-area categories
+        (``Multimodal``), or dataset/asset names tied to a single
+        project all belong in user vocabularies added at the
+        catalog level after schema creation.
+
+        A platform that ships opinionated domain defaults pushes
+        every downstream user toward those defaults whether or not
+        they fit. The defaults seeded here should be the smallest
+        set that lets a fresh DerivaML catalog be usable for any
+        ML workflow.
 
     Args:
         model: The ERMrest model to add terms to.
@@ -506,20 +527,7 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
                 "Name": "Data_Cleaning",
                 "Description": "Workflows that clean and preprocess raw data, including standardizing formats, handling missing values, and filtering invalid records.",
             },
-            {
-                "Name": "Embedding",
-                "Description": "Workflows that generate embedding vectors from input data using foundation models.",
-            },
             {"Name": "Dataset_Management", "Description": "Workflows that create, split, version, or manage datasets."},
-            {"Name": "VGG19", "Description": "VGG19 convolutional neural network for image classification."},
-            {
-                "Name": "RETFound",
-                "Description": "RETFound vision transformer (ViT-Large) foundation model for retinal images.",
-            },
-            {
-                "Name": "Multimodal",
-                "Description": "Workflows combining multiple data modalities (e.g., imaging + clinical records).",
-            },
         ],
     )
 
