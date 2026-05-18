@@ -131,6 +131,39 @@ results = pb.schemas[schema_name].tables[table_name].entities().fetch()
 - `{Asset}_Execution` tables link assets to executions with Input/Output roles
 - File uploads use Hatrac object store
 
+**Verb naming (`find_*` vs `list_*`)**: deriva-ml's public-API methods
+follow a predictable verb-then-noun convention. Knowing the rule
+means you don't have to guess which method to reach for:
+
+- `find_*` — schema-introspection / discovery that walks the
+  catalog model with filtering or traversal logic.
+  Examples: `find_features`, `find_datasets`, `find_workflows`,
+  `find_executions`, `find_assets`, `find_associations`. These do
+  non-trivial work to identify matching entities (predicates,
+  association detection, FK traversal).
+- `list_*` — straightforward enumeration of "what's there" inside
+  a known scope.
+  Examples: `list_assets`, `list_executions`,
+  `list_dataset_members`, `list_dataset_children`,
+  `list_dataset_parents`, `list_vocabulary_terms`. These are thin
+  wrappers over a table read.
+- `get_*` — single-RID detail read; takes a RID, returns the
+  bundled record.
+- `lookup_*` — RID-or-name resolution helper (e.g.
+  `lookup_dataset`); a sibling of `get_*` that accepts either form.
+- Mutating verbs (`create_*` / `update_*` / `delete_*` /
+  `add_*`) — write operations.
+
+If you reach for `ml.list_features` you will get an `AttributeError`;
+the correct call is `ml.find_features(table)`. Features require an
+association walk to identify, so they live under `find_*` not
+`list_*`.
+
+This convention applies to the Python library. The MCP wire
+surface uses a slightly different `find_*` rule (catalog-wide
+search by non-RID identifier — see the
+`deriva_ml_getting_started` prompt for the MCP-side definition).
+
 ### Testing
 
 Tests require a running Deriva catalog. Set `DERIVA_HOST` environment variable to specify the test server (defaults to `localhost`).
