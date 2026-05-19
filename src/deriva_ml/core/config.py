@@ -9,7 +9,7 @@ The configuration handles:
     - Schema configuration (domain_schema, ml_schema)
     - Directory paths (working_dir, cache_dir)
     - Logging levels for both DerivaML and underlying Deriva libraries
-    - Feature toggles (use_minid, check_auth)
+    - Feature toggles (use_minid)
 
 Integration with hydra-zen:
     The module registers a custom resolver for computing working directories
@@ -97,7 +97,6 @@ class DerivaMLConfig(BaseModel):
             If None, MINID functionality is disabled regardless of use_minid setting.
         use_minid: Whether to use MINID service for dataset bags. Only effective when
             s3_bucket is configured. Defaults to True when s3_bucket is set, False otherwise.
-        check_auth: Whether to verify authentication on connection. Defaults to True.
         clean_execution_dir: Whether to automatically clean execution working directories
             after successful upload. Defaults to True. Set to False to retain local copies
             of execution outputs for debugging or manual inspection.
@@ -128,7 +127,6 @@ class DerivaMLConfig(BaseModel):
     credential: Any = None
     s3_bucket: str | None = None
     use_minid: bool | None = None  # None means "auto" - True if s3_bucket is set
-    check_auth: bool = True
     clean_execution_dir: bool = True
     mode: ConnectionMode | str = ConnectionMode.online
 

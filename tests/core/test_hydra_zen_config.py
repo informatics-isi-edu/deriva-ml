@@ -50,7 +50,6 @@ class TestHydraZenDerivaMLConfig:
         # based on s3_bucket when the config is instantiated
         assert conf.use_minid is None
         assert conf.s3_bucket is None
-        assert conf.check_auth is True
 
     def test_instantiate_creates_pydantic_model(self):
         """Test that instantiate() creates a proper DerivaMLConfig instance."""
@@ -59,7 +58,6 @@ class TestHydraZenDerivaMLConfig:
         conf = DerivaMLConf(
             hostname="test.example.org",
             catalog_id="42",
-            check_auth=False,  # Disable auth check for testing
         )
 
         # Mock HydraConfig since we're not running under Hydra
@@ -123,7 +121,6 @@ class TestHydraZenDerivaMLConfig:
             hostname="test.example.org",
             catalog_id="99",
             working_dir=str(tmp_path / "work"),
-            check_auth=False,
         )
 
         # The compute_workdir resolver should use this path with catalog_id and hostname
@@ -513,7 +510,6 @@ class TestWorkingDirectoryIntegration:
             hostname="test.example.org",
             catalog_id="77",
             working_dir=str(work_dir),
-            check_auth=False,
         )
 
         # Verify the config has the working dir

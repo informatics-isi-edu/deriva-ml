@@ -58,7 +58,6 @@ def _make_test_config(deriva_name: str, config_name: str):
         name=deriva_name,
         hostname="test.example.org",
         catalog_id="1",
-        check_auth=False,
     )
 
     config_builds = builds(

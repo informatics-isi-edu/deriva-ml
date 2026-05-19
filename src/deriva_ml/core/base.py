@@ -250,7 +250,6 @@ class DerivaML(
         credential: dict | None = None,
         s3_bucket: str | None = None,
         use_minid: bool | None = None,
-        check_auth: bool = True,
         clean_execution_dir: bool = True,
         mode: ConnectionMode | str = ConnectionMode.online,
     ) -> None:
@@ -281,7 +280,6 @@ class DerivaML(
             use_minid: Use the MINID service when downloading dataset bags. Only effective when
                 s3_bucket is configured. If None (default), automatically set to True when s3_bucket
                 is provided, False otherwise.
-            check_auth: Check if the user has access to the catalog.
             clean_execution_dir: Whether to automatically clean up execution working directories
                 after successful upload. Defaults to True. Set to False to retain local copies.
             mode: Connection mode for this instance. ``ConnectionMode.online`` (default)
@@ -324,7 +322,6 @@ class DerivaML(
             self._init_online(
                 hostname=hostname,
                 catalog_id=catalog_id,
-                check_auth=check_auth,
                 cache=cache,
                 ml_schema=ml_schema,
                 domain_schemas=domain_schemas,
@@ -414,14 +411,21 @@ class DerivaML(
         *,
         hostname: str,
         catalog_id: str | int,
-        check_auth: bool,
         cache: "SchemaCache",
         ml_schema: str,
         domain_schemas: "str | set[str] | None",
         default_schema: "str | None",
     ) -> None:
         """Online init: connect to server, resolve schema via cache
-        or fresh fetch with a drift warning."""
+        or fresh fetch with a drift warning.
+
+        No pre-flight auth probe: the legacy ``/authn/session`` endpoint that
+        deriva-py's ``get_authn_session()`` calls is not exposed by credenza,
+        which is now the only supported auth backend. Authentication failures
+        surface as 401s on the first real ermrest call (``catalog.get("/")``
+        below) — accurate and source-true, instead of a synthetic
+        "you are not authorized" wrapper masking the real cause.
+        """
         from deriva_ml.model.catalog import DerivaModel
 
         server = DerivaServer(
@@ -430,14 +434,6 @@ class DerivaML(
             credentials=self.credential,
             session_config=self._get_session_config(),
         )
-        try:
-            if check_auth and server.get_authn_session():
-                pass
-        except Exception:
-            raise DerivaMLException(
-                "You are not authorized to access this catalog. "
-                "Please check your credentials and make sure you have logged in."
-            )
         self.catalog = server.connect_ermrest(catalog_id)
 
         # GET / returns {snaptime: ..., ...} — cheap way to learn

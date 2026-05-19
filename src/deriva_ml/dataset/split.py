@@ -1188,7 +1188,6 @@ def main() -> int:
             hostname=args.hostname,
             catalog_id=str(args.catalog_id),
             domain_schemas={args.domain_schema} if args.domain_schema else None,
-            check_auth=True,
         )
         logger.info(f"Connected, domain schema: {ml.default_schema}")
 
