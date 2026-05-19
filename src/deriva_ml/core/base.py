@@ -436,43 +436,28 @@ class DerivaML(
         )
         self.catalog = server.connect_ermrest(catalog_id)
 
-        # GET / returns {snaptime: ..., ...} — cheap way to learn
-        # the catalog's current snapshot id.
+        # Fetch the live schema. deriva-py caches the parsed dict on
+        # the catalog instance and auto-invalidates on schema-mutating
+        # POST/PUT/DELETE through the same catalog, so subsequent
+        # reads in the same process are O(1) and always current.
+        # The disk cache write below is purely for offline mode.
+        schema_json = self.catalog.getCatalogSchema()
         live_snapshot_id = self.catalog.get("/").json()["snaptime"]
+        cache.write(
+            snapshot_id=live_snapshot_id,
+            hostname=hostname,
+            catalog_id=str(catalog_id),
+            ml_schema=ml_schema,
+            schema=schema_json,
+        )
 
-        if cache.exists():
-            cached = cache.load()
-            if cached["snapshot_id"] != live_snapshot_id:
-                logger.warning(
-                    "schema cache is at snapshot %s; live catalog is at %s. "
-                    "Using cached schema. Call ml.refresh_schema() to update.",
-                    cached["snapshot_id"],
-                    live_snapshot_id,
-                )
-            self.model = DerivaModel.from_cached(
-                cached["schema"],
-                catalog=self.catalog,
-                ml_schema=ml_schema,
-                domain_schemas=domain_schemas,
-                default_schema=default_schema,
-            )
-        else:
-            # First-time online init — fetch live schema and populate cache.
-            live_schema = self.catalog.get("/schema").json()
-            cache.write(
-                snapshot_id=live_snapshot_id,
-                hostname=hostname,
-                catalog_id=str(catalog_id),
-                ml_schema=ml_schema,
-                schema=live_schema,
-            )
-            self.model = DerivaModel.from_cached(
-                live_schema,
-                catalog=self.catalog,
-                ml_schema=ml_schema,
-                domain_schemas=domain_schemas,
-                default_schema=default_schema,
-            )
+        self.model = DerivaModel.from_cached(
+            schema_json,
+            catalog=self.catalog,
+            ml_schema=ml_schema,
+            domain_schemas=domain_schemas,
+            default_schema=default_schema,
+        )
 
     def _init_offline(
         self,
@@ -561,9 +546,10 @@ class DerivaML(
                 f"state (staged rows may become inconsistent with the "
                 f"new schema)."
             )
+        # Force a refetch through deriva-py's binding cache; rebuilds
+        # the parsed-dict and path-builder caches on the catalog.
+        live_schema = self.catalog.getCatalogSchema(refresh=True)
         live_snapshot_id = self.catalog.get("/").json()["snaptime"]
-        live_schema = self.catalog.get("/schema").json()
-        old_snapshot_id = cache.snapshot_id()
         cache.write(
             snapshot_id=live_snapshot_id,
             hostname=self.host_name,
@@ -579,11 +565,7 @@ class DerivaML(
             domain_schemas=self.model.domain_schemas,
             default_schema=self.model.default_schema,
         )
-        logger.info(
-            "schema cache refreshed from %s to %s",
-            old_snapshot_id,
-            live_snapshot_id,
-        )
+        logger.info("schema refreshed to snapshot %s", live_snapshot_id)
 
     def pin_schema(self, reason: str | None = None) -> "SchemaDiff | None":
         """Freeze the local schema cache at its current snapshot.
@@ -624,7 +606,7 @@ class DerivaML(
             live_snapshot_id = self.catalog.get("/").json()["snaptime"]
             cached_payload = cache.load()
             if cached_payload["snapshot_id"] != live_snapshot_id:
-                live_schema = self.catalog.get("/schema").json()
+                live_schema = self.catalog.getCatalogSchema(refresh=True)
                 diff = _compute_diff(cached_payload["schema"], live_schema)
                 if not diff.is_empty():
                     logger.warning(
@@ -690,7 +672,7 @@ class DerivaML(
             raise DerivaMLReadOnlyError("diff_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         cached_payload = cache.load()
-        live_schema = self.catalog.get("/schema").json()
+        live_schema = self.catalog.getCatalogSchema(refresh=True)
         return _compute_diff(cached_payload["schema"], live_schema)
 
     @staticmethod

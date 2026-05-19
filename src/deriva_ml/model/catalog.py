@@ -593,15 +593,50 @@ class DerivaModel:
         if table is not None:
             # Find features for a specific table
             return find_table_features(self.name_to_table(table))
-        else:
-            # Find all features across all domain and ML schema tables
-            features: list[Feature] = []
-            for schema_name in [*self.domain_schemas, self.ml_schema]:
-                schema = self.model.schemas.get(schema_name)
-                if schema:
-                    for t in schema.tables.values():
-                        features.extend(find_table_features(t))
-            return features
+
+        # No table arg: discover features across the whole catalog.
+        #
+        # ``find_associations`` walks ``Table.referenced_by`` from each
+        # candidate table, so the same association table is visited
+        # once per FK target. For a single ``Image.Image_Classification``
+        # feature backed by ``Execution_Image_Image_Classification``
+        # (an association with FKs to Image, Execution, and the
+        # Image_Class vocab) the naive cross-schema scan yields three
+        # Feature objects -- one with ``target_table=Image`` (the
+        # actual target), one with ``target_table=Execution``, and one
+        # with ``target_table=Image_Class``. Only the first is what
+        # callers want. See
+        # docs/bugs/2026-05-19-find-features-duplicates.md.
+        #
+        # The fix is twofold:
+        # 1. Skip iteration over tables that can never be the actual
+        #    feature target -- the Execution table and any vocabulary
+        #    table. Every feature association references both, so
+        #    scanning them only produces duplicates.
+        # 2. Dedup the remaining list by the association table itself
+        #    (qualified schema.name), in case multiple distinct target
+        #    tables share an association in some non-canonical layout.
+        ml_schema_obj = self.model.schemas.get(self.ml_schema)
+        execution_table = ml_schema_obj.tables.get("Execution") if ml_schema_obj is not None else None
+
+        seen_feature_tables: set[tuple[str, str]] = set()
+        features: list[Feature] = []
+        for schema_name in [*self.domain_schemas, self.ml_schema]:
+            schema = self.model.schemas.get(schema_name)
+            if schema is None:
+                continue
+            for t in schema.tables.values():
+                if execution_table is not None and t is execution_table:
+                    continue
+                if self.is_vocabulary(t):
+                    continue
+                for f in find_table_features(t):
+                    key = (f.feature_table.schema.name, f.feature_table.name)
+                    if key in seen_feature_tables:
+                        continue
+                    seen_feature_tables.add(key)
+                    features.append(f)
+        return features
 
     def lookup_feature(self, table: TableInput, feature_name: str) -> Feature:
         """Look up the named feature on ``table``.
@@ -704,8 +739,7 @@ class DerivaModel:
         """
         if isinstance(self.catalog, CatalogStub):
             raise DerivaMLReadOnlyError(
-                "DerivaModel.apply() requires online mode; "
-                "this DerivaML instance was constructed with mode=offline."
+                "DerivaModel.apply() requires online mode; this DerivaML instance was constructed with mode=offline."
             )
         self.model.apply()
 
@@ -833,7 +867,6 @@ class DerivaModel:
             max_depth=max_depth,
             stop_at=stop_at,
         )
-
 
     def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:
         """Create a new table from TableDefinition.

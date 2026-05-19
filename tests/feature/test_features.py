@@ -196,14 +196,38 @@ class TestFeatures:
         assert all(f.target_table.name == "Image" for f in image_features)
 
         # Test finding all features (no table argument)
-        all_features = ml_instance.find_features()
+        all_features = list(ml_instance.find_features())
         all_feature_names = [f.feature_name for f in all_features]
         # Should include features from both tables
         assert "Health" in all_feature_names
         assert "BoundingBox" in all_feature_names
         assert "Quality" in all_feature_names
-        # Total should be at least the sum of individual table features
-        assert len(all_features) >= len(subject_features) + len(image_features)
+
+        # No duplicates: each feature appears exactly once. Without
+        # this assertion the no-table-arg branch of find_features
+        # rediscovers each association table once per FK target
+        # (target table, Execution, Feature_Name vocab, and every
+        # term-vocab the feature references), producing N copies of
+        # each Feature object. See
+        # docs/bugs/2026-05-19-find-features-duplicates.md.
+        feature_table_qnames = [f"{f.feature_table.schema.name}.{f.feature_table.name}" for f in all_features]
+        assert len(feature_table_qnames) == len(set(feature_table_qnames)), (
+            f"find_features() returned duplicates: {feature_table_qnames}"
+        )
+
+        # Total equals the sum of per-target-table feature lists.
+        # Stricter than the historical `>=` assertion that accommodated
+        # the duplicates bug.
+        assert len(all_features) == len(list(subject_features)) + len(list(image_features))
+
+        # Every returned Feature has a target_table that is the actual
+        # feature target -- not the Execution table, and not a
+        # vocabulary table. Validates the dedup tie-breaker.
+        for f in all_features:
+            assert f.target_table.name != "Execution", f"Feature {f.feature_name} has Execution as target_table"
+            assert not ml_instance.model.is_vocabulary(f.target_table), (
+                f"Feature {f.feature_name} has vocabulary {f.target_table.name} as target_table"
+            )
 
     def test_feature_record(self, dataset_test, tmp_path):
         ml_instance = DerivaML(
@@ -254,8 +278,7 @@ class TestFeatures:
         # Health feature values for every Subject during ensure_features, so the
         # unfiltered count will be (# demo subjects) + 1.
         features = [
-            f for f in ml_instance.feature_values("Subject", "Health")
-            if f.Execution == feature_execution.execution_rid
+            f for f in ml_instance.feature_values("Subject", "Health") if f.Execution == feature_execution.execution_rid
         ]
         assert len(features) == 1
 
@@ -316,7 +339,8 @@ class TestFeatures:
         # since the demo catalog also populates BoundingBox feature values
         # during ensure_features.
         features = [
-            f for f in ml_instance.feature_values("Image", "BoundingBox")
+            f
+            for f in ml_instance.feature_values("Image", "BoundingBox")
             if f.Execution == asset_execution.execution_rid
         ]
         assert len(features) == 3
@@ -392,17 +416,13 @@ class TestFeatures:
         """
         self.create_features(test_ml)
         # Sanity: feature exists before delete
-        assert "Health" in [
-            f.feature_name for f in test_ml.model.find_features("Subject")
-        ]
+        assert "Health" in [f.feature_name for f in test_ml.model.find_features("Subject")]
 
         result = test_ml.delete_feature("Subject", "Health")
         assert result is True
 
         # And it's actually gone
-        assert "Health" not in [
-            f.feature_name for f in test_ml.model.find_features("Subject")
-        ]
+        assert "Health" not in [f.feature_name for f in test_ml.model.find_features("Subject")]
 
     def test_delete_feature_missing_returns_false(self, test_ml):
         """delete_feature returns False when the feature doesn't exist.
@@ -420,7 +440,7 @@ class TestFeatures:
     def create_features(self, ml_instance: DerivaML):
         ml_instance.create_vocabulary("SubjectHealth", "A vocab")
         ml_instance.create_vocabulary("SubjectHealth1", "A vocab")
-        for t in ["SubjectHeath", "SubjectHealth1"]:
+        for t in ["SubjectHealth", "SubjectHealth1"]:
             ml_instance.add_term(
                 t,
                 "Sick",
