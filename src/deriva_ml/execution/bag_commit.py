@@ -153,7 +153,9 @@ def build_execution_bag(
     # ``col.info`` so the bag's written schema.json round-trips
     # losslessly — required for ``Table.is_asset()`` to recognize
     # asset tables at load time. See deriva-py PRs #238, #240.
-    schema_doc = execution._ml_object.catalog.get("/schema").json()
+    # Use the catalog's cached schema document; deriva-py manages
+    # freshness via ETag revalidation and schema-mutation invalidation.
+    schema_doc = execution._ml_object.catalog.getCatalogSchema()
     schemas_to_carry = ["deriva-ml", execution._ml_object.default_schema]
     metadata = ermrest_json_to_metadata(
         schema_doc,

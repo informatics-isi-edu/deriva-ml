@@ -156,15 +156,16 @@ class DerivaModel:
         then reads the catalog back off ``model.catalog`` as usual.
 
         This replicates what ``Model.fromcatalog(catalog)`` does
-        online — the online call fetches
-        ``catalog.get("/schema").json()`` and passes the result to
-        ``Model(catalog, dict)``. Here we pass in the already-cached
-        dict from :class:`~deriva_ml.core.schema_cache.SchemaCache`.
+        online — the online call fetches the schema dict via
+        ``catalog.getCatalogSchema()`` (cached and ETag-revalidated
+        by deriva-py) and passes the result to ``Model(catalog, dict)``.
+        Here we pass in the already-cached dict from
+        :class:`~deriva_ml.core.schema_cache.SchemaCache`.
 
         Args:
             schema_dict: The JSON payload from a previous
-                ``catalog.get('/schema').json()`` call, as persisted
-                by ``SchemaCache``.
+                ``catalog.getCatalogSchema()`` call (or any equivalent
+                ``/schema`` GET), as persisted by ``SchemaCache``.
             catalog: The catalog object to associate with the model.
                 Pass a real ``ErmrestCatalog`` online, or a
                 ``CatalogStub`` offline.

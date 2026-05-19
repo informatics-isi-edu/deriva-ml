@@ -110,7 +110,7 @@ def test_bag_commit_poc_image_round_trip(
     # cross-schema-FK automap work with deriva-ml's hyphenated
     # schema names.
     bag_dir = tmp_path / "commit-bag"
-    schema_doc = ml.catalog.get("/schema").json()
+    schema_doc = ml.catalog.getCatalogSchema()
     metadata = ermrest_json_to_metadata(
         schema_doc,
         schemas=["deriva-ml", ml.default_schema],

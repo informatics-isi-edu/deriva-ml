@@ -416,15 +416,27 @@ class DerivaML(
         domain_schemas: "str | set[str] | None",
         default_schema: "str | None",
     ) -> None:
-        """Online init: connect to server, resolve schema via cache
-        or fresh fetch with a drift warning.
+        """Online init: connect to server, fetch the live schema, build the model.
 
-        No pre-flight auth probe: the legacy ``/authn/session`` endpoint that
-        deriva-py's ``get_authn_session()`` calls is not exposed by credenza,
-        which is now the only supported auth backend. Authentication failures
-        surface as 401s on the first real ermrest call (``catalog.get("/")``
-        below) — accurate and source-true, instead of a synthetic
-        "you are not authorized" wrapper masking the real cause.
+        Schema freshness is handled entirely by deriva-py's
+        ``ErmrestCatalog``: it caches the parsed ``/schema`` dict on
+        the catalog instance, auto-invalidates on any same-instance
+        schema-mutating POST/PUT/DELETE, and uses HTTP ETags
+        (``If-None-Match``) for cross-instance freshness on every
+        read. ``_init_online`` does not maintain its own schema cache.
+
+        The disk cache write below is **only** for offline-mode
+        bootstrapping: a later ``DerivaML(mode=offline)`` in the same
+        working directory reads the JSON we write here. Online mode
+        never reads it back.
+
+        No pre-flight auth probe: the legacy ``/authn/session`` endpoint
+        that deriva-py's ``get_authn_session()`` calls is not exposed by
+        credenza, which is now the only supported auth backend.
+        Authentication failures surface as 401s on the first real
+        ermrest call (``getCatalogSchema()`` below) — accurate and
+        source-true, instead of a synthetic "you are not authorized"
+        wrapper masking the real cause.
         """
         from deriva_ml.model.catalog import DerivaModel
 
@@ -496,20 +508,34 @@ class DerivaML(
         )
 
     def refresh_schema(self, *, force: bool = False) -> None:
-        """Fetch the current catalog schema and overwrite the workspace cache.
+        """Force-refetch the live catalog schema; rebuild the model and disk cache.
 
-        Online mode only. Refuses in two cases:
+        Online mode only. For normal in-process use this method is
+        rarely needed: deriva-py's ``ErmrestCatalog`` already handles
+        schema freshness automatically (auto-invalidation on same-
+        instance mutations, ``If-None-Match`` revalidation on every
+        read). Use ``refresh_schema()`` when you specifically need to
+        bypass the in-process cache and re-fetch from the live
+        catalog -- e.g. after a known out-of-band mutation by another
+        process, or before overwriting the offline-mode disk cache.
 
-        1. The cache is pinned (via :meth:`pin_schema`). Raises
+        The disk cache (``SchemaCache``) is rewritten with the fresh
+        ``/schema`` JSON so subsequent offline-mode reads see the new
+        snapshot. The in-memory ``self.model`` is rebuilt from the
+        same fresh JSON.
+
+        Refuses in two cases:
+
+        1. The disk cache is pinned (via :meth:`pin_schema`). Raises
            :class:`DerivaMLSchemaPinned`. ``force=True`` does NOT
            bypass a pin — call :meth:`unpin_schema` first.
         2. The workspace has pending rows (staged/leasing/leased/
            uploading/failed). Raises
-           :class:`DerivaMLSchemaRefreshBlocked` unless
-           ``force=True`` is passed; a forced refresh may leave
-           staged rows whose metadata references columns or types
-           no longer in the new schema, causing catalog-insert
-           failures on the next upload.
+           :class:`DerivaMLSchemaRefreshBlocked` unless ``force=True``
+           is passed; a forced refresh may leave staged rows whose
+           metadata references columns or types no longer in the
+           new schema, causing catalog-insert failures on the next
+           upload.
 
         Args:
             force: If True, refresh even when the workspace has
@@ -517,7 +543,7 @@ class DerivaML(
 
         Raises:
             DerivaMLReadOnlyError: If called in offline mode.
-            DerivaMLSchemaPinned: If the cache is pinned (any
+            DerivaMLSchemaPinned: If the disk cache is pinned (any
                 ``force`` value).
             DerivaMLSchemaRefreshBlocked: If ``force=False`` and the
                 workspace has pending rows (and the cache is not
