@@ -85,7 +85,16 @@ class ExecutionRecord(BaseModel):
             property updates the catalog.
         start_time (datetime | None): When the execution started (read-only).
         stop_time (datetime | None): When the execution completed (read-only).
-        duration (str | None): Duration string from catalog (read-only).
+        duration (str | None): Algorithm-phase duration string from the
+            catalog ``Execution_Duration`` column (read-only). Renamed
+            from "Duration" 2026-05-19; old catalogs that predate the
+            schema bump report None.
+        download_duration (str | None): Init/download-phase duration
+            string from the catalog ``Download_Duration`` column
+            (read-only). None for old catalogs.
+        upload_duration (str | None): Upload-phase duration string from
+            the catalog ``Upload_Duration`` column (read-only). None for
+            old catalogs.
 
     Example:
         Look up an execution and query its state::
@@ -125,6 +134,8 @@ class ExecutionRecord(BaseModel):
     start_time: datetime | None = None
     stop_time: datetime | None = None
     duration: str | None = None
+    download_duration: str | None = None
+    upload_duration: str | None = None
 
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
     _logger: logging.Logger = PrivateAttr(default_factory=lambda: get_logger(__name__))
@@ -138,6 +149,8 @@ class ExecutionRecord(BaseModel):
         start_time: datetime | None = None,
         stop_time: datetime | None = None,
         duration: str | None = None,
+        download_duration: str | None = None,
+        upload_duration: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize an ExecutionRecord.
@@ -149,7 +162,9 @@ class ExecutionRecord(BaseModel):
             description: Description of the execution.
             start_time: When the execution started.
             stop_time: When the execution completed.
-            duration: Duration string.
+            duration: Algorithm-phase duration string (Execution_Duration).
+            download_duration: Init/download-phase duration string.
+            upload_duration: Upload-phase duration string.
             **kwargs: Additional arguments (including _ml_instance for internal use).
         """
         super().__init__(
@@ -157,6 +172,8 @@ class ExecutionRecord(BaseModel):
             start_time=start_time,
             stop_time=stop_time,
             duration=duration,
+            download_duration=download_duration,
+            upload_duration=upload_duration,
         )
         self._workflow = workflow
         self._status = status
@@ -641,7 +658,11 @@ class ExecutionRecord(BaseModel):
         if self.stop_time:
             lines.append(f"  stop_time: {self.stop_time}")
         if self.duration:
-            lines.append(f"  duration: {self.duration}")
+            lines.append(f"  execution_duration: {self.duration}")
+        if self.download_duration:
+            lines.append(f"  download_duration: {self.download_duration}")
+        if self.upload_duration:
+            lines.append(f"  upload_duration: {self.upload_duration}")
         return "\n".join(lines)
 
     def __repr__(self) -> str:

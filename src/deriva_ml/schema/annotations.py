@@ -12,7 +12,6 @@ Public entry points:
   (used by ``create_ml_schema``).
 """
 
-
 from deriva.core.ermrest_model import Model, Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 
@@ -432,7 +431,9 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 "RCT",
                 "Description",
                 {"source": [{"outbound": [schema, "Execution_Workflow_fkey"]}, "RID"]},
-                "Duration",
+                "Execution_Duration",
+                "Download_Duration",
+                "Upload_Duration",
                 "Status",
                 "Status_Detail",
             ]

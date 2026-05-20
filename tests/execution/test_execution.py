@@ -387,10 +387,24 @@ class TestExecutionLifecycle:
         vocabulary (Created, Running, Stopped, Pending_Upload, Uploaded,
         Failed, Aborted) — SQLite remains authoritative; the catalog is a
         synced mirror.
+
+        Regression guard (2026-05-19): __exit__'s clean-exit branch must
+        delegate to execution_stop() so that duration is written alongside
+        stop_time. Prior to the fix, __exit__ used an inline transition
+        that wrote stop_time but not duration, leaving the catalog
+        Duration column null for every with-block exit. See
+        docs/bugs/2026-05-19-execution-exit-omits-duration.md.
+
+        Companion PR 2 (same date) renamed catalog column Duration →
+        Execution_Duration and added Download_Duration + Upload_Duration
+        for init/download and upload phases respectively. Assertions
+        below cover all three columns. See
+        docs/bugs/2026-05-19-execution-phase-durations-design.md.
         """
         from deriva_ml.execution.state_store import ExecutionStatus
 
         execution = basic_execution
+        ml = execution._ml_object
 
         with execution.execute() as exe:
             assert exe.execution_rid is not None
@@ -400,12 +414,33 @@ class TestExecutionLifecycle:
         # After context exit, the authoritative SQLite status is Stopped.
         assert execution.status is ExecutionStatus.Stopped
 
+        # Execution_Duration (algorithm phase) is populated on the SQLite
+        # registry row AND projected into the catalog row — both must be
+        # set by the clean-exit path. Download_Duration is also set
+        # because _initialize_execution ran during create_execution.
+        assert execution.stop_time is not None, "stop_time must be set after __exit__"
+        catalog_row = ml._retrieve_rid(execution.execution_rid)
+        assert catalog_row["Execution_Duration"] is not None, (
+            "catalog Execution_Duration column must be populated after "
+            "__exit__ (regression: previously stayed null because "
+            "__exit__ wrote stop_time but not duration)"
+        )
+        assert catalog_row["Download_Duration"] is not None, (
+            "catalog Download_Duration must be populated by _initialize_execution timing (PR 2 download phase)"
+        )
+
         # Upload finalizes the catalog-visible lifecycle; after upload we
         # expect the SQLite status to have advanced (pending_upload or
         # uploaded depending on how the current upload pipeline is wired
         # relative to this task). We don't assert a specific terminal
         # state here — later tasks (E5/G-series) will refine.
         execution.upload_execution_outputs()
+
+        # After upload, Upload_Duration is populated.
+        catalog_row = ml._retrieve_rid(execution.execution_rid)
+        assert catalog_row["Upload_Duration"] is not None, (
+            "catalog Upload_Duration must be populated by upload_execution_outputs timing (PR 2 upload phase)"
+        )
 
     def test_execution_manual_start_stop(self, basic_execution):
         """``execution_start()`` / ``execution_stop()`` cycle status correctly.

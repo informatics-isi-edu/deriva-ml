@@ -289,7 +289,10 @@ class ExecutionMixin:
         workflow_rid = execution_data.get("Workflow")
         workflow = self.lookup_workflow(workflow_rid) if workflow_rid else None
 
-        # Create ExecutionRecord bound to this catalog
+        # Create ExecutionRecord bound to this catalog. Reads the three
+        # per-phase duration columns added 2026-05-19; old catalogs that
+        # predate the schema bump report None for all three (forward-only
+        # migration — see docs/bugs/2026-05-19-execution-phase-durations-design.md).
         record = ExecutionRecord(
             execution_rid=execution_rid,
             workflow=workflow,
@@ -297,7 +300,9 @@ class ExecutionMixin:
             description=execution_data.get("Description"),
             start_time=start_time,
             stop_time=stop_time,
-            duration=execution_data.get("Duration"),
+            duration=execution_data.get("Execution_Duration"),
+            download_duration=execution_data.get("Download_Duration"),
+            upload_duration=execution_data.get("Upload_Duration"),
             _ml_instance=self,
             _logger=getattr(self, "_logger", None),
         )

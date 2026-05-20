@@ -115,9 +115,17 @@ class ExecutionStateStore:
         # executions — see spec §2.5.1 for column purposes.
         # status values: created|running|stopped|failed|pending_upload|uploaded|aborted
         # mode values: online|offline
-        # duration: pre-formatted "Hh Mmin Ssec" string set during the
-        #     Running → Stopped transition; mirrored to the catalog's
-        #     Execution.Duration column via the state machine.
+        # Three pre-formatted "Hh Mmin Ssec" duration strings:
+        #   duration          — algorithm phase (Running → Stopped).
+        #                       Mirrored to catalog Execution.Execution_Duration.
+        #                       Internal SQLite name remains "duration"
+        #                       (avoiding a schema migration for existing
+        #                       workspaces); catalog-side rename is in
+        #                       _catalog_body_for_execution.
+        #   download_duration — init/download phase (_initialize_execution).
+        #                       Mirrored to catalog Execution.Download_Duration.
+        #   upload_duration   — upload phase (upload_execution_outputs).
+        #                       Mirrored to catalog Execution.Upload_Duration.
         self.executions = Table(
             EXECUTIONS_TABLE,
             self.metadata,
@@ -131,6 +139,8 @@ class ExecutionStateStore:
             Column("start_time", DateTime(timezone=True), nullable=True),
             Column("stop_time", DateTime(timezone=True), nullable=True),
             Column("duration", String, nullable=True),
+            Column("download_duration", String, nullable=True),
+            Column("upload_duration", String, nullable=True),
             Column("last_activity", DateTime(timezone=True), nullable=False),
             Column("error", Text, nullable=True),
             Column("sync_pending", Boolean, nullable=False, default=False),

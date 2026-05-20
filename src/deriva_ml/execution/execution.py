@@ -106,6 +106,37 @@ _METADATA_DESCRIPTIONS: dict[str, str] = {
 _ENV_SNAPSHOT_DESCRIPTION = "Runtime environment snapshot: installed packages, OS, platform, and Python configuration"
 
 
+def _format_duration(start: "datetime | None", end: "datetime | None") -> str:
+    """Format a wall-clock interval as ``"<H>H <M>min <S>sec"``.
+
+    Used by every per-phase duration measurement (algorithm, download,
+    upload, and the failed-path algorithm computation in ``__exit__``).
+    Centralizes the rounding and string format so all four sites stay
+    in sync.
+
+    Args:
+        start: Phase start timestamp. If None or tz-naive, falls back
+            to UTC interpretation. None yields ``"0H 0min 0.0sec"``.
+        end: Phase end timestamp. None yields ``"0H 0min 0.0sec"``.
+
+    Returns:
+        Pre-formatted string suitable for the catalog ``*_Duration``
+        columns and the SQLite ``*_duration`` columns.
+    """
+    from datetime import timezone
+
+    if start is None or end is None:
+        return "0H 0min 0.0sec"
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    delta = end - start
+    hours, remainder = divmod(delta.total_seconds(), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+
+
 class Execution:
     """Manages the lifecycle and context of a DerivaML execution.
 
@@ -300,7 +331,18 @@ class Execution:
                 _logger=self._logger,
             )
 
+        # Bracket _initialize_execution with timestamps so the
+        # download/materialize phase contributes a Download_Duration to
+        # the catalog row. The SQLite registry row doesn't exist yet at
+        # this point (insert_execution runs below), so we stash the
+        # formatted string on self and write it through after the row
+        # is created. See docs/bugs/2026-05-19-execution-phase-durations-design.md.
+        from datetime import timezone
+
+        _download_start = datetime.now(timezone.utc)
         self._initialize_execution(reload)
+        _download_end = datetime.now(timezone.utc)
+        self._download_duration_str = _format_duration(_download_start, _download_end)
 
         # Guard SQLite registry insertion: skip when (a) this is a dry-run
         # (we never want to persist dry-run state) or (b) we are resuming an
@@ -308,8 +350,6 @@ class Execution:
         # entry was written by the original run and should not be overwritten.
         # Writing twice would corrupt the start-time and initial-status fields.
         if not self._dry_run and reload is None:
-            from datetime import datetime, timezone
-
             store = self._ml_object.workspace.execution_state_store()
             now = datetime.now(timezone.utc)
 
@@ -330,6 +370,14 @@ class Execution:
                     working_dir_rel=f"execution/{self.execution_rid}",
                     created_at=now,
                     last_activity=now,
+                )
+                # Persist the just-measured download duration through
+                # update_execution. Done as a follow-up write rather
+                # than baked into insert_execution so the insert
+                # signature stays focused on identity / config fields.
+                store.update_execution(
+                    self.execution_rid,
+                    download_duration=self._download_duration_str,
                 )
             except Exception as exc:
                 # The catalog row is already created at this point —
@@ -1169,22 +1217,11 @@ class Execution:
 
         now = datetime.now(timezone.utc)
 
-        # Compute duration against the start_time read-through property.
-        # Falls back to "0H 0min 0.0sec" if start_time is missing
-        # (shouldn't happen in practice — Running → Stopped requires
-        # __enter__/execution_start to have set start_time).
-        start = self.start_time
-        if start is not None:
-            # Coerce any naive datetime from SQLite to UTC so arithmetic
-            # with `now` (aware) doesn't raise.
-            if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
-            duration = now - start
-            hours, remainder = divmod(duration.total_seconds(), 3600)
-            minutes, seconds = divmod(remainder, 60)
-            duration_str = f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
-        else:
-            duration_str = "0H 0min 0.0sec"
+        # Compute algorithm duration against start_time. Falls back to
+        # "0H 0min 0.0sec" if start_time is missing (shouldn't happen
+        # in practice — Running → Stopped requires __enter__ /
+        # execution_start to have set start_time).
+        duration_str = _format_duration(self.start_time, now)
 
         if self._dry_run:
             return
@@ -1389,6 +1426,15 @@ class Execution:
         if self.status is ExecutionStatus.Stopped:
             self.update_status(ExecutionStatus.Pending_Upload)
 
+        # Bracket the upload work with timestamps so Upload_Duration
+        # gets populated regardless of whether the call succeeds or
+        # raises. The write goes to SQLite *before* the terminal status
+        # transition so the state-machine PUT that follows carries the
+        # measurement to the catalog. See
+        # docs/bugs/2026-05-19-execution-phase-durations-design.md.
+        from datetime import timezone
+
+        _upload_start = datetime.now(timezone.utc)
         try:
             # ``_bag_commit_upload`` returns the per-call subset of
             # uploaded assets (see ``report_to_asset_map``). External
@@ -1399,6 +1445,14 @@ class Execution:
                 progress_callback=progress_callback,
             )
             self._set_asset_descriptions(uploaded)
+            # Record Upload_Duration just before the terminal transition
+            # so the catalog PUT for Pending_Upload → Uploaded carries
+            # the new value (state machine reads the full SQLite row
+            # via _catalog_body_for_execution).
+            self._ml_object.workspace.execution_state_store().update_execution(
+                self.execution_rid,
+                upload_duration=_format_duration(_upload_start, datetime.now(timezone.utc)),
+            )
             # Successful end of upload: Pending_Upload → Uploaded.
             if self.status is ExecutionStatus.Pending_Upload:
                 self.update_status(ExecutionStatus.Uploaded)
@@ -1406,6 +1460,13 @@ class Execution:
                 self._clean_folder_contents(self._execution_root)
             return uploaded
         except Exception as e:
+            # Capture partial upload duration before transitioning to
+            # Failed — same write-then-transition order so the failure
+            # PUT carries the partial measurement.
+            self._ml_object.workspace.execution_state_store().update_execution(
+                self.execution_rid,
+                upload_duration=_format_duration(_upload_start, datetime.now(timezone.utc)),
+            )
             error = format_exception(e)
             self.update_status(ExecutionStatus.Failed, error=error)
             raise e
@@ -1625,11 +1686,7 @@ class Execution:
         # "give me every asset that's ever served as input" queryable
         # through Asset_Type alone, regardless of which execution
         # it was input to.
-        direction_tag = (
-            ExecAssetType.input_file.value
-            if asset_role == "Input"
-            else ExecAssetType.output_file.value
-        )
+        direction_tag = ExecAssetType.input_file.value if asset_role == "Input" else ExecAssetType.output_file.value
 
         pb = self._ml_object.pathBuilder()
         for asset_table, asset_list in uploaded_assets.items():
@@ -2343,21 +2400,32 @@ class Execution:
             return False
 
         if exc_value is None:
-            target = ExecutionStatus.Stopped
-            extra = {"stop_time": now}
+            # Clean exit: delegate Running → Stopped to execution_stop() so
+            # the duration computation + single-atomic-transition contract
+            # (audit §4.5) is honored. The inline transition this replaced
+            # wrote stop_time but not duration, leaving the catalog
+            # Execution_Duration column null for every with-block exit —
+            # see docs/bugs/2026-05-19-execution-exit-omits-duration.md.
+            self.execution_stop()
         else:
-            target = ExecutionStatus.Failed
-            extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"}
-
-        transition(
-            store=self._ml_object.workspace.execution_state_store(),
-            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
-            execution_rid=self.execution_rid,
-            current=current,
-            target=target,
-            mode=self._ml_object._mode,
-            extra_fields=extra,
-        )
+            # Failed exit: write stop_time, error, AND duration so the
+            # Execution_Duration column reflects how long the run got
+            # before it crashed. Useful diagnostic when comparing failed
+            # vs successful runs of the same workflow.
+            duration_str = _format_duration(self.start_time, now)
+            transition(
+                store=self._ml_object.workspace.execution_state_store(),
+                catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
+                execution_rid=self.execution_rid,
+                current=current,
+                target=ExecutionStatus.Failed,
+                mode=self._ml_object._mode,
+                extra_fields={
+                    "stop_time": now,
+                    "duration": duration_str,
+                    "error": f"{exc_type.__name__}: {exc_value}",
+                },
+            )
 
         # Emit the pending-summary INFO log per §2.12 / R6.3. Full
         # PendingSummary object lands in Group G; this is a placeholder.
