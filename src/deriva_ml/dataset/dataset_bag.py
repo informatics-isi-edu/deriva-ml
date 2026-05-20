@@ -1171,9 +1171,9 @@ class DatasetBag:
                 once per ``__getitem__`` call. Receives:
 
                 - ``Path | None`` — absolute filesystem path under
-                  ``bag.path / "data/assets/<element_type>/<rid>/<filename>"``
-                  when ``element_type`` is an asset table; ``None``
-                  otherwise.
+                  ``bag.path / "data/asset/<rid>/<element_type>/<filename>"``
+                  (the canonical BDBag asset layout) when
+                  ``element_type`` is an asset table; ``None`` otherwise.
                 - ``dict[str, Any]`` — the raw row dict from the element
                   table (all columns, not just those the framework needs).
 
@@ -1332,9 +1332,9 @@ class DatasetBag:
                 once per generated element. Receives:
 
                 - ``Path | None`` — absolute filesystem path under
-                  ``bag.path / "data/assets/<element_type>/<rid>/<filename>"``
-                  when ``element_type`` is an asset table; ``None``
-                  otherwise.
+                  ``bag.path / "data/asset/<rid>/<element_type>/<filename>"``
+                  (the canonical BDBag asset layout) when
+                  ``element_type`` is an asset table; ``None`` otherwise.
                 - ``dict[str, Any]`` — the raw row dict from the element
                   table (all columns, not just those the framework needs).
 
