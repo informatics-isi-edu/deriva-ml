@@ -1,18 +1,21 @@
 """Tests for the execution runner module."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from functools import partial
+import logging
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
+from deriva_ml.core.constants import DRY_RUN_RID
+from deriva_ml.core.exceptions import DerivaMLStateInconsistency
 from deriva_ml.execution.runner import (
-    run_model,
+    _complete_parent_execution,
+    _get_job_num,
+    _is_multirun,
+    _multirun_state,
     create_model_config,
     reset_multirun_state,
-    _is_multirun,
-    _get_job_num,
-    _multirun_state,
+    run_model,
 )
-from deriva_ml.execution import ExecutionConfiguration, Workflow
 
 
 class TestMultirunDetection:
@@ -393,3 +396,97 @@ class TestRunModelUploadCallContract:
             f"Execution.upload_execution_outputs: {unsupported}. "
             f"Real method accepts: {real_params - {'self'}}."
         )
+
+
+class TestCompleteParentExecutionDryRun:
+    """Regression tests for the atexit handler under dry-run multirun.
+
+    Issue #177: the parent supervisor for a dry-run multirun uses
+    ``DRY_RUN_RID`` ("0000") as its execution_rid placeholder because the
+    parent is intentionally never written to the workspace SQLite registry.
+    The atexit handler used to unconditionally call ``execution_stop()`` on
+    the placeholder, which raised ``DerivaMLStateInconsistency`` from the
+    read-through ``start_time``/``status`` properties. The handler caught
+    the exception and emitted a WARNING reading
+    "Failed to complete parent execution: Execution 0000 no longer in
+    workspace registry..." -- alarming text for behavior that is correct
+    by design.
+
+    These tests pin the fix: the handler must short-circuit on the
+    ``DRY_RUN_RID`` placeholder, log a clear INFO message, and never touch
+    ``execution_stop`` / ``upload_execution_outputs`` on the placeholder.
+    """
+
+    @pytest.fixture(autouse=True)
+    def reset_state(self):
+        """Reset multirun state before and after each test."""
+        reset_multirun_state()
+        yield
+        reset_multirun_state()
+
+    def test_dry_run_placeholder_does_not_warn(self, caplog):
+        """No warning text about the placeholder RID escapes to the log.
+
+        The handler used to call ``execution_stop()`` on a parent whose
+        registry row never existed, catch ``DerivaMLStateInconsistency``,
+        and log a WARNING. After the fix the placeholder is short-circuited
+        before any registry-touching method runs.
+        """
+        # Build a parent execution that mimics a dry-run placeholder:
+        # execution_stop / upload_execution_outputs would (under the bug)
+        # raise DerivaMLStateInconsistency because no SQLite row exists.
+        parent = MagicMock()
+        parent.execution_rid = DRY_RUN_RID
+        parent.execution_stop.side_effect = DerivaMLStateInconsistency(
+            f"Execution {DRY_RUN_RID} no longer in workspace registry."
+        )
+        parent.upload_execution_outputs.side_effect = DerivaMLStateInconsistency(
+            f"Execution {DRY_RUN_RID} no longer in workspace registry."
+        )
+
+        _multirun_state.parent_execution = parent
+        _multirun_state.parent_execution_rid = DRY_RUN_RID
+        _multirun_state.job_sequence = 3
+
+        with caplog.at_level(logging.INFO):
+            _complete_parent_execution()
+
+        # No warnings (or higher) about the placeholder or registry.
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        for record in warnings:
+            assert DRY_RUN_RID not in record.getMessage()
+            assert "no longer in workspace registry" not in record.getMessage()
+            assert "Failed to complete parent execution" not in record.getMessage()
+        assert warnings == [], f"Unexpected warnings: {[r.getMessage() for r in warnings]}"
+
+        # An INFO line explains the skip.
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        assert any("Dry-run" in m and "not recorded" in m for m in info_messages), (
+            f"Expected dry-run skip INFO message, got: {info_messages}"
+        )
+
+        # The registry-touching methods were not invoked on the placeholder.
+        parent.execution_stop.assert_not_called()
+        parent.upload_execution_outputs.assert_not_called()
+
+    def test_real_parent_still_completed_normally(self, caplog):
+        """Non-placeholder parents still go through the full stop/upload path.
+
+        Guards against an over-eager short-circuit that would silently skip
+        real parent executions.
+        """
+        parent = MagicMock()
+        parent.execution_rid = "1-ABCD"
+        parent.upload_execution_outputs.return_value = {}
+
+        _multirun_state.parent_execution = parent
+        _multirun_state.parent_execution_rid = "1-ABCD"
+        _multirun_state.job_sequence = 2
+
+        with caplog.at_level(logging.INFO):
+            _complete_parent_execution()
+
+        parent.execution_stop.assert_called_once()
+        parent.upload_execution_outputs.assert_called_once()
+        info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        assert any("Completed parent execution: 1-ABCD" in m for m in info_messages)

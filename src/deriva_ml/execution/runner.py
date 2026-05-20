@@ -150,6 +150,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from hydra.core.hydra_config import HydraConfig
 from hydra_zen import builds
+
+from deriva_ml.core.constants import DRY_RUN_RID
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -220,14 +222,29 @@ def _complete_parent_execution() -> None:
 
     This is registered as an atexit handler to ensure the parent execution
     is properly completed and its outputs uploaded when the process exits.
+
+    Dry-run multiruns intentionally skip recording the parent execution in
+    the workspace SQLite registry; the placeholder ``DRY_RUN_RID`` is used
+    as its execution_rid. Calling ``execution_stop()`` on that placeholder
+    raises ``DerivaMLStateInconsistency`` because the read-through
+    properties (``start_time``, ``status``) cannot find a row to read.
+    Short-circuit on the placeholder so the dry-run exit path stays
+    log-clean -- there is nothing to stop or upload when the parent was
+    never persisted.
     """
     global _multirun_state
 
     if _multirun_state.parent_execution is None:
         return
 
+    parent = _multirun_state.parent_execution
     try:
-        parent = _multirun_state.parent_execution
+        if _multirun_state.parent_execution_rid == DRY_RUN_RID:
+            logging.info(
+                f"Dry-run: parent execution not recorded in workspace registry "
+                f"(expected for dry-run mode, {_multirun_state.job_sequence} child jobs)"
+            )
+            return
 
         # Stop the parent execution timing
         parent.execution_stop()
