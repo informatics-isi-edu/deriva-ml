@@ -30,6 +30,7 @@ call must happen AFTER exiting the context manager to ensure proper status track
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -135,6 +136,85 @@ def _format_duration(start: "datetime | None", end: "datetime | None") -> str:
     hours, remainder = divmod(delta.total_seconds(), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{round(hours, 0)}H {round(minutes, 0)}min {round(seconds, 4)}sec"
+
+
+def _check_overwrite_safe(
+    asset_filename: Path,
+    expected_md5: str | None,
+    asset_rid: RID,
+) -> None:
+    """Log a WARNING when ``download_asset`` is about to overwrite different bytes.
+
+    Issue #181 protects callers building custom download flows on top of
+    ``Execution.download_asset`` from the silent-overwrite footgun: when two
+    downloads share ``dest_dir`` and ``Filename`` but resolve to different
+    bytes, the second one wins and the first one vanishes without a trace.
+    PR #179 RID-keyed the platform-default ``dest_dir`` so the in-platform
+    call site is collision-free; this helper guards ad-hoc callers.
+
+    The check is *advisory* — overwrites are still permitted. The helper
+    just surfaces the collision at fault time. Three branches:
+
+    1. ``asset_filename`` does not exist: nothing to overwrite, return.
+    2. ``asset_filename`` exists and ``expected_md5`` matches its on-disk
+       md5: idempotent re-download (cache repopulation, retry, or genuinely
+       identical content), return silently.
+    3. Otherwise: log WARNING naming the asset RID, the colliding path,
+       and both md5s. If ``expected_md5`` is None (catalog doesn't record
+       MD5, or the value is missing from ``asset_record``), the conservative
+       choice is to warn anyway — without the catalog MD5 we cannot prove
+       the overwrite is idempotent.
+
+    Args:
+        asset_filename: The on-disk path ``download_asset`` is about to
+            write to (``dest_dir / asset_record["Filename"]``).
+        expected_md5: The MD5 of the bytes about to be written, typically
+            ``asset_record.get("MD5")``. Pass None when unknown.
+        asset_rid: RID of the asset being downloaded — included in the
+            WARNING for diagnostics.
+
+    Returns:
+        None. Side-effects only (a single WARNING log line when the
+        overwrite is non-idempotent or unverifiable).
+
+    Example:
+        >>> from pathlib import Path
+        >>> _check_overwrite_safe(Path("/nonexistent/file"), "abc123", "RID1")
+        >>> # No log, file does not exist.
+    """
+    if not asset_filename.exists() and not asset_filename.is_symlink():
+        return
+
+    on_disk_md5: str | None = None
+    try:
+        # Follow symlinks so the cache-hit branch (symlink to a cache
+        # entry) compares against the cache entry's bytes, which is what
+        # the next download will overwrite via unlink + symlink.
+        target = asset_filename.resolve() if asset_filename.is_symlink() else asset_filename
+        if target.is_file():
+            hasher = hashlib.md5()
+            with target.open("rb") as fp:
+                for chunk in iter(lambda: fp.read(8192), b""):
+                    hasher.update(chunk)
+            on_disk_md5 = hasher.hexdigest()
+    except OSError:
+        # If we cannot read the file (permissions, broken symlink, etc.)
+        # err on the side of warning — the overwrite is unverifiable.
+        on_disk_md5 = None
+
+    if expected_md5 is not None and on_disk_md5 is not None and expected_md5 == on_disk_md5:
+        return
+
+    logger.warning(
+        "download_asset: overwriting existing file at %s with asset %s "
+        "(existing md5=%s, expected md5=%s). "
+        "Pass a unique dest_dir per asset to avoid collisions; the canonical "
+        "pattern is dest_dir = working_dir / 'downloads' / asset_rid.",
+        asset_filename,
+        asset_rid,
+        on_disk_md5 if on_disk_md5 is not None else "<unreadable>",
+        expected_md5 if expected_md5 is not None else "<unknown>",
+    )
 
 
 class Execution:
@@ -1274,19 +1354,24 @@ class Execution:
     ) -> AssetFilePath:
         """Download an asset from a URL and place it in a local directory.
 
-        The file is written to ``dest_dir / asset_record["Filename"]``. The
-        caller owns ``dest_dir`` and is responsible for collision avoidance
-        when downloading multiple assets — two calls that share both
-        ``dest_dir`` and ``Filename`` will overwrite each other. When invoked
-        by ``_initialize_execution`` the per-asset ``dest_dir`` is keyed by
-        ``asset_rid`` so the on-disk layout is collision-free by
-        construction; ad-hoc callers should follow the same convention.
+        The file is written to ``dest_dir / asset_record["Filename"]``.
+        Overwrites any existing file at that path, with a WARNING logged
+        when the existing content is byte-different from the asset's
+        expected MD5 (issue #181). Idempotent re-downloads — the existing
+        file's md5 already matches the catalog's recorded MD5 — log
+        nothing. Callers that need silent overwrites can accept the
+        WARNING; callers that need genuine isolation should pass a unique
+        ``dest_dir`` per asset. The canonical pattern is
+        ``dest_dir = working_dir / 'downloads' / asset_rid``, which is
+        what ``_initialize_execution`` uses internally so the
+        platform-default download path is collision-free by construction.
 
         Args:
             asset_rid: RID of the asset.
-            dest_dir: Destination directory for the asset. Must be unique
-                across concurrent ``download_asset`` calls when ``Filename``
-                may collide.
+            dest_dir: Destination directory for the asset. When ``Filename``
+                may collide across concurrent ``download_asset`` calls,
+                pass a unique directory per asset to avoid the WARNING and
+                the silent overwrite it guards against.
             update_catalog: Whether to update the catalog execution information after downloading.
             use_cache: If True, check the cache directory for a previously downloaded copy
                 with a matching MD5 checksum before downloading. Cached copies are stored
@@ -1311,18 +1396,24 @@ class Execution:
         asset_metadata = {k: v for k, v in asset_record.items() if k in self._model.asset_metadata(asset_table)}
         asset_url = asset_record["URL"]
         asset_filename = dest_dir / asset_record["Filename"]
+        expected_md5 = asset_record.get("MD5")
 
         # Check cache before downloading
         cache_hit = False
         if use_cache:
-            md5 = asset_record.get("MD5")
+            md5 = expected_md5
             if md5:
                 asset_cache_dir = self._ml_object.cache_dir / "assets"
                 asset_cache_dir.mkdir(parents=True, exist_ok=True)
                 cache_key = f"{asset_rid}_{md5}"
                 cached_file = asset_cache_dir / cache_key / asset_record["Filename"]
                 if cached_file.exists():
-                    # Cache hit — symlink from cache to destination
+                    # Cache hit — symlink from cache to destination. The
+                    # cached file's bytes ARE the asset's expected bytes
+                    # by construction (cache_key includes md5), so reuse
+                    # ``expected_md5`` as the "about to be written" md5
+                    # in the overwrite check.
+                    _check_overwrite_safe(asset_filename, expected_md5, asset_rid)
                     self._logger.info(f"Using cached asset {asset_rid} (MD5: {md5})")
                     if asset_filename.exists() or asset_filename.is_symlink():
                         asset_filename.unlink()
@@ -1330,6 +1421,7 @@ class Execution:
                     cache_hit = True
 
         if not cache_hit:
+            _check_overwrite_safe(asset_filename, expected_md5, asset_rid)
             hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
             hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
 
