@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Issue #181: download_asset overwrite warning
+
+### Changed
+
+- **`Execution.download_asset` now logs a WARNING before overwriting
+  a non-identical existing file (#181).** PR #179 RID-keyed the
+  platform-default per-asset `dest_dir` so the in-platform download
+  path is collision-free, but `download_asset` itself still silently
+  overwrote when callers building custom download flows passed the
+  same `dest_dir` to two downloads whose `Filename`s collided. The
+  new guard — a module-level `_check_overwrite_safe` helper called at
+  both the regular-download and cache-hit-symlink write sites in
+  `src/deriva_ml/execution/execution.py` — hashes the existing file
+  and compares against the catalog's recorded MD5. If the bytes
+  match, the overwrite is idempotent and stays silent (cache
+  repopulation, retry). If they differ — or if the catalog has no
+  MD5 to compare against — a WARNING fires naming the asset RID, the
+  colliding path, and both MD5s. **Behavior change, not breaking**:
+  the overwrite still happens, return value is unchanged, no
+  exception is raised. Callers that legitimately need overwrite
+  semantics see a new log line they can ignore or filter; callers
+  that want true isolation should follow the canonical pattern of
+  `dest_dir = working_dir / "downloads" / asset_rid`.
+
 ## Unreleased — Issue #177: dry-run multirun exit log noise
 
 ### Fixed
