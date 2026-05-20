@@ -332,13 +332,14 @@ def _catalog_body_for_execution(
         # concurrent delete. Surface clearly rather than putting a
         # partial body to the catalog.
         raise DerivaMLStateInconsistency(f"executions row {execution_rid} vanished between write and PUT")
-    # Catalog Execution schema has: Workflow, Description, Duration,
-    # Status, Status_Detail (see src/deriva_ml/schema/create_schema.py).
+    # Catalog Execution schema has: Workflow, Description,
+    # Execution_Duration, Download_Duration, Upload_Duration, Status,
+    # Status_Detail (see src/deriva_ml/schema/create_schema.py).
     # Start/stop times are NOT catalog columns — they live in SQLite
-    # only. Duration IS a catalog column; we project it when SQLite
-    # has it set (execution_stop writes it during the Running →
-    # Stopped transition; pre-Stopped rows have duration=NULL and
-    # leave the catalog column unchanged via the body's omission).
+    # only. The three duration columns ARE catalog columns; we project
+    # each when SQLite has the matching value set. SQLite stores them
+    # as "duration", "download_duration", "upload_duration" — the
+    # catalog uses the title-case "<Phase>_Duration" naming.
     body: dict = {
         "RID": row["rid"],
         "Status": row["status"],
@@ -346,7 +347,11 @@ def _catalog_body_for_execution(
         "Status_Detail": row["error"] or row["description"],
     }
     if row.get("duration") is not None:
-        body["Duration"] = row["duration"]
+        body["Execution_Duration"] = row["duration"]
+    if row.get("download_duration") is not None:
+        body["Download_Duration"] = row["download_duration"]
+    if row.get("upload_duration") is not None:
+        body["Upload_Duration"] = row["upload_duration"]
     return [body]
 
 

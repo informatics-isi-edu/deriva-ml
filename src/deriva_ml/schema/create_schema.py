@@ -167,7 +167,18 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
             columns=[
                 ColumnDef("Workflow", BuiltinType.text),
                 ColumnDef("Description", BuiltinType.markdown),
-                ColumnDef("Duration", BuiltinType.text),
+                # Three duration columns, each measuring a distinct phase:
+                #   Execution_Duration — algorithm time inside the `with`
+                #     block (start of __enter__ → end of __exit__).
+                #     Renamed from "Duration" 2026-05-19 so all three
+                #     columns share the <Phase>_Duration pattern.
+                #   Download_Duration — init / dataset+asset download
+                #     time (_initialize_execution).
+                #   Upload_Duration   — upload_execution_outputs time
+                #     (bag commit + Hatrac PUTs).
+                ColumnDef("Execution_Duration", BuiltinType.text),
+                ColumnDef("Download_Duration", BuiltinType.text),
+                ColumnDef("Upload_Duration", BuiltinType.text),
                 ColumnDef("Status", BuiltinType.text),
                 ColumnDef("Status_Detail", BuiltinType.text),
             ],
