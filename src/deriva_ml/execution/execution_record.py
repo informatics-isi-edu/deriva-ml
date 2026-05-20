@@ -430,6 +430,15 @@ class ExecutionRecord(BaseModel):
                 workflow=workflow,
                 status=ExecutionStatus(record.get("Status") or "Created"),
                 description=record.get("Description"),
+                # Phase-duration columns (PR-2, 2026-05-19): forward
+                # the catalog values so consumers like the MCP
+                # `deriva_ml_list_execution_children` see the same
+                # timing data that the singular `lookup_execution`
+                # path exposes. Old rows pre-PR-2 simply lack the
+                # columns and fall to None.
+                duration=record.get("Execution_Duration"),
+                download_duration=record.get("Download_Duration"),
+                upload_duration=record.get("Upload_Duration"),
                 _ml_instance=self._ml_instance,
                 _logger=self._logger,
             )
@@ -509,6 +518,15 @@ class ExecutionRecord(BaseModel):
                 workflow=workflow,
                 status=ExecutionStatus(record.get("Status") or "Created"),
                 description=record.get("Description"),
+                # Phase-duration columns (PR-2, 2026-05-19): forward
+                # the catalog values so consumers like the MCP
+                # `deriva_ml_list_execution_parents` see the same
+                # timing data that the singular `lookup_execution`
+                # path exposes. Old rows pre-PR-2 simply lack the
+                # columns and fall to None.
+                duration=record.get("Execution_Duration"),
+                download_duration=record.get("Download_Duration"),
+                upload_duration=record.get("Upload_Duration"),
                 _ml_instance=self._ml_instance,
                 _logger=self._logger,
             )
