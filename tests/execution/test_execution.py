@@ -1186,6 +1186,115 @@ class TestAssetCaching:
         assert cache_assets_dir.exists()
         assert len(list(cache_assets_dir.iterdir())) == 1
 
+    def test_two_inputs_same_filename_do_not_collide(self, workflow_terms, test_workflow):
+        """Two input assets sharing a Filename land at disjoint RID-keyed paths.
+
+        Regression test for the silent-overwrite bug where
+        ``_initialize_execution`` keyed the per-asset download directory by
+        ``asset_table`` only. Two assets in the same table with the same
+        catalog ``Filename`` (a common case for ``predictions.csv`` from
+        parallel multirun children) overwrote each other on disk while both
+        ``AssetFilePath`` entries silently pointed at the same bytes.
+
+        The fix keys the directory by ``asset_rid`` so the layout is
+        ``<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>``
+        — collision-free by construction.
+
+        Proves: (1) both files exist with their original bytes, (2)
+        ``execution.asset_paths`` reports two distinct paths, (3) the
+        path layout is RID-keyed.
+        """
+        ml = workflow_terms
+
+        # Create two distinct uploads that produce two Execution_Asset
+        # rows whose Filename is identical. Two separate executions, both
+        # writing a file named "predictions.csv" with different bytes —
+        # mirrors the multirun-children-emit-prediction-CSV failure mode.
+        upload_a = ml.create_execution(
+            ExecutionConfiguration(
+                description="Producer A",
+                workflow=test_workflow,
+            )
+        )
+        with upload_a.execute() as exe:
+            asset_path = exe.asset_file_path(
+                MLAsset.execution_asset,
+                "ProducerA/predictions.csv",
+                asset_types=ExecAssetType.model_file,
+            )
+            with asset_path.open("w") as f:
+                f.write("producer-a-bytes")
+        uploaded_a = upload_a.upload_execution_outputs()
+        rid_a = uploaded_a["deriva-ml/Execution_Asset"][0].asset_rid
+
+        upload_b = ml.create_execution(
+            ExecutionConfiguration(
+                description="Producer B",
+                workflow=test_workflow,
+            )
+        )
+        with upload_b.execute() as exe:
+            asset_path = exe.asset_file_path(
+                MLAsset.execution_asset,
+                "ProducerB/predictions.csv",
+                asset_types=ExecAssetType.model_file,
+            )
+            with asset_path.open("w") as f:
+                f.write("producer-b-bytes")
+        uploaded_b = upload_b.upload_execution_outputs()
+        rid_b = uploaded_b["deriva-ml/Execution_Asset"][0].asset_rid
+
+        # Sanity: two distinct RIDs sharing the same catalog Filename is
+        # the precondition the bug needed to bite.
+        assert rid_a != rid_b
+        assert ml._retrieve_rid(rid_a)["Filename"] == "predictions.csv"
+        assert ml._retrieve_rid(rid_b)["Filename"] == "predictions.csv"
+
+        # Now configure a downstream execution that consumes BOTH assets.
+        # Under the old code, the second download landed on the same path
+        # as the first and silently overwrote it.
+        consumer = ml.create_execution(
+            ExecutionConfiguration(
+                description="Consumer",
+                workflow=test_workflow,
+                assets=[rid_a, rid_b],
+            )
+        )
+
+        paths = consumer.asset_paths["Execution_Asset"]
+        assert len(paths) == 2, "Both input assets must be reported"
+
+        path_a = next(p for p in paths if p.asset_rid == rid_a)
+        path_b = next(p for p in paths if p.asset_rid == rid_b)
+
+        # (1) The two AssetFilePath objects point at distinct files on disk.
+        assert Path(path_a.file_name) != Path(path_b.file_name), (
+            "Two input assets must not share a file_name path "
+            "(this is the regression — old code keyed dest_dir by table only)"
+        )
+
+        # (2) Each file exists and contains the bytes its producer wrote;
+        # the second download did not overwrite the first.
+        assert path_a.exists()
+        assert path_b.exists()
+        with Path(path_a.file_name).open() as f:
+            assert f.read() == "producer-a-bytes"
+        with Path(path_b.file_name).open() as f:
+            assert f.read() == "producer-b-bytes"
+
+        # (3) The on-disk layout matches the documented contract:
+        # <working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>.
+        # Assert against the structural shape — no hardcoded RIDs.
+        for path, rid in [(path_a, rid_a), (path_b, rid_b)]:
+            file_path = Path(path.file_name)
+            assert file_path.name == "predictions.csv"
+            assert file_path.parent.name == rid, (
+                f"Expected per-asset directory keyed by asset_rid={rid}, got {file_path.parent.name}"
+            )
+            assert file_path.parent.parent.name == "Execution_Asset"
+            assert file_path.parent.parent.parent.name == "downloaded-assets"
+            assert file_path.parent.parent.parent.parent.name == consumer.execution_rid
+
 
 # =============================================================================
 # TestExecutionDatasets - Dataset Operations Tests

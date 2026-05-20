@@ -90,7 +90,7 @@ exe.upload_execution_outputs()
 - `exe.execution_rid` — the RID of the catalog Execution record; use it to look up the run later.
 - `exe.working_dir` — the local scratch directory for this execution; do not write output files here directly (they will not be uploaded). Use `asset_file_path()` instead.
 - `exe.datasets` — the list of `DatasetSpec` objects from the configuration; iterate these to download each declared dataset.
-- `exe.asset_paths` — a `dict[str, list[AssetFilePath]]` mapping asset table name → list of paths for downloaded input assets.
+- `exe.asset_paths` — a `dict[str, list[AssetFilePath]]` mapping asset table name → list of paths for downloaded input assets. Each asset lands at `<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>` (RID-keyed so two assets sharing a filename do not collide). Always read via `AssetFilePath.file_name`; do not hand-construct paths from the table or filename.
 
 ## How to write asset files
 
