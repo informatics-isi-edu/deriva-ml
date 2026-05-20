@@ -157,7 +157,13 @@ class Execution:
         configuration (ExecutionConfiguration): Execution settings and parameters.
         workflow_rid (RID): RID of the associated workflow.
         status (ExecutionStatus): Current execution status (read-through from SQLite).
-        asset_paths (list[AssetFilePath]): Paths to execution assets.
+        asset_paths (dict[str, list[AssetFilePath]]): Mapping of asset-table name to
+            the list of ``AssetFilePath`` objects for input assets downloaded by
+            ``_initialize_execution``. Each downloaded asset lands at
+            ``<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>``
+            — keyed by asset RID, so two assets that share the same ``Filename`` do
+            not collide on disk. Read files via ``AssetFilePath.file_name``; do not
+            hand-construct paths from the asset table or filename.
         start_time (datetime | None): When execution started.
         stop_time (datetime | None): When execution completed.
 
@@ -569,7 +575,12 @@ class Execution:
         """Initialize the execution environment.
 
         Sets up the working directory, downloads required datasets and assets,
-        and saves initial configuration metadata.
+        and saves initial configuration metadata. Each input asset is placed at
+        ``<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>``
+        so two assets that share an asset table and ``Filename`` do not collide
+        on disk. After initialization, ``self.asset_paths`` maps asset-table
+        name to the list of ``AssetFilePath`` objects produced; use
+        ``AssetFilePath.file_name`` as the canonical read path.
 
         Args:
             reload: Optional RID of a previously initialized execution to reload.
@@ -616,8 +627,18 @@ class Execution:
             else:
                 rid_info_table = rid_info.table
             asset_table = rid_info_table.name
+            # Key per-asset download directory by ``asset_rid`` so two
+            # assets from the same table that happen to share the same
+            # ``Filename`` (a common case for prediction CSVs emitted by
+            # parallel multirun children) land on disjoint paths. Keying
+            # only by ``asset_table`` caused the second download to
+            # silently overwrite the first while still producing two
+            # ``AssetFilePath`` entries that pointed at the same bytes.
             dest_dir = (
-                execution_root(self._ml_object.working_dir, self.execution_rid) / "downloaded-assets" / asset_table
+                execution_root(self._ml_object.working_dir, self.execution_rid)
+                / "downloaded-assets"
+                / asset_table
+                / asset_rid
             )
             dest_dir.mkdir(parents=True, exist_ok=True)
             self.asset_paths.setdefault(asset_table, []).append(
@@ -1253,9 +1274,19 @@ class Execution:
     ) -> AssetFilePath:
         """Download an asset from a URL and place it in a local directory.
 
+        The file is written to ``dest_dir / asset_record["Filename"]``. The
+        caller owns ``dest_dir`` and is responsible for collision avoidance
+        when downloading multiple assets — two calls that share both
+        ``dest_dir`` and ``Filename`` will overwrite each other. When invoked
+        by ``_initialize_execution`` the per-asset ``dest_dir`` is keyed by
+        ``asset_rid`` so the on-disk layout is collision-free by
+        construction; ad-hoc callers should follow the same convention.
+
         Args:
             asset_rid: RID of the asset.
-            dest_dir: Destination directory for the asset.
+            dest_dir: Destination directory for the asset. Must be unique
+                across concurrent ``download_asset`` calls when ``Filename``
+                may collide.
             update_catalog: Whether to update the catalog execution information after downloading.
             use_cache: If True, check the cache directory for a previously downloaded copy
                 with a matching MD5 checksum before downloading. Cached copies are stored
@@ -1268,6 +1299,8 @@ class Execution:
 
         Returns:
             An AssetFilePath with the path to the downloaded (or cached) asset file.
+            ``AssetFilePath.file_name`` is the canonical access path — read from it
+            rather than hand-constructing a path from the asset table or filename.
         """
 
         asset_table = _asset_table if _asset_table is not None else self._ml_object.resolve_rid(asset_rid).table

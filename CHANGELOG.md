@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Per-asset download paths keyed by RID (collision-free by construction)
+
+### Fixed
+
+- **Silent overwrite when two input assets share a Filename.**
+  `Execution._initialize_execution` previously placed each downloaded
+  asset at
+  `<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<Filename>`,
+  keyed only by the asset table. Two assets from the same table that
+  happened to share a `Filename` (a common case for `predictions.csv`
+  files emitted by parallel multirun children) collided on disk: the
+  second download overwrote the first, while `execution.asset_paths`
+  still reported two distinct `AssetFilePath` entries that both pointed
+  at the same (last-written) bytes. Surfaced via the deriva-ml-model-template
+  ROC notebook reporting identical accuracies for two distinct model
+  variants. The new layout is
+  `<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>`
+  — collision-free by construction.
+
+### Changed
+
+- **On-disk layout for downloaded input assets (breaking).** Per-asset
+  download directories now include the asset RID. Callers reading
+  files via `AssetFilePath.file_name` from `execution.asset_paths`
+  (the documented contract) are unaffected — the canonical access path
+  is unchanged. Only callers that hand-constructed paths from the
+  asset table and filename need to update; that pattern was never
+  supported and is now documented as such on `download_asset`,
+  `_initialize_execution`, and the `Execution.asset_paths` attribute.
+
 ## Unreleased — Issue #174: split_dataset stratify works for feature-target columns
 
 ### Fixed
