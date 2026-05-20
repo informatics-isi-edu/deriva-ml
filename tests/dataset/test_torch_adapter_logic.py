@@ -13,6 +13,7 @@ Coverage matrix (spec §6.2):
 - Multi-target returns dict[str, FeatureRecord] via target_transform
 - Asset-table element with no sample_loader raises at construction
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,9 +48,7 @@ def _mock_bag_with_labeled_images(rids_and_labels: dict[str, str]):
     """
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": rid} for rid in rids_and_labels]}
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
         for rid, label in rids_and_labels.items():
@@ -86,9 +85,7 @@ def _mock_non_asset_bag(rids_and_labels: dict[str, str]):
     """Build a MagicMock bag for a non-asset element type (tabular)."""
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Subject": [{"RID": rid} for rid in rids_and_labels]}
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Subject": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
         for rid, label in rids_and_labels.items():
@@ -148,12 +145,8 @@ def test_missing_error_raises_at_construction():
     """missing='error' raises DerivaMLException at construction listing RIDs."""
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]}
-    )
-    bag.feature_values = MagicMock(
-        return_value=iter([_FakeRecord(Image="1-IMG1", Grade="Mild")])
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]})
+    bag.feature_values = MagicMock(return_value=iter([_FakeRecord(Image="1-IMG1", Grade="Mild")]))
     bag.model = MagicMock()
     bag.model.is_asset = MagicMock(return_value=True)
     bag.get_table_as_dict = MagicMock(return_value=iter([]))
@@ -186,10 +179,12 @@ def test_missing_unknown_keeps_all_elements_with_none_target():
     """missing='unknown' keeps all elements; target is None for unlabeled."""
     bag = _mock_bag_with_labeled_images({"1-IMG1": "Mild", "1-IMG2": ""})
     # Override get_table_as_dict to return both rows
-    bag.get_table_as_dict.return_value = iter([
-        {"RID": "1-IMG1", "Filename": "img1.jpg"},
-        {"RID": "1-IMG2", "Filename": "img2.jpg"},
-    ])
+    bag.get_table_as_dict.return_value = iter(
+        [
+            {"RID": "1-IMG1", "Filename": "img1.jpg"},
+            {"RID": "1-IMG2", "Filename": "img2.jpg"},
+        ]
+    )
     ds = build_torch_dataset(
         bag,
         "Image",
@@ -238,9 +233,7 @@ def test_multi_target_target_transform_receives_dict():
     """Multi-target: target_transform receives dict[str, FeatureRecord]."""
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": "1-IMG1"}]}
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}]})
 
     class _FakeGradeRecord(FeatureRecord):
         Image: str
@@ -340,3 +333,75 @@ def test_non_asset_table_no_sample_loader_returns_row_dict():
     )
     assert isinstance(ds, torch.utils.data.Dataset)
     assert len(ds) >= 0  # construction succeeded
+
+
+# ---------------------------------------------------------------------------
+# Asset path resolution against the canonical BDBag layout (regression test
+# for 2026-05-19: _resolve_asset_path computed data/assets/{table}/{rid}/...
+# but the BDBag materializer writes data/asset/{rid}/{table}/..., so
+# __getitem__ on a real bag raised FileNotFoundError. All prior asset-table
+# tests passed a canned sample_loader that ignored its `path` argument,
+# leaving the bug latent for ~3 weeks.)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_asset_path_uses_bdbag_canonical_layout(tmp_path):
+    """``_resolve_asset_path`` must return a path matching the on-disk
+    BDBag layout produced by the bag materializer: ``data/asset/{RID}/
+    {element_type}/{Filename}``. Singular ``asset/``; RID before the
+    element-type segment.
+
+    Regression test: the original implementation used
+    ``data/assets/{element_type}/{RID}/{Filename}`` (plural, swapped),
+    which never matched a real bag and was masked by canned
+    sample_loaders in all other tests.
+
+    Per the RID opacity rule
+    (deriva-skills/skills/deriva-context/references/concepts.md
+    "RID opacity rule"), this test treats the asset's RID as an
+    opaque token: it's generated from secrets.token_hex once and
+    threaded through both the on-disk layout and the bag mock, so
+    the test author never writes a RID-shaped literal. The
+    assertion compares the path the sample_loader received against
+    the path the test built — RIDs are equality-compared only;
+    nothing parses them.
+    """
+    import secrets
+
+    # Single opaque token shared between the mock bag and the on-disk
+    # layout — the test author never types a RID-shaped string.
+    asset_rid = secrets.token_hex(3).upper()
+    filename = "asset.bin"
+    asset_bytes = b"fake-asset-bytes"
+
+    # Build a bag directory tree at the canonical layout. Put a real
+    # file at the leaf so the test can verify the resolver hands back
+    # a path that exists.
+    bag_root = tmp_path / "Dataset_FAKE"
+    canonical_dir = bag_root / "data" / "asset" / asset_rid / "Image"
+    canonical_dir.mkdir(parents=True)
+    canonical_file = canonical_dir / filename
+    canonical_file.write_bytes(asset_bytes)
+
+    bag = _mock_bag_with_labeled_images({asset_rid: "Mild"})
+    bag.path = bag_root
+    bag.get_table_as_dict.return_value = iter([{"RID": asset_rid, "Filename": filename}])
+
+    received_paths: list[Path] = []
+
+    def capturing_loader(path, row):
+        received_paths.append(path)
+        return path.read_bytes()
+
+    ds = build_torch_dataset(
+        bag,
+        "Image",
+        sample_loader=capturing_loader,
+        targets=["Grade"],
+    )
+    sample, _ = ds[0]
+    # The sample_loader received the canonical-layout path and was able
+    # to read it. Pre-fix, sample_loader received a non-existent path
+    # and raised FileNotFoundError inside the read.
+    assert received_paths == [canonical_file]
+    assert sample == asset_bytes

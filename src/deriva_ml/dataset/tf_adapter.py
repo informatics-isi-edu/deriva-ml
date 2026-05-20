@@ -199,6 +199,13 @@ def _build_row_lookup(bag: "DatasetBag", element_type: str) -> dict:
 
 
 def _resolve_asset_path(bag: "DatasetBag", element_type: str, rid: str, row: dict) -> Path:
-    """Compute the on-disk path for an asset's file."""
+    """Compute the on-disk path for an asset's file.
+
+    Uses the canonical BDBag asset layout produced by the bag
+    materializer: ``data/asset/{RID}/{element_type}/{Filename}``
+    (singular ``asset/``; the RID comes before the element-type
+    segment). See ``deriva_ml.dataset.restructure`` for the matching
+    layout reference in the restructure path.
+    """
     filename = row.get("Filename") or f"{rid}.bin"
-    return bag.path / "data" / "assets" / element_type / rid / filename
+    return bag.path / "data" / "asset" / rid / element_type / filename
