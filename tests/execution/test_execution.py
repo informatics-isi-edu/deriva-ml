@@ -387,10 +387,19 @@ class TestExecutionLifecycle:
         vocabulary (Created, Running, Stopped, Pending_Upload, Uploaded,
         Failed, Aborted) — SQLite remains authoritative; the catalog is a
         synced mirror.
+
+        Regression guard (2026-05-19): __exit__'s clean-exit branch must
+        delegate to execution_stop() so that duration is written alongside
+        stop_time. Prior to the fix in commit "fix(execution): __exit__
+        writes Duration via execution_stop()", __exit__ used an inline
+        transition that wrote stop_time but not duration, leaving the
+        catalog Duration column null for every with-block exit. See
+        docs/bugs/2026-05-19-execution-exit-omits-duration.md.
         """
         from deriva_ml.execution.state_store import ExecutionStatus
 
         execution = basic_execution
+        ml = execution._ml_object
 
         with execution.execute() as exe:
             assert exe.execution_rid is not None
@@ -399,6 +408,16 @@ class TestExecutionLifecycle:
 
         # After context exit, the authoritative SQLite status is Stopped.
         assert execution.status is ExecutionStatus.Stopped
+
+        # Duration is populated on the SQLite registry row AND projected
+        # into the catalog row — both must be set by the clean-exit path.
+        assert execution.stop_time is not None, "stop_time must be set after __exit__"
+        catalog_row = ml._retrieve_rid(execution.execution_rid)
+        assert catalog_row["Duration"] is not None, (
+            "catalog Duration column must be populated after __exit__ "
+            "(regression: previously stayed null because __exit__ wrote "
+            "stop_time but not duration)"
+        )
 
         # Upload finalizes the catalog-visible lifecycle; after upload we
         # expect the SQLite status to have advanced (pending_upload or

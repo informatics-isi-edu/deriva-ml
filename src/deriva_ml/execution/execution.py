@@ -1625,11 +1625,7 @@ class Execution:
         # "give me every asset that's ever served as input" queryable
         # through Asset_Type alone, regardless of which execution
         # it was input to.
-        direction_tag = (
-            ExecAssetType.input_file.value
-            if asset_role == "Input"
-            else ExecAssetType.output_file.value
-        )
+        direction_tag = ExecAssetType.input_file.value if asset_role == "Input" else ExecAssetType.output_file.value
 
         pb = self._ml_object.pathBuilder()
         for asset_table, asset_list in uploaded_assets.items():
@@ -2343,21 +2339,23 @@ class Execution:
             return False
 
         if exc_value is None:
-            target = ExecutionStatus.Stopped
-            extra = {"stop_time": now}
+            # Clean exit: delegate Running → Stopped to execution_stop() so
+            # the duration computation + single-atomic-transition contract
+            # (audit §4.5) is honored. The inline transition this replaced
+            # wrote stop_time but not duration, leaving the catalog
+            # Duration column null for every with-block exit — see
+            # docs/bugs/2026-05-19-execution-exit-omits-duration.md.
+            self.execution_stop()
         else:
-            target = ExecutionStatus.Failed
-            extra = {"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"}
-
-        transition(
-            store=self._ml_object.workspace.execution_state_store(),
-            catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
-            execution_rid=self.execution_rid,
-            current=current,
-            target=target,
-            mode=self._ml_object._mode,
-            extra_fields=extra,
-        )
+            transition(
+                store=self._ml_object.workspace.execution_state_store(),
+                catalog=(self._ml_object.catalog if self._ml_object._mode is ConnectionMode.online else None),
+                execution_rid=self.execution_rid,
+                current=current,
+                target=ExecutionStatus.Failed,
+                mode=self._ml_object._mode,
+                extra_fields={"stop_time": now, "error": f"{exc_type.__name__}: {exc_value}"},
+            )
 
         # Emit the pending-summary INFO log per §2.12 / R6.3. Full
         # PendingSummary object lands in Group G; this is a placeholder.
