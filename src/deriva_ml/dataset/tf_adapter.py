@@ -73,8 +73,17 @@ def build_tf_dataset(
             then the generator is re-wrapped so the first sample is not lost.
 
     Returns:
-        A ``tf.data.Dataset`` whose elements are ``sample`` when
-        ``targets=None``, or ``(sample, target)`` otherwise.
+        A ``tf.data.Dataset`` whose elements are:
+
+        - ``(sample, rid)`` when ``targets=None`` (unlabeled).
+        - ``(sample, target, rid)`` when ``targets`` is set (labeled).
+
+        The element's RID is always the last positional value. It's
+        passed through raw — never touched by ``transform`` or
+        ``target_transform`` — because the RID is the row's catalog
+        identity, not a feature value. The motivating use case is
+        downstream code that records per-element predictions back to
+        the catalog (the RID is the FK target for the feature row).
 
     Raises:
         ImportError: If TensorFlow is not installed.
@@ -141,12 +150,12 @@ def build_tf_dataset(
                 sample = transform(sample)
 
             if targets is None:
-                yield sample
+                yield (sample, rid)
             else:
                 target = target_map.get(rid)
                 if target_transform is not None:
                     target = target_transform(target)
-                yield (sample, target)
+                yield (sample, target, rid)
 
     # output_signature handling.
     if output_signature is None:
