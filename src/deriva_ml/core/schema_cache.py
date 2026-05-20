@@ -18,10 +18,12 @@ File layout on disk at ``<workspace>/schema-cache.json``::
         }
     }
 
-Writes are atomic: the new contents go to ``schema-cache.json.tmp``,
-get ``fsync``'d, then ``os.replace`` moves the tmp over the
-original. If anything crashes mid-write, the old file remains
-intact.
+Writes are atomic: the new contents go to a uuid4-suffixed sibling
+``schema-cache.json.<hex>.tmp``, get ``fsync``'d, then ``os.replace``
+moves the tmp over the original. The uuid suffix means concurrent
+writers never collide on the same tmp file, so the publish step is
+safe last-writer-wins. If anything crashes mid-write, the old file
+remains intact.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
 
@@ -130,14 +133,19 @@ class SchemaCache:
     def _write_atomic(self, payload: dict) -> None:
         """Atomically write ``payload`` as JSON to the cache file.
 
-        Writes to a sibling ``.tmp``, ``fsync``'s, then ``os.replace``'s
-        over the target. On failure the original file is unchanged.
-        Used by both ``write()`` (full cache refresh) and ``pin()``/
-        ``unpin()`` (which rewrite an existing cache's payload with
-        a tweaked ``"pin"`` key).
+        Writes to a uuid4-suffixed sibling ``.tmp``, ``fsync``'s, then
+        ``os.replace``'s over the target. On failure the original file
+        is unchanged. Used by both ``write()`` (full cache refresh) and
+        ``pin()``/``unpin()`` (which rewrite an existing cache's payload
+        with a tweaked ``"pin"`` key).
+
+        The tmp filename includes a uuid4 hex suffix so concurrent
+        writers cannot collide on the same intermediate file. ``os.replace``
+        is atomic on POSIX and Windows, so the publish step is
+        last-writer-wins regardless of how many writers are racing.
         """
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._path.with_suffix(".json.tmp")
+        tmp = self._path.parent / f"{self._path.name}.{uuid4().hex}.tmp"
         with open(tmp, "w") as fp:
             json.dump(payload, fp, indent=2)
             fp.flush()

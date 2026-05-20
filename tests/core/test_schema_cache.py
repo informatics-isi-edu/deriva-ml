@@ -1,4 +1,5 @@
 """Unit tests for SchemaCache — the workspace-backed schema store."""
+
 from __future__ import annotations
 
 import pytest
@@ -6,18 +7,21 @@ import pytest
 
 def test_exists_false_when_missing(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     assert cache.exists() is False
 
 
 def test_snapshot_id_none_when_missing(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     assert cache.snapshot_id() is None
 
 
 def test_write_then_load_round_trip(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     schema = {"schemas": {"deriva-ml": {}}, "acls": {}, "annotations": {}}
     cache.write(
@@ -39,6 +43,7 @@ def test_write_then_load_round_trip(tmp_path):
 
 def test_load_missing_raises(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     with pytest.raises(FileNotFoundError):
         cache.load()
@@ -47,6 +52,7 @@ def test_load_missing_raises(tmp_path):
 def test_corrupt_cache_raises_configuration_error(tmp_path):
     from deriva_ml.core.exceptions import DerivaMLConfigurationError
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     # Write garbage where the cache file should live
     cache._path.write_text("{ this is not valid json")
@@ -58,17 +64,22 @@ def test_corrupt_cache_raises_configuration_error(tmp_path):
 def test_write_is_atomic_no_partial_file_on_crash(tmp_path, monkeypatch):
     """If os.replace fails mid-write, the old cache remains intact."""
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
 
     # Populate a valid initial cache
     cache.write(
-        snapshot_id="v1", hostname="h", catalog_id="c",
-        ml_schema="ml", schema={"a": 1},
+        snapshot_id="v1",
+        hostname="h",
+        catalog_id="c",
+        ml_schema="ml",
+        schema={"a": 1},
     )
     assert cache.snapshot_id() == "v1"
 
     # Simulate a crash: make os.replace raise after the tmp is written.
     import os as os_mod
+
     original_replace = os_mod.replace
 
     def crashing_replace(*args, **kwargs):
@@ -78,8 +89,11 @@ def test_write_is_atomic_no_partial_file_on_crash(tmp_path, monkeypatch):
 
     with pytest.raises(OSError, match="simulated"):
         cache.write(
-            snapshot_id="v2", hostname="h", catalog_id="c",
-            ml_schema="ml", schema={"a": 2},
+            snapshot_id="v2",
+            hostname="h",
+            catalog_id="c",
+            ml_schema="ml",
+            schema={"a": 2},
         )
 
     # After restore, the OLD cache is still intact.
@@ -91,6 +105,7 @@ def test_write_is_atomic_no_partial_file_on_crash(tmp_path, monkeypatch):
 def test_write_atomic_helper_exists_and_writes_payload(tmp_path):
     """_write_atomic is the private helper pin/unpin will reuse."""
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     payload = {
         "snapshot_id": "s1",
@@ -102,6 +117,7 @@ def test_write_atomic_helper_exists_and_writes_payload(tmp_path):
     cache._write_atomic(payload)
     assert cache.exists()
     import json
+
     assert json.loads(cache._path.read_text()) == payload
 
 
@@ -120,6 +136,7 @@ def test_pin_on_unpinned_cache_sets_fields(tmp_path):
     from datetime import datetime, timezone
 
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     _populate(cache)
     before = datetime.now(timezone.utc)
@@ -135,6 +152,7 @@ def test_pin_on_unpinned_cache_sets_fields(tmp_path):
 
 def test_pin_without_reason(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     _populate(cache)
     cache.pin()
@@ -147,6 +165,7 @@ def test_pin_idempotent_updates_metadata(tmp_path):
     import time
 
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     _populate(cache)
     cache.pin(reason="first")
@@ -161,6 +180,7 @@ def test_pin_idempotent_updates_metadata(tmp_path):
 
 def test_unpin_clears_fields(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     _populate(cache)
     cache.pin(reason="r")
@@ -174,6 +194,7 @@ def test_unpin_clears_fields(tmp_path):
 
 def test_unpin_on_unpinned_is_no_op(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     _populate(cache)
     cache.unpin()  # should not raise
@@ -183,14 +204,17 @@ def test_unpin_on_unpinned_is_no_op(tmp_path):
 
 def test_pin_status_on_missing_cache_raises(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     import pytest
+
     with pytest.raises(FileNotFoundError):
         cache.pin_status()
 
 
 def test_pin_persists_across_instances(tmp_path):
     from deriva_ml.core.schema_cache import SchemaCache
+
     a = SchemaCache(tmp_path)
     _populate(a)
     a.pin(reason="persist me")
@@ -205,6 +229,7 @@ def test_cache_file_format_has_nested_pin_object(tmp_path):
     import json
 
     from deriva_ml.core.schema_cache import SchemaCache
+
     cache = SchemaCache(tmp_path)
     _populate(cache)
     cache.pin(reason="x")
@@ -215,3 +240,97 @@ def test_cache_file_format_has_nested_pin_object(tmp_path):
     cache.unpin()
     raw2 = json.loads(cache._path.read_text())
     assert "pin" not in raw2
+
+
+def test_concurrent_writers_do_not_corrupt_cache(tmp_path):
+    """Regression test for issue #173 (B14): concurrent writers race-safe.
+
+    Spawns multiple threads that each rewrite the cache repeatedly with a
+    distinct payload. With the pre-fix shared ``.tmp`` filename, the
+    writers would stomp each other's tmp contents and one writer's
+    ``os.replace`` would surface ``FileNotFoundError``. After the fix,
+    every writer gets its own uuid-suffixed tmp file and ``os.replace``
+    cleanly resolves last-writer-wins.
+
+    Assertions:
+        - Final cache file exists and parses as JSON.
+        - The persisted payload matches exactly one of the writers'
+          inputs (no truncation, no interleaved bytes).
+        - No leftover ``.tmp`` stragglers in the cache directory.
+        - No thread raised an exception.
+    """
+    import json
+    import threading
+
+    from deriva_ml.core.schema_cache import SchemaCache
+
+    num_writers = 8
+    iterations = 25
+    barrier = threading.Barrier(num_writers)
+    errors: list[BaseException] = []
+    errors_lock = threading.Lock()
+
+    cache = SchemaCache(tmp_path)
+
+    def make_payload(writer_id: int, iteration: int) -> dict:
+        """Build a distinct, easily-identifiable cache payload.
+
+        Args:
+            writer_id: 0-based thread index.
+            iteration: 0-based per-thread iteration counter.
+
+        Returns:
+            A SchemaCache payload dict with a sentinel ``writer`` /
+            ``iteration`` pair and a sizeable filler string so partial
+            writes have room to be detectable.
+        """
+        return {
+            "snapshot_id": f"snap-{writer_id}-{iteration}",
+            "hostname": "example.org",
+            "catalog_id": str(writer_id),
+            "ml_schema": "deriva-ml",
+            "schema": {
+                "writer": writer_id,
+                "iteration": iteration,
+                "filler": "x" * 10_000,
+            },
+        }
+
+    def writer(writer_id: int) -> None:
+        """Thread body: rewrite the cache ``iterations`` times.
+
+        Args:
+            writer_id: 0-based thread index used to tag each payload.
+        """
+        try:
+            barrier.wait()
+            for i in range(iterations):
+                cache._write_atomic(make_payload(writer_id, i))
+        except BaseException as exc:  # pragma: no cover - re-raised below
+            with errors_lock:
+                errors.append(exc)
+
+    threads = [threading.Thread(target=writer, args=(wid,)) for wid in range(num_writers)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"writer thread(s) raised: {errors!r}"
+
+    # Final file must exist and be valid JSON (no truncation/corruption).
+    assert cache.exists()
+    loaded = json.loads(cache._path.read_text())
+
+    # The final payload must match exactly one writer's input shape.
+    schema = loaded["schema"]
+    assert set(schema.keys()) == {"writer", "iteration", "filler"}
+    assert 0 <= schema["writer"] < num_writers
+    assert 0 <= schema["iteration"] < iterations
+    assert schema["filler"] == "x" * 10_000
+    assert loaded["snapshot_id"] == f"snap-{schema['writer']}-{schema['iteration']}"
+    assert loaded["catalog_id"] == str(schema["writer"])
+
+    # No straggler tmp files should remain after all writers finish.
+    leftovers = sorted(p.name for p in tmp_path.iterdir() if p.name != "schema-cache.json")
+    assert leftovers == [], f"unexpected leftover files: {leftovers}"
