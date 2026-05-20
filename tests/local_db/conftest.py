@@ -427,6 +427,268 @@ def populated_denorm_diamond(
 
 
 # ---------------------------------------------------------------------------
+# Feature-association fixture (issue #174)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def denorm_schema_feature(tmp_path: Path) -> Path:
+    """Canned schema with a DerivaML feature-association table.
+
+    Extends :func:`denorm_schema` by adding:
+
+    - ``Execution`` table in the ``deriva-ml`` schema (provenance).
+    - ``Image_Classification`` vocabulary table in the ``isa`` schema
+      (the value table — i.e. the term).
+    - ``Execution_Image_Image_Classification`` association table with
+      three FKs (Image, Execution, Image_Classification) and a
+      ``Feature_Name`` column. This is the canonical shape of a
+      DerivaML feature value table — see ``DerivaModel.find_features``
+      for the runtime predicate.
+
+    Plus a *non-feature* 3-FK association,
+    ``Image_Subject_UnrelatedThing``, with three domain FKs but no
+    FK to ``Execution`` — used to verify
+    :meth:`_is_feature_association` correctly rejects 3-FK associations
+    that aren't features.
+
+    Used by the planner-rules tests in
+    :mod:`tests.local_db.test_planner_rules` to exercise the
+    transparency widening introduced for issue #174.
+    """
+    doc = _base_schema_doc()
+
+    # Add Dataset_Image association (same as denorm_schema)
+    doc["schemas"]["deriva-ml"]["tables"]["Dataset_Image"] = {
+        "table_name": "Dataset_Image",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Dataset", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Dataset_Image", "column_name": "Dataset"}
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Dataset", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Dataset_Image", "column_name": "Image"}
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    # Add Execution table (deriva-ml schema)
+    doc["schemas"]["deriva-ml"]["tables"]["Execution"] = {
+        "table_name": "Execution",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [],
+    }
+
+    # Add Image_Classification vocabulary term table (isa schema)
+    doc["schemas"]["isa"]["tables"]["Image_Classification"] = {
+        "table_name": "Image_Classification",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # Add Execution_Image_Image_Classification feature-assoc table.
+    # Three domain FKs: Image, Execution, Image_Classification.
+    # Includes a Feature_Name column to match the DerivaML runtime
+    # predicate (DerivaModel.find_features's is_feature check).
+    doc["schemas"]["deriva-ml"]["tables"]["Execution_Image_Image_Classification"] = {
+        "table_name": "Execution_Image_Image_Classification",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image_Classification", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Image_Image_Classification",
+                        "column_name": "Image",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Image_Image_Classification",
+                        "column_name": "Execution",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Image_Image_Classification",
+                        "column_name": "Image_Classification",
+                    }
+                ],
+                "referenced_columns": [
+                    {"schema_name": "isa", "table_name": "Image_Classification", "column_name": "RID"}
+                ],
+            },
+        ],
+    }
+
+    # Add a non-feature 3-FK association (no FK to Execution) to verify
+    # the predicate rejects 3-FK shapes that aren't features.
+    doc["schemas"]["isa"]["tables"]["Image_Subject_UnrelatedThing"] = {
+        "table_name": "Image_Subject_UnrelatedThing",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "UnrelatedThing", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Image_Subject_UnrelatedThing",
+                        "column_name": "Image",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Image_Subject_UnrelatedThing",
+                        "column_name": "Subject",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Subject", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "isa",
+                        "table_name": "Image_Subject_UnrelatedThing",
+                        "column_name": "UnrelatedThing",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "UnrelatedThing", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    # Add a 4-FK association to verify the predicate rejects multi-way
+    # associations (should NOT be transparent).
+    doc["schemas"]["isa"]["tables"]["FourWayAssoc"] = {
+        "table_name": "FourWayAssoc",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "UnrelatedThing", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [{"schema_name": "isa", "table_name": "FourWayAssoc", "column_name": "Image"}],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [{"schema_name": "isa", "table_name": "FourWayAssoc", "column_name": "Subject"}],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Subject", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "isa", "table_name": "FourWayAssoc", "column_name": "UnrelatedThing"}
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "UnrelatedThing", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "isa", "table_name": "FourWayAssoc", "column_name": "Execution"}
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    out = tmp_path / "schema.json"
+    out.write_text(json.dumps(doc))
+    return out
+
+
+@pytest.fixture
+def denorm_feature_model(denorm_schema_feature: Path) -> Model:
+    """ERMrest Model with a DerivaML feature-association table."""
+    return Model.fromfile("file-system", denorm_schema_feature)
+
+
+@pytest.fixture
+def denorm_feature_deriva_model(denorm_feature_model: Model) -> DerivaModel:
+    """DerivaModel for the feature-association fixture."""
+    return DerivaModel(
+        model=denorm_feature_model,
+        ml_schema="deriva-ml",
+        domain_schemas={"isa"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 

@@ -501,6 +501,10 @@ def split_dataset(
     selection_fn: SelectionFunction | None = None,
     workflow_type: str = "Dataset_Split",
     dry_run: bool = False,
+    # Denormalization-control parameters (issue #174)
+    row_per: str | None = None,
+    via: list[str] | None = None,
+    ignore_unrelated_anchors: bool = False,
 ) -> SplitResult:
     """Split a DerivaML dataset into training, testing, and optionally validation subsets.
 
@@ -561,6 +565,23 @@ def split_dataset(
             ``stratify_by_column``.
         workflow_type: Workflow type vocabulary term. Default: "Dataset_Split".
         dry_run: If True, return what would happen without modifying catalog.
+        row_per: Explicit leaf table for denormalization (passed
+            through to :meth:`Dataset.get_denormalized_as_dataframe`).
+            When ``stratify_by_column`` or ``selection_fn`` is set and
+            ``row_per`` is None, defaults to ``element_table`` — the
+            natural anchor when partitioning element rows. Set
+            explicitly to override (e.g., when projecting a feature
+            value table's columns through a feature-association
+            bridge and you want one row per feature value).
+        via: Tables forced into the join chain without contributing
+            columns (denormalizer ``via=`` parameter). Useful to
+            disambiguate path ambiguity (Rule 6) without polluting
+            the output column list.
+        ignore_unrelated_anchors: If True, silently drop dataset
+            anchors whose table has no FK path to any requested
+            table. Pass-through to the denormalizer (Rule 8) — useful
+            when the source dataset has heterogeneous member tables
+            and only a subset participates in the split.
 
     Returns:
         SplitResult with partition info for split, training, testing,
@@ -609,6 +630,33 @@ def split_dataset(
                 test_size=0.2,
                 stratify_by_column="Image_Classification.Image_Class",
                 include_tables=["Image", "Image_Classification"],
+            )
+
+        Stratified split on a feature-target column (one row per
+        Image, projecting the Image_Classification vocab term)::
+
+            # Image and Image_Classification are linked by the feature-
+            # association table Execution_Image_Image_Classification.
+            # ``split_dataset`` auto-defaults ``row_per=element_table``
+            # when stratifying, so the join produces one row per Image
+            # with the classification label projected as a column.
+            result = split_dataset(
+                ml, "28D0",
+                test_size=0.2,
+                stratify_by_column="Image_Classification.Image_Class",
+                include_tables=["Image", "Image_Classification"],
+                element_table="Image",
+            )
+
+        Override ``row_per`` to project one row per feature value
+        instead (e.g., when computing per-annotation statistics)::
+
+            result = split_dataset(
+                ml, "28D0",
+                test_size=0.2,
+                stratify_by_column="Image_Classification.Image_Class",
+                include_tables=["Image", "Execution_Image_Image_Classification"],
+                row_per="Execution_Image_Image_Classification",
             )
 
         Stratified split dropping rows with missing labels::
@@ -758,8 +806,23 @@ def split_dataset(
     use_denormalization = stratify_by_column is not None or selection_fn is not None
 
     if use_denormalization:
-        logger.info(f"Denormalizing dataset with tables: {include_tables}")
-        df = source_ds.get_denormalized_as_dataframe(include_tables)
+        # Default row_per to the element table when stratifying, so
+        # the natural "one row per element" cardinality lines up with
+        # how the partitions are built downstream (RID lookups happen
+        # via the {element_table}.RID column). Callers who want a
+        # different row_per (e.g., one row per feature value when the
+        # feature-assoc table is in include_tables) can pass it
+        # explicitly. See issue #174 for the motivating case.
+        effective_row_per = row_per if row_per is not None else element_table
+        logger.info(
+            f"Denormalizing dataset with tables: {include_tables} (row_per={effective_row_per}, via={via or []})"
+        )
+        df = source_ds.get_denormalized_as_dataframe(
+            include_tables,
+            row_per=effective_row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
+        )
         logger.info(f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns")
 
         if stratify_by_column:
@@ -885,6 +948,9 @@ def split_dataset(
             "stratify_missing": stratify_missing,
             "element_table": element_table,
             "include_tables": include_tables,
+            "row_per": row_per,
+            "via": via,
+            "ignore_unrelated_anchors": ignore_unrelated_anchors,
             "training_types": train_types,
             "testing_types": test_types,
             "validation_types": val_types if val_types else None,
@@ -1131,6 +1197,21 @@ def main() -> int:
         "(e.g., Image,Image_Classification). Required for stratified splitting.",
     )
     parser.add_argument(
+        "--row-per",
+        help="Explicit leaf table for denormalization. Defaults to --element-table when stratifying (issue #174).",
+    )
+    parser.add_argument(
+        "--via",
+        help="Comma-separated tables forced into the join chain without "
+        "contributing columns (denormalizer via= parameter). Use to "
+        "disambiguate path ambiguity (Rule 6) without polluting output.",
+    )
+    parser.add_argument(
+        "--ignore-unrelated-anchors",
+        action="store_true",
+        help="Silently drop dataset anchors with no FK path to any requested table (denormalizer Rule 8 escape hatch).",
+    )
+    parser.add_argument(
         "--training-types",
         default="Labeled",
         help="Comma-separated additional dataset types for training set (default: Labeled)",
@@ -1196,6 +1277,7 @@ def main() -> int:
         training_types = [t.strip() for t in args.training_types.split(",")] if args.training_types else None
         testing_types = [t.strip() for t in args.testing_types.split(",")] if args.testing_types else None
         validation_types = [t.strip() for t in args.validation_types.split(",")] if args.validation_types else None
+        via = [t.strip() for t in args.via.split(",")] if args.via else None
 
         # Run the split
         result = split_dataset(
@@ -1214,6 +1296,9 @@ def main() -> int:
             validation_types=validation_types,
             element_table=args.element_table,
             include_tables=include_tables,
+            row_per=args.row_per,
+            via=via,
+            ignore_unrelated_anchors=args.ignore_unrelated_anchors,
             workflow_type=args.workflow_type,
             dry_run=args.dry_run,
         )

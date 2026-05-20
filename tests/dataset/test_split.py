@@ -1188,3 +1188,135 @@ class TestSplitDataset:
                 test_size=4,
                 element_table="NonExistentTable",
             )
+
+
+# =============================================================================
+# Unit Tests: split_dataset denormalization plumbing (issue #174)
+# =============================================================================
+
+
+class TestDenormalizationPlumbing:
+    """Verify split_dataset forwards row_per/via/ignore_unrelated_anchors
+    to ``get_denormalized_as_dataframe``.
+
+    Issue #174: before this fix, the denormalizer kwargs that the
+    underlying ``Denormalizer.as_dataframe`` accepts (``row_per``,
+    ``via``, ``ignore_unrelated_anchors``) were not exposed by
+    ``split_dataset``. As a result, stratifying on a column that
+    lived behind a feature-association bridge surfaced a confusing
+    ``row_per``-required error with no way to satisfy it. This test
+    pins the plumbing: the kwargs reach the denormalizer, and
+    ``row_per`` defaults to ``element_table`` when stratifying.
+    """
+
+    @staticmethod
+    def _stub_ml_and_dataset(captured: dict):
+        """Build minimal stand-ins that record denormalize kwargs.
+
+        We don't need a real catalog — split_dataset's stratify path
+        calls ``source_ds.list_dataset_members`` and
+        ``source_ds.get_denormalized_as_dataframe``, then runs the
+        selection in-memory and returns a ``dry_run`` result without
+        touching the catalog further (we use ``dry_run=True``).
+        """
+
+        class _StubDataset:
+            def list_dataset_members(self, *, recurse: bool = True):
+                # Two-column 6-row "dataset": six "Item" RIDs.
+                return {
+                    "Item": [{"RID": f"R{i}"} for i in range(6)],
+                }
+
+            def get_denormalized_as_dataframe(
+                self,
+                include_tables,
+                *,
+                row_per=None,
+                via=None,
+                ignore_unrelated_anchors=False,
+            ):
+                captured["include_tables"] = list(include_tables)
+                captured["row_per"] = row_per
+                captured["via"] = list(via) if via is not None else None
+                captured["ignore_unrelated_anchors"] = ignore_unrelated_anchors
+                # Return a balanced 2-class DataFrame keyed by Item.RID.
+                return pd.DataFrame(
+                    {
+                        "Item.RID": [f"R{i}" for i in range(6)],
+                        "Vocab.Class": ["A", "A", "A", "B", "B", "B"],
+                    }
+                )
+
+        class _StubML:
+            def lookup_dataset(self, rid: str):
+                return _StubDataset()
+
+        return _StubML(), _StubDataset()
+
+    @requires_sklearn
+    def test_row_per_defaults_to_element_table_on_stratify(self):
+        """When stratifying and ``row_per`` is None, default to ``element_table``."""
+        captured: dict = {}
+        ml, _ = self._stub_ml_and_dataset(captured)
+
+        result = split_dataset(
+            ml,
+            "DS-1",
+            test_size=2,
+            train_size=4,
+            seed=42,
+            stratify_by_column="Vocab.Class",
+            include_tables=["Item", "Vocab"],
+            element_table="Item",
+            dry_run=True,
+        )
+        assert isinstance(result, SplitResult)
+        # The denormalize call must have received the auto-defaulted row_per.
+        assert captured["row_per"] == "Item", (
+            f"row_per should default to element_table='Item', got {captured['row_per']!r}"
+        )
+        # via and ignore_unrelated_anchors default to None / False.
+        assert captured["via"] is None
+        assert captured["ignore_unrelated_anchors"] is False
+
+    @requires_sklearn
+    def test_row_per_explicit_passed_through(self):
+        """Explicit ``row_per`` overrides the element_table default."""
+        captured: dict = {}
+        ml, _ = self._stub_ml_and_dataset(captured)
+
+        split_dataset(
+            ml,
+            "DS-1",
+            test_size=2,
+            train_size=4,
+            seed=42,
+            stratify_by_column="Vocab.Class",
+            include_tables=["Item", "Vocab"],
+            element_table="Item",
+            row_per="Vocab",
+            dry_run=True,
+        )
+        assert captured["row_per"] == "Vocab"
+
+    @requires_sklearn
+    def test_via_and_ignore_unrelated_anchors_forwarded(self):
+        """``via`` and ``ignore_unrelated_anchors`` reach the denormalizer."""
+        captured: dict = {}
+        ml, _ = self._stub_ml_and_dataset(captured)
+
+        split_dataset(
+            ml,
+            "DS-1",
+            test_size=2,
+            train_size=4,
+            seed=42,
+            stratify_by_column="Vocab.Class",
+            include_tables=["Item", "Vocab"],
+            element_table="Item",
+            via=["Execution_Item_Vocab"],
+            ignore_unrelated_anchors=True,
+            dry_run=True,
+        )
+        assert captured["via"] == ["Execution_Item_Vocab"]
+        assert captured["ignore_unrelated_anchors"] is True
