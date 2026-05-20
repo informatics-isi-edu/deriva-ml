@@ -153,12 +153,14 @@ class FeatureRecord(BaseModel):
             execution_rid: RID of the execution to filter by.
 
         Returns:
-            A selector function ``(list[FeatureRecord]) -> FeatureRecord``
-            suitable for use as the ``selector=`` argument to ``feature_values``.
-
-        Raises:
-            DerivaMLException: If no records in the group match the
-                given execution RID.
+            A selector function ``(list[FeatureRecord]) -> FeatureRecord | None``
+            suitable for use as the ``selector=`` argument to
+            ``feature_values``. Returns ``None`` when no record in the group
+            matches the execution; returns the newest matching record (by RCT)
+            otherwise. Mirrors ``select_by_workflow``'s no-match semantics:
+            ``feature_values`` invokes the selector once per target row, so
+            targets whose record group lacks a match are silently omitted
+            from the output rather than aborting the whole query.
 
         Examples:
             Select values from a specific execution::
@@ -171,10 +173,16 @@ class FeatureRecord(BaseModel):
                 ...     print(rec)
         """
 
-        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
+        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord | None":
             filtered = [r for r in records if r.Execution == execution_rid]
             if not filtered:
-                raise DerivaMLException(f"No feature records match execution '{execution_rid}'.")
+                # Return None so feature_values omits this target RID silently.
+                # Parallel to select_by_workflow's behavior; raising used to
+                # abort the whole query when any target row lacked a record
+                # from the target execution, which made the selector
+                # unusable in any catalog where the feature is sparsely
+                # annotated by execution (the common case).
+                return None
             return FeatureRecord.select_newest(filtered)
 
         return _selector
@@ -201,8 +209,8 @@ class FeatureRecord(BaseModel):
         **None return semantics:** when no record in a group matches the
         workflow, the selector returns ``None``. ``feature_values`` treats
         ``None`` as "feature absent for this target RID" and omits the target
-        from the iterator. This is distinct from ``select_by_execution``, which
-        raises on no-match.
+        from the iterator. ``select_by_execution`` follows the same
+        convention.
 
         Args:
             workflow: Name (or RID) of the workflow to filter by. Must be a
@@ -355,7 +363,6 @@ class FeatureRecord(BaseModel):
                     raise DerivaMLException(
                         "select_majority_vote requires a column name — could not auto-detect from feature metadata."
                     )
-
 
             counts = Counter(getattr(r, col, None) for r in records)
             max_count = max(counts.values())
