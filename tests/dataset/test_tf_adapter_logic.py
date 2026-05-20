@@ -15,6 +15,7 @@ Coverage matrix (spec §6.2):
 - Non-asset-table element works without sample_loader
 - output_signature=None triggers first-sample inference
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -49,9 +50,7 @@ def _mock_bag_with_labeled_images(rids_and_labels: dict[str, str]):
     """
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": rid} for rid in rids_and_labels]}
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
         for rid, label in rids_and_labels.items():
@@ -88,9 +87,7 @@ def _mock_non_asset_bag(rids_and_labels: dict[str, str]):
     """Build a MagicMock bag for a non-asset element type (tabular)."""
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Subject": [{"RID": rid} for rid in rids_and_labels]}
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Subject": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
         for rid, label in rids_and_labels.items():
@@ -127,7 +124,8 @@ def test_as_tf_dataset_returns_tf_dataset():
         targets=["Grade"],
         output_signature=(
             tf.TensorSpec(shape=(3,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     assert isinstance(ds, tf.data.Dataset)
@@ -136,10 +134,12 @@ def test_as_tf_dataset_returns_tf_dataset():
 def test_element_count_reflects_all_when_no_skip():
     """Dataset element count equals total member count when missing != 'skip'."""
     bag = _mock_bag_with_labeled_images({"1-IMG1": "Mild", "1-IMG2": "Severe"})
-    bag.get_table_as_dict.return_value = iter([
-        {"RID": "1-IMG1", "Filename": "img1.jpg"},
-        {"RID": "1-IMG2", "Filename": "img2.jpg"},
-    ])
+    bag.get_table_as_dict.return_value = iter(
+        [
+            {"RID": "1-IMG1", "Filename": "img1.jpg"},
+            {"RID": "1-IMG2", "Filename": "img2.jpg"},
+        ]
+    )
     ds = build_tf_dataset(
         bag,
         "Image",
@@ -148,7 +148,8 @@ def test_element_count_reflects_all_when_no_skip():
         target_transform=lambda rec: tf.constant(rec.Grade if rec is not None else ""),
         output_signature=(
             tf.TensorSpec(shape=(1,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     count = sum(1 for _ in ds)
@@ -164,12 +165,8 @@ def test_missing_error_raises_at_construction():
     """missing='error' raises DerivaMLException at construction listing RIDs."""
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]}
-    )
-    bag.feature_values = MagicMock(
-        return_value=iter([_FakeRecord(Image="1-IMG1", Grade="Mild")])
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]})
+    bag.feature_values = MagicMock(return_value=iter([_FakeRecord(Image="1-IMG1", Grade="Mild")]))
     bag.model = MagicMock()
     bag.model.is_asset = MagicMock(return_value=True)
     bag.get_table_as_dict = MagicMock(return_value=iter([]))
@@ -197,7 +194,8 @@ def test_missing_skip_drops_unlabeled_elements():
         missing="skip",
         output_signature=(
             tf.TensorSpec(shape=(1,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     count = sum(1 for _ in ds)
@@ -208,10 +206,12 @@ def test_missing_unknown_keeps_all_elements_with_none_target():
     """missing='unknown' keeps all elements; target is None for unlabeled."""
     bag = _mock_bag_with_labeled_images({"1-IMG1": "Mild", "1-IMG2": ""})
     # Override get_table_as_dict to return both rows
-    bag.get_table_as_dict.return_value = iter([
-        {"RID": "1-IMG1", "Filename": "img1.jpg"},
-        {"RID": "1-IMG2", "Filename": "img2.jpg"},
-    ])
+    bag.get_table_as_dict.return_value = iter(
+        [
+            {"RID": "1-IMG1", "Filename": "img1.jpg"},
+            {"RID": "1-IMG2", "Filename": "img2.jpg"},
+        ]
+    )
     # target_transform must handle None for the unlabeled element.
     targets_seen = []
 
@@ -228,7 +228,8 @@ def test_missing_unknown_keeps_all_elements_with_none_target():
         missing="unknown",
         output_signature=(
             tf.TensorSpec(shape=(1,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     count = sum(1 for _ in ds)
@@ -259,7 +260,8 @@ def test_single_target_target_transform_receives_featurerecord():
         target_transform=capture_target,
         output_signature=(
             tf.TensorSpec(shape=(1,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.int32),
+            tf.TensorSpec(shape=(), dtype=tf.int32),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     list(ds)  # consume to trigger __call__
@@ -272,9 +274,7 @@ def test_multi_target_target_transform_receives_dict():
     """Multi-target: target_transform receives dict[str, FeatureRecord]."""
     bag = MagicMock()
     bag.path = Path("/tmp/fake_bag")
-    bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": "1-IMG1"}]}
-    )
+    bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}]})
 
     class _FakeGradeRecord(FeatureRecord):
         Image: str
@@ -315,7 +315,8 @@ def test_multi_target_target_transform_receives_dict():
         target_transform=capture_target,
         output_signature=(
             tf.TensorSpec(shape=(1,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.int32),
+            tf.TensorSpec(shape=(), dtype=tf.int32),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     list(ds)
@@ -348,7 +349,8 @@ def test_selector_dict_form_passes_selector_to_feature_values():
         target_transform=lambda rec: tf.constant(rec.Grade if rec is not None else ""),
         output_signature=(
             tf.TensorSpec(shape=(1,), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     list(ds)
@@ -393,7 +395,8 @@ def test_non_asset_table_no_sample_loader_returns_row_dict():
         target_transform=lambda rec: tf.constant(rec.Grade if rec is not None else ""),
         output_signature=(
             tf.TensorSpec(shape=None, dtype=tf.string),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     assert isinstance(ds_no_loader, tf.data.Dataset)
@@ -409,7 +412,8 @@ def test_non_asset_table_no_sample_loader_returns_row_dict():
         target_transform=lambda rec: tf.constant(rec.Grade if rec is not None else ""),
         output_signature=(
             tf.TensorSpec(shape=(), dtype=tf.string),
-            tf.TensorSpec(shape=(), dtype=tf.string),
+            tf.TensorSpec(shape=(), dtype=tf.string),  # target
+            tf.TensorSpec(shape=(), dtype=tf.string),  # rid
         ),
     )
     assert isinstance(ds, tf.data.Dataset)
@@ -425,10 +429,12 @@ def test_non_asset_table_no_sample_loader_returns_row_dict():
 def test_output_signature_none_infers_from_first_sample():
     """output_signature=None: element_spec is inferred from the first yielded sample."""
     bag = _mock_bag_with_labeled_images({"1-IMG1": "Mild", "1-IMG2": "Severe"})
-    bag.get_table_as_dict.return_value = iter([
-        {"RID": "1-IMG1", "Filename": "img1.jpg"},
-        {"RID": "1-IMG2", "Filename": "img2.jpg"},
-    ])
+    bag.get_table_as_dict.return_value = iter(
+        [
+            {"RID": "1-IMG1", "Filename": "img1.jpg"},
+            {"RID": "1-IMG2", "Filename": "img2.jpg"},
+        ]
+    )
 
     ds = build_tf_dataset(
         bag,
@@ -439,10 +445,12 @@ def test_output_signature_none_infers_from_first_sample():
     )
 
     assert isinstance(ds, tf.data.Dataset)
-    # element_spec should reflect a float32 tensor of shape (3,)
-    spec = ds.element_spec
-    assert spec.dtype == tf.float32
-    assert spec.shape == (3,)
+    # element_spec is now (sample_spec, rid_spec) — the rid is always
+    # the last positional value in the yielded tuple.
+    sample_spec, rid_spec = ds.element_spec
+    assert sample_spec.dtype == tf.float32
+    assert sample_spec.shape == (3,)
+    assert rid_spec.dtype == tf.string
 
     # All elements should be present (inference must not drop the first sample)
     count = sum(1 for _ in ds)

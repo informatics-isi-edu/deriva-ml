@@ -1195,8 +1195,10 @@ class DatasetBag:
             targets: Source of label data. Three shapes are accepted:
 
                 - ``None`` (default) — unlabeled dataset. ``__getitem__``
-                  returns just the sample (not a tuple). Useful for
-                  inference loops and self-supervised pretext tasks.
+                  returns ``(sample, rid)``. Useful for inference loops
+                  and self-supervised pretext tasks (the RID is still
+                  surfaced so the inference loop can record predictions
+                  back to the catalog).
                 - ``list[str]`` — feature names read via
                   ``bag.feature_values(element_type, name)`` with no
                   selector. One ``FeatureRecord`` is resolved per element.
@@ -1239,10 +1241,18 @@ class DatasetBag:
         Returns:
             A ``torch.utils.data.Dataset`` whose ``__getitem__`` returns:
 
-            - ``sample`` when ``targets=None`` (unlabeled).
-            - ``(sample, target)`` when ``targets`` is set, where
+            - ``(sample, rid)`` when ``targets=None`` (unlabeled).
+            - ``(sample, target, rid)`` when ``targets`` is set, where
               ``sample = transform(sample_loader(path, row_dict))`` and
               ``target = target_transform(feature_record_shape)``.
+
+            The element's catalog RID is always the last positional
+            value. It's passed through raw — never touched by
+            ``transform`` or ``target_transform`` — because the RID
+            is the row's catalog identity, not a feature value. The
+            motivating use case is downstream code that records
+            per-element predictions back to the catalog (the RID is
+            the FK target for the feature row).
 
             ``__len__`` equals the count of labeled elements when
             ``missing="skip"``, the total element count otherwise.
@@ -1309,8 +1319,10 @@ class DatasetBag:
         ``DatasetBag``. TensorFlow is imported lazily inside the builder
         so the base library stays importable without TensorFlow installed.
 
-        Each call to the generator yields one element (sample, or
-        ``(sample, target)`` when ``targets`` is supplied). Callers are
+        Each call to the generator yields one element — either
+        ``(sample, rid)`` (unlabeled) or ``(sample, target, rid)``
+        (with ``targets`` set). The RID is always the last value;
+        see the Returns section for details. Callers are
         responsible for chaining ``.batch()`` and ``.prefetch()`` to get
         production throughput — the method does not apply batching itself.
 
@@ -1407,10 +1419,18 @@ class DatasetBag:
         Returns:
             A ``tf.data.Dataset`` whose elements are:
 
-            - ``sample`` when ``targets=None`` (unlabeled).
-            - ``(sample, target)`` when ``targets`` is set, where
+            - ``(sample, rid)`` when ``targets=None`` (unlabeled).
+            - ``(sample, target, rid)`` when ``targets`` is set, where
               ``sample = transform(sample_loader(path, row_dict))`` and
               ``target = target_transform(feature_record_shape)``.
+
+            The element's catalog RID is always the last positional
+            value. It's passed through raw — never touched by
+            ``transform`` or ``target_transform`` — because the RID
+            is the row's catalog identity, not a feature value. The
+            motivating use case is downstream code that records
+            per-element predictions back to the catalog (the RID is
+            the FK target for the feature row).
 
             Callers must chain ``.batch()`` / ``.prefetch()`` themselves —
             the returned dataset is unbatched.

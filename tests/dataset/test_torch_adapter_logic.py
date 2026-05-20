@@ -193,10 +193,11 @@ def test_missing_unknown_keeps_all_elements_with_none_target():
         missing="unknown",
     )
     assert len(ds) == 2
-    # Find the unlabeled item — target should be None
+    # Find the unlabeled item — target should be None.
+    # Return shape with targets set is (sample, target, rid).
     targets_seen = []
     for i in range(len(ds)):
-        sample, target = ds[i]
+        sample, target, _rid = ds[i]
         targets_seen.append(target)
     assert None in targets_seen
 
@@ -399,9 +400,93 @@ def test_resolve_asset_path_uses_bdbag_canonical_layout(tmp_path):
         sample_loader=capturing_loader,
         targets=["Grade"],
     )
-    sample, _ = ds[0]
+    # Return shape with targets set is (sample, target, rid).
+    sample, _target, returned_rid = ds[0]
     # The sample_loader received the canonical-layout path and was able
     # to read it. Pre-fix, sample_loader received a non-existent path
     # and raised FileNotFoundError inside the read.
     assert received_paths == [canonical_file]
     assert sample == asset_bytes
+    # The RID surfaced as the last positional value is the same opaque
+    # token threaded through the bag mock and the on-disk layout.
+    assert returned_rid == asset_rid
+
+
+# ---------------------------------------------------------------------------
+# Return-shape contract (RID always last positional value, per spec §3)
+# ---------------------------------------------------------------------------
+
+
+def test_return_shape_targets_none_is_sample_rid_tuple(tmp_path):
+    """``targets=None`` → ``__getitem__`` returns ``(sample, rid)``.
+
+    The RID is the catalog identity of the row. It's always surfaced
+    so downstream code can record per-element predictions / outputs
+    back to the catalog without re-iterating the bag's row table.
+    """
+    import secrets
+
+    # Set up a single asset on disk so sample_loader can succeed.
+    asset_rid = secrets.token_hex(3).upper()
+    filename = "asset.bin"
+    asset_bytes = b"opaque-bytes"
+
+    bag_root = tmp_path / "Dataset_FAKE"
+    leaf_dir = bag_root / "data" / "asset" / asset_rid / "Image"
+    leaf_dir.mkdir(parents=True)
+    (leaf_dir / filename).write_bytes(asset_bytes)
+
+    bag = _mock_bag_with_labeled_images({asset_rid: "Mild"})
+    bag.path = bag_root
+    bag.get_table_as_dict.return_value = iter([{"RID": asset_rid, "Filename": filename}])
+
+    ds = build_torch_dataset(
+        bag,
+        "Image",
+        sample_loader=lambda path, row: path.read_bytes(),
+        # No targets → unlabeled shape.
+    )
+    item = ds[0]
+    assert isinstance(item, tuple), f"expected tuple, got {type(item).__name__}"
+    assert len(item) == 2, f"expected 2-tuple (sample, rid), got len={len(item)}"
+    sample, returned_rid = item
+    assert sample == asset_bytes
+    assert returned_rid == asset_rid
+
+
+def test_return_shape_with_targets_is_sample_target_rid_tuple(tmp_path):
+    """``targets`` set → ``__getitem__`` returns ``(sample, target, rid)``.
+
+    RID is the last positional value regardless of targets shape. It's
+    passed through raw (never touched by ``transform`` or
+    ``target_transform``).
+    """
+    import secrets
+
+    asset_rid = secrets.token_hex(3).upper()
+    filename = "asset.bin"
+    asset_bytes = b"opaque-bytes"
+
+    bag_root = tmp_path / "Dataset_FAKE"
+    leaf_dir = bag_root / "data" / "asset" / asset_rid / "Image"
+    leaf_dir.mkdir(parents=True)
+    (leaf_dir / filename).write_bytes(asset_bytes)
+
+    bag = _mock_bag_with_labeled_images({asset_rid: "Mild"})
+    bag.path = bag_root
+    bag.get_table_as_dict.return_value = iter([{"RID": asset_rid, "Filename": filename}])
+
+    ds = build_torch_dataset(
+        bag,
+        "Image",
+        sample_loader=lambda path, row: path.read_bytes(),
+        targets=["Grade"],
+    )
+    item = ds[0]
+    assert isinstance(item, tuple)
+    assert len(item) == 3, f"expected 3-tuple (sample, target, rid), got len={len(item)}"
+    sample, target, returned_rid = item
+    assert sample == asset_bytes
+    assert getattr(target, "Grade", None) == "Mild"
+    # RID is the SAME opaque token the bag mock produced — last positional.
+    assert returned_rid == asset_rid

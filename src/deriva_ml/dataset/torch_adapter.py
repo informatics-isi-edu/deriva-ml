@@ -64,8 +64,17 @@ def build_torch_dataset(
             ``"unknown"`` keeps them with target=None.
 
     Returns:
-        A ``torch.utils.data.Dataset`` whose ``__getitem__`` returns
-        ``sample`` when ``targets=None``, or ``(sample, target)`` otherwise.
+        A ``torch.utils.data.Dataset`` whose ``__getitem__`` returns:
+
+        - ``(sample, rid)`` when ``targets=None`` (unlabeled).
+        - ``(sample, target, rid)`` when ``targets`` is set (labeled).
+
+        The element's RID is always the last positional value. It's
+        passed through raw — never touched by ``transform`` or
+        ``target_transform`` — because the RID is the row's catalog
+        identity, not a feature value. The motivating use case is
+        downstream code that records per-element predictions back to
+        the catalog (the RID is the FK target for the feature row).
 
     Raises:
         ImportError: If torch is not installed.
@@ -138,12 +147,12 @@ def build_torch_dataset(
                 sample = transform(sample)
 
             if targets is None:
-                return sample
+                return sample, rid
 
             target = self._target_map.get(rid)
             if target_transform is not None:
                 target = target_transform(target)
-            return sample, target
+            return sample, target, rid
 
     return _TorchDataset()
 
