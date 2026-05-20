@@ -16,11 +16,13 @@ Exception Hierarchy:
     │   ├── DerivaMLNotFoundError (entity not found)
     │   │   ├── DerivaMLDatasetNotFound (dataset lookup failures)
     │   │   ├── DerivaMLTableNotFound (table lookup failures)
-    │   │   └── DerivaMLInvalidTerm (vocabulary term not found)
+    │   │   ├── DerivaMLInvalidTerm (vocabulary term not found)
+    │   │   └── NoAssociationException (find_association: zero matches)
     │   ├── DerivaMLTableTypeError (wrong table type)
     │   ├── DerivaMLValidationError (data validation failures)
     │   ├── DerivaMLCycleError (cycle detected in relationships)
-    │   └── DerivaMLStateInconsistency (SQLite/catalog state disagreement)
+    │   ├── DerivaMLStateInconsistency (SQLite/catalog state disagreement)
+    │   └── AmbiguousAssociationException (find_association: multiple matches)
     │
     ├── DerivaMLExecutionError (execution lifecycle)
     │   ├── DerivaMLWorkflowError (workflow issues)
@@ -67,6 +69,8 @@ __all__ = [
     "DerivaMLMaterializeLimitExceeded",
     "DerivaMLCycleError",
     "DerivaMLStateInconsistency",
+    "NoAssociationException",
+    "AmbiguousAssociationException",
     "DerivaMLExecutionError",
     "DerivaMLWorkflowError",
     "DerivaMLDirtyWorkflowError",
@@ -426,6 +430,75 @@ class DerivaMLStateInconsistency(DerivaMLDataError):
     """
 
     pass
+
+
+class NoAssociationException(DerivaMLNotFoundError):
+    """Raised when no association table connects two tables.
+
+    Surfaced by :meth:`deriva_ml.model.catalog.DerivaModel.find_association`
+    when the caller asked for the unique association linking ``table1`` and
+    ``table2`` but no such association exists. Carrying this as a distinct
+    type (rather than a bare :class:`DerivaMLException`) lets callers
+    distinguish the legitimate "no link" case from real errors without
+    pattern-matching on the exception message.
+
+    Args:
+        table1: Name of the first endpoint table.
+        table2: Name of the second endpoint table.
+
+    Attributes:
+        table1: Name of the first endpoint table.
+        table2: Name of the second endpoint table.
+
+    Example:
+        Branch on the typed exception instead of message text::
+
+            >>> from deriva_ml.core.exceptions import NoAssociationException
+            >>> try:  # doctest: +SKIP
+            ...     model.find_association("Image", "Subject")
+            ... except NoAssociationException:
+            ...     # legitimate: there is no association
+            ...     assoc = None
+    """
+
+    def __init__(self, table1: str, table2: str) -> None:
+        super().__init__(f"No association tables found between {table1} and {table2}.")
+        self.table1 = table1
+        self.table2 = table2
+
+
+class AmbiguousAssociationException(DerivaMLDataError):
+    """Raised when multiple association tables connect two tables.
+
+    Surfaced by :meth:`deriva_ml.model.catalog.DerivaModel.find_association`
+    when more than one association table links ``table1`` and ``table2``
+    (e.g. an old ``Image_Dataset`` and a newer ``Dataset_Image`` both
+    persist on the same catalog). The caller must disambiguate by
+    referencing the desired association table by name.
+
+    Args:
+        table1: Name of the first endpoint table.
+        table2: Name of the second endpoint table.
+        count: Number of association tables that matched.
+
+    Attributes:
+        table1: Name of the first endpoint table.
+        table2: Name of the second endpoint table.
+        count: Number of association tables that matched.
+
+    Example:
+        >>> from deriva_ml.core.exceptions import AmbiguousAssociationException
+        >>> try:  # doctest: +SKIP
+        ...     model.find_association("Image", "Dataset")
+        ... except AmbiguousAssociationException as e:
+        ...     print(f"{e.count} association tables between {e.table1} and {e.table2}")
+    """
+
+    def __init__(self, table1: str, table2: str, count: int) -> None:
+        super().__init__(f"There are {count} association tables between {table1} and {table2}.")
+        self.table1 = table1
+        self.table2 = table2
+        self.count = count
 
 
 # =============================================================================

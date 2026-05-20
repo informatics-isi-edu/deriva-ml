@@ -66,7 +66,7 @@ from deriva_ml.asset.aux_classes import AssetFilePath
 from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES
 from deriva_ml.core.definitions import MLVocab
 from deriva_ml.core.ermrest import UploadProgress
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.upload_layout import asset_type_path, flat_asset_dir
 
@@ -567,7 +567,8 @@ def load_execution_bag(
             match_by_columns[(schema, table.name)] = ["URL"]
             try:
                 type_assoc, _, _ = model.find_association(table.name, "Asset_Type")
-            except Exception:  # noqa: BLE001 — defensive; no asset-type table
+            except NoAssociationException:
+                # No asset-type association for this asset table — skip.
                 continue
             match_by_columns[(type_assoc.schema.name, type_assoc.name)] = [
                 table.name,

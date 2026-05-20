@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
 from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
@@ -1084,7 +1084,9 @@ class ExecutionMixin:
         """
         try:
             assoc_table, asset_fk, _exec_fk = self.model.find_association(asset_table, "Execution")
-        except Exception:
+        except NoAssociationException:
+            # Asset table has no <AssetTable>_Execution tracking — legitimate
+            # case for catalogs that don't track execution provenance per asset.
             return None
 
         pb = self.pathBuilder()
