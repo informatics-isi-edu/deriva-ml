@@ -358,8 +358,6 @@ def run_model(
     model_config: Any,
     dry_run: bool = False,
     ml_class: type["DerivaML"] | None = None,
-    upload_timeout: int = 600,
-    upload_chunk_size: int = 50_000_000,
     script_config: Any = None,
 ) -> None:
     """
@@ -413,16 +411,6 @@ def run_model(
         The DerivaML class (or subclass) to instantiate. If None, uses the
         base DerivaML class. Use this to instantiate domain-specific classes
         like EyeAI or GUDMAP.
-
-    upload_timeout : int, optional
-        Timeout in seconds for each chunk upload. Default is 600 (10 min).
-        This value is used as both the connect and read timeout. Since urllib3
-        uses the connect timeout for socket writes, it must be large enough
-        to send a full chunk over the network.
-
-    upload_chunk_size : int, optional
-        Chunk size in bytes for hatrac uploads. Default is 50000000 (50 MB).
-        Larger chunks reduce overhead but require more memory.
 
     Returns
     -------
@@ -593,11 +581,28 @@ def run_model(
     # ---------------------------------------------------------------------------
     # After the model completes, upload any output files (metrics, predictions,
     # model checkpoints) to the Deriva catalog for permanent storage.
+    #
+    # NOTE(2026-05-19): previously this call passed timeout=... and
+    # chunk_size=... kwargs. Both were unsupported by
+    # Execution.upload_execution_outputs's signature (which only accepts
+    # clean_folder and progress_callback) and the @validate_call decorator
+    # made the mismatch fatal at runtime. The kwargs have been removed from
+    # this call AND from run_model's signature because:
+    #
+    #   * chunk_size: had a defined home at DerivaUpload._hatracUpload's
+    #     chunk_size parameter (deriva-py), but the call site at
+    #     deriva.bag.catalog_loader._hatracUpload doesn't pass it through.
+    #     Filed as a follow-up on deriva-py.
+    #
+    #   * timeout: has no home anywhere in the deriva-py upload chain.
+    #     HatracStore.put_loc, _hatracUpload, and the underlying requests
+    #     calls do not accept a per-call timeout. Adding it requires a
+    #     deriva-py feature, not a deriva-ml plumbing change.
+    #
+    # Once deriva-py grows the matching support, re-introduce both
+    # parameters here AND in run_model's signature.
     if not dry_run:
-        uploaded_assets = execution.upload_execution_outputs(
-            timeout=(upload_timeout, upload_timeout),
-            chunk_size=upload_chunk_size,
-        )
+        uploaded_assets = execution.upload_execution_outputs()
 
         # Print summary of uploaded assets
         total_files = sum(len(files) for files in uploaded_assets.values())
