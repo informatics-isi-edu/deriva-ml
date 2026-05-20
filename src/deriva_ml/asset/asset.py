@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deriva_ml.core.definitions import RID
+from deriva_ml.core.exceptions import NoAssociationException
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution_record import ExecutionRecord
@@ -149,7 +150,7 @@ class Asset:
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         try:
             type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
-        except Exception:
+        except NoAssociationException:
             # No type association for this asset table
             self._asset_types = []
             return

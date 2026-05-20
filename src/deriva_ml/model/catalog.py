@@ -38,10 +38,12 @@ from deriva_ml.core.definitions import (
     _is_system_schema,
 )
 from deriva_ml.core.exceptions import (
+    AmbiguousAssociationException,
     DerivaMLException,
     DerivaMLFeatureNotFound,
     DerivaMLReadOnlyError,
     DerivaMLTableTypeError,
+    NoAssociationException,
 )
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
@@ -499,9 +501,14 @@ class DerivaModel:
             (one referencing ``table1``, one referencing ``table2``).
 
         Raises:
-            DerivaMLException: If no association connects the two tables,
-                or if multiple associations connect them (in which case
-                the caller should disambiguate by name).
+            NoAssociationException: If no association table connects the
+                two tables. Callers that legitimately handle the "no link"
+                case (e.g. probing whether an asset table is tracked
+                through ``Execution``) should catch this specific subclass
+                rather than the broader :class:`DerivaMLException`.
+            AmbiguousAssociationException: If multiple association tables
+                connect the two tables. The caller must disambiguate by
+                naming the desired association table directly.
         """
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
@@ -515,11 +522,9 @@ class DerivaModel:
         if len(tables) == 1:
             return tables[0]
         elif len(tables) == 0:
-            raise DerivaMLException(f"No association tables found between {table1.name} and {table2.name}.")
+            raise NoAssociationException(table1.name, table2.name)
         else:
-            raise DerivaMLException(
-                f"There are {len(tables)} association tables between {table1.name} and {table2.name}."
-            )
+            raise AmbiguousAssociationException(table1.name, table2.name, len(tables))
 
     def is_asset(self, table: TableInput) -> bool:
         """Check whether ``table`` is a proper asset table.

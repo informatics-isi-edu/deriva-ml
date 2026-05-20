@@ -26,6 +26,38 @@ All notable changes to this project are documented here.
   that want true isolation should follow the canonical pattern of
   `dest_dir = working_dir / "downloads" / asset_rid`.
 
+## Unreleased — Issue #180: typed exceptions for `find_association` failure modes
+
+### Changed
+
+- **`DerivaModel.find_association` now raises typed subclasses
+  (#180).** The two failure modes — "no association exists" and
+  "multiple associations exist" — used to surface as bare
+  `DerivaMLException` with diagnostic prose in the message, forcing
+  callers that needed to distinguish them to pattern-match on the
+  message text. Both modes now raise a dedicated subclass:
+
+  - `NoAssociationException` (`DerivaMLNotFoundError` subtree) when
+    no association table connects the two endpoints.
+  - `AmbiguousAssociationException` (`DerivaMLDataError` subtree)
+    when more than one association table connects them; carries the
+    `count` field.
+
+  Both subclasses inherit from `DerivaMLException`, so existing
+  callers that `except DerivaMLException:` continue to work. Callers
+  that previously string-matched on `"No association tables found"`
+  should switch to `except NoAssociationException:` — the load-bearing
+  change is the type, not the message text. The companion update in
+  `deriva-ml-mcp` (`tools/asset.py` `_get_asset_detail_impl`) is filed
+  as a follow-up PR there.
+
+  In-repo callers that intentionally swallowed "no association"
+  errors via broad `except Exception:` blocks (`asset/asset.py`,
+  `core/mixins/asset.py`, `core/mixins/execution.py`,
+  `execution/bag_commit.py`) have been tightened to
+  `except NoAssociationException:` — real errors now propagate as
+  intended.
+
 ## Unreleased — Issue #177: dry-run multirun exit log noise
 
 ### Fixed

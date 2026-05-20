@@ -26,7 +26,7 @@ _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
 Table = _ermrest_model.Table
 
 from deriva_ml.core.definitions import RID, AssetTableDef, ColumnDefinition, MLVocab, VocabularyTerm
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
 from deriva_ml.schema.annotations import asset_annotation
 
 if TYPE_CHECKING:
@@ -341,13 +341,15 @@ class AssetMixin:
         asset_types = []
         try:
             type_assoc_table, asset_fk, _ = self.model.find_association(asset_table, "Asset_Type")
+        except NoAssociationException:
+            # No type association for this asset table
+            pass
+        else:
             type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
             types = list(
                 type_path.filter(type_path.columns[asset_fk] == asset_rid).attributes(type_path.Asset_Type).fetch()
             )
             asset_types = [t["Asset_Type"] for t in types]
-        except Exception:
-            pass  # No type association for this asset table
 
         return Asset(
             catalog=self,  # type: ignore[arg-type]
