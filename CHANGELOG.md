@@ -2,14 +2,14 @@
 
 All notable changes to this project are documented here.
 
-## Unreleased -- Issue #177: dry-run multirun exit log noise
+## Unreleased — Issue #177: dry-run multirun exit log noise
 
 ### Fixed
 
 - **Misleading dry-run exit warning for the placeholder parent
   execution RID (#177).** When running a Hydra multirun with
   `dry_run=true`, the parent supervisor uses `DRY_RUN_RID` (`"0000"`)
-  as a placeholder for its execution_rid -- dry-run mode intentionally
+  as a placeholder for its execution_rid — dry-run mode intentionally
   skips writing the parent's row to the workspace SQLite registry.
   At process exit, `_complete_parent_execution` (the atexit handler
   in `src/deriva_ml/execution/runner.py`) unconditionally called
@@ -17,8 +17,8 @@ All notable changes to this project are documented here.
   `DerivaMLStateInconsistency` from the read-through `start_time`
   property. The handler caught the exception and emitted a WARNING
   reading "Failed to complete parent execution: Execution 0000 no
-  longer in workspace registry..." -- alarming text for behavior
-  that is correct by design. The handler now short-circuits on the
+  longer in workspace registry..." — alarming text for behavior that
+  is correct by design. The handler now short-circuits on the
   `DRY_RUN_RID` placeholder, logs an INFO message explaining the
   skip, and never touches `execution_stop` /
   `upload_execution_outputs` for the placeholder.
