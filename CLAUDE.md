@@ -181,11 +181,14 @@ e.g. `4CY`, `BR0`) is a server implementation detail. In particular:
   three weeks).
 - **Never parse, slice, regex, or `startswith`** on a RID. The
   format is not stable contract.
-- **Never sort RIDs lexicographically and treat the order as
-  meaningful.** Catalog cursor pagination (`after_rid`) is a
-  server-supported equality boundary on the indexed RID column —
-  that's not a violation; client-side ordering by RID for
-  display purposes is.
+- **RID ordering is server-internal mechanics, not semantics.**
+  The server sorts rows by RID to provide stable iteration order
+  for cursor pagination — `after_rid=X` returns rows with
+  `RID > X`, walking the table in the server's RID collation.
+  That ordering is what makes pagination work; **it carries no
+  semantic meaning**. Don't sort by RID client-side to surface
+  "newest" or "related" rows; use `RCT` for newest-first ordering
+  and follow the relevant FK / association table for relatedness.
 - **Never compare RIDs across catalogs.** RID `4CY` in catalog 46
   has nothing to do with RID `4CY` in catalog 42. Cross-catalog
   identity is `(host, catalog_id, RID)`.
