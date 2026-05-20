@@ -105,7 +105,11 @@ columns:
   type: text
 - name: Description
   type: markdown
-- name: Duration
+- name: Execution_Duration
+  type: text
+- name: Download_Duration
+  type: text
+- name: Upload_Duration
   type: text
 - name: Status
   type: text
@@ -181,11 +185,7 @@ terms:
 - name: Analysis
 - name: Ingest
 - name: Data_Cleaning
-- name: Embedding
 - name: Dataset_Management
-- name: VGG19
-- name: RETFound
-- name: Multimodal
 ```
 
 ## Feature_Name
