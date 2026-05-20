@@ -308,3 +308,88 @@ class TestRunModelWithMocks:
 
         # Verify custom class was used for instantiation
         mock_custom_class.instantiate.assert_called_once_with(mock_config)
+
+
+class TestRunModelUploadCallContract:
+    """Regression tests for runner.run_model's call to upload_execution_outputs.
+
+    Surfaced 2026-05-19: ``runner.run_model`` was calling
+    ``execution.upload_execution_outputs(timeout=..., chunk_size=...)`` but
+    the method's signature only accepts ``clean_folder`` and
+    ``progress_callback``. The ``@validate_call`` decorator on the method
+    made the mismatch fatal at runtime. Every other runner test in this
+    file uses bare ``MagicMock()`` for the execution, which accepts any
+    kwargs without complaint — so the bug went undetected until the
+    e2e platform test exercised the real method.
+
+    These tests use ``MagicMock(spec=Execution)`` so the mock validates
+    kwargs against the real method signature.
+    """
+
+    @pytest.fixture(autouse=True)
+    def reset_state(self):
+        """Reset multirun state before each test."""
+        reset_multirun_state()
+        yield
+        reset_multirun_state()
+
+    @patch("deriva_ml.execution.runner._is_multirun")
+    def test_run_model_call_matches_upload_execution_outputs_signature(self, mock_is_multirun):
+        """run_model must only pass kwargs that upload_execution_outputs accepts.
+
+        Before the 2026-05-19 fix, run_model passed timeout= and chunk_size=
+        kwargs that the upload method's signature did not accept. The fix
+        strips those (deferred until deriva-py adds per-call timeout and
+        plumbed-through chunk_size support). This test pins the contract.
+        """
+        from deriva_ml.execution.execution import Execution
+
+        mock_is_multirun.return_value = False
+
+        mock_ml_class = MagicMock()
+        mock_ml_instance = MagicMock()
+        mock_ml_class.instantiate.return_value = mock_ml_instance
+
+        # spec=Execution enforces that method calls match the real
+        # Execution surface — passing unknown kwargs raises AttributeError
+        # / TypeError at the mock layer, which is what we want.
+        mock_execution = MagicMock(spec=Execution)
+        mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
+        mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
+        mock_execution.upload_execution_outputs.return_value = {}
+        mock_ml_instance.create_execution.return_value = mock_execution
+
+        mock_model_config = Mock()
+        mock_config = MagicMock()
+        mock_workflow = MagicMock()
+
+        # Call should complete without raising. Pre-fix, this raised
+        # because the upload_execution_outputs MagicMock(spec=...) rejected
+        # the timeout=/chunk_size= kwargs the runner passed.
+        run_model(
+            deriva_ml=mock_config,
+            datasets=[],
+            assets=[],
+            description="Test",
+            workflow=mock_workflow,
+            model_config=mock_model_config,
+            dry_run=False,
+            ml_class=mock_ml_class,
+        )
+
+        # Verify the actual kwargs the runner passed are a subset of the
+        # real method's signature.
+        import inspect
+
+        real_sig = inspect.signature(Execution.upload_execution_outputs)
+        real_params = set(real_sig.parameters.keys())
+
+        call_args = mock_execution.upload_execution_outputs.call_args
+        passed_kwargs = set(call_args.kwargs.keys()) if call_args else set()
+
+        unsupported = passed_kwargs - real_params
+        assert not unsupported, (
+            f"run_model passed kwargs not accepted by "
+            f"Execution.upload_execution_outputs: {unsupported}. "
+            f"Real method accepts: {real_params - {'self'}}."
+        )
