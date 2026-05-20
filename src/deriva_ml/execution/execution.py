@@ -1521,11 +1521,13 @@ class Execution:
         After a successful load, marks every pending manifest
         entry as ``uploaded`` (matches the legacy contract that
         the manifest reflects the destination's state after a
-        commit). The transient bag dir is left in place so
-        post-mortem inspection is possible if needed; the caller's
-        ``clean_folder`` flag determines whether the surrounding
-        ``execution_root`` (which contains the bag dir) is also
-        removed.
+        commit). The transient bag dir is left in place at
+        ``working_dir/upload/{execution_rid}/`` so post-mortem
+        inspection is possible if needed; users may delete the
+        ``upload/{rid}/`` directory by hand once they no longer
+        need it. The caller's ``clean_folder`` flag controls
+        cleanup of the separate ``execution_root`` only (see
+        :meth:`upload_execution_outputs`).
 
         Returns:
             ``{"{schema}/{table}": [AssetFilePath, ...]}`` for the
@@ -1537,7 +1539,12 @@ class Execution:
             report_to_asset_map,
         )
 
-        bag_dir = Path(self._working_dir) / f"commit-bag-{self.execution_rid}"
+        # Issue #178: per-execution upload staging lives under a
+        # dedicated ``upload/`` parent — not at the cache root, where
+        # it used to sit beside ``cache/`` and ``schema-cache.json``
+        # and was easy to mistake for cache state. The cache root now
+        # contains only caches; per-execution scratch is here.
+        bag_dir = Path(self._working_dir) / "upload" / self.execution_rid
         if bag_dir.exists():
             # An earlier (failed) attempt may have left a partial
             # bag on disk. Wipe it so the build starts clean —
