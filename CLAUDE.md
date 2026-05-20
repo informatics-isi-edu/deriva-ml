@@ -164,6 +164,43 @@ surface uses a slightly different `find_*` rule (catalog-wide
 search by non-RID identifier — see the
 `deriva_ml_getting_started` prompt for the MCP-side definition).
 
+**RIDs are opaque: equality only.** A RID's only valid operation
+is equality comparison. The format (`<catalog-prefix>-<encoded-counter>`,
+e.g. `4CY`, `BR0`) is a server implementation detail. In particular:
+
+- **Never hard-code a RID as a literal** in tests, fixtures,
+  scripts, configs, or docstring examples. Obtain RIDs from a
+  fresh catalog lookup or fixture call — never from a string
+  written by a human. The failure mode is silent: a literal like
+  `"1-IMG1"` round-trips through a test that mocks the layer
+  where the RID matters, the test passes, and production breaks
+  the first time a real RID flows through the same code path
+  (see the 2026-05-19 torch-adapter bag-layout bug for an
+  illustrative case — every adapter test stubbed the path
+  argument so the wrong on-disk layout went undetected for
+  three weeks).
+- **Never parse, slice, regex, or `startswith`** on a RID. The
+  format is not stable contract.
+- **Never sort RIDs lexicographically and treat the order as
+  meaningful.** Catalog cursor pagination (`after_rid`) is a
+  server-supported equality boundary on the indexed RID column —
+  that's not a violation; client-side ordering by RID for
+  display purposes is.
+- **Never compare RIDs across catalogs.** RID `4CY` in catalog 46
+  has nothing to do with RID `4CY` in catalog 42. Cross-catalog
+  identity is `(host, catalog_id, RID)`.
+- **Never infer column values from a RID across snaptimes.** The
+  same RID at two snaptimes refers to the same row, but its
+  column values can differ — RID identity is constant; row data
+  is not.
+
+For tests specifically: every RID a test touches must come from
+a fixture-produced catalog row (e.g. via `CatalogManager`
+populated datasets, or a fresh `create_*` call inside the test).
+The test asserts shape and equality against values it pulled
+from the catalog — never against values it wrote into a string
+literal.
+
 ### Testing
 
 Tests require a running Deriva catalog. Set `DERIVA_HOST` environment variable to specify the test server (defaults to `localhost`).

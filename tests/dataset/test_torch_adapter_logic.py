@@ -355,19 +355,37 @@ def test_resolve_asset_path_uses_bdbag_canonical_layout(tmp_path):
     ``data/assets/{element_type}/{RID}/{Filename}`` (plural, swapped),
     which never matched a real bag and was masked by canned
     sample_loaders in all other tests.
+
+    Per the RID opacity rule
+    (deriva-skills/skills/deriva-context/references/concepts.md
+    "RID opacity rule"), this test treats the asset's RID as an
+    opaque token: it's generated from secrets.token_hex once and
+    threaded through both the on-disk layout and the bag mock, so
+    the test author never writes a RID-shaped literal. The
+    assertion compares the path the sample_loader received against
+    the path the test built — RIDs are equality-compared only;
+    nothing parses them.
     """
+    import secrets
+
+    # Single opaque token shared between the mock bag and the on-disk
+    # layout — the test author never types a RID-shaped string.
+    asset_rid = secrets.token_hex(3).upper()
+    filename = "asset.bin"
+    asset_bytes = b"fake-asset-bytes"
+
     # Build a bag directory tree at the canonical layout. Put a real
     # file at the leaf so the test can verify the resolver hands back
     # a path that exists.
     bag_root = tmp_path / "Dataset_FAKE"
-    canonical_dir = bag_root / "data" / "asset" / "1-IMG1" / "Image"
+    canonical_dir = bag_root / "data" / "asset" / asset_rid / "Image"
     canonical_dir.mkdir(parents=True)
-    canonical_file = canonical_dir / "img1.jpg"
-    canonical_file.write_bytes(b"fake-image-bytes")
+    canonical_file = canonical_dir / filename
+    canonical_file.write_bytes(asset_bytes)
 
-    bag = _mock_bag_with_labeled_images({"1-IMG1": "Mild"})
+    bag = _mock_bag_with_labeled_images({asset_rid: "Mild"})
     bag.path = bag_root
-    bag.get_table_as_dict.return_value = iter([{"RID": "1-IMG1", "Filename": "img1.jpg"}])
+    bag.get_table_as_dict.return_value = iter([{"RID": asset_rid, "Filename": filename}])
 
     received_paths: list[Path] = []
 
@@ -386,4 +404,4 @@ def test_resolve_asset_path_uses_bdbag_canonical_layout(tmp_path):
     # to read it. Pre-fix, sample_loader received a non-existent path
     # and raised FileNotFoundError inside the read.
     assert received_paths == [canonical_file]
-    assert sample == b"fake-image-bytes"
+    assert sample == asset_bytes
