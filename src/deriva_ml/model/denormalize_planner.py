@@ -9,6 +9,59 @@ columns. It does **not** issue any SQL. The plan is consumed by
 ``core/mixins/dataset.py:list_denormalized_columns`` (which only needs
 the column list).
 
+------------------------------------------------------------------
+Transparency model
+------------------------------------------------------------------
+
+A *transparent* table is one the planner walks **through** without
+asking the caller to name it in ``include_tables`` or ``via``. The
+planner treats two kinds of tables as transparent:
+
+1. **Topological association tables** (M:N link tables):
+   :meth:`DenormalizePlanner._is_topological_association`. Exactly two
+   domain FKs (system FKs to ``ERMrest_Client`` / ``ERMrest_Group`` are
+   ignored). Examples: ``Dataset_Image``, ``Subject_Sample``. These
+   exist purely to link two domain tables — the planner hops through
+   them in both directions so ``A → assoc → B`` discovers B from A.
+
+2. **Feature association tables** (DerivaML feature value tables):
+   :meth:`DenormalizePlanner._is_feature_association`. Three domain
+   FKs, exactly one of which targets the ML schema's ``Execution``
+   table; the other two are the feature's target domain table and a
+   vocabulary / value table. Examples:
+   ``Execution_Image_Image_Classification``,
+   ``Execution_Subject_Diagnosis``. These exist to record one
+   feature value per (target, execution) — the Execution FK is an
+   audit / provenance edge, *not* a domain edge that callers ever
+   want to filter on. From the planner's denormalization perspective
+   they behave like a pure 2-FK bridge between the target and the
+   value table.
+
+In both cases, transparency means:
+
+- the planner walks **through** the table in both directions when
+  determining reachability (:meth:`_outbound_reachable`);
+- the table does **not** count as an interior table for the
+  diamond-disambiguation rule (Rule 6 in :meth:`_find_path_ambiguities`);
+- the table's own columns are excluded from the output **unless** the
+  caller explicitly names it in ``include_tables``, at which point
+  its non-FK metadata columns (``Feature_Name`` / ``Confidence`` /
+  etc.) become regular projected columns and the table behaves like
+  any requested table (it still routes the join, but it's no longer
+  "transparent" for *that* call).
+
+What is intentionally **not** transparent:
+
+- 4+ FK tables (multi-way associations the caller has to disambiguate
+  by hand).
+- 3-FK domain-only tables that don't reference ``Execution`` (these
+  are genuine 3-way associations whose third FK is a domain
+  semantic, not provenance, and the caller should signal intent).
+- Tables that satisfy neither predicate. The planner treats anything
+  not in ``include_tables`` / ``via`` and not transparent as a dead
+  end during reachability — that's how it stops itself from sliding
+  off the requested star into the rest of the schema.
+
 **This module is internal.** The user-facing API for denormalization
 is :class:`local_db.denormalize.Denormalizer` — see
 ``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``
@@ -66,8 +119,13 @@ The methods compose in three layers, lowest first:
   with transparent association hops.
 - :meth:`DenormalizePlanner._schema_to_paths` — DFS path enumeration
   with cycle detection and vocab termination.
-- :meth:`DenormalizePlanner._is_topological_association` — predicate
-  for the "transparent intermediate" rule.
+- :meth:`DenormalizePlanner._is_topological_association` — 2-FK
+  predicate (pure M:N bridges).
+- :meth:`DenormalizePlanner._is_feature_association` — 3-FK predicate
+  (one FK targets the ML schema's ``Execution`` table; the other two
+  are domain/value edges).
+- :meth:`DenormalizePlanner._is_transparent_intermediate` — union of
+  the two predicates; this is what the reachability primitives consult.
 - :meth:`DenormalizePlanner._table_relationship` — column-pair
   extraction for a specific (table1, table2) FK.
 
@@ -308,11 +366,7 @@ class DenormalizePlanner:
             planner._is_topological_association("Observation")         # False (has 1 FK)
         """
         try:
-            tbl = (
-                name_or_table
-                if hasattr(name_or_table, "foreign_keys")
-                else self.model.name_to_table(name_or_table)
-            )
+            tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.model.name_to_table(name_or_table)
             fks = list(tbl.foreign_keys)
             # Domain FKs exclude the system FKs to ERMrest_Client /
             # ERMrest_Group that every table carries (for RCB/RMB).
@@ -320,6 +374,106 @@ class DenormalizePlanner:
             return len(domain_fks) == 2
         except Exception:
             return False
+
+    def _is_feature_association(self, name_or_table: str | Table) -> bool:
+        """Predicate for DerivaML feature-association transparency.
+
+        A feature-association table is a 3-FK association whose third
+        FK is the DerivaML ``Execution`` provenance edge — the other
+        two FKs are the feature's *target* domain table (the entity
+        the feature is attached to) and a *value* table (a vocabulary
+        term, an asset, or a metadata table). Concrete example::
+
+            Execution_Image_Image_Classification
+                -> Image                    (feature target)
+                -> Image_Classification     (value: vocab term)
+                -> Execution                (provenance / audit)
+
+        The Execution FK is structurally an audit edge, not a domain
+        edge — it records *which run* asserted the value, not a
+        semantic relationship a caller would ever join through. The
+        denormalization planner therefore treats feature-association
+        tables as transparent in the same sense as topological 2-FK
+        associations: the planner hops through them in both directions
+        during reachability, and they don't count as interior tables
+        when checking for diamond ambiguity.
+
+        **Why we don't widen** :meth:`_is_topological_association` **instead**:
+        the 2-FK predicate is intentionally strict because the diamond
+        rule (Rule 6) uses it. Conflating "transparent bridge" with
+        "feature with audit edge" inside a single predicate makes the
+        rule docs harder to read and risks accidentally treating other
+        3-FK shapes as transparent in the future. The two predicates
+        compose at the call sites (mostly
+        :meth:`_outbound_reachable`) where transparency is consulted.
+
+        **Structural, not naming.** The predicate ignores the table
+        name (``Execution_*`` is a convention, not a contract) and
+        keys off the FK shape. Domain FKs exclude the system FKs to
+        ``ERMrest_Client`` / ``ERMrest_Group``.
+
+        Args:
+            name_or_table: table name (looked up via
+                ``self.model.name_to_table``) or a :class:`Table`
+                instance.
+
+        Returns:
+            ``True`` if the table has exactly 3 domain FKs and exactly
+            one of them targets the ML schema's ``Execution`` table.
+
+        Example::
+
+            planner._is_feature_association(
+                "Execution_Image_Image_Classification"
+            )                                                          # True
+            planner._is_feature_association("Dataset_Image")           # False (2 FKs)
+            planner._is_feature_association("Image")                   # False (no Execution FK)
+            planner._is_feature_association("Three_Way_Domain_Assoc")  # False (no FK to Execution)
+        """
+        try:
+            tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.model.name_to_table(name_or_table)
+            fks = list(tbl.foreign_keys)
+            # Domain FKs exclude the system FKs to ERMrest_Client /
+            # ERMrest_Group that every table carries (for RCB/RMB).
+            domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
+            if len(domain_fks) != 3:
+                return False
+            ml_schema = self.model.ml_schema
+            execution_fks = [
+                fk for fk in domain_fks if fk.pk_table.name == "Execution" and fk.pk_table.schema.name == ml_schema
+            ]
+            return len(execution_fks) == 1
+        except Exception:
+            return False
+
+    def _is_transparent_intermediate(self, name_or_table: str | Table) -> bool:
+        """Return ``True`` if the table is transparent (assoc or feature-assoc).
+
+        Convenience predicate that ORs
+        :meth:`_is_topological_association` and
+        :meth:`_is_feature_association`. See the module-level
+        "Transparency model" section for the conceptual contract.
+
+        Args:
+            name_or_table: table name or :class:`Table` instance.
+
+        Returns:
+            ``True`` if either transparency predicate matches.
+
+        Example::
+
+            planner._is_transparent_intermediate("Dataset_Image")
+            # True — 2-FK topological association.
+
+            planner._is_transparent_intermediate(
+                "Execution_Image_Image_Classification"
+            )
+            # True — 3-FK feature association.
+
+            planner._is_transparent_intermediate("Image")
+            # False — domain table, not a bridge.
+        """
+        return self._is_topological_association(name_or_table) or self._is_feature_association(name_or_table)
 
     def _fk_neighbors(self, table: str | Table) -> set[Table]:
         """Return FK-neighbor tables of *table* (outbound + inbound, deduplicated).
@@ -435,15 +589,23 @@ class DenormalizePlanner:
         Composes :meth:`_downstream_fk_sources` plus association-
         transparency logic — does NOT walk FKs directly.
 
-        **Transparent association hops**: when the walker hits an
-        association table (per :meth:`is_topological_association`) that isn't
-        in ``tables_in_set``, it hops through it in BOTH directions —
-        both the tables that point at the association (inbound) AND the
-        tables the association's FKs point at (outbound). This lets
-        ``A → assoc → B`` discover B from A even when A → assoc is an
-        inbound FK and assoc → B is an outbound FK. Without this
-        bidirectional hop, many-to-many relationships (Dataset ↔ Image
-        via Dataset_Image) wouldn't be traversable.
+        **Transparent hops**: when the walker hits a *transparent
+        intermediate* (per :meth:`_is_transparent_intermediate`) that
+        isn't in ``tables_in_set``, it hops through it in BOTH
+        directions — both the tables that point at the intermediate
+        (inbound) AND the tables the intermediate's FKs point at
+        (outbound). This lets ``A → bridge → B`` discover B from A
+        even when ``A → bridge`` is an inbound FK and ``bridge → B``
+        is an outbound FK. Without this bidirectional hop, many-to-many
+        relationships (Dataset ↔ Image via Dataset_Image) and feature
+        targets (Image ↔ Image_Classification via the feature-assoc
+        table) wouldn't be traversable.
+
+        Both topological 2-FK associations (e.g. ``Dataset_Image``)
+        and 3-FK feature associations (e.g.
+        ``Execution_Image_Image_Classification``, where the third FK
+        is the audit edge to ``Execution``) count as transparent —
+        see the module docstring's "Transparency model" section.
 
         **Direction matters**: with ``Image.Subject → Subject.RID``:
 
@@ -487,19 +649,24 @@ class DenormalizePlanner:
             except Exception:
                 continue
 
-            # When the current node is itself an association table AND it's
-            # not the starting point, hop through both directions: both the
-            # tables that point at it (referenced_by) AND the tables it
-            # points to (foreign_keys). This is the "transparent bridge"
-            # semantics — M:N link tables should be traversable in both
-            # directions so that A→assoc→B discovers B from A.
-            hopping_through_association = t != from_table and self._is_topological_association(tbl)
+            # When the current node is itself a transparent intermediate
+            # AND it's not the starting point, hop through both directions:
+            # both the tables that point at it (referenced_by) AND the
+            # tables it points to (foreign_keys). This is the "transparent
+            # bridge" semantics — M:N link tables and feature-assoc tables
+            # should be traversable in both directions so that
+            # A → bridge → B discovers B from A.
+            hopping_through_bridge = t != from_table and self._is_transparent_intermediate(tbl)
 
             valid_schemas = self.model.domain_schemas | {self.model.ml_schema}
             neighbors: list[Table] = list(self._downstream_fk_sources(t))
-            if hopping_through_association:
-                # Add the association's outbound FK targets (the "other
-                # side" of the M:N link) so we can see past the bridge.
+            if hopping_through_bridge:
+                # Add the bridge's outbound FK targets (the "other side"
+                # of the link) so we can see past the bridge. For feature-
+                # assoc tables this also exposes the Execution target,
+                # but that's fine — Execution is in _DEFAULT_SKIP_TABLES
+                # for path enumeration and the reachability set only
+                # cares about whether requested tables are reachable.
                 for fk in tbl.foreign_keys:
                     nxt = fk.pk_table
                     if nxt.schema.name in valid_schemas:
@@ -511,14 +678,99 @@ class DenormalizePlanner:
                     continue
                 if target_name in tables_in_set:
                     seen_names.add(target_name)
-                    # Continue only if this is itself an association (transparent)
-                    if self._is_topological_association(neighbor):
+                    # Continue only if this neighbor is itself transparent
+                    # (so we can chain bridges).
+                    if self._is_transparent_intermediate(neighbor):
                         stack.append(target_name)
-                elif self._is_topological_association(neighbor):
-                    # Transparent hop: continue through the association
+                elif self._is_transparent_intermediate(neighbor):
+                    # Transparent hop: continue through the bridge.
                     stack.append(target_name)
-                # else: non-requested, non-association — dead end
+                # else: non-requested, non-transparent — dead end
         return {t for t in seen_names if t in tables_in_set and t != from_table}
+
+    def _outbound_reachable_strict(
+        self,
+        from_table: str,
+        tables_in_set: set[str],
+    ) -> set[str]:
+        """Strict-direction variant of :meth:`_outbound_reachable`.
+
+        Walks downstream from ``from_table`` following only
+        :meth:`_downstream_fk_sources` (direct ``referenced_by``
+        edges). Does **NOT** perform the bidirectional transparent-
+        bridge hop that :meth:`_outbound_reachable` uses. This means
+        ``A ↔ assoc ↔ B`` (where both A and B are upstream of the
+        bridge) does **not** treat B as downstream of A — neither
+        side fans out into the other through the bridge.
+
+        Used by **Rule 5** (downstream-leaf rejection in
+        :meth:`_determine_row_per`) and **Rule 2** (sink-finding in
+        :meth:`_find_sinks`).
+
+        **Why a separate primitive.** :meth:`_outbound_reachable` is
+        used by :meth:`Denormalizer._classify_anchors` to answer the
+        connectivity question "is anchor X related to row_per via
+        *any* FK chain?" — there, the bidirectional bridge hop is the
+        right behavior (an Image-anchored set IS related to a
+        Dataset-anchored set, even though the bridge sits in between
+        and points at both). For Rules 2 and 5 we need the strict
+        directional notion: "if I pick X as row_per, will the rows
+        fan out into Y?" A bridge whose two endpoints are both
+        upstream of it does not fan out — it produces at most a
+        1:1:1 join, so neither endpoint should be considered
+        downstream of the other.
+
+        Args:
+            from_table: starting table (the candidate row_per).
+            tables_in_set: subgraph — only tables in this set count
+                as destinations in the result.
+
+        Returns:
+            Set of names in ``tables_in_set`` strictly downstream of
+            ``from_table`` (excluding ``from_table`` itself).
+
+        Example::
+
+            # Direct FK Image -> Subject:
+            planner._outbound_reachable_strict("Subject", {"Subject", "Image"})
+            # {"Image"}    — Image references Subject (Image is fan-out)
+            planner._outbound_reachable_strict("Image", {"Subject", "Image"})
+            # set()        — Subject is upstream of Image, not downstream
+
+            # Bridge case (Image <- feature-assoc -> Image_Classification):
+            planner._outbound_reachable_strict(
+                "Image", {"Image", "Image_Classification"}
+            )
+            # set()        — neither side is strictly downstream of the
+            #               other; the bridge does not fan out.
+        """
+        seen: set[str] = set()
+        visited: set[str] = set()
+        stack: list[str] = [from_table]
+        while stack:
+            t = stack.pop()
+            if t in visited:
+                continue
+            visited.add(t)
+            try:
+                tbl = self.model.name_to_table(t)
+            except Exception:
+                continue
+            for neighbor in self._downstream_fk_sources(tbl):
+                target_name = neighbor.name
+                if target_name == from_table:
+                    continue
+                if target_name in tables_in_set:
+                    seen.add(target_name)
+                # Recurse into downstream tables regardless of set
+                # membership — a chain like Subject ← Observation ←
+                # Image must surface Image when only {Subject, Image}
+                # are in the set. We never bridge through assoc tables
+                # bidirectionally here; only follow further
+                # `referenced_by` edges.
+                if target_name not in visited:
+                    stack.append(target_name)
+        return {t for t in seen if t in tables_in_set and t != from_table}
 
     def _schema_to_paths(
         self,
@@ -708,7 +960,11 @@ class DenormalizePlanner:
         the natural ``row_per`` — one output row per sink row, with
         upstream columns hoisted.
 
-        Composes :meth:`_outbound_reachable`; does not traverse FKs
+        Composes :meth:`_outbound_reachable_strict` — strict downstream
+        only (no bidirectional bridge hop). Two tables linked only by
+        a transparent bridge (M:N association or feature-assoc) are
+        therefore both sink candidates and the caller must
+        disambiguate with explicit ``row_per=``. Does not traverse FKs
         itself.
 
         Args:
@@ -735,11 +991,11 @@ class DenormalizePlanner:
         """
         via = via or []
         all_tables = set(include_tables) | set(via)
-        # A sink is a requested table whose outbound-reach set, minus
-        # itself, is empty — i.e., nothing else in the subgraph is
-        # downstream of it.
+        # A sink is a requested table whose strict-downstream set,
+        # minus itself, is empty — i.e., nothing else in the subgraph
+        # is strictly downstream of it via direct FK chain.
         return sorted(
-            t for t in all_tables if t in include_tables and not (self._outbound_reachable(t, all_tables) - {t})
+            t for t in all_tables if t in include_tables and not (self._outbound_reachable_strict(t, all_tables) - {t})
         )
 
     def _determine_row_per(
@@ -803,7 +1059,11 @@ class DenormalizePlanner:
         if row_per is not None:
             if row_per not in include_tables:
                 raise ValueError(f"row_per={row_per!r} must be in include_tables={include_tables}")
-            downstream = self._outbound_reachable(row_per, all_tables)
+            # Rule 5 uses strict downstream (no bidirectional bridge
+            # hop) — picking either side of a transparent bridge as
+            # row_per is legitimate, since the bridge produces at
+            # most a 1:1:1 join, not a fan-out.
+            downstream = self._outbound_reachable_strict(row_per, all_tables)
             downstream_in_inc = [t for t in include_tables if t in downstream and t != row_per]
             if downstream_in_inc:
                 raise DerivaMLDenormalizeDownstreamLeaf(
@@ -884,8 +1144,10 @@ class DenormalizePlanner:
         for path in paths:
             names = [t.name for t in path]
             # Transparency filter: every intermediate must be either
-            # requested (in tables_in_set) or a pure association.
-            if all(mid in tables_in_set or self._is_topological_association(mid) for mid in names[1:-1]):
+            # requested (in tables_in_set) or a transparent intermediate
+            # (a pure association table OR a feature-association table —
+            # see the module-level "Transparency model" section).
+            if all(mid in tables_in_set or self._is_transparent_intermediate(mid) for mid in names[1:-1]):
                 result.append(names)
         return result
 
@@ -1025,20 +1287,21 @@ class DenormalizePlanner:
                 return None
 
             def _is_downstream_chain(p: list[str]) -> bool:
-                """Check that the path is all-downstream, treating pure
-                association tables as transparent bridges. A transparent
-                bridge Image ← assoc → Subject counts as a single
-                downstream step (the assoc's referenced_by connects the
-                two sides). Association tables at interior positions
-                don't count as direction changes."""
+                """Check that the path is all-downstream, treating
+                transparent intermediates (pure 2-FK associations AND
+                feature-assoc tables) as transparent bridges. A
+                transparent bridge Image ← assoc → Subject counts as a
+                single downstream step (the assoc's referenced_by
+                connects the two sides). Transparent intermediates at
+                interior positions don't count as direction changes."""
                 i = 0
                 while i < len(p) - 1:
                     a, b = p[i], p[i + 1]
-                    # If b is an interior association table, hop across
-                    # it: count the A → assoc → C edge as a single
-                    # transparent bridge and move two steps forward.
-                    if i + 2 < len(p) and self._is_topological_association(b):
-                        # A → assoc → C: the bridge is legitimate
+                    # If b is an interior transparent intermediate, hop
+                    # across it: count the A → bridge → C edge as a
+                    # single transparent step and move two steps forward.
+                    if i + 2 < len(p) and self._is_transparent_intermediate(b):
+                        # A → bridge → C: the bridge is legitimate
                         # regardless of internal direction; advance past.
                         i += 2
                         continue
@@ -1059,8 +1322,9 @@ class DenormalizePlanner:
             # Disambiguation rule:
             # - A path is "signaled" if at least one of its non-endpoint
             #   intermediates is in ``include_tables ∪ via`` (user explicitly
-            #   routed through it). Association tables don't count — they're
-            #   transparent and the user shouldn't need to name them.
+            #   routed through it). Transparent intermediates (pure
+            #   associations and feature-assoc tables) don't count —
+            #   they're transparent and the user shouldn't need to name them.
             # - If exactly one path is signaled, the user has picked it → no
             #   ambiguity.
             # - Otherwise (0 or >1 signaled), we cannot silently choose →
@@ -1068,7 +1332,7 @@ class DenormalizePlanner:
             def _is_signaled(p: list[str]) -> bool:
                 intermediates = p[1:-1]
                 for mid in intermediates:
-                    if mid in all_tables and not self._is_topological_association(mid):
+                    if mid in all_tables and not self._is_transparent_intermediate(mid):
                         return True
                 return False
 
@@ -1082,7 +1346,7 @@ class DenormalizePlanner:
             all_intermediates: set[str] = set()
             for p in reportable:
                 for node in p[1:-1]:
-                    if node not in include_tables and not self._is_topological_association(node):
+                    if node not in include_tables and not self._is_transparent_intermediate(node):
                         all_intermediates.add(node)
             ambiguities.append(
                 {
@@ -1192,13 +1456,16 @@ class DenormalizePlanner:
                 selected_subpaths[target] = unique[0]
                 continue
 
-            # A path is "selected" if all its non-association intermediates are
-            # in include_tables.  Association tables (M:N link tables) are
-            # infrastructure that the user shouldn't need to name explicitly —
-            # they are transparently included in the join chain.
+            # A path is "selected" if all its non-transparent intermediates
+            # are in include_tables. Transparent intermediates (M:N link
+            # tables and feature-assoc tables) are infrastructure that
+            # the user shouldn't need to name explicitly — they are
+            # transparently included in the join chain.
             #
-            # We detect association tables via ``self._is_topological_association``
-            # (module-level method that ignores ERMrest system FKs).
+            # We detect transparent intermediates via
+            # ``self._is_transparent_intermediate`` (the union of the
+            # 2-FK topological-association predicate and the 3-FK
+            # feature-association predicate; both ignore ERMrest system FKs).
 
             def _intermediates_covered(sp: list[Table], ints: tuple[str, ...]) -> bool:
                 sp_tables = {t.name: t for t in sp}
@@ -1207,7 +1474,7 @@ class DenormalizePlanner:
                         # In include_tables OR in via= — explicitly routed.
                         continue
                     tbl = sp_tables.get(t)
-                    if tbl is not None and self._is_topological_association(tbl):
+                    if tbl is not None and self._is_transparent_intermediate(tbl):
                         continue  # transparent — doesn't need to be in include_tables
                     return False
                 return True

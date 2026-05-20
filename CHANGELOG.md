@@ -2,6 +2,55 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Issue #174: split_dataset stratify works for feature-target columns
+
+### Fixed
+
+- **Denormalization planner recognizes feature-association tables as
+  transparent intermediates.** Previously, a 3-FK feature-assoc table
+  (e.g. `Execution_Image_Image_Classification`) failed the 2-FK
+  topological-association predicate, which made `_outbound_reachable`
+  fail to bridge through it and surfaced two confusing errors from
+  `split_dataset(stratify_by_column=...)` when the stratification
+  column lived behind the bridge:
+
+  - `Anchors of table(s) ['Image'] have no FK path to ...` (variant A).
+  - `Multiple candidates for row_per: ['Image', 'Image_Classification']`
+    with no kwarg exposed to disambiguate (variant B).
+
+  The planner now treats both pure 2-FK association tables AND
+  3-FK feature-association tables (one FK to the ML schema's
+  `Execution` table) as transparent intermediates. See the
+  "Transparency model" section in
+  `src/deriva_ml/model/denormalize_planner.py` for the conceptual
+  contract. The sibling predicate `_is_feature_association` and the
+  union helper `_is_transparent_intermediate` are now consulted by
+  `_outbound_reachable`, `_enumerate_paths`, `_find_path_ambiguities`,
+  and `_build_join_tree`.
+
+- **Rule 5 (downstream-leaf rejection) uses strict downstream.**
+  A new helper `_outbound_reachable_strict` walks only direct FK
+  chains (no bidirectional bridge hop). Rule 5 and Rule 2
+  (sink-finding) consult it, so picking either endpoint of a
+  transparent bridge as `row_per=` is no longer rejected as a
+  "downstream leaf." Side effect: when both endpoints of a bridge
+  appear in `include_tables` with no explicit `row_per`, the
+  planner now raises `DerivaMLDenormalizeMultiLeaf` (with both
+  candidates listed) instead of the older `DerivaMLDenormalizeNoSink`
+  — strictly a better error message.
+
+### Added
+
+- **`split_dataset(row_per=..., via=..., ignore_unrelated_anchors=...)`**
+  pass-through parameters reach the underlying
+  `Denormalizer.as_dataframe` call. When `stratify_by_column` is set
+  and `row_per` is None, `split_dataset` defaults
+  `row_per=element_table` automatically — the natural anchor when
+  partitioning element rows through a feature-association bridge.
+
+- **CLI flags** `--row-per`, `--via`, `--ignore-unrelated-anchors` on
+  `deriva-ml-split-dataset` matching the new Python kwargs.
+
 ## Unreleased — Sort + materialize_limit + execution_rids on find_*/feature_values
 
 ### Added
