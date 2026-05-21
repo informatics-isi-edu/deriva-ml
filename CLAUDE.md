@@ -412,6 +412,37 @@ The `bump-version` step happens AFTER merge, on `main`, in a clean
 working tree (so the bump-commit lands on `main` directly and the
 tag points at it). Never bump from a feature branch.
 
+### Cross-repo bug fixes (deriva-py ↔ deriva-ml)
+
+When a deriva-ml bug traces back to a deriva-py contract violation,
+fix the bug **and** pin the contract at the layer that promises it:
+
+- **The contract test belongs upstream**, in deriva-py's test suite,
+  alongside the implementation that makes the promise. A future
+  refactor that breaks the contract must fail deriva-py's own CI
+  before a release ships — not deriva-ml's CI after the pin advances.
+- **The contract fix lands in the same upstream PR as the contract
+  test.** Don't defer the test to "we'll add it later" — the
+  fix-without-test PR creates a regression window in deriva-py's main
+  branch.
+- **A reproduction harness in deriva-ml is OK, but it's not the pin.**
+  An `xfail(strict=True)` test in this repo is fine as a reproduction
+  while the upstream fix is scoped — it proves the bug is reachable
+  from a real user flow and gives a visible "lockstep ratchet" when
+  the pin advances. Once upstream ships with its own test, **delete
+  the downstream xfail**; do not "unxfail" it. The contract test now
+  lives upstream; whatever downstream tests remain are
+  consumer-integration coverage and should be framed that way.
+
+Reference case: bag-cache multi-anchor erasure (issue #142). Fix
+landed in deriva-py PR #254 with upstream tests
+(`test_cache_index_record_accumulates_anchors`,
+`test_cache_index_record_dedupes_repeated_anchor`); deriva-ml PR #146
+bumped the pin and the downstream coverage at
+`tests/dataset/test_multi_anchor_bag_cache.py` reframed as
+integration. See that file's module docstring for the consumer-side
+framing.
+
 ### Version Bumping
 
 Use the `bump-version` script for releases - it handles the complete workflow:
