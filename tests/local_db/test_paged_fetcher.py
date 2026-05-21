@@ -205,24 +205,39 @@ class TestFetchByRids:
         assert len(batch_requests[1][1]["rids"]) == 500
         assert len(batch_requests[2][1]["rids"]) == 200
 
-    def test_deduplication_across_calls(self, engine):
-        """Second call with overlapping RIDs only requests the new ones."""
+    def test_overlapping_calls_keep_engine_consistent(self, engine):
+        """Two ``fetch_by_rids`` calls with overlapping RIDs land the engine
+        in the right shape (each row present exactly once), even though
+        the stateless contract re-requests overlapping RIDs from the
+        server on the second call.
+
+        Pre-2026-05-22 the fetcher carried a per-instance ``_seen`` set
+        that suppressed the second-call network request for overlapping
+        RIDs. That dedup was removed when finding A01 showed it could
+        not be made safe for non-PK ``rid_column`` values (see
+        ``docs/design/denormalization.md`` §4). The new contract is:
+        the server is the authority for what rows match; the database's
+        UNIQUE constraint via INSERT-OR-IGNORE prevents the second
+        call's writes from crashing or duplicating. Test reflects that:
+        we assert correctness of the engine state, not the network
+        request count.
+        """
         rows = _make_rows(5)
         client = FakePagedClient(rows_by_table={"Image": rows})
         table = _make_target_table(engine, "Image")
         fetcher = PagedFetcher(client=client, engine=engine)
         all_rids = [r["RID"] for r in rows]
 
-        # First call: R0000, R0001, R0002
         fetcher.fetch_by_rids("Image", all_rids[:3], table, batch_size=500)
-        client.requests.clear()
+        assert _rows_count(engine, table) == 3
 
-        # Second call: R0001, R0002 already seen; only R0003, R0004 should be fetched
+        # Second call overlaps the first by R0001, R0002 and adds R0003, R0004.
+        # Stateless contract: the request goes out; INSERT-OR-IGNORE handles
+        # duplicates; the engine ends up with all four new RIDs and zero
+        # duplicates.
         fetcher.fetch_by_rids("Image", all_rids[1:], table, batch_size=500)
-
-        batch_requests = [r for r in client.requests if r[0] == "fetch_rid_batch"]
-        assert len(batch_requests) == 1
-        assert set(batch_requests[0][1]["rids"]) == {all_rids[3], all_rids[4]}
+        assert _rows_count(engine, table) == 5
+        assert fetcher.fetched_rids("Image", target_table=table) == set(all_rids)
 
     def test_post_fallback_on_long_url(self, engine):
         """600 rows, max_url_bytes tiny → POST fallback triggered.
@@ -381,6 +396,161 @@ class TestFetchByRids:
         fetcher_b.fetch_by_rids("Image", rids, table, batch_size=500)
         assert _rows_count(engine, table) == 5
 
+    def test_fetch_by_fk_column_multiple_rows_per_value(self, engine):
+        """B.4 in the test matrix (``docs/design/denormalization.md`` §8):
+        ``fetch_by_rids`` filtering on an FK column where multiple rows
+        share the same FK value must fetch ALL matching rows, not collapse
+        to one per FK.
+
+        This is the unit-level reproduction of finding A01. The pre-fix
+        implementation hydrated a "seen" set from the engine's
+        ``rid_column`` values, then treated any FK value already in the
+        engine as "we've seen this row" — silently dropping every row
+        beyond the first per FK. The stateless contract has no such
+        cache; the server's response is taken at face value and inserted
+        via INSERT-OR-IGNORE (which dedups by RID, not by FK).
+        """
+        # Build an "Execution_Image_Quality"-shaped fake table: 4 Images,
+        # 3 feature rows per Image, each with a unique RID. The FK column
+        # is "Image" — non-unique across rows.
+        feature_rows = []
+        for i in range(4):
+            for j in range(3):
+                feature_rows.append(
+                    {
+                        "RID": f"F{i:02d}{j}",
+                        "Filename": f"feature_{i}_{j}",
+                        "Subject": f"img_{i}",  # the "Image" FK
+                    }
+                )
+        # The FakePagedClient filters by ``column`` arg, so use Subject
+        # as the stand-in for the FK column in this fixture.
+        client = FakePagedClient(rows_by_table={"FeatureValues": feature_rows})
+        feature_table = _make_target_table(engine, "FeatureValues")
+        fetcher = PagedFetcher(client=client, engine=engine)
+
+        # Request all rows for the 4 Image FK values. Expected: 12 rows
+        # in the engine (4 Images × 3 features each).
+        image_fks = [f"img_{i}" for i in range(4)]
+        fetcher.fetch_by_rids(
+            "FeatureValues",
+            image_fks,
+            feature_table,
+            rid_column="Subject",  # the FK column, not the PK
+            batch_size=500,
+        )
+        assert _rows_count(engine, feature_table) == 12, (
+            "Expected 12 rows (4 Images × 3 features each); finding A01 "
+            "previously caused this to be 4 (one per Image, the rest "
+            "silently dropped)."
+        )
+
+        # A second fetcher against the now-populated engine must also
+        # produce the same 12 rows when asked for the same FK values —
+        # i.e., the operation is idempotent across fetcher instances
+        # AND across the cross-session form of finding 05.
+        fetcher_b = PagedFetcher(client=client, engine=engine)
+        fetcher_b.fetch_by_rids(
+            "FeatureValues",
+            image_fks,
+            feature_table,
+            rid_column="Subject",
+            batch_size=500,
+        )
+        assert _rows_count(engine, feature_table) == 12
+
+    def test_fetch_by_fk_column_partial_overlap(self, engine):
+        """B.5 in the test matrix: partial-overlap FK fetch.
+
+        Some FK values' rows are already in the engine; the server has
+        additional rows for some of the same FK values that the prior
+        fetch did not capture (because the prior fetch was for a
+        different scope). A second ``fetch_by_rids`` by the FK column
+        must pull in the new server rows and integrate them with the
+        already-present ones via INSERT-OR-IGNORE.
+        """
+        # Same shape as B.4 but only half the feature rows are in the
+        # engine at the start.
+        feature_rows = []
+        for i in range(2):
+            for j in range(3):
+                feature_rows.append(
+                    {
+                        "RID": f"P{i:02d}{j}",
+                        "Filename": f"f_{i}_{j}",
+                        "Subject": f"img_{i}",
+                    }
+                )
+        client = FakePagedClient(rows_by_table={"FeatureValues": feature_rows})
+        feature_table = _make_target_table(engine, "FeatureValues")
+
+        # Pre-populate engine with the first Image's feature rows.
+        from sqlalchemy import insert as _insert
+
+        with engine.begin() as conn:
+            conn.execute(_insert(feature_table), feature_rows[:3])
+        assert _rows_count(engine, feature_table) == 3
+
+        # Now ask the fetcher for BOTH Images. Engine should end with
+        # all 6 rows; the existing 3 are kept, the 3 new ones are added.
+        fetcher = PagedFetcher(client=client, engine=engine)
+        fetcher.fetch_by_rids(
+            "FeatureValues",
+            ["img_0", "img_1"],
+            feature_table,
+            rid_column="Subject",
+        )
+        assert _rows_count(engine, feature_table) == 6
+
+    def test_insert_with_missing_rid_in_row(self, tmp_path: Path) -> None:
+        """A.4 in the test matrix: insert behavior when an incoming row
+        has no ``RID`` column.
+
+        Pin the behavior: INSERT-OR-IGNORE relies on RID being the
+        conflict-target column. A row without RID violates the table's
+        NOT-NULL primary-key constraint and the engine raises. This is
+        the right behavior — rows from ermrest always carry RID, so a
+        missing RID is a programming error worth surfacing.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'wd.sqlite'}", future=True)
+        target = _make_target_table(engine)
+        client = FakePagedClient(rows_by_table={"Image": []})
+        fetcher = PagedFetcher(client=client, engine=engine)
+
+        # Calling _insert_rows directly with a bad row should raise.
+        with pytest.raises(IntegrityError):
+            fetcher._insert_rows(target, [{"Filename": "x", "Subject": "y"}])
+
+    def test_predicate_against_pre_populated_engine(self, engine):
+        """B.6 in the test matrix: ``fetch_predicate`` against an engine
+        that already holds some of the rows. INSERT-OR-IGNORE keeps the
+        engine consistent without crashing.
+
+        Pre-A01 the predicate path conditioned page-row insertion on the
+        seen-set, which is sufficient when each row's RID is the only
+        identity. Post-A01 we removed the seen-set, so the predicate
+        path now also relies on INSERT-OR-IGNORE for re-entry safety.
+        This test pins that behavior.
+        """
+        rows = _make_rows(5)
+        client = FakePagedClient(rows_by_table={"Image": rows})
+        table = _make_target_table(engine, "Image")
+
+        # Pre-populate with the first 2 rows (simulating a prior session).
+        from sqlalchemy import insert as _insert
+
+        with engine.begin() as conn:
+            conn.execute(_insert(table), rows[:2])
+        assert _rows_count(engine, table) == 2
+
+        # fetch_predicate over the same table — should fetch all 5,
+        # INSERT-OR-IGNORE the 2 already present, insert the 3 new.
+        fetcher = PagedFetcher(client=client, engine=engine)
+        fetcher.fetch_predicate("Image", predicate=None, target_table=table)
+        assert _rows_count(engine, table) == 5
+
     def test_extra_columns_in_rows_are_silently_dropped(self, tmp_path: Path) -> None:
         engine = create_engine(f"sqlite:///{tmp_path / 'wd.sqlite'}", future=True)
         target = _make_target_table(engine)  # has RID, Filename, Subject
@@ -404,20 +574,29 @@ class TestFetchByRids:
 
 class TestFetchedRids:
     def test_tracks_rids_from_predicate_fetch(self, engine):
-        """After fetch_predicate, fetched_rids returns the correct set."""
+        """After ``fetch_predicate``, ``fetched_rids`` (passing the target
+        table) returns the set actually present in the engine.
+
+        Post-stateless-refactor (``docs/design/denormalization.md`` §4),
+        ``fetched_rids`` reads directly from the engine; callers must
+        pass ``target_table`` so the fetcher knows which SQLAlchemy
+        table to read.
+        """
         rows = _make_rows(5)
         client = FakePagedClient(rows_by_table={"Image": rows})
         table = _make_target_table(engine, "Image")
         fetcher = PagedFetcher(client=client, engine=engine)
 
         fetcher.fetch_predicate("Image", None, table)
-        result = fetcher.fetched_rids("Image")
+        result = fetcher.fetched_rids("Image", target_table=table)
 
         expected = {r["RID"] for r in rows}
         assert result == expected
 
     def test_tracks_rids_from_rid_fetch(self, engine):
-        """After fetch_by_rids, fetched_rids returns the fetched RIDs."""
+        """After ``fetch_by_rids``, ``fetched_rids`` (passing the target
+        table) returns the set actually present in the engine.
+        """
         rows = _make_rows(5)
         client = FakePagedClient(rows_by_table={"Image": rows})
         table = _make_target_table(engine, "Image")
@@ -425,7 +604,7 @@ class TestFetchedRids:
         rids = [r["RID"] for r in rows[:3]]
 
         fetcher.fetch_by_rids("Image", rids, table, batch_size=500)
-        result = fetcher.fetched_rids("Image")
+        result = fetcher.fetched_rids("Image", target_table=table)
 
         assert result == set(rids)
 

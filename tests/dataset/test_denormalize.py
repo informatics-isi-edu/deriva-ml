@@ -1536,8 +1536,12 @@ class TestNewFKPatterns:
         ["Image", "Execution_Image_Quality"] should produce a wide table with
         both Image columns and feature columns (ImageQuality values).
 
-        This tests whether feature tables (which are essentially association
-        tables with extra columns) can participate in denormalization.
+        The demo fixture creates exactly one Quality feature value per
+        Image (see ``demo_catalog.create_demo_features``), so the row
+        count equals the Image member count. The N-feature-per-anchor
+        case is covered by
+        :meth:`test_feature_table_multiple_rows_per_anchor` below
+        (the A01 regression test).
         """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
@@ -1555,13 +1559,136 @@ class TestNewFKPatterns:
         feature_cols = [c for c in df.columns if c.startswith("Execution_Image_Quality.")]
         assert len(feature_cols) > 0, "Expected Execution_Image_Quality columns"
 
-        # Every Image member should have a quality feature value
+        # Demo fixture: exactly one Quality feature value per Image.
         members = bag.list_dataset_members(recurse=True)
         image_count = len(members.get("Image", []))
         assert len(df) == image_count, (
-            f"Row count ({len(df)}) should match Image member count ({image_count}). "
-            "Each Image should have exactly one quality feature value."
+            f"Row count ({len(df)}) should match Image member count ({image_count}) "
+            "for the demo fixture's 1-feature-per-Image setup."
         )
+
+    def test_feature_table_multiple_rows_per_anchor(self, dataset_test, tmp_path):
+        """Regression for 2026-05-21 finding A01 (C.4 in the test matrix
+        in ``docs/design/denormalization.md`` §8).
+
+        When a feature table has N rows per anchor (multi-annotator,
+        multi-model-prediction, time-series), the denormalize wide
+        table must contain N output rows per anchor — NOT one with N-1
+        silently collapsed.
+
+        Bug shape: the demo fixture's 1-per-Image Quality population
+        is exercised first (priming the local SQLite cache), then
+        N more Quality feature rows are written per Image via fresh
+        Executions. Pre-fix, the second live denormalize call would
+        find the original 1-per-Image rows in the cache and the
+        ``_get_seen`` hydration code (v1.37.2) would skip the fetch
+        for the new rows entirely. Post-fix (stateless ``PagedFetcher``
+        with INSERT-OR-IGNORE on ``_insert_rows``), the second call
+        re-fetches and lands all (1 + N) × image_count rows.
+        """
+        from deriva_ml import DerivaML, MLVocab as vc
+        from deriva_ml.execution import ExecutionConfiguration
+
+        ml = DerivaML(
+            dataset_test.catalog.hostname,
+            dataset_test.catalog.catalog_id,
+            working_dir=tmp_path,
+            use_minid=False,
+        )
+
+        dataset_description = dataset_test.dataset_description
+        bag_before = dataset_description.dataset.download_dataset_bag(
+            dataset_description.dataset.current_version, use_minid=False
+        )
+        members = bag_before.list_dataset_members(recurse=True)
+        image_member_rids = {m["RID"] for m in members.get("Image", [])}
+        assert len(image_member_rids) > 0, "Expected Image members in dataset"
+
+        # Warm up the local SQLite by running a live denormalize on the
+        # original 1-per-Image data. This is the precondition that used
+        # to trigger A01: an engine partially populated with the wrong
+        # subset of feature rows.
+        live_ds_warmup = ml.lookup_dataset(dataset_description.dataset.dataset_rid)
+        df_warmup = live_ds_warmup.get_denormalized_as_dataframe(
+            include_tables=["Image", "Execution_Image_Quality"],
+            row_per="Execution_Image_Quality",
+        )
+        assert len(df_warmup) == len(image_member_rids), (
+            f"Warm-up denormalize should return 1 row per Image "
+            f"({len(image_member_rids)}); got {len(df_warmup)}."
+        )
+
+        # Add EXTRA_ANNOTATORS more Quality features per Image, each
+        # from a fresh Workflow+Execution. Mirrors the cifar10 e2e
+        # shape (1 ground-truth + 5 model predictions per Image).
+        EXTRA_ANNOTATORS = 5
+        ml.add_term(
+            vc.workflow_type,
+            "Extra Annotator Workflow",
+            description="Adds extra Quality annotations per Image for finding A01 regression test",
+        )
+        QualityFeature = ml.feature_record_class("Image", "Quality")
+        extra_execution_rids: list[str] = []
+        for i in range(EXTRA_ANNOTATORS):
+            workflow_n = ml.create_workflow(
+                name=f"Extra Annotator #{i + 1} (A01 regression)",
+                workflow_type="Extra Annotator Workflow",
+                description=(
+                    f"A01 regression: writes Quality annotation #{i + 1} per "
+                    f"Image so denormalize is exercised with N feature rows "
+                    "per anchor across N distinct Executions."
+                ),
+            )
+            annot_n = ml.create_execution(
+                ExecutionConfiguration(
+                    description=f"Quality annotation #{i + 1} (A01)",
+                    workflow=workflow_n,
+                )
+            )
+            label = "Good" if i % 2 == 0 else "Bad"
+            with annot_n.execute() as exe:
+                exe.add_features(
+                    [QualityFeature(Image=rid, ImageQuality=label) for rid in image_member_rids]
+                )
+            # Flush staged feature records to ermrest; add_features only
+            # stages to a SQLite buffer; upload_execution_outputs writes.
+            annot_n.upload_execution_outputs()
+            extra_execution_rids.append(annot_n.execution_rid)
+
+        total_features_per_image = 1 + EXTRA_ANNOTATORS
+
+        # The live denormalize MUST now return total_features_per_image
+        # rows per Image. Pre-fix this returned just the warmup-cached
+        # 1 row per Image; the new rows were silently dropped.
+        live_ds = ml.lookup_dataset(dataset_description.dataset.dataset_rid)
+        df = live_ds.get_denormalized_as_dataframe(
+            include_tables=["Image", "Execution_Image_Quality"],
+            row_per="Execution_Image_Quality",
+        )
+
+        expected = total_features_per_image * len(image_member_rids)
+        assert len(df) == expected, (
+            f"Expected {expected} rows ({len(image_member_rids)} Images × "
+            f"{total_features_per_image} Quality feature values each); got "
+            f"{len(df)}. The denormalize surface is silently dropping "
+            f"feature rows — finding A01."
+        )
+
+        per_image_counts = df["Image.RID"].value_counts()
+        for img_rid in image_member_rids:
+            assert per_image_counts.get(img_rid, 0) == total_features_per_image, (
+                f"Image {img_rid} should appear in {total_features_per_image} "
+                f"rows (one per Quality feature record); got "
+                f"{per_image_counts.get(img_rid, 0)}."
+            )
+
+        executions_in_df = set(df["Execution_Image_Quality.Execution"].dropna().unique())
+        for extra_rid in extra_execution_rids:
+            assert extra_rid in executions_in_df, (
+                f"Execution {extra_rid} should appear in the denormalize "
+                f"output. Currently it is silently omitted (only the demo's "
+                f"original execution survives)."
+            )
 
 
 class TestVersionPinnedDenormalize:
