@@ -574,7 +574,14 @@ class DerivaML(
             )
         # Force a refetch through deriva-py's binding cache; rebuilds
         # the parsed-dict and path-builder caches on the catalog.
-        live_schema = self.catalog.getCatalogSchema(refresh=True)
+        # ``getCatalogSchema()`` is conditionally revalidated via
+        # ``If-None-Match`` on every call, so an external mutation is
+        # naturally observed; purging the prefix here guarantees the
+        # refetch even when the ETag has not changed (defensive: covers
+        # cases where the server lies about ETag stability or where the
+        # caller explicitly wants the parsed-dict cache invalidated).
+        self.catalog.purge_cache_by_prefix("/schema")
+        live_schema = self.catalog.getCatalogSchema()
         live_snapshot_id = self.catalog.get("/").json()["snaptime"]
         cache.write(
             snapshot_id=live_snapshot_id,
@@ -632,7 +639,9 @@ class DerivaML(
             live_snapshot_id = self.catalog.get("/").json()["snaptime"]
             cached_payload = cache.load()
             if cached_payload["snapshot_id"] != live_snapshot_id:
-                live_schema = self.catalog.getCatalogSchema(refresh=True)
+                # See refresh_schema for the purge+get rationale.
+                self.catalog.purge_cache_by_prefix("/schema")
+                live_schema = self.catalog.getCatalogSchema()
                 diff = _compute_diff(cached_payload["schema"], live_schema)
                 if not diff.is_empty():
                     logger.warning(
@@ -698,7 +707,9 @@ class DerivaML(
             raise DerivaMLReadOnlyError("diff_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         cached_payload = cache.load()
-        live_schema = self.catalog.getCatalogSchema(refresh=True)
+        # See refresh_schema for the purge+get rationale.
+        self.catalog.purge_cache_by_prefix("/schema")
+        live_schema = self.catalog.getCatalogSchema()
         return _compute_diff(cached_payload["schema"], live_schema)
 
     @staticmethod

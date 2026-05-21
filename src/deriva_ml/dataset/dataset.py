@@ -474,20 +474,24 @@ class Dataset:
         """
         return self._ml_instance.list_dataset_element_types()
 
-    def find_features(self, table: str | Table) -> Iterable[Feature]:
-        """Find features associated with a table.
+    def find_features(self, table: str | Table | None = None) -> Iterable[Feature]:
+        """Find features associated with a table, or all features when ``None``.
 
         Args:
-            table: Table to find features for.
+            table: Table to find features for. When ``None``, returns every
+                feature defined on the catalog (matches the ``DatasetLike``
+                protocol signature and the ``DatasetBag`` implementation).
 
         Returns:
             Iterable of Feature objects.
 
         Raises:
-            DerivaMLTableNotFound: If ``table`` does not exist in the schema.
+            DerivaMLTableNotFound: If ``table`` is supplied but does not
+                exist in the schema.
 
         Example:
             >>> features = list(dataset.find_features("Image"))  # doctest: +SKIP
+            >>> all_features = list(dataset.find_features())  # doctest: +SKIP
         """
         return self._ml_instance.find_features(table)
 

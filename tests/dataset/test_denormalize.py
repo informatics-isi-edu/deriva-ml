@@ -985,12 +985,23 @@ class TestMultiHopDenormalize:
             assert non_null > 0, "Subject.RID should be populated via multi-hop FK chain"
 
     def test_association_table_join(self, dataset_test, tmp_path):
-        """M3: Join through association table (M:N)."""
+        """M3: Join through association table (M:N).
+
+        Under Rule 2 / Rule 6, ``["Image", "Observation", "ClinicalRecord"]``
+        has two sink candidates (Image and ClinicalRecord are both leaves
+        in the FK graph), so auto-inference raises
+        :class:`DerivaMLDenormalizeMultiLeaf`. Pin Image as the row anchor
+        explicitly — Image is the dataset member, so "one row per Image
+        with its ClinicalRecord columns hoisted" is the call intent.
+        """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation", "ClinicalRecord"])
+        df = bag.get_denormalized_as_dataframe(
+            include_tables=["Image", "Observation", "ClinicalRecord"],
+            row_per="Image",
+        )
 
         assert len(df) > 0
         cr_cols = [c for c in df.columns if c.startswith("ClinicalRecord.")]
@@ -1013,12 +1024,20 @@ class TestMultiHopDenormalize:
         assert len(img_cols) > 0, "Expected Image columns"
 
     def test_full_chain_with_association(self, dataset_test, tmp_path):
-        """M5: Full chain Image → Observation ← ClinicalRecord_Observation → ClinicalRecord."""
+        """M5: Full chain Image → Observation ← ClinicalRecord_Observation → ClinicalRecord.
+
+        Multi-leaf disambiguation: see ``test_association_table_join``.
+        Image is pinned as the row anchor; the full chain is traversed to
+        bring ClinicalRecord columns into each Image row.
+        """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation", "ClinicalRecord"])
+        df = bag.get_denormalized_as_dataframe(
+            include_tables=["Image", "Observation", "ClinicalRecord"],
+            row_per="Image",
+        )
 
         assert len(df) > 0
         for prefix in ["Image.", "Observation.", "ClinicalRecord."]:
@@ -1270,13 +1289,32 @@ class TestAmbiguousPaths:
             non_null = df["Observation.RID"].notna().sum()
             assert non_null > 0, "Observation.RID should be populated via direct FK"
 
-    def test_association_table_single_path(self, dataset_test, tmp_path):
-        """A4: Association table path — if only one path exists, no error."""
+    def test_association_table_resolves_with_explicit_row_per(self, dataset_test, tmp_path):
+        """A4: Association-table denormalization succeeds when ``row_per`` is explicit.
+
+        Renamed from ``test_association_table_single_path``: under the
+        new Rule 2 (sink-finding), the bare
+        ``["Image", "Observation", "ClinicalRecord"]`` request raises
+        :class:`DerivaMLDenormalizeMultiLeaf` because Image and
+        ClinicalRecord both qualify as sinks. The original "single
+        path → no error" framing no longer maps: a single coherent FK
+        path can still leave ambiguous *leaves*, which is a separate
+        contract (and the user-disambiguation point).
+
+        This test now pins the resolution path: with ``row_per="Image"``
+        the denormalization completes and yields rows. Path ambiguity
+        (where this test originally lived) is covered by
+        ``test_direct_fk_raises_ambiguity`` /
+        ``test_disambiguation_with_intermediate_changes_path``.
+        """
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation", "ClinicalRecord"])
+        df = bag.get_denormalized_as_dataframe(
+            include_tables=["Image", "Observation", "ClinicalRecord"],
+            row_per="Image",
+        )
         assert len(df) > 0
 
 

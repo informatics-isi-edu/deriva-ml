@@ -1,36 +1,47 @@
-"""Round-trip tests for multi-anchor bag-cache scenarios (§3.E from
+"""Integration tests for multi-anchor bag-cache scenarios (§3.E from
 ``docs/design/deriva-ml-audit-2026-05-phase2-dataset.md``).
 
-Background
-----------
+What this file covers
+---------------------
 
-Every cached bag is keyed by its BDBag checksum. The reverse index
-``bag_anchor_rids`` (in deriva-py's
-:class:`deriva.bag.cache_index.BagCacheIndex`) answers "which bags
-reference this RID?". The audit asked us to test the following user
-story explicitly:
+deriva-ml's :class:`~deriva_ml.dataset.bag_cache.BagCache` is a thin
+wrapper over deriva-py's :class:`~deriva.bag.cache_index.BagCacheIndex`.
+The wrapper has its own responsibilities — bag materialization,
+``cache_status()`` semantics, FK cascade through the deriva-ml layer —
+that are independent of the index itself. These tests pin the
+**consumer-side** round-trip: a user who runs
+``download_dataset_bag(rid=A)`` then ``download_dataset_bag(rid=B)``
+on overlapping content (same checksum) gets ``CacheStatus.CACHED``
+for both anchors, sees one ``bags`` row, and both anchors round-trip
+through the deriva-ml surface.
 
-    User runs ``download_dataset_bag(rid=A)`` then
-    ``download_dataset_bag(rid=B)`` on **overlapping content** (i.e.,
-    the export produces the same checksum). The audit's hypothesis:
-    "they will be storing one bag, not two".
+Where the contract itself is pinned
+-----------------------------------
+
+The underlying contract — that ``BagCacheIndex.record()`` *accumulates*
+anchors across calls rather than replacing them — is **not** pinned
+here. It lives upstream in
+``deriva-py/tests/deriva/bag/test_cache_index.py``:
+
+* ``test_cache_index_record_accumulates_anchors``
+* ``test_cache_index_record_dedupes_repeated_anchor``
+
+That's the right home: the contract belongs to the layer that makes
+the promise. If a deriva-py refactor breaks ``record()``, upstream CI
+catches it before a release ships. These deriva-ml tests are
+consumer-side coverage of how ``BagCache`` *uses* the contract, not
+the contract pin itself.
 
 History
 -------
 
-When this test file was first added (PR #143), the user story was
-**half-broken**: storage was correctly shared (one ``bags`` row), but
-``BagCacheIndex.record()`` *replaced* the anchor list on every call,
-so the first anchor RID was silently erased. The desired behaviour
-was pinned with ``xfail(strict=True)`` while the fix was scoped
-(see issue #142).
-
-The fix landed upstream in deriva-py PR #254 (commit ``cc5b141``):
-``record()`` now **accumulates** anchors via ``INSERT OR IGNORE`` on
-the existing ``PRIMARY KEY (checksum, "table", rid)`` constraint.
-This file's tests now pin the **fixed** behaviour positively: both
-RIDs resolve after the A→B round trip, the bag row stays unique,
-and the deriva-ml ``BagCache`` surface honours both anchors.
+PR #143 originally introduced this file with ``xfail(strict=True)``
+markers because the bug was reachable only at the deriva-ml layer and
+upstream coverage did not yet exist. Deriva-py PR #254 (commit
+``cc5b141``) shipped the fix together with upstream unit tests; this
+file dropped the xfail markers in deriva-ml PR #146. With upstream
+now carrying the contract pin, this file's framing is "integration",
+not "regression for #142".
 
 The tests run without ``DERIVA_HOST`` (pure-local
 ``BagCacheIndex`` / ``BagCache`` exercise).
