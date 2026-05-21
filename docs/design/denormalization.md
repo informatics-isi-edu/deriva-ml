@@ -284,6 +284,7 @@ deletion/update freshness cases until we decide to fix.
 | F3 | Stale local data when server mutates between calls (deletes, updates) | Cache is write-through, never invalidated. | Documented as a known limitation. See §6. Test cases marked `xfail`. |
 | F4 | `_collect_fk_values` walks "values currently present in the engine" to decide what to fetch from the server. If a parent table's membership was updated server-side after the engine cached it, downstream fetches use the stale parent set. | Same root cause as F3. | Same status — known limitation, tracked. |
 | F5 | Path-walk order silently determines which rows get loaded when two element tables share intermediate tables | `_populate_from_catalog_inner` walks `join_tables` in dict iteration order; the order isn't part of the documented contract. | Not currently a bug, because every fetch must visit each (table, rid_column, rid) tuple at least once. Pin to the test matrix in §8 so a regression here would be caught. |
+| **F6** | `describe()` / `preflight_count` reports `estimated_row_count.total = 0` while the actual fetch returns rows | The estimator counted anchors whose table literally equals `row_per`. When `row_per` is downstream of the anchor table (the common feature-table case), no anchor matches and the sum is silently 0. Mathematically the cardinality is N rows per anchor for an unknown-from-anchor-data N. | Fixed by honest "unknown" semantics: when anchors are downstream of `row_per`, `in_scope_row_per_rows` and `total` return `None` and a `reason` field tells the caller why. The case-1 path (anchor == row_per) still returns an exact integer. Originally surfaced as 2026-05-21 finding A02 (Analyst arc). |
 
 ---
 
@@ -332,6 +333,15 @@ are marked `unit`.
 | C.5x | Mutation → re-denormalize. **Deletion or update** server-side between calls. | live, `xfail` | freshness limitation — see §6 |
 | C.6 | `split_dataset` then live denormalize of the parent | live | parent's feature rows visible |
 | C.7 | Live denormalize a Split parent containing children | live | members from children appear |
+
+### Layer E — `describe()` / preflight estimated_row_count
+
+| # | Scenario | Kind | Assert |
+|---|---|---|---|
+| E.1 | Anchor table == `row_per` (case 1) | live | exact integer estimate == anchor count |
+| E.2 | **Anchor table is downstream of `row_per` (case 2 — feature-table common case)** | live | **`in_scope_row_per_rows` and `total` are `None`; a `reason` field is present (A02 regression)** |
+| E.3 | Mixed scoping anchors (some at `row_per`, some downstream) | live | honest `None` with reason (the case-2 contribution can't be added to the case-1 count) |
+| E.4 | All anchors orphan (no FK path) | live | `orphan_rows` is exact, `in_scope_row_per_rows == 0`, `total == orphan_rows` |
 
 ### Layer D — Cross-channel parity
 

@@ -244,3 +244,142 @@ class TestDatasetDescribeDenormalized:
         # We don't assert it's non-empty here because other test schemas may
         # not include the diamond; just verify it's well-formed.
         assert isinstance(info["ambiguities"], list)
+
+
+class TestEstimatedRowCount:
+    """Regression tests for ``estimated_row_count`` in ``describe()`` —
+    the spec §5 plan-dict field that the 2026-05-21 e2e Analyst arc
+    surfaced as finding A02 (preflight returns 0 while the actual
+    fetch returns rows).
+
+    The estimator counts anchors whose table equals ``row_per`` and
+    sums them into ``in_scope_row_per_rows``. That formula is correct
+    only when anchors sit *at* ``row_per``. When ``row_per`` is
+    downstream of the anchor table — the common feature-table case —
+    the formula returns 0 even though the join will produce N rows
+    per anchor.
+
+    Contract pinned here:
+
+    - Anchor table == row_per → estimate is exact (anchor count).
+    - Anchor table is downstream of row_per via FK chain → estimate
+      is ``None`` (honest: we don't know without a catalog query).
+      A reason string is included so callers can tell why.
+    - Anchor unreachable from row_per → orphan (existing behaviour).
+    """
+
+    @staticmethod
+    def _find_dataset_with_image_anchors(ml):
+        """Locate a dataset in the demo fixture that has Image members
+        as anchors.
+
+        ``catalog_with_datasets`` creates a hierarchy; ``find_datasets()``
+        returns the lot, and ``[0]`` is not guaranteed to be the one
+        with Image members. Iterate and pick the first dataset whose
+        ``describe_denormalized(["Image"])`` reports Image anchors > 0.
+        """
+        for dataset in ml.find_datasets():
+            info = dataset.describe_denormalized(["Image"])
+            if info["anchors"]["by_type"].get("Image", 0) > 0:
+                return dataset
+        raise AssertionError(
+            "No dataset in catalog_with_datasets has Image anchors; "
+            "demo fixture changed?"
+        )
+
+    def test_estimate_exact_when_anchor_is_row_per(
+        self, catalog_with_datasets: "tuple[DerivaML, object]"
+    ):
+        """Anchors at the row_per table give an exact estimate.
+
+        Demo fixture has Image anchors; with row_per='Image', the
+        estimator can compute the exact in-scope row count (== Image
+        anchor count) without any catalog query.
+
+        Note: the demo fixture may also include other anchor types
+        (Subject, etc.) that reach Image. The "anchor==row_per case
+        is exact" claim only holds when ALL scoping anchors are at
+        row_per. If the fixture has mixed-cardinality anchors, the
+        estimator honestly returns None — which is correct, and this
+        test then validates *that* behavior instead.
+        """
+        ml, _ = catalog_with_datasets
+        dataset = self._find_dataset_with_image_anchors(ml)
+
+        info = dataset.describe_denormalized(["Image"], row_per="Image")
+        estimated = info["estimated_row_count"]
+        anchors_by_type = info["anchors"]["by_type"]
+        image_anchors = anchors_by_type.get("Image", 0)
+        other_anchor_types = {t: c for t, c in anchors_by_type.items() if t != "Image" and c > 0}
+
+        assert image_anchors > 0, "Demo dataset should have Image anchors"
+
+        if other_anchor_types:
+            # Mixed-cardinality fixture: estimator can't be exact, so
+            # the honest answer is None.
+            assert estimated["in_scope_row_per_rows"] is None, (
+                f"Fixture has non-Image anchors {other_anchor_types}; "
+                f"estimator should return None (mixed cardinality), got "
+                f"{estimated['in_scope_row_per_rows']}"
+            )
+            assert estimated["total"] is None
+            assert "reason" in estimated
+        else:
+            # Pure Image-anchor fixture: estimate is exact.
+            assert estimated["in_scope_row_per_rows"] == image_anchors, (
+                f"Anchor==row_per case should report exact count "
+                f"({image_anchors}); got {estimated['in_scope_row_per_rows']}"
+            )
+            assert estimated["total"] == image_anchors
+
+    def test_estimate_unknown_when_row_per_downstream_of_anchor(
+        self, catalog_with_datasets: "tuple[DerivaML, object]"
+    ):
+        """Regression for 2026-05-21 finding A02.
+
+        When ``row_per`` is downstream of the anchor table (via FK
+        chain), the actual row count is N rows per anchor for some
+        N ≥ 0 that depends on per-anchor feature populations. The
+        estimator can't compute that from anchors alone, so the
+        honest answer is ``None`` (with a reason), NOT a silent 0.
+
+        The demo's ``Execution_Image_Quality`` feature table is
+        downstream of ``Image``: each Image may have 0..N quality
+        feature rows. With row_per=Execution_Image_Quality and
+        anchors at Image, the pre-A02-fix code returned
+        ``in_scope_row_per_rows: 0`` because no anchor table matched
+        ``row_per`` literally. Post-fix, the estimate is None with a
+        reason flag.
+        """
+        ml, _ = catalog_with_datasets
+        dataset = self._find_dataset_with_image_anchors(ml)
+
+        info = dataset.describe_denormalized(
+            ["Image", "Execution_Image_Quality"],
+            row_per="Execution_Image_Quality",
+        )
+        estimated = info["estimated_row_count"]
+        anchors_by_type = info["anchors"]["by_type"]
+        image_anchors = anchors_by_type.get("Image", 0)
+
+        assert image_anchors > 0, "Demo dataset should have Image anchors"
+
+        # The honest answer is "unknown" — we don't have a per-anchor
+        # fan-out estimate without querying the catalog. Pre-fix this
+        # was silently 0, which the e2e Analyst arc consumed as
+        # truth. The contract: when we can't compute, say so.
+        assert estimated["in_scope_row_per_rows"] is None, (
+            f"row_per downstream of anchor: estimate should be None "
+            f"(unknown), not {estimated['in_scope_row_per_rows']} "
+            f"(silently 0 was finding A02)."
+        )
+        assert estimated["total"] is None
+        # Reason field tells the caller WHY the estimate is unknown.
+        assert "reason" in estimated, (
+            "estimated_row_count should include a 'reason' field when "
+            "the count cannot be computed honestly."
+        )
+        assert "downstream" in estimated["reason"].lower(), (
+            f"reason should mention the downstream relationship: got "
+            f"{estimated['reason']!r}"
+        )

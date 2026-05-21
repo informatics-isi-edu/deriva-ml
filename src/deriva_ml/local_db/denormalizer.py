@@ -588,8 +588,19 @@ class Denormalizer:
               suggestions}`` dicts, one per Rule 6 ambiguity. Empty
               when the plan is unambiguous.
             - ``estimated_row_count``: ``{in_scope_row_per_rows,
-              orphan_rows, total}`` — coarse anchor-based estimate.
-              Fields are ``None`` when estimation couldn't be computed.
+              orphan_rows, total}``, optionally with a ``reason`` field.
+              Anchor-based estimate; honest about unknowns. ``total``
+              is exact when every scoping anchor sits at ``row_per``
+              (case 1 of §3.7). When any scoping anchor is downstream
+              of ``row_per`` (the common feature-table case), the
+              per-anchor fan-out is unknown without a catalog query —
+              ``in_scope_row_per_rows`` and ``total`` come back as
+              ``None`` and a ``reason`` string names the downstream
+              tables. ``orphan_rows`` is always exact (an orphan
+              contributes exactly one row regardless of ``row_per``
+              cardinality). Originally surfaced as 2026-05-21 finding
+              A02; documented in ``docs/design/denormalization.md`` §7
+              row F6.
             - ``anchors``: ``{total, by_type}`` — counts of anchor RIDs
               grouped by table.
             - ``source``: ``"catalog"`` for live Datasets, ``"local"``
@@ -709,15 +720,33 @@ class Denormalizer:
             anchors = {}
         anchors_by_type = {t: len(rids) for t, rids in anchors.items()}
 
-        # ── estimated row count (crude — refined in future work) ────────────
-        # For v1: report how many anchors would be scoping vs orphan.
-        estimated = {
+        # ── estimated row count (anchor-based; honest about unknowns) ───────
+        #
+        # Three cases (see ``docs/design/denormalization.md`` §6 freshness
+        # caveat and the 2026-05-21 finding A02 history):
+        #
+        # 1. Anchor table == row_per → in_scope is exact (1 row per anchor).
+        # 2. Anchor table reaches row_per via FK chain (downstream or
+        #    upstream) but is NOT row_per itself → cardinality is N rows
+        #    per anchor for some N ≥ 0 that depends on per-anchor data the
+        #    estimator does not have without a catalog query. Honest answer:
+        #    None (with a `reason` field so the caller knows why).
+        # 3. Anchor table has no FK path to row_per → orphan (case 3 of
+        #    Rule 7; counted in orphan_rows).
+        #
+        # The pre-A02 implementation only honored case 1 (filtered on
+        # ``table == resolved_row_per``) and silently returned 0 for case
+        # 2. That meant ``preflight_count`` reported 0 for every
+        # feature-table denormalize (the common case where row_per is a
+        # downstream feature table and anchors are Image / Subject /
+        # whatever the dataset elements are). The 2026-05-21 e2e Analyst
+        # arc consumed the silent 0 as truth and reported A02.
+        estimated: dict[str, Any] = {
             "in_scope_row_per_rows": None,
             "orphan_rows": None,
             "total": None,
         }
         if resolved_row_per is not None:
-            # Count anchors classified as scoping (includes row_per anchors)
             try:
                 scoping, orphans, _ = self._classify_anchors(
                     anchors,
@@ -726,13 +755,44 @@ class Denormalizer:
                     row_per=resolved_row_per,
                     ignore_unrelated_anchors=True,  # describe shouldn't raise
                 )
-                in_scope = sum(len(rids) for table, rids in scoping.items() if table == resolved_row_per)
+                # Split scoping into "anchors sitting at row_per"
+                # (case 1, exact contribution) and "anchors elsewhere
+                # but reaching row_per via FK chain" (case 2, unknown
+                # fan-out).
+                at_row_per_count = sum(
+                    len(rids) for table, rids in scoping.items() if table == resolved_row_per
+                )
+                downstream_anchor_tables = [
+                    table
+                    for table, rids in scoping.items()
+                    if table != resolved_row_per and rids
+                ]
                 orphan_count = sum(len(rids) for rids in orphans.values())
-                estimated = {
-                    "in_scope_row_per_rows": in_scope,
-                    "orphan_rows": orphan_count,
-                    "total": in_scope + orphan_count,
-                }
+
+                if downstream_anchor_tables:
+                    # Case 2 dominates: we can't honestly state a total
+                    # without per-anchor fan-out info. Surface what we
+                    # DO know (orphan_rows is exact) and a reason for
+                    # the unknown fields.
+                    estimated = {
+                        "in_scope_row_per_rows": None,
+                        "orphan_rows": orphan_count,
+                        "total": None,
+                        "reason": (
+                            f"anchor table(s) {downstream_anchor_tables} are "
+                            f"downstream of row_per={resolved_row_per!r}; "
+                            "cardinality is N rows per anchor for unknown N. "
+                            "Run the actual fetch to count, or query the "
+                            "catalog directly for an exact figure."
+                        ),
+                    }
+                else:
+                    # Case 1 only: estimate is exact.
+                    estimated = {
+                        "in_scope_row_per_rows": at_row_per_count,
+                        "orphan_rows": orphan_count,
+                        "total": at_row_per_count + orphan_count,
+                    }
             except Exception:
                 pass
 
