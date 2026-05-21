@@ -1189,6 +1189,84 @@ class TestSplitDataset:
                 element_table="NonExistentTable",
             )
 
+    # ------------------------------------------------------------------
+    # Regression tests for finding 05 — denormalize cache re-entry
+    # ------------------------------------------------------------------
+    #
+    # Finding 05 (deriva-ml-model-template/findings/setup/05): the local
+    # SQLite cache populated by the first live-catalog denormalize call
+    # is not consulted by the second call's PagedFetcher, so the second
+    # call's INSERT into Dataset crashes with UNIQUE constraint failed.
+    # Manifests in two ways:
+    #
+    #   (a) Two split_dataset calls against the same source in one
+    #       process — second call's denormalize crashes.
+    #   (b) Any split_dataset call in a session where the local DB
+    #       already has the source Dataset row from a prior session.
+    #
+    # Both shapes broke the model-template Phase 0 bootstrap (only
+    # 10 of 13 expected datasets created). Both are covered here.
+
+    def test_two_splits_same_source_in_one_process(self, test_ml):
+        """Two split_dataset calls against the same source must both succeed.
+
+        Phase 0 of the multi-persona test calls split_dataset twice
+        against the Training dataset (once for the full labeled split,
+        once for the small labeled split). Before the finding-05 fix,
+        the second call crashed inside the denormalizer with
+        ``UNIQUE constraint failed: Dataset.RID`` because the local
+        SQLite already held the source's Dataset row from the first
+        call's _populate_from_catalog.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result_a = split_dataset(ml, source_rid, test_size=3, seed=42)
+        assert isinstance(result_a, SplitResult)
+
+        # Second split from the same source — must not crash.
+        result_b = split_dataset(ml, source_rid, test_size=4, seed=99)
+        assert isinstance(result_b, SplitResult)
+        assert result_b.split.rid != result_a.split.rid
+
+    def test_split_after_prior_denormalize_of_source(self, test_ml, tmp_path):
+        """A standalone get_denormalized_as_dataframe on the source must
+        not poison a subsequent split_dataset against the same source.
+
+        This exercises the cross-call path without involving two splits
+        — exactly the shape an Analyst persona would hit when they
+        inspect the source dataset before kicking off a curated split.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        # First: inspect the source as the Analyst would.
+        src = ml.lookup_dataset(source_rid)
+        df = src.get_denormalized_as_dataframe(include_tables=["SplitTestItem"])
+        assert len(df) == 12
+
+        # Then: a Curator-style split. Must not crash.
+        result = split_dataset(ml, source_rid, test_size=3, seed=42)
+        assert isinstance(result, SplitResult)
+        assert result.training.count == 9
+        assert result.testing.count == 3
+
+    def test_two_denormalize_calls_on_same_dataset(self, test_ml):
+        """Two get_denormalized_as_dataframe calls on the same live
+        Dataset must both succeed.
+
+        Minimal form of finding 05 — does not involve split_dataset.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+        src = ml.lookup_dataset(source_rid)
+
+        df_a = src.get_denormalized_as_dataframe(include_tables=["SplitTestItem"])
+        df_b = src.get_denormalized_as_dataframe(include_tables=["SplitTestItem"])
+
+        assert len(df_a) == len(df_b) == 12
+        assert list(df_a.columns) == list(df_b.columns)
+
 
 # =============================================================================
 # Unit Tests: split_dataset denormalization plumbing (issue #174)

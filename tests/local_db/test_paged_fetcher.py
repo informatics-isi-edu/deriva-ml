@@ -291,6 +291,96 @@ class TestFetchByRids:
 
         assert _rows_count(engine, table) == 5
 
+    def test_two_fetchers_same_engine_overlapping_rids(self, engine):
+        """Two PagedFetcher instances against one engine — second must not
+        crash on the rows the first inserted.
+
+        Regression for the finding-05 root cause: ``_populate_from_catalog``
+        builds a fresh ``PagedFetcher`` on every call, and the per-fetcher
+        ``_seen`` set starts empty. Before this test was added, the second
+        fetcher's ``fetch_by_rids`` would try to INSERT rows already in the
+        DB and raise ``UNIQUE constraint failed``.
+        """
+        rows = _make_rows(5)
+        client = FakePagedClient(rows_by_table={"Image": rows})
+        table = _make_target_table(engine, "Image")
+        rids = [r["RID"] for r in rows]
+
+        # First fetcher inserts all five rows.
+        fetcher_a = PagedFetcher(client=client, engine=engine)
+        fetcher_a.fetch_by_rids("Image", rids, table, batch_size=500)
+        assert _rows_count(engine, table) == 5
+
+        # Second fetcher (fresh instance, fresh _seen) requests the same
+        # RIDs. It must not crash on the duplicate INSERT.
+        fetcher_b = PagedFetcher(client=client, engine=engine)
+        fetcher_b.fetch_by_rids("Image", rids, table, batch_size=500)
+        assert _rows_count(engine, table) == 5
+
+    def test_fresh_fetcher_against_pre_populated_engine(self, engine):
+        """Cross-session simulation — engine has rows from a 'prior' run,
+        a fresh fetcher must cope.
+
+        The on-disk SQLite workspace persists across Python processes, so
+        a new ``DerivaML`` instance pointed at the same catalog sees rows
+        from the previous session. The fetcher must not blindly INSERT.
+        """
+        rows = _make_rows(5)
+        client = FakePagedClient(rows_by_table={"Image": rows})
+        table = _make_target_table(engine, "Image")
+        rids = [r["RID"] for r in rows]
+
+        # Simulate a prior session having populated the DB.
+        with engine.begin() as conn:
+            from sqlalchemy import insert as _insert
+
+            conn.execute(_insert(table), rows)
+        assert _rows_count(engine, table) == 5
+
+        # New fetcher (mimicking a fresh process / fresh DerivaML) tries
+        # to fetch the same RIDs. Must succeed without crash.
+        fetcher = PagedFetcher(client=client, engine=engine)
+        fetcher.fetch_by_rids("Image", rids, table, batch_size=500)
+        assert _rows_count(engine, table) == 5
+
+    def test_two_fetchers_partial_overlap(self, engine):
+        """Two fetchers, overlapping but not identical RID sets — new RIDs
+        must be inserted, overlapping ones must be no-ops.
+        """
+        rows = _make_rows(10)
+        client = FakePagedClient(rows_by_table={"Image": rows})
+        table = _make_target_table(engine, "Image")
+        rids = [r["RID"] for r in rows]
+
+        fetcher_a = PagedFetcher(client=client, engine=engine)
+        fetcher_a.fetch_by_rids("Image", rids[:6], table, batch_size=500)
+        assert _rows_count(engine, table) == 6
+
+        # Second fetcher requests RIDs 4..9 — 4 and 5 already present, 6..9 new.
+        fetcher_b = PagedFetcher(client=client, engine=engine)
+        fetcher_b.fetch_by_rids("Image", rids[4:], table, batch_size=500)
+        assert _rows_count(engine, table) == 10
+
+    def test_two_fetchers_predicate_then_rids_overlap(self, engine):
+        """First fetcher populates via the page/predicate path; second
+        fetcher's fetch_by_rids on the same RIDs must still cope.
+
+        This exercises the predicate→RID interleaving inside one engine
+        but across fetcher instances.
+        """
+        rows = _make_rows(5)
+        client = FakePagedClient(rows_by_table={"Image": rows})
+        table = _make_target_table(engine, "Image")
+        rids = [r["RID"] for r in rows]
+
+        fetcher_a = PagedFetcher(client=client, engine=engine)
+        fetcher_a.fetch_predicate("Image", predicate=None, target_table=table, sort=("RID",))
+        assert _rows_count(engine, table) == 5
+
+        fetcher_b = PagedFetcher(client=client, engine=engine)
+        fetcher_b.fetch_by_rids("Image", rids, table, batch_size=500)
+        assert _rows_count(engine, table) == 5
+
     def test_extra_columns_in_rows_are_silently_dropped(self, tmp_path: Path) -> None:
         engine = create_engine(f"sqlite:///{tmp_path / 'wd.sqlite'}", future=True)
         target = _make_target_table(engine)  # has RID, Filename, Subject

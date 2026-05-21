@@ -119,11 +119,46 @@ class PagedFetcher:
     def __init__(self, *, client: PagedClient, engine: Engine) -> None:
         self._client = client
         self._engine = engine
-        # Tracks already-inserted (table, column) → set of seen values, preventing
-        # double-inserts when the same fetcher is reused across multiple calls.
+        # Tracks already-inserted (table, column) → set of seen values. The
+        # set is hydrated lazily from the engine on first access via
+        # :meth:`_get_seen` so that fresh fetcher instances pointing at a
+        # workspace populated by a prior fetcher (or a prior session) do
+        # not re-fetch and re-INSERT rows that already exist locally.
         self._seen: dict[tuple[str, str], set[str]] = {}
         # Cached row counts per table, populated lazily by fetch_by_rids_or_predicate.
         self._counts: dict[str, int] = {}
+
+    def _get_seen(self, table: str, rid_column: str, target_table: Table) -> set[str]:
+        """Return the seen-set for ``(table, rid_column)``, hydrating it
+        from the engine on first access.
+
+        Reads the existing ``{rid_column}`` values from ``target_table``
+        and seeds the set with them, so fresh fetcher instances against
+        a workspace that already holds rows (from a prior fetcher in
+        the same process, or from a prior Python session that wrote to
+        the same on-disk SQLite) do not attempt to re-INSERT them.
+
+        Subsequent ``fetch_by_rids`` / ``fetch_predicate`` calls extend
+        this set in memory; the engine is only re-read on first access
+        for a given key. This keeps the dedup honest across multiple
+        ``PagedFetcher`` instances sharing one engine — the root cause
+        of the model-template 2026-05-21 finding 05 (``UNIQUE constraint
+        failed: Dataset.RID`` on the second live denormalize call).
+        """
+        key = (table, rid_column)
+        if key in self._seen:
+            return self._seen[key]
+        existing: set[str] = set()
+        col = target_table.columns.get(rid_column)
+        if col is not None:
+            from sqlalchemy import select as _select
+
+            with self._engine.connect() as conn:
+                for (rid,) in conn.execute(_select(col)):
+                    if rid is not None:
+                        existing.add(str(rid))
+        self._seen[key] = existing
+        return existing
 
     def fetch_predicate(
         self,
@@ -149,6 +184,7 @@ class PagedFetcher:
         Returns:
             Total number of rows inserted.
         """
+        seen = self._get_seen(table, "RID", target_table)
         n = 0
         after: tuple | None = None
         while True:
@@ -161,10 +197,14 @@ class PagedFetcher:
             )
             if not page:
                 break
-            self._insert_rows(target_table, page)
-            key = (table, "RID")
-            self._seen.setdefault(key, set()).update(str(r["RID"]) for r in page if "RID" in r)
-            n += len(page)
+            # Drop rows the engine already has — re-entry into this code
+            # path (a fresh PagedFetcher pointed at a populated engine)
+            # would otherwise crash on the INSERT.
+            new_rows = [r for r in page if str(r.get("RID")) not in seen]
+            if new_rows:
+                self._insert_rows(target_table, new_rows)
+            seen.update(str(r["RID"]) for r in page if "RID" in r)
+            n += len(new_rows)
             if len(page) < page_size:
                 break
             last = page[-1]
@@ -198,8 +238,7 @@ class PagedFetcher:
             Number of rows actually inserted (may be less than ``len(rids)`` if
             some RIDs were already in the seen-set or don't exist on the server).
         """
-        key = (table, rid_column)
-        seen = self._seen.setdefault(key, set())
+        seen = self._get_seen(table, rid_column, target_table)
         to_fetch = [r for r in dict.fromkeys(str(x) for x in rids) if r not in seen]
         if not to_fetch:
             return 0
