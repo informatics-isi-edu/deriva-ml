@@ -5,19 +5,25 @@ shells out to ``deriva.config.acl_config`` with ``policy.json``
 to install per-row update/delete protection. The end-to-end
 behavior had no test; a regression that silently broke the
 ``deriva-acl-config`` invocation (e.g., missing policy file,
-swallowed CalledProcessError) would leave new catalogs without
+swallowed CalledProcessError, or running it before the
+deriva-ml schema exists) would leave new catalogs without
 ``row_owner_guard`` protection.
 
-This test verifies that after ``create_ml_catalog`` returns:
+This test verifies that after ``create_ml_catalog`` returns,
+every table in the ``deriva-ml`` schema carries the
+``row_owner_guard`` binding in its ``acl_bindings`` field. The
+binding lives as a first-class catalog-model field, not buried
+in annotations — see deriva-py's ``Table.acl_bindings`` (a JSON
+dict managed independently of ``Table.annotations``).
 
-1. The catalog model carries an ``acl_bindings`` annotation
-   somewhere in the catalog or schema annotations.
-2. The bindings include ``row_owner_guard`` (or an equivalent
-   per-row binding).
-
-The exact place ``deriva-acl-config`` writes the bindings can
-shift between deriva-py versions; we assert presence at any
-ACL-binding-capable level rather than pinning a specific path.
+The original (now-fixed) regression: ``create_ml_catalog``
+called ``acl_config`` *before* ``create_ml_schema``, so the
+policy's per-table binding rule (which targets all non-public
+schemas) matched zero tables. The deriva-ml tables were
+silently created later without bindings; non-curator users
+hit HTTP 403 on every Execution_Metadata PATCH because
+``row_owner_guard`` (the binding that would have authorized
+"users can update rows they created") was never applied.
 
 Pattern follows ``test_vocab_fk_convention.py``. Requires
 DERIVA_HOST.
@@ -29,24 +35,6 @@ import json
 from importlib.resources import files
 
 import pytest
-
-
-def _find_row_owner_guard(node) -> bool:
-    """Recursively search a JSON-ish structure for ``row_owner_guard``."""
-    if isinstance(node, dict):
-        for k, v in node.items():
-            if k == "row_owner_guard":
-                return True
-            if _find_row_owner_guard(v):
-                return True
-    elif isinstance(node, list):
-        for item in node:
-            if _find_row_owner_guard(item):
-                return True
-    elif isinstance(node, str):
-        if node == "row_owner_guard":
-            return True
-    return False
 
 
 @pytest.mark.integration
@@ -76,25 +64,27 @@ def test_create_ml_catalog_applies_row_owner_guard() -> None:
     try:
         model = catalog.getCatalogModel()
 
-        # deriva-acl-config writes ACL bindings at the catalog or
-        # schema level (varies by version). Check both.
-        found = _find_row_owner_guard(model.annotations)
-        if not found:
-            for schema in model.schemas.values():
-                if _find_row_owner_guard(schema.annotations):
-                    found = True
-                    break
-                for table in schema.tables.values():
-                    if _find_row_owner_guard(table.annotations):
-                        found = True
-                        break
-                if found:
-                    break
-
-        assert found, (
-            "row_owner_guard not found anywhere in the catalog model "
-            "after create_ml_catalog. The deriva-acl-config invocation "
-            "in create_ml_catalog may have silently failed."
+        # deriva-acl-config writes per-table bindings into
+        # ``table.acl_bindings`` (a first-class catalog-model field,
+        # not buried in annotations). Walk the deriva-ml schema and
+        # require row_owner_guard on every table — the per-table
+        # binding rule in policy.json applies to all non-public
+        # schemas, so a single missing table flags either a
+        # configure ordering bug (acl_config ran before
+        # create_ml_schema) or a policy regression.
+        deriva_ml = model.schemas["deriva-ml"]
+        missing = [
+            tname
+            for tname, table in deriva_ml.tables.items()
+            if "row_owner_guard" not in (table.acl_bindings or {})
+        ]
+        assert not missing, (
+            f"row_owner_guard binding missing on deriva-ml tables: "
+            f"{sorted(missing)}. acl_config must run *after* "
+            f"create_ml_schema, otherwise the per-table binding rule "
+            f"finds no tables to bind to. See create_schema.py "
+            f"ordering of create_ml_schema vs the acl_config "
+            f"subprocess."
         )
     finally:
         catalog.delete_ermrest_catalog(really=True)

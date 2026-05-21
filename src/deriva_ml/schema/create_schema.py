@@ -592,6 +592,14 @@ def create_ml_catalog(
     model.configure_baseline_catalog()
     policy_file = files("deriva_ml.schema").joinpath("policy.json")
 
+    # The deriva-ml schema must exist *before* acl_config runs, otherwise
+    # policy.json's per-table binding rule (which matches all non-``public``
+    # schemas) has nothing to bind to, and ``row_owner_guard`` is silently
+    # applied to zero tables. The failure mode is invisible until a
+    # non-curator user PATCHes ``Execution_Metadata`` and gets HTTP 403.
+    # See ``tests/schema/test_acl_application.py``.
+    create_ml_schema(catalog, project_name=project_name)
+
     # Apply the catalog ACL policy via deriva.config.acl_config. We invoke
     # it as a module via the *current* interpreter (sys.executable -m ...)
     # rather than through PATH lookup of the deriva-acl-config console
@@ -631,8 +639,6 @@ def create_ml_catalog(
             f"row-level update/delete bindings will not work. "
             f"stderr:\n{e.stderr}"
         ) from e
-
-    create_ml_schema(catalog, project_name=project_name)
 
     # Create alias if requested
     if catalog_alias:
