@@ -66,14 +66,14 @@ class TestBagDataSourceMultiCSV:
 
     def test_csv_cache_collects_all_paths(self, nested_bag: Path):
         """_csv_cache should map each table name to a list of ALL matching CSV paths."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
 
         assert "Dataset_Version" in source._csv_cache
         assert len(source._csv_cache["Dataset_Version"]) == 2
 
     def test_get_table_data_yields_all_rows(self, nested_bag: Path):
         """get_table_data should yield rows from all CSV files for a table."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
         rows = list(source.get_table_data("Dataset_Version"))
 
         # Should have all 4 rows: 2 from parent + 2 from child
@@ -83,7 +83,7 @@ class TestBagDataSourceMultiCSV:
 
     def test_get_table_data_preserves_all_datasets(self, nested_bag: Path):
         """All dataset RIDs should be present in the yielded rows."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
         rows = list(source.get_table_data("Dataset_Version"))
 
         datasets = {r["Dataset"] for r in rows}
@@ -91,18 +91,18 @@ class TestBagDataSourceMultiCSV:
 
     def test_has_table_with_multiple_csvs(self, nested_bag: Path):
         """has_table should return True when multiple CSVs exist for a table."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
         assert source.has_table("Dataset_Version") is True
 
     def test_list_available_tables(self, nested_bag: Path):
         """list_available_tables should include tables with multiple CSVs."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
         tables = source.list_available_tables()
         assert "Dataset_Version" in tables
 
     def test_get_row_count_sums_all_csvs(self, nested_bag: Path):
         """get_row_count should return total rows across all CSV files."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
         count = source.get_row_count("Dataset_Version")
         assert count == 4
 
@@ -112,7 +112,7 @@ class TestBagDataSourceMultiCSV:
         Deduplication is handled downstream by DataLoader's on_conflict policy,
         not by BagDataSource.
         """
-        source = BagDataSource(nested_bag_with_duplicates, asset_localization=False)
+        source = BagDataSource(nested_bag_with_duplicates)
         rows = list(source.get_table_data("Subject"))
 
         # S2 appears in both CSVs, so we get 4 rows total (dedup is not BagDataSource's job)
@@ -127,14 +127,14 @@ class TestBagDataSourceMultiCSV:
         csv_file.parent.mkdir(parents=True)
         csv_file.write_text("RID,Value\nR1,hello\nR2,world\n")
 
-        source = BagDataSource(tmp_path, asset_localization=False)
+        source = BagDataSource(tmp_path)
         rows = list(source.get_table_data("Simple"))
         assert len(rows) == 2
         assert source.get_row_count("Simple") == 2
 
     def test_missing_table_returns_empty(self, nested_bag: Path):
         """Requesting a table with no CSVs should yield nothing."""
-        source = BagDataSource(nested_bag, asset_localization=False)
+        source = BagDataSource(nested_bag)
         rows = list(source.get_table_data("NonExistent"))
         assert rows == []
         assert source.has_table("NonExistent") is False

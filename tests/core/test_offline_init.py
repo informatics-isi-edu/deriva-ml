@@ -150,48 +150,15 @@ def test_refresh_schema_force_succeeds(test_ml, caplog):
     )
 
 
-@pytest.mark.skipif(
-    not os.environ.get("DERIVA_HOST"),
-    reason="requires a live catalog at DERIVA_HOST",
-)
-def test_online_drift_warning(catalog_manager, tmp_path, caplog):
-    """Cache at stale snapshot id → re-init online → warning logged; cache unchanged."""
-    import json as _json
-    import logging
-
-    from deriva_ml import ConnectionMode, DerivaML
-    from deriva_ml.core.schema_cache import SchemaCache
-
-    catalog_manager.reset()
-
-    # First, online to populate the cache normally.
-    DerivaML(
-        hostname=catalog_manager.hostname,
-        catalog_id=catalog_manager.catalog_id,
-        mode=ConnectionMode.online,
-        working_dir=tmp_path,
-    )
-
-    # Corrupt the snapshot_id to force drift.
-    cache = SchemaCache(tmp_path)
-    data = cache.load()
-    data["snapshot_id"] = "fake-drift-snapshot"
-    (tmp_path / "schema-cache.json").write_text(_json.dumps(data))
-
-    # Re-init online → drift warning.
-    caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="deriva_ml"):
-        DerivaML(
-            hostname=catalog_manager.hostname,
-            catalog_id=catalog_manager.catalog_id,
-            mode=ConnectionMode.online,
-            working_dir=tmp_path,
-        )
-    assert any(
-        "snapshot" in r.getMessage().lower()
-        for r in caplog.records
-    ), f"expected drift-warning log; got {[r.getMessage() for r in caplog.records]}"
-
-    # Cache snapshot_id still says the fake value — we DIDN'T auto-refresh.
-    reloaded = _json.loads((tmp_path / "schema-cache.json").read_text())
-    assert reloaded["snapshot_id"] == "fake-drift-snapshot"
+# NOTE: ``test_online_drift_warning`` was removed alongside this commit.
+# Its premise -- that online init compares the cached snapshot to the
+# live one and emits a warning on mismatch -- belonged to a pre-1f2e7223
+# design. Schema-cache freshness is now handled in deriva-py's binding
+# layer (auto-invalidation + If-None-Match revalidation), so the
+# "cache at X, live at Y" condition can no longer arise at online init
+# in a way that requires user action. The disk cache is now solely a
+# bootstrap for offline mode; ``_init_online`` writes the live snapshot
+# unconditionally, so any stale snapshot on disk is just overwritten.
+# The companion 340-line file ``test_refresh_schema_warning.py`` was
+# deleted in 1f2e7223; this stub records that this file's drift test
+# was a missed cleanup from that commit.
