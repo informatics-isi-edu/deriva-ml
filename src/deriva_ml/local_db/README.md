@@ -96,7 +96,18 @@ DatasetBag.get_denormalized_as_dataframe ─> Denormalizer(bag).as_dataframe(...
 
 ## Further reading
 
-- Phase 1 design spec: `docs/superpowers/specs/2026-04-15-unified-local-db-design.md`
-- Phase 2 design spec: `docs/superpowers/specs/2026-04-15-unified-local-db-phase2-design.md`
-- Phase 1 plan: `docs/superpowers/plans/2026-04-15-unified-local-db-phase1.md`
-- Phase 2 plan: `docs/superpowers/plans/2026-04-16-unified-local-db-phase2.md`
+- **Primary design reference:** `docs/design/denormalization.md` —
+  current architecture, state-ownership model, fetcher / INSERT
+  contracts, fragility map, and test matrix. Start here.
+- **Semantic Rules 1–8 (planner):**
+  `docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md`.
+  Still authoritative for `Denormalizer` semantics.
+- **Workspace layout (ATTACH'd schema files, registries):**
+  `docs/superpowers/specs/2026-04-15-unified-local-db-design.md`
+  and `…/2026-04-15-unified-local-db-phase2-design.md`. Still
+  authoritative for storage; superseded by
+  `docs/design/denormalization.md` wherever they overlap on
+  fetcher/INSERT semantics.
+- **Implementation plans (historical):**
+  `docs/superpowers/plans/archive/` — point-in-time records of
+  past implementation work. Do not cite as current design.

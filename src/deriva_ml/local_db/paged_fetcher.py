@@ -1,26 +1,38 @@
 """Paged fetching primitive for the local_db layer.
 
-Exposes three public methods:
+Stateless transport adapter between an ERMrest-like ``PagedClient`` and a
+SQLAlchemy engine's local SQLite. Three public methods:
 
 - ``fetch_predicate``: keyset-paged scan of rows matching an ERMrest
   predicate into a SQLAlchemy ``Table`` in local SQLite.
-- ``fetch_by_rids``: RID-set batched fetch with URL byte-length guard, GET
-  shrink-then-POST fallback, and per-operation dedup against a
-  ``target_table``.
+- ``fetch_by_rids``: RID-set batched fetch with URL byte-length guard and
+  GET-shrink-then-POST fallback.
 - ``fetch_by_rids_or_predicate``: dispatches between the two based on a
   cardinality threshold (``|rid_set| / table_row_count``).
 
-The class is parameterized on a ``client`` object providing four methods:
-``count``, ``fetch_page``, ``fetch_rid_batch``, and — optionally — a `POST`
-mode flag to ``fetch_rid_batch`` for the oversized-URL fallback. See the
-fake client used in tests for the exact interface contract.
+Contract: the only mutation point against the engine is ``_insert_rows``,
+which uses ``INSERT OR IGNORE`` semantics (rows whose ``RID`` already
+exists in the target table are skipped, not overwritten, not raised on).
+``fetch_*`` methods do NOT consult engine state to decide what to
+request — the server is the authority for what rows match a query, and
+the database's UNIQUE constraint is the authority for insert collisions.
+
+See ``docs/design/denormalization.md`` for the full pipeline architecture,
+state model, and contract. The 2026-05-21 model-template e2e run
+documented two failure modes this design closes (finding 05: re-INSERT
+crash; finding A01: silent row-drop on FK-column fetch).
+
+The class is parameterized on a ``client`` object providing three methods:
+``count``, ``fetch_page``, ``fetch_rid_batch``. See the fake client used
+in tests for the exact interface contract.
 """
 
 from __future__ import annotations
 
 from typing import Any, Iterable, Protocol
 
-from sqlalchemy import Table, insert, select
+from sqlalchemy import Table, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from deriva_ml.core.logging_config import get_logger
@@ -102,8 +114,28 @@ class PagedFetcher:
     - :meth:`fetch_by_rids_or_predicate`: automatically routes between the two
       strategies based on ``|rids| / table_row_count`` cardinality ratio.
 
-    Deduplication is performed per ``(table, column)`` pair: rows already
-    inserted in a previous fetch call are skipped.
+    Statelessness contract (``docs/design/denormalization.md`` §4):
+
+    - **No engine-derived dedup.** ``fetch_by_rids``/``fetch_predicate`` do
+      not consult the engine to decide what to request. The server is the
+      authority for "what rows match this query right now."
+    - **INSERT-OR-IGNORE at the only mutation point.** Insert collisions
+      are resolved by the database's UNIQUE constraint via
+      ``INSERT OR IGNORE``, so re-entering the populate path against an
+      engine that already holds some rows (within a session OR across
+      sessions, on the same on-disk SQLite workspace) is safe and idempotent.
+    - **No in-memory state survives across calls.** The fetcher carries
+      a per-table row-count memo (used by the cardinality heuristic) and
+      nothing else.
+
+    This design closes two failure modes from the 2026-05-21
+    model-template e2e run:
+
+    - **Finding 05** (re-INSERT crashes with ``UNIQUE constraint failed``):
+      ``_insert_rows`` no longer raises on existing RIDs.
+    - **Finding A01** (silent row-drop on FK-column fetches): the fetcher
+      doesn't try to dedup at the fetch boundary at all, so it can't
+      conflate "we've seen this PK" with "we've seen this FK value".
 
     Args:
         client: A :class:`PagedClient` implementation (e.g., :class:`ErmrestPagedClient`).
@@ -119,46 +151,12 @@ class PagedFetcher:
     def __init__(self, *, client: PagedClient, engine: Engine) -> None:
         self._client = client
         self._engine = engine
-        # Tracks already-inserted (table, column) → set of seen values. The
-        # set is hydrated lazily from the engine on first access via
-        # :meth:`_get_seen` so that fresh fetcher instances pointing at a
-        # workspace populated by a prior fetcher (or a prior session) do
-        # not re-fetch and re-INSERT rows that already exist locally.
-        self._seen: dict[tuple[str, str], set[str]] = {}
-        # Cached row counts per table, populated lazily by fetch_by_rids_or_predicate.
+        # Cached row counts per table, populated lazily by
+        # fetch_by_rids_or_predicate. Per-fetcher; not engine-derived.
+        # This is the only state the fetcher carries across calls within
+        # its own lifetime, and it survives only the one denormalize call
+        # that built the fetcher.
         self._counts: dict[str, int] = {}
-
-    def _get_seen(self, table: str, rid_column: str, target_table: Table) -> set[str]:
-        """Return the seen-set for ``(table, rid_column)``, hydrating it
-        from the engine on first access.
-
-        Reads the existing ``{rid_column}`` values from ``target_table``
-        and seeds the set with them, so fresh fetcher instances against
-        a workspace that already holds rows (from a prior fetcher in
-        the same process, or from a prior Python session that wrote to
-        the same on-disk SQLite) do not attempt to re-INSERT them.
-
-        Subsequent ``fetch_by_rids`` / ``fetch_predicate`` calls extend
-        this set in memory; the engine is only re-read on first access
-        for a given key. This keeps the dedup honest across multiple
-        ``PagedFetcher`` instances sharing one engine — the root cause
-        of the model-template 2026-05-21 finding 05 (``UNIQUE constraint
-        failed: Dataset.RID`` on the second live denormalize call).
-        """
-        key = (table, rid_column)
-        if key in self._seen:
-            return self._seen[key]
-        existing: set[str] = set()
-        col = target_table.columns.get(rid_column)
-        if col is not None:
-            from sqlalchemy import select as _select
-
-            with self._engine.connect() as conn:
-                for (rid,) in conn.execute(_select(col)):
-                    if rid is not None:
-                        existing.add(str(rid))
-        self._seen[key] = existing
-        return existing
 
     def fetch_predicate(
         self,
@@ -171,8 +169,10 @@ class PagedFetcher:
         """Fetch all rows matching *predicate* via keyset pagination.
 
         Iterates ``@after`` pages until the client returns fewer rows than
-        *page_size*, which signals end-of-data.  Rows are inserted into
-        *target_table* and the fetched RIDs are recorded for deduplication.
+        *page_size*, which signals end-of-data. Rows are inserted into
+        *target_table* via :meth:`_insert_rows`, which uses INSERT-OR-IGNORE
+        semantics — so a page row whose RID is already in the engine is
+        skipped without error.
 
         Args:
             table: Qualified table name (``"schema:table"``).
@@ -182,9 +182,8 @@ class PagedFetcher:
             page_size: Rows per page (also the stop condition threshold).
 
         Returns:
-            Total number of rows inserted.
+            Number of rows actually written (skipped duplicates do not count).
         """
-        seen = self._get_seen(table, "RID", target_table)
         n = 0
         after: tuple | None = None
         while True:
@@ -197,14 +196,7 @@ class PagedFetcher:
             )
             if not page:
                 break
-            # Drop rows the engine already has — re-entry into this code
-            # path (a fresh PagedFetcher pointed at a populated engine)
-            # would otherwise crash on the INSERT.
-            new_rows = [r for r in page if str(r.get("RID")) not in seen]
-            if new_rows:
-                self._insert_rows(target_table, new_rows)
-            seen.update(str(r["RID"]) for r in page if "RID" in r)
-            n += len(new_rows)
+            n += self._insert_rows(target_table, page)
             if len(page) < page_size:
                 break
             last = page[-1]
@@ -220,42 +212,45 @@ class PagedFetcher:
         batch_size: int = DEFAULT_BATCH_SIZE,
         max_url_bytes: int = DEFAULT_MAX_URL_BYTES,
     ) -> int:
-        """Fetch rows by explicit RID list, batching and deduplicating automatically.
+        """Fetch rows whose *rid_column* matches any value in *rids*.
 
-        Already-seen RIDs (from previous calls on this fetcher) are skipped.
-        Each batch is fetched via :meth:`_fetch_rid_batch_with_fallback`, which
-        tries GET first and falls back to POST if the URL would be too long.
+        Issues one or more HTTP requests via :meth:`_fetch_rid_batch_with_fallback`
+        (GET → POST shrink-fallback for oversized URLs), then inserts the
+        returned rows into *target_table* via :meth:`_insert_rows`.
+
+        ``rid_column`` may be the table's primary key (``"RID"`` — the
+        default and most common case) or a foreign-key column. When it
+        is an FK, the server may return many rows per filter value;
+        the fetcher does not assume one-to-one. This is the A01 case
+        that previously caused silent row-drops.
 
         Args:
             table: Qualified table name (``"schema:table"``).
-            rids: Iterable of RID values to fetch.
+            rids: Iterable of values to filter by on *rid_column*.
             target_table: SQLAlchemy :class:`Table` to insert into.
-            rid_column: Column name that holds the RID values (default ``"RID"``).
-            batch_size: Number of RIDs per HTTP request.
-            max_url_bytes: Byte threshold above which GET is split into POST.
+            rid_column: Column name on *table* to filter on (default ``"RID"``).
+            batch_size: Number of values per HTTP request.
+            max_url_bytes: Byte threshold above which GET shrinks to POST.
 
         Returns:
-            Number of rows actually inserted (may be less than ``len(rids)`` if
-            some RIDs were already in the seen-set or don't exist on the server).
+            Number of rows actually written (rows already present by RID
+            are skipped via INSERT-OR-IGNORE and do not count).
         """
-        seen = self._get_seen(table, rid_column, target_table)
-        to_fetch = [r for r in dict.fromkeys(str(x) for x in rids) if r not in seen]
-        if not to_fetch:
+        deduped = list(dict.fromkeys(str(x) for x in rids))
+        if not deduped:
             return 0
 
         n = 0
         i = 0
-        while i < len(to_fetch):
-            batch = to_fetch[i : i + batch_size]
+        while i < len(deduped):
+            batch = deduped[i : i + batch_size]
             rows = self._fetch_rid_batch_with_fallback(
                 table=table,
                 column=rid_column,
                 rids=batch,
                 max_url_bytes=max_url_bytes,
             )
-            self._insert_rows(target_table, rows)
-            seen.update(batch)
-            n += len(rows)
+            n += self._insert_rows(target_table, rows)
             i += batch_size
         return n
 
@@ -358,32 +353,58 @@ class PagedFetcher:
         )
 
     def fetched_rids(self, table: str, target_table: Table | None = None) -> set[str]:
-        """Return the set of RIDs that have been fetched for *table*.
+        """Return the set of RIDs currently in *target_table*.
 
-        If no RIDs have been tracked yet but *target_table* is provided, queries
-        the local table directly to populate the seen-set.
+        Read directly from the engine — the engine is the only authoritative
+        source for "what's in this workspace right now." There is no
+        in-memory cache to consult.
 
         Args:
-            table: Qualified table name.
-            target_table: Optional SQLAlchemy Table to fall back to for lookup.
+            table: Qualified table name (informational; used in the API for
+                consistency with the rest of the class).
+            target_table: SQLAlchemy ``Table`` to read RIDs from. Required;
+                if ``None``, returns the empty set (we have no other way to
+                know which engine table corresponds to *table*).
 
         Returns:
-            Set of RID strings (may be empty if nothing has been fetched yet).
+            Set of RID strings currently present in *target_table*.
         """
-        for (t, _col), s in self._seen.items():
-            if t == table:
-                return set(s)
-        if target_table is not None:
-            with self._engine.connect() as conn:
-                rids = {str(row[0]) for row in conn.execute(select(target_table.c.RID))}
-            self._seen[(table, "RID")] = set(rids)
-            return set(rids)
-        return set()
+        if target_table is None:
+            return set()
+        with self._engine.connect() as conn:
+            return {str(row[0]) for row in conn.execute(select(target_table.c.RID)) if row[0] is not None}
 
-    def _insert_rows(self, target_table: Table, rows: list[dict[str, Any]]) -> None:
+    def _insert_rows(self, target_table: Table, rows: list[dict[str, Any]]) -> int:
+        """Insert *rows* into *target_table* using INSERT-OR-IGNORE.
+
+        Contract (``docs/design/denormalization.md`` §5):
+
+        - For each row: if a row with the same RID already exists in
+          ``target_table``, skip (do not update, do not crash).
+          Otherwise insert.
+        - Extra columns on incoming rows that are not declared on
+          ``target_table`` are silently dropped (preserves the prior
+          contract; useful because ERMrest queries return system
+          columns like ``RCB`` that the local schema may not mirror).
+        - Returns the count of rows actually written (not skipped).
+
+        Uses SQLite's ``INSERT OR IGNORE`` via SQLAlchemy's
+        ``sqlite_insert(...).on_conflict_do_nothing()``. The engine is
+        always SQLite in this layer (see ``local_db/README.md``); if
+        that ever changes, this method becomes the dialect-aware seam.
+        """
         if not rows:
-            return
+            return 0
         cols = {c.name for c in target_table.columns}
         projected = [{k: v for k, v in r.items() if k in cols} for r in rows]
+        if not projected:
+            return 0
+        stmt = sqlite_insert(target_table).on_conflict_do_nothing(index_elements=["RID"])
         with self._engine.begin() as conn:
-            conn.execute(insert(target_table), projected)
+            result = conn.execute(stmt, projected)
+        # SQLAlchemy reports rowcount as the number of rows the database
+        # actually inserted; for INSERT OR IGNORE, skipped rows do not count.
+        # Fall back to len(projected) on dialects that don't report rowcount
+        # reliably (none we use today; this is a defensive default).
+        written = result.rowcount if result.rowcount is not None and result.rowcount >= 0 else len(projected)
+        return written

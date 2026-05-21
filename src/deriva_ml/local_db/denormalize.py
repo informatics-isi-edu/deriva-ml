@@ -493,9 +493,11 @@ def _populate_from_catalog_inner(
 
     # --- Step 2: Walk each join path, fetching each table in turn ----------
     # We process tables in the order they appear along each path. Already-
-    # fetched tables are skipped (PagedFetcher dedup handles this per-table
-    # via its internal _seen map, but we also dedupe at the path level to
-    # avoid unnecessary method-call overhead).
+    # walked tables are skipped via the ``processed`` set so we don't issue
+    # redundant fetches. PagedFetcher itself is stateless about prior fetches
+    # (see paged_fetcher.py and docs/design/denormalization.md §4); the
+    # dedup that matters is between this for-loop's iterations, not between
+    # PagedFetcher instances.
     processed: set[str] = {"Dataset"}
 
     for _key, (path, join_conditions, _join_types) in join_tables.items():

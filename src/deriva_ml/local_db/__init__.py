@@ -20,7 +20,15 @@ tracking.  Key public symbols:
 - :class:`ManifestStore`: crash-safe SQLite replacement for the old
   ``asset-manifest.json`` file.
 
-See ``docs/superpowers/specs/2026-04-15-unified-local-db-design.md`` for design.
+See ``docs/design/denormalization.md`` for the current architecture,
+state model, fetcher/INSERT contract, fragility map, and test matrix.
+The older Phase 1 / Phase 2 design specs under
+``docs/superpowers/specs/`` remain authoritative for the workspace
+layout (ATTACH'd schema files, ``main.db`` registries) and the
+``Denormalizer`` class semantic Rules 1–8 respectively, but are
+superseded by ``docs/design/denormalization.md`` wherever they
+overlap on fetcher/INSERT-side behavior.
+
 See ``README.md`` in this directory for a short orientation.
 """
 
