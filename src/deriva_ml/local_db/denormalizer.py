@@ -4,8 +4,14 @@ Wraps the lower-level ``_denormalize_impl`` primitive in a class-based API
 with support for auto-inferred ``row_per``, explicit ``via`` path routing,
 orphan-row handling, and arbitrary RID anchor sets.
 
-See ``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``
-for the semantic rules this class implements.
+Architecture, state model, fetcher/INSERT contract, fragility map, and
+test matrix:
+    ``docs/design/denormalization.md``
+
+The semantic Rules 1–8 implemented here (auto-inferred ``row_per``,
+downstream-leaf rejection, ambiguity detection, orphan emission,
+unrelated-anchor handling, etc.) live in:
+    ``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``
 """
 
 from __future__ import annotations
