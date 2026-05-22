@@ -24,18 +24,35 @@ Splitting Strategies:
         selection logic (balanced labels, filtered subsets, etc.).
 
 Example:
-    Simple random 80/20 split::
+    ``split_dataset`` runs inside an Execution the caller has already
+    opened. The caller's workflow identifies the code making the
+    splitting decision; deriva-ml never invents a workflow on the
+    caller's behalf, so this function is safe to call from
+    environments without a git checkout (notebook kernels, MCP
+    servers, scheduled jobs) as long as the caller has wired up a
+    workflow with honest provenance::
 
         from deriva_ml import DerivaML
         from deriva_ml.dataset.split import split_dataset
+        from deriva_ml.execution import ExecutionConfiguration
 
         ml = DerivaML("localhost", "9")
-        result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
 
-    Three-way train/val/test split::
+        workflow = ml.create_workflow(
+            name="My splitting script",
+            workflow_type="Dataset_Split",
+            description="80/20 train/test for sleep-stage classifier v3",
+        )
+        config = ExecutionConfiguration(workflow=workflow)
+
+        with ml.create_execution(config) as exe:
+            result = split_dataset(ml, "28D0", exe, test_size=0.2, seed=42)
+        exe.upload_execution_outputs(clean_folder=True)
+
+    Three-way train/val/test split (same execution, reuse ``exe``)::
 
         result = split_dataset(
-            ml, "28D0",
+            ml, "28D0", exe,
             test_size=0.2,
             val_size=0.1,
             seed=42,
@@ -44,7 +61,7 @@ Example:
     Stratified split::
 
         result = split_dataset(
-            ml, "28D0",
+            ml, "28D0", exe,
             test_size=0.2,
             stratify_by_column="Image_Classification.Image_Class",
             include_tables=["Image", "Image_Classification"],
@@ -57,7 +74,7 @@ Example:
             return {"Training": train_indices, "Testing": test_indices}
 
         result = split_dataset(
-            ml, "28D0",
+            ml, "28D0", exe,
             test_size=100,
             selection_fn=my_selector,
             include_tables=["Image", "Image_Classification"],
@@ -82,8 +99,8 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
+    from deriva_ml.execution import Execution
 
-from deriva_ml.execution import ExecutionConfiguration
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -426,23 +443,6 @@ def _resolve_sizes(
 # =============================================================================
 
 
-def _ensure_workflow_type(ml: DerivaML, workflow_type: str = "Dataset_Split") -> None:
-    """Ensure the workflow type exists in the catalog.
-
-    Args:
-        ml: Connected DerivaML instance.
-        workflow_type: Workflow type term name.
-    """
-    existing_types = {t.name for t in ml.list_vocabulary_terms("Workflow_Type")}
-    if workflow_type not in existing_types:
-        logger.info(f"Creating {workflow_type} workflow type...")
-        ml.add_term(
-            table="Workflow_Type",
-            term_name=workflow_type,
-            description="Workflow for splitting datasets into training/testing subsets",
-        )
-
-
 def _ensure_dataset_types(ml: DerivaML) -> None:
     """Ensure required dataset types exist.
 
@@ -482,6 +482,7 @@ def _ensure_dataset_types(ml: DerivaML) -> None:
 def split_dataset(
     ml: DerivaML,
     source_dataset_rid: str,
+    execution: Execution,
     *,
     # scikit-learn compatible parameters
     test_size: float | int = 0.2,
@@ -499,7 +500,6 @@ def split_dataset(
     element_table: str | None = None,
     include_tables: list[str] | None = None,
     selection_fn: SelectionFunction | None = None,
-    workflow_type: str = "Dataset_Split",
     dry_run: bool = False,
     # Denormalization-control parameters (issue #174)
     row_per: str | None = None,
@@ -524,6 +524,20 @@ def split_dataset(
     Args:
         ml: Connected DerivaML instance.
         source_dataset_rid: RID of the source dataset to split.
+        execution: A live :class:`Execution` the caller has already
+            opened (typically via ``with ml.create_execution(config) as
+            exe:``). All datasets created by this split — the parent
+            Split row and the Training / Validation / Testing children —
+            are attributed to *this* execution, which in turn is
+            attributed to the execution's workflow. The caller owns
+            execution provenance: their workflow URL and checksum
+            identify the code making the splitting decision, and
+            deriva-ml never invents a workflow on the caller's behalf.
+            The caller is responsible for committing the execution
+            (``exe.upload_execution_outputs()`` / context-manager exit).
+            ``split_dataset`` will write a ``split_config.json``
+            artifact into ``exe.working_dir`` that the caller's upload
+            will pick up.
         test_size: If float (0-1), fraction of data for testing.
             If int, absolute number of test samples. Default: 0.2.
         train_size: If float (0-1), fraction of data for training.
@@ -563,7 +577,6 @@ def split_dataset(
         selection_fn: Custom selection function conforming to the
             ``SelectionFunction`` protocol. Mutually exclusive with
             ``stratify_by_column``.
-        workflow_type: Workflow type vocabulary term. Default: "Dataset_Split".
         dry_run: If True, return what would happen without modifying catalog.
         row_per: Explicit leaf table for denormalization (passed
             through to :meth:`Dataset.get_denormalized_as_dataframe`).
@@ -905,128 +918,116 @@ def split_dataset(
         return result
 
     # -------------------------------------------------------------------------
-    # Ensure vocabulary terms exist
+    # Ensure dataset-type vocabulary terms exist (Training, Testing,
+    # Validation, Split, Labeled, Unlabeled). Workflow-type vocabulary is
+    # the caller's concern -- they registered the workflow that owns
+    # ``execution`` and chose its type.
     # -------------------------------------------------------------------------
-    _ensure_workflow_type(ml, workflow_type)
     _ensure_dataset_types(ml)
 
     # -------------------------------------------------------------------------
-    # Create execution and dataset hierarchy
+    # Create dataset hierarchy inside the caller's execution
     # -------------------------------------------------------------------------
     partitions_desc = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
     auto_description = f"Split of dataset {source_dataset_rid} ({strategy_desc}, {partitions_desc}, seed={seed})"
 
-    logger.info("Creating workflow and execution...")
-    workflow = ml.create_workflow(
-        name=f"Dataset Split: {source_dataset_rid}",
-        workflow_type=workflow_type,
-        description="Split dataset into training/testing/validation subsets",
-    )
-
-    config = ExecutionConfiguration(
-        workflow=workflow,
-        description=split_description or auto_description,
-    )
+    exe = execution
+    logger.info("Splitting inside caller's execution %s", exe.execution_rid)
 
     train_types = ["Training"] + (training_types or [])
     test_types = ["Testing"] + (testing_types or [])
     val_types = ["Validation"] + (validation_types or []) if val_size is not None else []
 
-    with ml.create_execution(config) as exe:
-        logger.info(f"  Execution RID: {exe.execution_rid}")
+    # Save split parameters as config artifact. The caller's execution
+    # is responsible for uploading this on its own ``upload_execution_outputs``;
+    # we never call upload here.
+    split_params = {
+        "source_dataset_rid": source_dataset_rid,
+        "test_size": test_size,
+        "train_size": train_size,
+        "val_size": val_size,
+        "partition_sizes": partition_sizes,
+        "shuffle": shuffle,
+        "seed": seed,
+        "stratify_by_column": stratify_by_column,
+        "stratify_missing": stratify_missing,
+        "element_table": element_table,
+        "include_tables": include_tables,
+        "row_per": row_per,
+        "via": via,
+        "ignore_unrelated_anchors": ignore_unrelated_anchors,
+        "training_types": train_types,
+        "testing_types": test_types,
+        "validation_types": val_types if val_types else None,
+        "strategy": strategy_desc,
+    }
+    params_file = Path(exe.working_dir) / "split_config.json"
+    params_file.write_text(json.dumps(split_params, indent=2))
+    logger.info(f"  Saved split parameters to {params_file}")
 
-        # Save split parameters as config artifact
-        split_params = {
-            "source_dataset_rid": source_dataset_rid,
-            "test_size": test_size,
-            "train_size": train_size,
-            "val_size": val_size,
-            "partition_sizes": partition_sizes,
-            "shuffle": shuffle,
-            "seed": seed,
-            "stratify_by_column": stratify_by_column,
-            "stratify_missing": stratify_missing,
-            "element_table": element_table,
-            "include_tables": include_tables,
-            "row_per": row_per,
-            "via": via,
-            "ignore_unrelated_anchors": ignore_unrelated_anchors,
-            "training_types": train_types,
-            "testing_types": test_types,
-            "validation_types": val_types if val_types else None,
-            "strategy": strategy_desc,
-        }
-        params_file = Path(exe.working_dir) / "split_config.json"
-        params_file.write_text(json.dumps(split_params, indent=2))
-        logger.info(f"  Saved split parameters to {params_file}")
+    # Create parent Split dataset
+    split_ds = exe.create_dataset(
+        description=split_description or auto_description,
+        dataset_types=["Split"],
+    )
+    logger.info(f"  Created Split dataset: {split_ds.dataset_rid}")
 
-        # Create parent Split dataset
-        split_ds = exe.create_dataset(
-            description=split_description or auto_description,
-            dataset_types=["Split"],
-        )
-        logger.info(f"  Created Split dataset: {split_ds.dataset_rid}")
+    # Create Training dataset
+    training_ds = exe.create_dataset(
+        description=(
+            f"Training subset ({partition_sizes['Training']} samples) of "
+            f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
+        ),
+        dataset_types=train_types,
+    )
+    logger.info(f"  Created Training dataset: {training_ds.dataset_rid}")
 
-        # Create Training dataset
-        training_ds = exe.create_dataset(
+    # Create Validation dataset (if requested)
+    validation_ds = None
+    if val_size is not None:
+        validation_ds = exe.create_dataset(
             description=(
-                f"Training subset ({partition_sizes['Training']} samples) of "
+                f"Validation subset ({partition_sizes['Validation']} samples) of "
                 f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
             ),
-            dataset_types=train_types,
+            dataset_types=val_types,
         )
-        logger.info(f"  Created Training dataset: {training_ds.dataset_rid}")
+        logger.info(f"  Created Validation dataset: {validation_ds.dataset_rid}")
 
-        # Create Validation dataset (if requested)
-        validation_ds = None
-        if val_size is not None:
-            validation_ds = exe.create_dataset(
-                description=(
-                    f"Validation subset ({partition_sizes['Validation']} samples) of "
-                    f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
-                ),
-                dataset_types=val_types,
-            )
-            logger.info(f"  Created Validation dataset: {validation_ds.dataset_rid}")
+    # Create Testing dataset
+    testing_ds = exe.create_dataset(
+        description=(
+            f"Testing subset ({partition_sizes['Testing']} samples) of "
+            f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
+        ),
+        dataset_types=test_types,
+    )
+    logger.info(f"  Created Testing dataset: {testing_ds.dataset_rid}")
 
-        # Create Testing dataset
-        testing_ds = exe.create_dataset(
-            description=(
-                f"Testing subset ({partition_sizes['Testing']} samples) of "
-                f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
-            ),
-            dataset_types=test_types,
-        )
-        logger.info(f"  Created Testing dataset: {testing_ds.dataset_rid}")
+    # Link children to parent
+    child_rids = [training_ds.dataset_rid, testing_ds.dataset_rid]
+    if validation_ds is not None:
+        child_rids.insert(1, validation_ds.dataset_rid)
+    split_ds.add_dataset_members(child_rids, validate=False)
+    logger.info("  Linked child datasets to Split dataset")
 
-        # Link children to parent
-        child_rids = [training_ds.dataset_rid, testing_ds.dataset_rid]
-        if validation_ds is not None:
-            child_rids.insert(1, validation_ds.dataset_rid)
-        split_ds.add_dataset_members(child_rids, validate=False)
-        logger.info("  Linked child datasets to Split dataset")
-
-        # Add members to each partition
-        batch_size = 500
-        for part_name, ds in [
-            ("Training", training_ds),
-            ("Validation", validation_ds),
-            ("Testing", testing_ds),
-        ]:
-            if ds is None:
-                continue
-            rids = partition_rids[part_name]
-            logger.info(f"  Adding {len(rids)} members to {part_name} dataset...")
-            for i in range(0, len(rids), batch_size):
-                batch = rids[i : i + batch_size]
-                ds.add_dataset_members({element_table: batch}, validate=False)
-                added = min(i + batch_size, len(rids))
-                if added % 2000 == 0 or added >= len(rids):
-                    logger.info(f"    Added {added}/{len(rids)}")
-
-    # Upload execution outputs (after context manager exits)
-    logger.info("Uploading execution outputs...")
-    exe.upload_execution_outputs(clean_folder=True)
+    # Add members to each partition
+    batch_size = 500
+    for part_name, ds in [
+        ("Training", training_ds),
+        ("Validation", validation_ds),
+        ("Testing", testing_ds),
+    ]:
+        if ds is None:
+            continue
+        rids = partition_rids[part_name]
+        logger.info(f"  Adding {len(rids)} members to {part_name} dataset...")
+        for i in range(0, len(rids), batch_size):
+            batch = rids[i : i + batch_size]
+            ds.add_dataset_members({element_table: batch}, validate=False)
+            added = min(i + batch_size, len(rids))
+            if added % 2000 == 0 or added >= len(rids):
+                logger.info(f"    Added {added}/{len(rids)}")
 
     # -------------------------------------------------------------------------
     # Build result
@@ -1262,6 +1263,7 @@ def main() -> int:
 
     try:
         from deriva_ml import DerivaML
+        from deriva_ml.execution import ExecutionConfiguration
 
         # Connect
         logger.info(f"Connecting to {args.hostname}, catalog {args.catalog_id}")
@@ -1279,29 +1281,75 @@ def main() -> int:
         validation_types = [t.strip() for t in args.validation_types.split(",")] if args.validation_types else None
         via = [t.strip() for t in args.via.split(",")] if args.via else None
 
-        # Run the split
-        result = split_dataset(
-            ml=ml,
-            source_dataset_rid=args.dataset_rid,
-            test_size=args.test_size,
-            train_size=args.train_size,
-            val_size=args.val_size,
-            shuffle=not args.no_shuffle,
-            seed=args.seed,
-            stratify_by_column=args.stratify_by_column,
-            stratify_missing=args.stratify_missing,
-            split_description=args.description,
-            training_types=training_types,
-            testing_types=testing_types,
-            validation_types=validation_types,
-            element_table=args.element_table,
-            include_tables=include_tables,
-            row_per=args.row_per,
-            via=via,
-            ignore_unrelated_anchors=args.ignore_unrelated_anchors,
-            workflow_type=args.workflow_type,
-            dry_run=args.dry_run,
-        )
+        # Dry-run: skip workflow/execution overhead entirely. split_dataset's
+        # dry-run path doesn't touch the catalog and doesn't need a live
+        # execution -- pass a sentinel so the type-check is satisfied and the
+        # early-return at the top of split_dataset fires before any execution
+        # methods are called.
+        if args.dry_run:
+            result = split_dataset(
+                ml=ml,
+                source_dataset_rid=args.dataset_rid,
+                execution=None,  # type: ignore[arg-type]  -- dry-run returns before use
+                test_size=args.test_size,
+                train_size=args.train_size,
+                val_size=args.val_size,
+                shuffle=not args.no_shuffle,
+                seed=args.seed,
+                stratify_by_column=args.stratify_by_column,
+                stratify_missing=args.stratify_missing,
+                split_description=args.description,
+                training_types=training_types,
+                testing_types=testing_types,
+                validation_types=validation_types,
+                element_table=args.element_table,
+                include_tables=include_tables,
+                row_per=args.row_per,
+                via=via,
+                ignore_unrelated_anchors=args.ignore_unrelated_anchors,
+                dry_run=True,
+            )
+        else:
+            # The CLI itself is the caller -- it lives in a git checkout
+            # of deriva-ml, so its workflow URL/checksum come from this
+            # script's git context (via the Workflow validator's
+            # built-in introspection). The MCP server, by contrast,
+            # would never reach this code path -- it opens its own
+            # execution from a caller-supplied workflow_rid.
+            workflow = ml.create_workflow(
+                name=f"deriva-ml-split-dataset CLI: {args.dataset_rid}",
+                workflow_type=args.workflow_type,
+                description="Split dataset via the deriva-ml-split-dataset CLI",
+            )
+            with ml.create_execution(
+                ExecutionConfiguration(
+                    workflow=workflow,
+                    description=args.description or f"Split of {args.dataset_rid}",
+                )
+            ) as exe:
+                result = split_dataset(
+                    ml=ml,
+                    source_dataset_rid=args.dataset_rid,
+                    execution=exe,
+                    test_size=args.test_size,
+                    train_size=args.train_size,
+                    val_size=args.val_size,
+                    shuffle=not args.no_shuffle,
+                    seed=args.seed,
+                    stratify_by_column=args.stratify_by_column,
+                    stratify_missing=args.stratify_missing,
+                    split_description=args.description,
+                    training_types=training_types,
+                    testing_types=testing_types,
+                    validation_types=validation_types,
+                    element_table=args.element_table,
+                    include_tables=include_tables,
+                    row_per=args.row_per,
+                    via=via,
+                    ignore_unrelated_anchors=args.ignore_unrelated_anchors,
+                    dry_run=False,
+                )
+            exe.upload_execution_outputs(clean_folder=True)
 
         # Print summary
         if args.dry_run:

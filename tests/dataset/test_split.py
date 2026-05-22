@@ -636,7 +636,9 @@ class TestSplitDataset:
         """Create a dataset with enough members to split.
 
         Creates a table 'SplitTestItem' with 12 records and a dataset
-        containing all of them.
+        containing all of them. Also registers a ``Dataset_Split``
+        workflow-type vocabulary term so each test can open its own
+        splitting execution without re-adding the term.
 
         Returns:
             RID of the created dataset.
@@ -663,6 +665,7 @@ class TestSplitDataset:
 
         # Create workflow and dataset
         ml.add_term(MLVocab.workflow_type, "Setup", description="Setup workflow")
+        ml.add_term(MLVocab.workflow_type, "Dataset_Split", description="Dataset split workflow")
         ml.add_term("Dataset_Type", "Source", description="Source dataset")
         workflow = ml.create_workflow(
             name="Setup Workflow",
@@ -678,12 +681,33 @@ class TestSplitDataset:
 
         return dataset.dataset_rid
 
+    @staticmethod
+    def _split_in_execution(ml: DerivaML, source_rid: str, **kwargs) -> SplitResult:
+        """Open a split execution, run ``split_dataset``, and commit.
+
+        Tests use this to keep each call site to one line -- the
+        per-test workflow and execution are boilerplate that doesn't
+        vary across cases. Real callers (CLI, model-template scripts,
+        the MCP wrapper) open the execution themselves.
+        """
+        workflow = ml.create_workflow(
+            name="Test Split Workflow",
+            workflow_type="Dataset_Split",
+            description="Splitting workflow for tests",
+        )
+        with ml.create_execution(
+            ExecutionConfiguration(workflow=workflow, description="Test split")
+        ) as exe:
+            result = split_dataset(ml, source_rid, exe, **kwargs)
+        exe.upload_execution_outputs(clean_folder=True)
+        return result
+
     def test_basic_random_split(self, test_ml):
         """Test basic 80/20 random split."""
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=0.25,
@@ -709,7 +733,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=3, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=3, seed=42)
 
         # Verify parent-child relationships
         split_ds = ml.lookup_dataset(result.split.rid)
@@ -723,7 +747,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -746,7 +770,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
 
         training_ds = ml.lookup_dataset(result.training.rid)
         testing_ds = ml.lookup_dataset(result.testing.rid)
@@ -761,12 +785,12 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result1 = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result1 = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
         training_ds1 = ml.lookup_dataset(result1.training.rid)
         train_rids1 = {r["RID"] for r in training_ds1.list_dataset_members().get("SplitTestItem", [])}
 
         # Create another split with same parameters on same source
-        result2 = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result2 = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
         training_ds2 = ml.lookup_dataset(result2.training.rid)
         train_rids2 = {r["RID"] for r in training_ds2.list_dataset_members().get("SplitTestItem", [])}
 
@@ -777,7 +801,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -804,7 +828,7 @@ class TestSplitDataset:
         initial_datasets = list(ml.find_datasets())
         initial_count = len(initial_datasets)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -844,7 +868,7 @@ class TestSplitDataset:
                 offset += size
             return result
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -865,7 +889,7 @@ class TestSplitDataset:
             return {"Training": np.array([0]), "Testing": np.array([1])}
 
         with pytest.raises(ValueError, match="mutually exclusive"):
-            split_dataset(
+            self._split_in_execution(
                 ml,
                 source_rid,
                 test_size=4,
@@ -880,7 +904,7 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         with pytest.raises(ValueError, match="include_tables is required"):
-            split_dataset(
+            self._split_in_execution(
                 ml,
                 source_rid,
                 test_size=4,
@@ -896,7 +920,7 @@ class TestSplitDataset:
             return {"Training": np.array([0]), "Testing": np.array([1])}
 
         with pytest.raises(ValueError, match="include_tables is required"):
-            split_dataset(
+            self._split_in_execution(
                 ml,
                 source_rid,
                 test_size=4,
@@ -907,7 +931,7 @@ class TestSplitDataset:
         """Test that splitting an empty dataset raises ValueError."""
         ml = test_ml
 
-        # Create an empty dataset (no members)
+        # Create an empty dataset (no members) inside a setup execution.
         ml.add_term(MLVocab.workflow_type, "Setup", description="Setup workflow")
         ml.add_term("Dataset_Type", "Source", description="Source dataset")
         workflow = ml.create_workflow(
@@ -921,15 +945,18 @@ class TestSplitDataset:
             description="Empty dataset",
         )
 
+        # Reuse the same execution for the split attempt -- the ValueError
+        # fires before split_dataset reaches anything execution-specific,
+        # so we don't need a separate Dataset_Split workflow here.
         with pytest.raises(ValueError, match="no members"):
-            split_dataset(ml, empty_ds.dataset_rid, test_size=0.2)
+            split_dataset(ml, empty_ds.dataset_rid, execution, test_size=0.2)
 
     def test_provenance_tracking(self, test_ml):
         """Test that split creates proper execution provenance."""
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
 
         # The split dataset should have execution history
         split_ds = ml.lookup_dataset(result.split.rid)
@@ -950,7 +977,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
 
         # Versions should be valid PEP 440 strings — round-trip through
         # DatasetVersion.parse and have at least major.minor.patch in
@@ -967,7 +994,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -987,7 +1014,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=2,
@@ -1011,7 +1038,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=2,
@@ -1032,7 +1059,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=2,
@@ -1059,7 +1086,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=2,
@@ -1086,7 +1113,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=2,
@@ -1105,7 +1132,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
         assert result.strategy == "random"
 
     def test_strategy_field_dry_run(self, test_ml):
@@ -1113,7 +1140,9 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=4, seed=42, dry_run=True)
+        result = self._split_in_execution(
+            ml, source_rid, test_size=4, seed=42, dry_run=True
+        )
         assert result.strategy == "random"
         assert result.element_table == "SplitTestItem"
         assert result.seed == 42
@@ -1123,7 +1152,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -1141,7 +1170,7 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         custom_desc = "My custom split for experiment X"
-        result = split_dataset(
+        result = self._split_in_execution(
             ml,
             source_rid,
             test_size=4,
@@ -1157,7 +1186,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = split_dataset(ml, source_rid, test_size=4, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
 
         # All fields should be populated
         assert result.source == source_rid
@@ -1182,7 +1211,7 @@ class TestSplitDataset:
         source_rid = self._setup_splittable_dataset(ml)
 
         with pytest.raises(ValueError, match="no members"):
-            split_dataset(
+            self._split_in_execution(
                 ml,
                 source_rid,
                 test_size=4,
@@ -1221,11 +1250,11 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result_a = split_dataset(ml, source_rid, test_size=3, seed=42)
+        result_a = self._split_in_execution(ml, source_rid, test_size=3, seed=42)
         assert isinstance(result_a, SplitResult)
 
         # Second split from the same source — must not crash.
-        result_b = split_dataset(ml, source_rid, test_size=4, seed=99)
+        result_b = self._split_in_execution(ml, source_rid, test_size=4, seed=99)
         assert isinstance(result_b, SplitResult)
         assert result_b.split.rid != result_a.split.rid
 
@@ -1246,7 +1275,7 @@ class TestSplitDataset:
         assert len(df) == 12
 
         # Then: a Curator-style split. Must not crash.
-        result = split_dataset(ml, source_rid, test_size=3, seed=42)
+        result = self._split_in_execution(ml, source_rid, test_size=3, seed=42)
         assert isinstance(result, SplitResult)
         assert result.training.count == 9
         assert result.testing.count == 3
@@ -1340,6 +1369,7 @@ class TestDenormalizationPlumbing:
         result = split_dataset(
             ml,
             "DS-1",
+            None,  # type: ignore[arg-type]  -- dry_run=True returns before use
             test_size=2,
             train_size=4,
             seed=42,
@@ -1366,6 +1396,7 @@ class TestDenormalizationPlumbing:
         split_dataset(
             ml,
             "DS-1",
+            None,  # type: ignore[arg-type]  -- dry_run=True returns before use
             test_size=2,
             train_size=4,
             seed=42,
@@ -1386,6 +1417,7 @@ class TestDenormalizationPlumbing:
         split_dataset(
             ml,
             "DS-1",
+            None,  # type: ignore[arg-type]  -- dry_run=True returns before use
             test_size=2,
             train_size=4,
             seed=42,
