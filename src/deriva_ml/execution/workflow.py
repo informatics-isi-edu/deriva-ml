@@ -177,6 +177,12 @@ class Workflow(BaseModel):
     def _check_writable_catalog(self, operation: str) -> None:
         """Check that the catalog is writable and workflow is registered.
 
+        Delegates to the shared free helper in
+        :mod:`deriva_ml.execution._helpers` — same contract used
+        by :class:`ExecutionRecord`. Kept as a thin instance
+        method so the in-class call sites (``description`` setter,
+        ``_update_description_in_catalog``) read naturally.
+
         Args:
             operation: Description of the operation being attempted.
 
@@ -184,19 +190,14 @@ class Workflow(BaseModel):
             DerivaMLException: If the workflow is not registered (no RID),
                 or if the catalog is read-only (a snapshot).
         """
-        # Import here to avoid circular dependency at module load
-        import importlib
+        from deriva_ml.execution._helpers import check_writable_catalog
 
-        _deriva_core = importlib.import_module("deriva.core")
-        ErmrestSnapshot = _deriva_core.ErmrestSnapshot
-
-        if self.rid is None:
-            raise DerivaMLException(f"Cannot {operation}: Workflow is not registered in the catalog (no RID)")
-
-        if isinstance(self._ml_instance.catalog, ErmrestSnapshot):
-            raise DerivaMLException(
-                f"Cannot {operation} on a read-only catalog snapshot. Use a writable catalog connection instead."
-            )
+        check_writable_catalog(
+            rid=self.rid,
+            ml_instance=self._ml_instance,
+            entity_label="Workflow",
+            operation=operation,
+        )
 
     def _update_description_in_catalog(self, new_description: str | None) -> None:
         """Update the description field in the catalog.
@@ -211,12 +212,15 @@ class Workflow(BaseModel):
             DerivaMLException: If the workflow is not registered (no RID),
                 or if the catalog is read-only (a snapshot).
         """
-        self._check_writable_catalog("update description")
+        from deriva_ml.execution._helpers import update_field_in_catalog
 
-        # Update the catalog record
-        pb = self._ml_instance.pathBuilder()
-        workflow_path = pb.schemas[self._ml_instance.ml_schema].Workflow
-        workflow_path.update([{"RID": self.rid, "Description": new_description}])
+        self._check_writable_catalog("update description")
+        update_field_in_catalog(
+            rid=self.rid,
+            ml_instance=self._ml_instance,
+            table_name="Workflow",
+            updates={"Description": new_description},
+        )
 
     def _get_workflow_type_association_table(self):
         """Get the association table for workflow types.

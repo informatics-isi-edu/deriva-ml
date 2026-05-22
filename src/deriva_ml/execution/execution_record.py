@@ -256,6 +256,10 @@ class ExecutionRecord(BaseModel):
     def _check_writable_catalog(self, operation: str) -> None:
         """Check that the catalog is writable and execution is registered.
 
+        Delegates to the shared free helper in
+        :mod:`deriva_ml.execution._helpers` — same contract used
+        by :class:`Workflow`.
+
         Args:
             operation: Description of the operation being attempted.
 
@@ -263,21 +267,14 @@ class ExecutionRecord(BaseModel):
             DerivaMLException: If the execution is not registered (no RID),
                 or if the catalog is read-only (a snapshot).
         """
-        import importlib
+        from deriva_ml.execution._helpers import check_writable_catalog
 
-        _deriva_core = importlib.import_module("deriva.core")
-        ErmrestSnapshot = _deriva_core.ErmrestSnapshot
-
-        if self.execution_rid is None:
-            raise DerivaMLException(f"Cannot {operation}: Execution is not registered in the catalog (no RID)")
-
-        if self._ml_instance is None:
-            raise DerivaMLException(f"Cannot {operation}: ExecutionRecord is not bound to a catalog")
-
-        if isinstance(self._ml_instance.catalog, ErmrestSnapshot):
-            raise DerivaMLException(
-                f"Cannot {operation} on a read-only catalog snapshot. Use a writable catalog connection instead."
-            )
+        check_writable_catalog(
+            rid=self.execution_rid,
+            ml_instance=self._ml_instance,
+            entity_label="Execution",
+            operation=operation,
+        )
 
     def _update_status_in_catalog(self, new_status: ExecutionStatus, status_detail: str = "") -> None:
         """Update the status field in the catalog.
@@ -289,14 +286,18 @@ class ExecutionRecord(BaseModel):
         Raises:
             DerivaMLException: If the catalog is read-only or not connected.
         """
-        self._check_writable_catalog("update status")
+        from deriva_ml.execution._helpers import update_field_in_catalog
 
-        pb = self._ml_instance.pathBuilder()
-        execution_path = pb.schemas[self._ml_instance.ml_schema].Execution
-        update_data = {"RID": self.execution_rid, "Status": new_status.value}
+        self._check_writable_catalog("update status")
+        updates: dict[str, Any] = {"Status": new_status.value}
         if status_detail:
-            update_data["Status_Detail"] = status_detail
-        execution_path.update([update_data])
+            updates["Status_Detail"] = status_detail
+        update_field_in_catalog(
+            rid=self.execution_rid,
+            ml_instance=self._ml_instance,
+            table_name="Execution",
+            updates=updates,
+        )
 
     def _update_description_in_catalog(self, new_description: str | None) -> None:
         """Update the description field in the catalog.
@@ -307,11 +308,15 @@ class ExecutionRecord(BaseModel):
         Raises:
             DerivaMLException: If the catalog is read-only or not connected.
         """
-        self._check_writable_catalog("update description")
+        from deriva_ml.execution._helpers import update_field_in_catalog
 
-        pb = self._ml_instance.pathBuilder()
-        execution_path = pb.schemas[self._ml_instance.ml_schema].Execution
-        execution_path.update([{"RID": self.execution_rid, "Description": new_description}])
+        self._check_writable_catalog("update description")
+        update_field_in_catalog(
+            rid=self.execution_rid,
+            ml_instance=self._ml_instance,
+            table_name="Execution",
+            updates={"Description": new_description},
+        )
 
     def update_status(self, status: ExecutionStatus, status_detail: str = "") -> None:
         """Update execution status with an optional detail message.
