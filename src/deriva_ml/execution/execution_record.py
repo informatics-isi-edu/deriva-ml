@@ -256,6 +256,10 @@ class ExecutionRecord(BaseModel):
     def _check_writable_catalog(self, operation: str) -> None:
         """Check that the catalog is writable and execution is registered.
 
+        Delegates to the shared free helper in
+        :mod:`deriva_ml.execution._helpers` — same contract used
+        by :class:`Workflow`.
+
         Args:
             operation: Description of the operation being attempted.
 
@@ -263,21 +267,14 @@ class ExecutionRecord(BaseModel):
             DerivaMLException: If the execution is not registered (no RID),
                 or if the catalog is read-only (a snapshot).
         """
-        import importlib
+        from deriva_ml.execution._helpers import check_writable_catalog
 
-        _deriva_core = importlib.import_module("deriva.core")
-        ErmrestSnapshot = _deriva_core.ErmrestSnapshot
-
-        if self.execution_rid is None:
-            raise DerivaMLException(f"Cannot {operation}: Execution is not registered in the catalog (no RID)")
-
-        if self._ml_instance is None:
-            raise DerivaMLException(f"Cannot {operation}: ExecutionRecord is not bound to a catalog")
-
-        if isinstance(self._ml_instance.catalog, ErmrestSnapshot):
-            raise DerivaMLException(
-                f"Cannot {operation} on a read-only catalog snapshot. Use a writable catalog connection instead."
-            )
+        check_writable_catalog(
+            rid=self.execution_rid,
+            ml_instance=self._ml_instance,
+            entity_label="Execution",
+            operation=operation,
+        )
 
     def _update_status_in_catalog(self, new_status: ExecutionStatus, status_detail: str = "") -> None:
         """Update the status field in the catalog.
@@ -289,14 +286,18 @@ class ExecutionRecord(BaseModel):
         Raises:
             DerivaMLException: If the catalog is read-only or not connected.
         """
-        self._check_writable_catalog("update status")
+        from deriva_ml.execution._helpers import update_field_in_catalog
 
-        pb = self._ml_instance.pathBuilder()
-        execution_path = pb.schemas[self._ml_instance.ml_schema].Execution
-        update_data = {"RID": self.execution_rid, "Status": new_status.value}
+        self._check_writable_catalog("update status")
+        updates: dict[str, Any] = {"Status": new_status.value}
         if status_detail:
-            update_data["Status_Detail"] = status_detail
-        execution_path.update([update_data])
+            updates["Status_Detail"] = status_detail
+        update_field_in_catalog(
+            rid=self.execution_rid,
+            ml_instance=self._ml_instance,
+            table_name="Execution",
+            updates=updates,
+        )
 
     def _update_description_in_catalog(self, new_description: str | None) -> None:
         """Update the description field in the catalog.
@@ -307,11 +308,15 @@ class ExecutionRecord(BaseModel):
         Raises:
             DerivaMLException: If the catalog is read-only or not connected.
         """
-        self._check_writable_catalog("update description")
+        from deriva_ml.execution._helpers import update_field_in_catalog
 
-        pb = self._ml_instance.pathBuilder()
-        execution_path = pb.schemas[self._ml_instance.ml_schema].Execution
-        execution_path.update([{"RID": self.execution_rid, "Description": new_description}])
+        self._check_writable_catalog("update description")
+        update_field_in_catalog(
+            rid=self.execution_rid,
+            ml_instance=self._ml_instance,
+            table_name="Execution",
+            updates={"Description": new_description},
+        )
 
     def update_status(self, status: ExecutionStatus, status_detail: str = "") -> None:
         """Update execution status with an optional detail message.
@@ -407,17 +412,12 @@ class ExecutionRecord(BaseModel):
             return
         _visited.add(self.execution_rid)
 
-        pb = self._ml_instance.pathBuilder()
-        ml_schema = self._ml_instance.ml_schema
-        exec_exec_path = pb.schemas[ml_schema].Execution_Execution
-        execution_path = pb.schemas[ml_schema].Execution
+        from deriva_ml.execution._helpers import fetch_nested_execution_rows
 
-        # Query for child executions (Execution column = parent, Nested_Execution = child)
-        records = list(
-            exec_exec_path.filter(exec_exec_path.Execution == self.execution_rid)
-            .link(execution_path, on=(exec_exec_path.Nested_Execution == execution_path.RID))
-            .entities()
-            .fetch()
+        records = fetch_nested_execution_rows(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+            direction="children",
         )
 
         for record in records:
@@ -495,17 +495,12 @@ class ExecutionRecord(BaseModel):
             return
         _visited.add(self.execution_rid)
 
-        pb = self._ml_instance.pathBuilder()
-        ml_schema = self._ml_instance.ml_schema
-        exec_exec_path = pb.schemas[ml_schema].Execution_Execution
-        execution_path = pb.schemas[ml_schema].Execution
+        from deriva_ml.execution._helpers import fetch_nested_execution_rows
 
-        # Query for parent executions (Execution column = parent, Nested_Execution = child)
-        records = list(
-            exec_exec_path.filter(exec_exec_path.Nested_Execution == self.execution_rid)
-            .link(execution_path, on=(exec_exec_path.Execution == execution_path.RID))
-            .entities()
-            .fetch()
+        records = fetch_nested_execution_rows(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+            direction="parents",
         )
 
         for record in records:
@@ -549,21 +544,16 @@ class ExecutionRecord(BaseModel):
             >>> # Or by RID
             >>> parent_record.add_nested_execution("3-XYZ9", sequence=1)
         """
+        from deriva_ml.execution._helpers import insert_nested_execution_link
+
         self._check_writable_catalog("add nested execution")
-
         child_rid = child.execution_rid if isinstance(child, ExecutionRecord) else child
-
-        pb = self._ml_instance.pathBuilder()
-        exec_exec_path = pb.schemas[self._ml_instance.ml_schema].Execution_Execution
-
-        record = {
-            "Execution": self.execution_rid,
-            "Nested_Execution": child_rid,
-        }
-        if sequence is not None:
-            record["Sequence"] = sequence
-
-        exec_exec_path.insert([record])
+        insert_nested_execution_link(
+            ml_instance=self._ml_instance,
+            parent_rid=self.execution_rid,
+            child_rid=child_rid,
+            sequence=sequence,
+        )
 
     def list_input_datasets(self) -> list["Dataset"]:
         """List datasets that were input to this execution.
@@ -587,24 +577,12 @@ class ExecutionRecord(BaseModel):
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
 
-        pb = self._ml_instance.pathBuilder()
-        dataset_exec_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Execution
+        from deriva_ml.execution._helpers import list_input_datasets as _list_input_datasets
 
-        records = list(dataset_exec_path.filter(dataset_exec_path.Execution == self.execution_rid).entities().fetch())
-
-        # Look up each dataset and return Dataset objects, excluding
-        # any that this execution itself produced (those go on the
-        # output side; the Dataset_Execution table conflates both).
-        datasets = []
-        for record in records:
-            dataset_rid = record.get("Dataset")
-            if not dataset_rid:
-                continue
-            producer = self._ml_instance._producer_of_dataset(dataset_rid)
-            if producer == self.execution_rid:
-                continue
-            datasets.append(self._ml_instance.lookup_dataset(dataset_rid))
-        return datasets
+        return _list_input_datasets(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+        )
 
     def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List assets associated with this execution.
@@ -631,37 +609,14 @@ class ExecutionRecord(BaseModel):
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
 
-        # Find all *_Execution association tables and query them
-        # Search both the domain schemas and the ML schema
-        assets: list[Asset] = []
-        schemas_to_search = [*self._ml_instance.domain_schemas, self._ml_instance.ml_schema]
+        from deriva_ml.execution._helpers import list_assets as _list_assets
 
-        for schema_name in schemas_to_search:
-            for table in self._ml_instance.model.model.schemas[schema_name].tables.values():
-                if table.name.endswith("_Execution") and table.name != "Dataset_Execution":
-                    # Extract asset table name from association table name
-                    # e.g., "Image_Execution" -> "Image", "Execution_Asset_Execution" -> "Execution_Asset"
-                    asset_table_name = table.name.replace("_Execution", "")
-
-                    pb = self._ml_instance.pathBuilder()
-                    table_path = pb.schemas[schema_name].tables[table.name]
-                    try:
-                        query = table_path.filter(table_path.Execution == self.execution_rid)
-                        if asset_role:
-                            query = query.filter(table_path.Asset_Role == asset_role)
-                        records = list(query.entities().fetch())
-
-                        # Look up each asset and convert to Asset object
-                        for record in records:
-                            asset_rid = record.get(asset_table_name)
-                            if asset_rid:
-                                try:
-                                    assets.append(self._ml_instance.lookup_asset(asset_rid))
-                                except Exception as e:
-                                    logger.debug(f"Could not look up asset {asset_rid}: {e}")
-                    except Exception as e:
-                        logger.debug(f"Could not query asset table {table.name}: {e}")
-        return assets
+        return _list_assets(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+            asset_role=asset_role,
+            logger=logger,
+        )
 
     def __str__(self) -> str:
         """Return string representation of the execution record."""
