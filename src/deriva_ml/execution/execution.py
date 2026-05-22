@@ -520,7 +520,23 @@ class Execution:
         # self.uploaded_assets intentionally not set — they are all
         # read-through properties backed by SQLite / the asset manifest.
         instance._execution_record = None
+        # Pull ``workflow_rid`` from the registry row. The SQLite
+        # row carries it (see ``state_store.executions.workflow_rid``);
+        # leaving it None silently breaks downstream code that
+        # relies on ``execution.workflow_rid`` (notably
+        # ``add_workflow_executions`` linkage during nested-execution
+        # attach). Best-effort: if the registry lookup fails or
+        # returns None, leave it None — but we try.
         instance.workflow_rid = None
+        try:
+            row = ml_object.workspace.execution_state_store().get_execution(execution_rid)
+            if row is not None:
+                instance.workflow_rid = row.get("workflow_rid")
+        except Exception:
+            # The registry read can fail in odd offline-mode tests
+            # or partially-initialized fixtures; preserve the
+            # legacy ``None`` rather than refuse to construct.
+            pass
         return instance
 
     def _save_runtime_environment(self):
@@ -1946,8 +1962,16 @@ class Execution:
         asset_table = self._model.name_to_table(asset_name)
         schema = asset_table.schema.name
 
-        # Validate and normalize asset types
-        asset_types = asset_types or kwargs.pop("Asset_Type", None) or asset_name
+        # Validate and normalize asset types. Use ``is None`` rather
+        # than ``or`` so an explicit ``asset_types=[]`` (the user
+        # saying "no content tags") is honored as-is — the previous
+        # ``or`` chain collapsed an empty list to ``asset_name`` and
+        # then ``lookup_term`` would fail on the table name. The
+        # legacy ``Asset_Type`` kwarg keeps its fallback role.
+        if asset_types is None:
+            asset_types = kwargs.pop("Asset_Type", None)
+            if asset_types is None:
+                asset_types = asset_name
         asset_types = [asset_types] if isinstance(asset_types, str) else asset_types
         for t in asset_types:
             self._ml_object.lookup_term(MLVocab.asset_type, t)

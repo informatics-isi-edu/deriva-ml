@@ -469,6 +469,15 @@ class Workflow(BaseModel):
             >>> print(f"URL: {url}")
             >>> print(f"Checksum: {checksum}")
         """
+        # The "must be inside a git checkout" guard is a precondition
+        # for honest provenance. But ``allow_dirty=True`` is the
+        # documented escape hatch for ad-hoc / dry-run / notebook
+        # workflows that don't need a clean checkout — refusing to
+        # run those because the cwd isn't inside git defeats the
+        # intent of the flag. When ``allow_dirty=True``, downgrade
+        # the no-git precondition to a warning and return empty
+        # provenance (URL/checksum both empty strings); when False
+        # (the default), keep the hard refuse.
         try:
             subprocess.run(
                 ["git", "rev-parse", "--is-inside-work-tree"],
@@ -477,6 +486,13 @@ class Workflow(BaseModel):
                 check=True,
             )
         except subprocess.CalledProcessError:
+            if allow_dirty:
+                logger.warning(
+                    "Not executing in a Git repository; allow_dirty=True, "
+                    "returning empty URL/checksum. Provenance will not be "
+                    "recoverable for this workflow."
+                )
+                return "", ""
             raise DerivaMLException("Not executing in a Git repository.")
 
         github_url, is_dirty = Workflow._github_url(executable_path)
@@ -609,12 +625,20 @@ class Workflow(BaseModel):
         # Get repo URL from local GitHub repo.
         if executable_path == "REPL":
             return "REPL", True
+        # ``check=True`` is load-bearing: without it ``subprocess.run``
+        # never raises, ``result.stdout`` for a missing ``origin``
+        # remote is an empty string, and ``github_url`` becomes
+        # ``""`` — silently recorded as provenance pointing at
+        # ``/blob/<sha>/<path>`` with no host. The
+        # ``CalledProcessError`` catch was unreachable until this
+        # flag was added.
         try:
             result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
                 capture_output=True,
                 text=True,
                 cwd=executable_path.parent,
+                check=True,
             )
             github_url = result.stdout.strip().removesuffix(".git")
         except subprocess.CalledProcessError:
@@ -653,8 +677,13 @@ class Workflow(BaseModel):
         except subprocess.CalledProcessError:
             is_dirty = False  # If the Git command fails, assume no changes
 
-        """Get SHA-1 hash of latest commit of the file in the repository"""
-
+        # Get SHA-1 hash of latest commit of the file in the
+        # repository. ``check=False`` here is deliberate: a file
+        # that has never been committed (a new script in a worktree
+        # the user is iterating on) legitimately has no log; the
+        # empty ``sha`` string yields a URL pointing at ``/blob//``,
+        # which the dirty-flow already treats as a non-clean
+        # provenance signal upstream.
         result = subprocess.run(
             ["git", "log", "-n", "1", "--pretty=format:%H", executable_path],
             cwd=repo_root,
