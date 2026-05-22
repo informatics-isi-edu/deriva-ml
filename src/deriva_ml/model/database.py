@@ -34,7 +34,7 @@ from deriva.core.ermrest_model import Model
 from sqlalchemy import select
 
 from deriva_ml.core.definitions import ML_SCHEMA, RID, _get_domain_schemas
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLDatasetNotFound
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.model.catalog import DerivaModel
 from deriva_ml.core.logging_config import get_logger
@@ -186,11 +186,13 @@ class DatabaseModel(BagDatabase, DerivaModel):
             :class:`DatasetVersion` for the named dataset.
 
         Raises:
-            DerivaMLException: If the RID is not in this bag.
+            DerivaMLDatasetNotFound: If the RID is not in this bag.
         """
         rid = dataset_rid or self.dataset_rid
         if rid not in self.bag_rids:
-            raise DerivaMLException(f"Dataset RID {rid} is not in this bag")
+            raise DerivaMLDatasetNotFound(
+                rid, msg="Dataset RID not found in this bag"
+            )
         return self.bag_rids[rid]
 
     def rid_lookup(self, dataset_rid: RID) -> DatasetVersion | None:
@@ -210,10 +212,12 @@ class DatabaseModel(BagDatabase, DerivaModel):
             :class:`DatasetVersion` for the RID.
 
         Raises:
-            DerivaMLException: If the RID is not in this bag.
+            DerivaMLDatasetNotFound: If the RID is not in this bag.
         """
         if dataset_rid in self.bag_rids:
             return self.bag_rids[dataset_rid]
-        raise DerivaMLException(f"Dataset {dataset_rid} not found in this bag")
+        raise DerivaMLDatasetNotFound(
+            dataset_rid, msg="Dataset not found in this bag"
+        )
 
 __all__ = ["DatabaseModel"]

@@ -31,7 +31,6 @@ from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.definitions import (
     ML_SCHEMA,
     RID,
-    SYSTEM_SCHEMAS,
     DerivaAssetColumns,
     TableDefinition,
     _get_domain_schemas,
@@ -110,7 +109,6 @@ class DerivaModel:
         self.hostname = self.catalog.deriva_server.server if isinstance(self.catalog, ErmrestCatalog) else "localhost"
 
         self.ml_schema = ml_schema
-        self._system_schemas = frozenset(SYSTEM_SCHEMAS | {ml_schema})
 
         # Determine domain schemas
         if domain_schemas is not None:
@@ -699,7 +697,7 @@ class DerivaModel:
             raise DerivaMLTableTypeError("asset table", table.name)
         return {c.name for c in table.columns} - DerivaAssetColumns
 
-    def asset_metadata_columns(self, table: str | Table) -> list[Column]:
+    def asset_metadata_columns(self, table: TableInput) -> list[Column]:
         """Return Column objects for the asset-metadata columns of ``table``.
 
         Like :meth:`asset_metadata` but returns the :class:`Column`
