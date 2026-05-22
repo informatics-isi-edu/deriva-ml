@@ -246,12 +246,17 @@ def list_assets(
 ) -> list:
     """Return the :class:`Asset` list associated with an execution.
 
-    Walks every ``*_Execution`` association table across the
+    Walks the ``*_Execution`` association tables across the
     domain + ml schemas (excluding ``Dataset_Execution``,
     which is the dataset linkage and handled separately by
     :func:`list_input_datasets`), filters by the anchor
     execution and optionally by ``asset_role``, and looks up
     each matched asset.
+
+    Uses :meth:`DerivaModel.find_asset_execution_tables` to
+    discover the association tables once per model lifetime —
+    repeated ``list_assets`` calls reuse the cached discovery
+    so the schema walk cost is paid once, not per call.
 
     Replaces parallel implementations on
     :meth:`Execution.list_assets` (dry-run fallback path) and
@@ -264,15 +269,17 @@ def list_assets(
             ``"Output"`` from the ``Asset_Role`` vocabulary.
             ``None`` returns all.
         logger: Optional logger for per-asset debug lines
-            ("could not look up asset", "could not query
-            asset table"). Defaults to the module logger if
-            ``None``.
+            ("could not look up asset"). Defaults to the
+            module logger if ``None``.
 
     Returns:
-        List of :class:`Asset` objects. Per-asset lookup
-        failures are swallowed with a debug log so a
-        single asset's catalog issue doesn't break the
-        whole listing.
+        List of :class:`Asset` objects. **Only** per-asset
+        ``lookup_asset`` failures are swallowed with a debug
+        log so a single asset's catalog issue doesn't break
+        the whole listing. Connectivity errors on the
+        outer association-table query propagate — silently
+        returning an empty list for a real catalog problem
+        would be misleading.
     """
     if logger is None:
         from deriva_ml.core.logging_config import get_logger
@@ -280,41 +287,34 @@ def list_assets(
         logger = get_logger(__name__)
 
     assets = []
-    schemas_to_search = [
-        *ml_instance.domain_schemas,
-        ml_instance.ml_schema,
-    ]
     pb = ml_instance.pathBuilder()
 
-    for schema_name in schemas_to_search:
-        schema_obj = ml_instance.model.model.schemas[schema_name]
-        for table in schema_obj.tables.values():
-            if not table.name.endswith("_Execution"):
+    # Cached once per ``DerivaModel`` lifetime. Pre-fix this
+    # walked every table in every schema on every call (a
+    # 200-table catalog → 400 catalog touches per call) and
+    # wrapped the per-table query in a bare ``except Exception``
+    # that hid real connectivity errors as "no assets". Now
+    # the schema iteration is amortised and the outer try/except
+    # is gone — catalog errors surface to the caller.
+    for schema_name, table_name in ml_instance.model.find_asset_execution_tables():
+        # ``Image_Execution`` → asset_table_name == ``"Image"``.
+        asset_table_name = table_name.replace("_Execution", "")
+        table_path = pb.schemas[schema_name].tables[table_name]
+        query = table_path.filter(table_path.Execution == execution_rid)
+        if asset_role:
+            query = query.filter(table_path.Asset_Role == asset_role)
+        records = list(query.entities().fetch())
+        for record in records:
+            asset_rid = record.get(asset_table_name)
+            if not asset_rid:
                 continue
-            if table.name == "Dataset_Execution":
-                continue
-            # ``Image_Execution`` → asset_table_name == ``"Image"``.
-            asset_table_name = table.name.replace("_Execution", "")
-            table_path = pb.schemas[schema_name].tables[table.name]
             try:
-                query = table_path.filter(table_path.Execution == execution_rid)
-                if asset_role:
-                    query = query.filter(table_path.Asset_Role == asset_role)
-                records = list(query.entities().fetch())
-                for record in records:
-                    asset_rid = record.get(asset_table_name)
-                    if not asset_rid:
-                        continue
-                    try:
-                        assets.append(ml_instance.lookup_asset(asset_rid))
-                    except Exception as e:
-                        logger.debug(
-                            "Could not look up asset %s: %s", asset_rid, e
-                        )
+                assets.append(ml_instance.lookup_asset(asset_rid))
             except Exception as e:
-                logger.debug(
-                    "Could not query asset table %s: %s", table.name, e
-                )
+                # Per-row swallow only — one asset row's catalog
+                # issue shouldn't break the whole listing. The
+                # outer query failure (above) does propagate.
+                logger.debug("Could not look up asset %s: %s", asset_rid, e)
     return assets
 
 

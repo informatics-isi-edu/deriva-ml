@@ -67,6 +67,10 @@ class _FakeModel:
       ``report_to_asset_map`` can be exercised.
     - ``asset_metadata(name)`` → ``set[str]`` of declared metadata
       column names.
+    - ``asset_metadata_sorted(name)`` → ``list[str]`` of declared
+      metadata column names in alphabetic order. Mirrors the
+      production ``DerivaModel`` helper that pins the sort
+      invariant; ``bag_commit`` reads through this method.
     - ``find_association(table, partner)`` →
       ``(assoc_table, asset_fk_col, partner_fk_col)``. The bag-commit
       function reads ``assoc_table.name`` only.
@@ -90,6 +94,9 @@ class _FakeModel:
 
     def asset_metadata(self, name: str) -> set[str]:
         return self._metadata_cols.get(name, set())
+
+    def asset_metadata_sorted(self, name: str) -> list[str]:
+        return sorted(self.asset_metadata(name))
 
     def find_association(self, table_name: str, partner_name: str):
         key = (table_name, partner_name)
