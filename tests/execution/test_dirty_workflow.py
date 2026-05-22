@@ -136,3 +136,121 @@ class TestWorkflowAllowDirtyField:
         # but we can verify the get_url_and_checksum path works.
         url, checksum = Workflow.get_url_and_checksum(test_file, allow_dirty=True)
         assert "github.com" in url
+
+
+class TestDirtyDetectionStatusCodes:
+    """Tests for ``Workflow._github_url`` dirty-detection across all
+    ``git status --porcelain`` two-letter status codes.
+
+    The previous implementation matched the substring ``"M "`` against
+    ``git status --porcelain`` output, which only caught **staged**
+    modifications. It silently passed every other dirty state through
+    as "clean" — including the common case of an unstaged edit
+    (`` M``), an untracked file (``??``), a rename, a delete, or a
+    merge conflict. Provenance contract: the workflow's recorded
+    commit hash only reproduces the run if every file in the repo
+    matches HEAD, so any non-empty porcelain output must register as
+    dirty.
+
+    Each test below puts the repo into one specific dirty state, then
+    calls ``_github_url`` and asserts ``is_dirty == True``. The repo
+    factory commits one ``model.py`` so we always have a base to
+    drift from.
+    """
+
+    def test_clean_repo_is_not_dirty(self, git_repo):
+        """Untouched committed repo reports clean."""
+        repo, test_file = git_repo
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is False
+
+    def test_unstaged_modification_is_dirty(self, git_repo):
+        """`` M`` (unstaged modification) registers as dirty."""
+        repo, test_file = git_repo
+        test_file.write_text("# unstaged change\n")
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is True, (
+            "Unstaged edit to a tracked file must be dirty; this was "
+            "the original silent-pass case the old substring check missed."
+        )
+
+    def test_staged_modification_is_dirty(self, git_repo):
+        """``M `` (staged modification) registers as dirty."""
+        repo, test_file = git_repo
+        test_file.write_text("# staged change\n")
+        subprocess.run(["git", "add", "model.py"], cwd=repo, capture_output=True, check=True)
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is True
+
+    def test_both_modified_is_dirty(self, git_repo):
+        """``MM`` (staged + unstaged on the same file) registers as dirty."""
+        repo, test_file = git_repo
+        test_file.write_text("# staged\n")
+        subprocess.run(["git", "add", "model.py"], cwd=repo, capture_output=True, check=True)
+        test_file.write_text("# staged then re-edited\n")
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is True
+
+    def test_untracked_file_is_dirty(self, git_repo):
+        """``??`` (untracked file) registers as dirty.
+
+        The original heuristic silently treated untracked files as
+        clean. A workflow that adds (but doesn't commit) a new
+        ``utils.py`` it imports from would have recorded a "clean"
+        provenance hash that wouldn't reproduce on checkout.
+        """
+        repo, _ = git_repo
+        (repo / "utils.py").write_text("# untracked helper\n")
+        _, is_dirty = Workflow._github_url(repo / "model.py")
+        assert is_dirty is True
+
+    def test_deleted_file_is_dirty(self, git_repo):
+        """``D `` (deleted tracked file) registers as dirty."""
+        repo, test_file = git_repo
+        # Commit a second file so we have something we can delete
+        # without invalidating ``test_file`` (which the call site
+        # passes in).
+        (repo / "extra.py").write_text("# to be deleted\n")
+        subprocess.run(["git", "add", "extra.py"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add extra.py"], cwd=repo, capture_output=True, check=True
+        )
+        (repo / "extra.py").unlink()
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is True
+
+    def test_renamed_file_is_dirty(self, git_repo):
+        """``R `` (rename) registers as dirty."""
+        repo, test_file = git_repo
+        # Commit a second file we can rename without affecting test_file.
+        (repo / "extra.py").write_text("# to be renamed\n")
+        subprocess.run(["git", "add", "extra.py"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add extra.py"], cwd=repo, capture_output=True, check=True
+        )
+        subprocess.run(
+            ["git", "mv", "extra.py", "renamed.py"], cwd=repo, capture_output=True, check=True
+        )
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is True
+
+    def test_unrelated_file_dirty_still_marks_repo_dirty(self, git_repo):
+        """A dirty unrelated file marks the whole repo dirty.
+
+        Provenance demands repo-wide cleanliness: a workflow that
+        ``import``s another module the repo holds will silently
+        observe that module's working-tree state. Limiting the dirty
+        check to ``executable_path`` itself would let a dirty
+        ``utils.py`` slip through as "the script is clean."
+        """
+        repo, test_file = git_repo
+        # ``test_file`` is committed and untouched; another tracked
+        # file in the repo is modified.
+        (repo / "other.py").write_text("# tracked file added\n")
+        subprocess.run(["git", "add", "other.py"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add other.py"], cwd=repo, capture_output=True, check=True
+        )
+        (repo / "other.py").write_text("# modified after commit\n")
+        _, is_dirty = Workflow._github_url(test_file)
+        assert is_dirty is True
