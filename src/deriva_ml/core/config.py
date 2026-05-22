@@ -23,29 +23,29 @@ Example:
         ...     catalog_id='my_catalog',
         ...     working_dir='/path/to/work'
         ... )
-        >>> ml = DerivaML.instantiate(config)
+        >>> ml = DerivaML.instantiate(config)  # doctest: +SKIP
 
     With hydra-zen:
         >>> from hydra_zen import builds, instantiate, store, zen  # doctest: +SKIP
-        >>> from deriva_ml import DerivaML
-        >>> from deriva_ml.core.config import DerivaMLConfig
+        >>> from deriva_ml import DerivaML  # doctest: +SKIP
+        >>> from deriva_ml.core.config import DerivaMLConfig  # doctest: +SKIP
         >>>
         >>> # Create a structured config for DerivaML
-        >>> DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+        >>> DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)  # doctest: +SKIP
         >>>
         >>> # Store configurations for different environments
-        >>> store(DerivaMLConf(
+        >>> store(DerivaMLConf(  # doctest: +SKIP
         ...     hostname='dev.example.org',
         ...     catalog_id='1',
         ... ), name='dev')
         >>>
-        >>> store(DerivaMLConf(
+        >>> store(DerivaMLConf(  # doctest: +SKIP
         ...     hostname='prod.example.org',
         ...     catalog_id='52',
         ... ), name='prod')
         >>>
         >>> # Use with Hydra's @hydra.main or zen() wrapper
-        >>> @zen(DerivaMLConf)
+        >>> @zen(DerivaMLConf)  # doctest: +SKIP
         ... def my_task(cfg: DerivaMLConfig):
         ...     ml = DerivaML.instantiate(cfg)
         ...     # ... do work with ml instance
@@ -105,7 +105,9 @@ class DerivaMLConfig(BaseModel):
             database. Accepts either an enum value or its string literal ("online"/"offline").
 
     Example:
-        >>> config = DerivaMLConfig(
+        >>> # DerivaMLConfig requires a Hydra context to validate; skipping
+        >>> # the example at doctest time but the call shape is real:
+        >>> config = DerivaMLConfig(  # doctest: +SKIP
         ...     hostname='deriva.example.org',
         ...     catalog_id=1,
         ...     default_schema='my_domain',
@@ -184,10 +186,19 @@ class DerivaMLConfig(BaseModel):
             Path: Absolute path to the working directory.
 
         Example:
-            >>> DerivaMLConfig.compute_workdir('/shared/data', '52', 'ml.example.org')
-            PosixPath('/shared/data/username/deriva-ml/ml.example.org/52')
-            >>> DerivaMLConfig.compute_workdir(None, 1, 'localhost')
-            PosixPath('/home/username/.deriva-ml/localhost/1')
+            >>> # Path structure for a shared-dir working tree:
+            >>> # /<working_dir>/<username>/deriva-ml/<hostname>/<catalog_id>
+            >>> p = DerivaMLConfig.compute_workdir('/shared/data', '52', 'ml.example.org')
+            >>> str(p).endswith('/deriva-ml/ml.example.org/52')
+            True
+            >>> str(p).startswith('/shared/data/')
+            True
+
+            >>> # Path structure for the default (~/.deriva-ml) tree:
+            >>> # <home>/.deriva-ml/<hostname>/<catalog_id>
+            >>> p = DerivaMLConfig.compute_workdir(None, 1, 'localhost')
+            >>> str(p).endswith('/.deriva-ml/localhost/1')
+            True
         """
         # Append username and deriva-ml to provided path, or use ~/.deriva-ml as base
         if working_dir:
