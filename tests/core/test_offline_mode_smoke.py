@@ -24,7 +24,10 @@ def test_offline_mode_end_to_end_usage(catalog_manager, tmp_path):
     schema inspection and rejects any catalog access."""
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.core.catalog_stub import CatalogStub
-    from deriva_ml.core.exceptions import DerivaMLReadOnlyError
+    from deriva_ml.core.exceptions import (
+        DerivaMLOfflineError,
+        DerivaMLReadOnlyError,
+    )
 
     catalog_manager.reset()
 
@@ -79,6 +82,12 @@ def test_offline_mode_end_to_end_usage(catalog_manager, tmp_path):
 
     # --- Contract 5: refresh_schema() refuses in offline mode
     # (no pending rows needed — mode check fires first).
-    with pytest.raises(DerivaMLReadOnlyError) as ei:
+    # Raises ``DerivaMLOfflineError``, NOT ``DerivaMLReadOnlyError``
+    # — the two exceptions are different semantics:
+    # ``DerivaMLOfflineError`` is for online-only operations called
+    # in offline mode; ``DerivaMLReadOnlyError`` (Contract 4 above)
+    # is for writes-on-read-only-resources like the catalog stub
+    # rejecting a method call.
+    with pytest.raises(DerivaMLOfflineError) as ei:
         ml_offline.refresh_schema()
     assert "online" in str(ei.value).lower()
