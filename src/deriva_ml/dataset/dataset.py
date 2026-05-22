@@ -1930,18 +1930,41 @@ class Dataset:
         """
         description = description or "Updated dataset via add_dataset_members"
 
-        def check_dataset_cycle(member_rid, path=None):
+        # Lazily compute the set of RIDs that would form a cycle if
+        # added as a member of this dataset: self.dataset_rid plus
+        # every descendant dataset's RID. ``list_dataset_children``
+        # already walks the descendant tree with built-in cycle
+        # protection, so we lean on it rather than re-implementing
+        # the walk here.
+        #
+        # The lazy ``_cycle_rids`` cell avoids paying the cost of
+        # the descendant walk when no Dataset-RID members are being
+        # added (the common case — most callers add ``Image`` or
+        # ``Subject`` rows, not nested datasets).
+        _cycle_rids_cache: set[RID] | None = None
+
+        def _get_cycle_rids() -> set[RID]:
+            nonlocal _cycle_rids_cache
+            if _cycle_rids_cache is None:
+                _cycle_rids_cache = {self.dataset_rid} | {
+                    child.dataset_rid
+                    for child in self.list_dataset_children(recurse=True)
+                }
+            return _cycle_rids_cache
+
+        def check_dataset_cycle(member_rid: RID) -> bool:
+            """True if adding ``member_rid`` as a nested dataset would form a cycle.
+
+            A cycle forms when ``member_rid`` is either this dataset
+            itself (direct self-reference) or one of its transitive
+            descendants. Pre-fix, this check did ``set(self.dataset_rid)``
+            on a string and matched on individual characters, which
+            could never detect a real cycle (RIDs are multi-character
+            strings, not single characters). See the workspace
+            CLAUDE.md "RIDs are opaque: equality only" rule —
+            ``set(rid_string)`` is parsing.
             """
-
-            Args:
-              member_rid:
-              path: (Default value = None)
-
-            Returns:
-
-            """
-            path = path or set(self.dataset_rid)
-            return member_rid in path
+            return member_rid in _get_cycle_rids()
 
         if validate:
             existing_rids = set(m["RID"] for ms in self.list_dataset_members().values() for m in ms)

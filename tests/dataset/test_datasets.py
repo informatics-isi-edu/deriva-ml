@@ -4,6 +4,8 @@ Tests for dataset functionality.
 
 from pprint import pformat
 
+import pytest
+
 try:
     from icecream import ic
 except ImportError:
@@ -16,6 +18,7 @@ from deriva_ml import (
     MLVocab,
     TableDefinition,
 )
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 from deriva_ml.demo_catalog import DatasetDescription
@@ -413,3 +416,67 @@ class TestDataset:
         execution_rids = {exe.execution_rid for exe in executions}
         assert execution1.execution_rid in execution_rids
         assert execution2.execution_rid in execution_rids
+
+    def test_add_dataset_members_rejects_self_reference_cycle(self, dataset_test, tmp_path):
+        """Adding a dataset as a member of itself raises a cycle exception.
+
+        Regression test for ``add_dataset_members``'s
+        ``check_dataset_cycle``. Pre-fix the check did
+        ``set(self.dataset_rid)`` on a multi-character string,
+        producing a character-set (e.g. ``{"4", "H", "M"}`` from
+        ``"4HM"``). The check could never detect a real
+        Dataset-RID cycle. Self-reference is the minimum-viable
+        cycle case; this test exercises it.
+        """
+        dset_description = dataset_test.dataset_description
+        parent = dset_description.dataset
+
+        with pytest.raises(DerivaMLException, match=r"cycle"):
+            parent.add_dataset_members(
+                members=[parent.dataset_rid],
+                description="self-reference must be refused",
+            )
+
+    def test_add_dataset_members_rejects_descendant_cycle(self, dataset_test, tmp_path):
+        """Adding a transitive descendant (grandchild) as a nested member raises.
+
+        Stricter than self-reference: the rebuilt cycle check
+        walks ``list_dataset_children(recurse=True)`` to gather
+        the full descendant set, so adding any RID already in
+        the subtree — not just a direct child — forms a cycle.
+
+        The demo fixture's outer dataset has grandchildren
+        (``double_nested → [training, testing] → [dataset, dataset]``).
+        We pick one of the grandchildren — not a direct member
+        of the outer, so the existing-member guard doesn't fire
+        first; the cycle guard is what catches the request.
+
+        Pre-fix this scenario passed silently because the cycle
+        check was the broken character-set match. Post-fix it
+        raises ``DerivaMLException`` with a cycle message.
+        """
+        dset_description = dataset_test.dataset_description
+        parent = dset_description.dataset
+
+        # Direct children (not useful — they're already members,
+        # so the existing-member guard would fire before the
+        # cycle guard).
+        direct_children_rids = {
+            child.dataset_rid for child in parent.list_dataset_children()
+        }
+        # All descendants (recursive).
+        all_descendants = parent.list_dataset_children(recurse=True)
+        # Grandchildren = descendants minus direct children.
+        grandchildren = [
+            d for d in all_descendants if d.dataset_rid not in direct_children_rids
+        ]
+        if not grandchildren:
+            pytest.skip("Fixture has no grandchild datasets to exercise the cycle path.")
+
+        grandchild_rid = grandchildren[0].dataset_rid
+
+        with pytest.raises(DerivaMLException, match=r"cycle"):
+            parent.add_dataset_members(
+                members=[grandchild_rid],
+                description="grandchild descendant must be refused as cycle",
+            )
