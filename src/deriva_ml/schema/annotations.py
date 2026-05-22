@@ -244,14 +244,31 @@ def catalog_annotation(
     model.apply()
 
 
-def asset_annotation(asset_table: Table):
-    """Generate annotations for an asset table.
+def asset_annotation(asset_table: Table) -> None:
+    """Attach Chaise display annotations to an asset table in-place.
+
+    Mutates ``asset_table.annotations`` and ``asset_table.columns['URL'].annotations``
+    with the Chaise ``table-display``, ``visible-columns``, and
+    ``asset`` annotation tags, then calls ``asset_table.schema.model.apply()``
+    to push the changes to the catalog. Does not return anything.
 
     Args:
         asset_table: The Table object representing the asset table.
+            Must have a ``URL`` column (the file-preview annotation
+            is attached there).
 
     Returns:
-        A dictionary containing the annotations for the asset table.
+        None. The function operates by side effect — annotations
+        are written to ``asset_table.annotations`` and the catalog
+        model is applied before return.
+
+    Side effects:
+        * Mutates ``asset_table.annotations`` to add ``table_display``
+          and ``visible_columns`` keys.
+        * Mutates ``asset_table.columns['URL'].annotations`` to add
+          the file-preview ``asset`` annotation.
+        * Calls ``asset_table.schema.model.apply()``, which issues an
+          HTTP PUT to the catalog.
     """
 
     schema = asset_table.schema.name
@@ -304,7 +321,13 @@ def asset_annotation(asset_table: Table):
                 "MD5",
                 asset_type_source,
             ]
-            + [fkey_column(c) for c in asset_metadata],
+            # ``asset_metadata`` is a set; sort by column name for
+            # deterministic output. Without the sort, the visible-
+            # columns order jitters run-to-run on rebuilds and
+            # breaks downstream diffs of catalog annotations.
+            # Same family of invariant as the asset-manifest
+            # alphabetic-order rule documented in CLAUDE.md.
+            + [fkey_column(c) for c in sorted(asset_metadata)],
             "detailed": [
                 "RID",
                 "Filename",
@@ -318,7 +341,7 @@ def asset_annotation(asset_table: Table):
                 [schema, f"{asset_name}_RCB_fkey"],
                 [schema, f"{asset_name}_RMB_fkey"],
             ]
-            + [fkey_column(c) for c in asset_metadata],
+            + [fkey_column(c) for c in sorted(asset_metadata)],
             "filter": {
                 "and": [
                     {"source": "RID"},
@@ -359,6 +382,47 @@ def asset_annotation(asset_table: Table):
 
 
 def generate_annotation(model: Model, schema: str) -> dict:
+    """Build the Chaise annotation bundles for the canonical ML tables.
+
+    Returns a dict whose values are annotation bundles ready to pass
+    as the ``annotations=`` argument to the table-creation helpers
+    in ``create_schema.py``. The bundles cover ``visible-columns``,
+    ``table-display``, ``visible-foreign-keys``, and related Chaise
+    presentation tags for the four canonical ML tables (Workflow,
+    Dataset, Execution, Dataset_Version) plus the schema-level
+    Chaise config.
+
+    Args:
+        model: The catalog's :class:`~deriva.core.ermrest_model.Model`
+            instance. Reserved for future model-introspection use
+            (e.g., discovering feature association tables to
+            customize Dataset's visible-columns). Currently not read.
+        schema: Name of the ML schema. Every FK reference in the
+            returned bundles is qualified with this name, so a
+            non-default ``schema_name`` (e.g., ``"my_ml"``) produces
+            annotations that point at the right schema's FKs rather
+            than the literal ``"deriva-ml"``.
+
+    Returns:
+        A dict with five keys:
+
+        * ``workflow_annotation``
+        * ``dataset_annotation``
+        * ``execution_annotation``
+        * ``schema_annotation``
+        * ``dataset_version_annotation``
+
+        Each value is a Chaise-shaped annotation dict (keys are
+        ``isrd-tags:...`` URIs). The caller is responsible for
+        passing the bundles to the appropriate table-creation
+        helpers — this function does not mutate any catalog state.
+
+    Example:
+        >>> annotations = generate_annotation(model, "deriva-ml")  # doctest: +SKIP
+        >>> dataset_table = schema.create_table(  # doctest: +SKIP
+        ...     TableDef(name="Dataset", annotations=annotations["dataset_annotation"]),
+        ... )
+    """
     workflow_annotation = {
         deriva_tags.table_display: {
             "*": {
@@ -503,7 +567,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 [schema, "Dataset_RMB_fkey"],
                 {
                     "source": [
-                        {"outbound": ["deriva-ml", "Dataset_Version_fkey"]},
+                        {"outbound": [schema, "Dataset_Version_fkey"]},
                         "Version",
                     ],
                     "markdown_name": "Dataset Version",
@@ -514,10 +578,10 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 "Description",
                 {
                     "source": [
-                        {"inbound": ["deriva-ml", "Dataset_Dataset_Type_Dataset_fkey"]},
+                        {"inbound": [schema, "Dataset_Dataset_Type_Dataset_fkey"]},
                         {
                             "outbound": [
-                                "deriva-ml",
+                                schema,
                                 "Dataset_Dataset_Type_Dataset_Type_fkey",
                             ]
                         },
@@ -527,7 +591,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 },
                 {
                     "source": [
-                        {"outbound": ["deriva-ml", "Dataset_Version_fkey"]},
+                        {"outbound": [schema, "Dataset_Version_fkey"]},
                         "Version",
                     ],
                     "markdown_name": "Dataset Version",
@@ -543,13 +607,13 @@ def generate_annotation(model: Model, schema: str) -> dict:
                         "source": [
                             {
                                 "inbound": [
-                                    "deriva-ml",
+                                    schema,
                                     "Dataset_Dataset_Type_Dataset_fkey",
                                 ]
                             },
                             {
                                 "outbound": [
-                                    "deriva-ml",
+                                    schema,
                                     "Dataset_Dataset_Type_Dataset_Type_fkey",
                                 ]
                             },

@@ -44,6 +44,49 @@ def create_dataset_table(
     dataset_annotation: Optional[dict] = None,
     version_annotation: Optional[dict] = None,
 ) -> Table:
+    """Create the Dataset table and its supporting vocabulary + association tables.
+
+    Side-effect graph (six tables created on ``schema`` in order):
+
+    1. ``Dataset`` — the main dataset table; columns
+       ``Description`` (markdown) and ``Deleted`` (boolean).
+    2. ``Dataset_Type`` — controlled-vocabulary table for dataset
+       types. ``curie_template`` is ``{project_name}:{{RID}}``.
+    3. ``Dataset_Dataset_Type`` — association table linking
+       ``Dataset`` ↔ ``Dataset_Type`` (built by
+       :meth:`Table.define_association`).
+    4. ``Dataset_Version`` — produced by
+       :func:`define_table_dataset_version` and referenced by
+       ``Dataset.Version`` (an outbound FK; ``True`` selects the
+       active version per row).
+    5. ``Dataset_Dataset`` — self-association for nested datasets
+       (``Nested_Dataset`` ↔ parent ``Dataset``).
+    6. ``Dataset_Execution`` — association table linking
+       ``Dataset`` ↔ ``Execution`` for execution-output datasets.
+
+    FK edges added (in addition to the association ones above):
+    ``Dataset.Version`` → ``Dataset_Version.RID``.
+
+    Args:
+        schema: The schema (typically the deriva-ml schema) where
+            the six tables are created.
+        execution_table: The pre-existing ``Execution`` table; used
+            only as the right-hand side of the ``Dataset_Execution``
+            association.
+        project_name: Project name used as the CURIE namespace for
+            the ``Dataset_Type`` vocabulary (``{project_name}:{RID}``).
+        dataset_annotation: Optional Chaise annotation bundle for
+            the ``Dataset`` table. Pass
+            ``generate_annotation(model, schema)["dataset_annotation"]``
+            for the canonical shape.
+        version_annotation: Optional Chaise annotation bundle for
+            the ``Dataset_Version`` table.
+
+    Returns:
+        The created ``Dataset`` table. The five sibling tables are
+        also created on ``schema`` but not returned — the caller
+        can reach them via ``schema.tables[...]``.
+    """
     dataset_table = schema.create_table(
         TableDef(
             name=MLTable.dataset,
@@ -235,16 +278,32 @@ def create_asset_table(
         execution_table: The execution table for association.
         asset_type_table: The asset type vocabulary table.
         asset_role_table: The asset role vocabulary table.
-        use_hatrac: Whether to use Hatrac for file storage (default True).
+        use_hatrac: When ``True`` (default) the asset table's URL
+            column is wired with the Hatrac upload template
+            ``/hatrac/metadata/{{MD5}}.{{Filename}}`` — Chaise's
+            file-upload UI will deposit bytes into Hatrac at that
+            path. When ``False`` (used by the ``File`` table) the
+            template is omitted; the URL column carries a plain
+            string and no Hatrac upload UI is wired up. Previously
+            this parameter was accepted but silently ignored, so
+            the ``File`` table got the same Hatrac template as
+            ``Execution_Asset``.
 
     Returns:
         The created asset Table object.
     """
+    # ``hatrac_template=None`` (the AssetTableDef default) means
+    # "no Hatrac upload template" — the URL column is a plain
+    # string. The Hatrac template is wired up only when the
+    # caller asks for it via ``use_hatrac=True``.
+    hatrac_template = (
+        "/hatrac/metadata/{{MD5}}.{{Filename}}" if use_hatrac else None
+    )
     asset_table = schema.create_table(
         AssetTableDef(
             schema_name=schema.name,
             name=asset_name,
-            hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
+            hatrac_template=hatrac_template,
         )
     )
     schema.create_table(
