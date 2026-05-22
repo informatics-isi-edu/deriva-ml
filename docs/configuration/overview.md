@@ -50,7 +50,6 @@ conf = DerivaMLConf(
     domain_schemas='my_project',       # Domain schema name
     working_dir='/shared/workspace',  # Base working directory
     use_minid=True,                   # Use MINID for dataset bags
-    check_auth=True,                  # Verify authentication
 )
 ```
 
@@ -62,7 +61,6 @@ conf = DerivaMLConf(
 | `working_dir` | str/Path | None | Base directory for outputs |
 | `ml_schema` | str | "deriva-ml" | ML schema name |
 | `use_minid` | bool | True | Use MINID service for datasets |
-| `check_auth` | bool | True | Verify authentication on connect |
 
 ### DatasetSpecConfig
 
