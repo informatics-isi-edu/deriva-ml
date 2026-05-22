@@ -664,3 +664,161 @@ def test_expand_nested_dataset_anchors_no_children() -> None:
     anchors = [RIDAnchor(table="Dataset", rids=["L"])]
     expanded = _expand_nested_dataset_anchors(anchors, catalog)
     assert set(expanded[0].rids) == {"L"}
+
+
+# ---------------------------------------------------------------------------
+# Orphan-strategy behavioural coverage (audit P1 1.3)
+# ---------------------------------------------------------------------------
+#
+# Pre-fix, the orphan strategies (FAIL/DELETE/NULLIFY) had no
+# behavioural test: existing integration tests all use the DELETE
+# default, and ``test_clone_via_bag_preserves_explicit_fail_strategy``
+# pins only the policy-merge plumbing (the merged policy reaching
+# the builder). No test verified that non-zero orphan counters
+# from a real load actually surface on the destination's
+# provenance annotation.
+#
+# These tests close that gap by mocking ``BagCatalogLoader.run()``
+# to return a synthesized ``LoadReport`` with non-zero orphan
+# counters under each strategy, then asserting the
+# ``set_catalog_provenance`` call carries the expected
+# ``orphan_strategy`` + aggregated counters.
+
+
+def _make_load_report_with_orphans(
+    *,
+    total_rows: int,
+    rows_skipped_orphan: int = 0,
+    rows_nullified_orphan: int = 0,
+) -> MagicMock:
+    """Build a LoadReport-shaped mock with synthesized orphan counters.
+
+    The provenance writer reads ``total_rows_inserted`` and
+    iterates ``table_stats.values()`` summing
+    ``rows_skipped_orphan`` and ``rows_nullified_orphan``. We
+    pack everything into a single synthetic table stat for
+    simplicity.
+    """
+    report = MagicMock()
+    report.total_rows_inserted = total_rows
+    table_stat = MagicMock(spec=[])
+    table_stat.rows_skipped_orphan = rows_skipped_orphan
+    table_stat.rows_nullified_orphan = rows_nullified_orphan
+    report.table_stats = {"my_schema.SomeTable": table_stat}
+    return report
+
+
+def test_clone_via_bag_delete_strategy_surfaces_orphan_count_on_provenance(
+    tmp_path: Path,
+) -> None:
+    """``DanglingFKStrategy.DELETE`` + orphan rows → annotation reflects the count.
+
+    A clone whose load step drops orphan rows (because the FK
+    target was excluded from the slice, e.g.) must record the
+    aggregated count on the destination's provenance annotation.
+    A reader inspecting the catalog later sees "rows_copied=N,
+    orphan_rows_removed=K" and knows the clone was lossy under
+    the DELETE strategy.
+    """
+    fake_bag_path = tmp_path / "fake-bag"
+    fake_bag_path.mkdir()
+
+    fake_report = _make_load_report_with_orphans(
+        total_rows=100, rows_skipped_orphan=7
+    )
+
+    user_policy = FKTraversalPolicy(
+        dangling_fk_strategy=DanglingFKStrategy.DELETE,
+    )
+
+    with (
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.get_credential",
+            return_value={},
+        ),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
+        ) as MockBuilder,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
+        ) as MockLoader,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
+        ) as MockSetProv,
+    ):
+        MockBuilder.return_value.build.return_value = fake_bag_path
+        loader = MagicMock()
+        loader.run.return_value = fake_report
+        MockLoader.return_value.__enter__.return_value = loader
+
+        clone_via_bag(
+            source_hostname="src.example.org",
+            source_catalog_id="1",
+            dest_hostname="dst.example.org",
+            dest_catalog_id="42",
+            root_rid="ABC",
+            policy=user_policy,
+            output_dir=tmp_path,
+        )
+
+        MockSetProv.assert_called_once()
+        clone_details = MockSetProv.call_args.kwargs["clone_details"]
+        assert clone_details.orphan_strategy == "delete"
+        assert clone_details.orphan_rows_removed == 7
+        assert clone_details.orphan_rows_nullified == 0
+        assert clone_details.rows_copied == 100
+
+
+def test_clone_via_bag_nullify_strategy_surfaces_orphan_count_on_provenance(
+    tmp_path: Path,
+) -> None:
+    """``DanglingFKStrategy.NULLIFY`` + nullified rows → annotation reflects the count."""
+    fake_bag_path = tmp_path / "fake-bag"
+    fake_bag_path.mkdir()
+
+    fake_report = _make_load_report_with_orphans(
+        total_rows=50, rows_nullified_orphan=4
+    )
+
+    user_policy = FKTraversalPolicy(
+        dangling_fk_strategy=DanglingFKStrategy.NULLIFY,
+    )
+
+    with (
+        patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.get_credential",
+            return_value={},
+        ),
+        patch(
+            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
+        ) as MockBuilder,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
+        ) as MockLoader,
+        patch(
+            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
+        ) as MockSetProv,
+    ):
+        MockBuilder.return_value.build.return_value = fake_bag_path
+        loader = MagicMock()
+        loader.run.return_value = fake_report
+        MockLoader.return_value.__enter__.return_value = loader
+
+        clone_via_bag(
+            source_hostname="src.example.org",
+            source_catalog_id="1",
+            dest_hostname="dst.example.org",
+            dest_catalog_id="42",
+            root_rid="ABC",
+            policy=user_policy,
+            output_dir=tmp_path,
+        )
+
+        MockSetProv.assert_called_once()
+        clone_details = MockSetProv.call_args.kwargs["clone_details"]
+        assert clone_details.orphan_strategy == "nullify"
+        assert clone_details.orphan_rows_nullified == 4
+        assert clone_details.orphan_rows_removed == 0
+        assert clone_details.rows_copied == 50
