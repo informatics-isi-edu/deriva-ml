@@ -454,10 +454,21 @@ class FeatureMixin:
                 ... ):
                 ...     print(f"{rec.Image}: {rec.Glaucoma} (by {rec.Execution})")
 
-            Filter by a specific workflow — works identically on a downloaded bag::
+            Filter by a specific workflow — works identically on a downloaded bag.
+            ``select_by_workflow`` takes a ``str`` (Workflow_Type name or
+            Workflow RID); the underlying ``list_workflow_executions``
+            call is ``@validate_call``'d to ``str`` and will reject a
+            ``Workflow`` object outright::
 
+                >>> # By Workflow_Type name (the common case):
+                >>> sel = FeatureRecord.select_by_workflow(  # doctest: +SKIP
+                ...     "Glaucoma_Training_v2", container=ml,
+                ... )
+                >>> # ... or by Workflow RID, when you need a specific run:
                 >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")  # doctest: +SKIP
-                >>> sel = FeatureRecord.select_by_workflow(workflow, container=ml)  # doctest: +SKIP
+                >>> sel = FeatureRecord.select_by_workflow(  # doctest: +SKIP
+                ...     workflow.rid, container=ml,
+                ... )
                 >>> labels = [r.Glaucoma for r in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=sel,
                 ... )]
