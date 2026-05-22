@@ -12,6 +12,7 @@ via monkeypatched ``DerivaML.__init__``.
 from __future__ import annotations
 
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -228,3 +229,94 @@ def test_cite_accepts_dict_with_rid_key():
     harness = _CiteHarness()
     url = DerivaML.cite(harness, {"RID": "1-XYZ"})  # type: ignore[arg-type]
     assert url.startswith("https://deriva.example.org/id/42/1-XYZ@")
+
+
+# ---------------------------------------------------------------------------
+# catalog_snapshot — kwarg forwarding
+# ---------------------------------------------------------------------------
+#
+# ``DerivaML.catalog_snapshot(version)`` must construct the snapshot
+# instance with every connection-shaping kwarg the original
+# instance carries. Earlier versions forwarded only the two logging
+# levels and the hostname — every other kwarg the user had passed
+# to the original ``DerivaML(...)`` (working_dir, cache_dir,
+# domain_schemas, default_schema, project_name, ml_schema, s3_bucket,
+# use_minid, credential, clean_execution_dir, mode) got silently
+# re-defaulted. The snapshot then had a different working_dir from
+# its parent, re-fetched credentials from disk, and re-auto-detected
+# domain schemas — all observable behaviour drifts.
+#
+# This test pins the forwarding contract by monkey-patching
+# ``DerivaML.__init__`` to capture the kwargs the snapshot call
+# uses, then asserts each one matches the parent.
+
+
+def test_catalog_snapshot_forwards_connection_kwargs():
+    """Every connection-shaping kwarg on `self` is forwarded to the snapshot.
+
+    Catches regressions where ``catalog_snapshot`` drops a kwarg
+    when DerivaML grows a new constructor parameter.
+    """
+    from deriva_ml.core.base import DerivaML
+    from deriva_ml.core.connection_mode import ConnectionMode
+
+    # Build a fake "parent" DerivaML with known kwarg state. We
+    # don't actually construct one (would need a live catalog);
+    # we forge an instance and populate the attributes that
+    # ``catalog_snapshot`` reads.
+    parent = DerivaML.__new__(DerivaML)
+    parent.host_name = "src.example.org"
+    parent.domain_schemas = {"my_domain"}
+    parent.default_schema = "my_domain"
+    parent.project_name = "myproj"
+    parent.cache_dir = "/tmp/mycache"
+    parent.working_dir = "/tmp/mywd"
+    parent.ml_schema = "deriva-ml-custom"
+    parent._logging_level = 30  # logging.WARNING
+    parent._deriva_logging_level = 30
+    parent.credential = {"cookie": "secret"}
+    parent.s3_bucket = "s3://my-bucket"
+    parent.use_minid = True
+    parent.clean_execution_dir = False
+    parent._mode = ConnectionMode.online
+
+    # Capture the kwargs passed to the inner DerivaML(...) call.
+    captured: dict = {}
+
+    def fake_init(self, hostname, catalog_id, **kwargs):
+        captured["hostname"] = hostname
+        captured["catalog_id"] = catalog_id
+        captured.update(kwargs)
+        # Stub out the rest so __init__ doesn't try to connect.
+        raise _StopInit("captured")
+
+    class _StopInit(Exception):
+        pass
+
+    import contextlib
+
+    with patch.object(DerivaML, "__init__", fake_init):
+        with contextlib.suppress(_StopInit):
+            DerivaML.catalog_snapshot(parent, "1@SNAP")  # type: ignore[arg-type]
+
+    # Hostname + the version snapshot ID are positional.
+    assert captured["hostname"] == "src.example.org"
+    assert captured["catalog_id"] == "1@SNAP"
+
+    # Every connection-shaping kwarg the parent carries must have
+    # arrived at the snapshot. If a new kwarg is added to DerivaML
+    # and catalog_snapshot doesn't forward it, this list — and the
+    # docstring on catalog_snapshot — needs to be updated together.
+    assert captured["domain_schemas"] == {"my_domain"}
+    assert captured["default_schema"] == "my_domain"
+    assert captured["project_name"] == "myproj"
+    assert captured["cache_dir"] == "/tmp/mycache"
+    assert captured["working_dir"] == "/tmp/mywd"
+    assert captured["ml_schema"] == "deriva-ml-custom"
+    assert captured["logging_level"] == 30
+    assert captured["deriva_logging_level"] == 30
+    assert captured["credential"] == {"cookie": "secret"}
+    assert captured["s3_bucket"] == "s3://my-bucket"
+    assert captured["use_minid"] is True
+    assert captured["clean_execution_dir"] is False
+    assert captured["mode"] is ConnectionMode.online
