@@ -2379,17 +2379,14 @@ class Execution:
             self._execution_record.add_nested_execution(nested_rid, sequence=sequence)
         else:
             # Fallback for cases without execution record
-            pb = self._ml_object.pathBuilder()
-            execution_execution = pb.schemas[self._ml_object.ml_schema].Execution_Execution
+            from deriva_ml.execution._helpers import insert_nested_execution_link
 
-            record = {
-                "Execution": self.execution_rid,
-                "Nested_Execution": nested_rid,
-            }
-            if sequence is not None:
-                record["Sequence"] = sequence
-
-            execution_execution.insert([record])
+            insert_nested_execution_link(
+                ml_instance=self._ml_object,
+                parent_rid=self.execution_rid,
+                child_rid=nested_rid,
+                sequence=sequence,
+            )
 
     def is_nested(self) -> bool:
         """Check if this execution is nested within another execution.

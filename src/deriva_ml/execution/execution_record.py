@@ -412,17 +412,12 @@ class ExecutionRecord(BaseModel):
             return
         _visited.add(self.execution_rid)
 
-        pb = self._ml_instance.pathBuilder()
-        ml_schema = self._ml_instance.ml_schema
-        exec_exec_path = pb.schemas[ml_schema].Execution_Execution
-        execution_path = pb.schemas[ml_schema].Execution
+        from deriva_ml.execution._helpers import fetch_nested_execution_rows
 
-        # Query for child executions (Execution column = parent, Nested_Execution = child)
-        records = list(
-            exec_exec_path.filter(exec_exec_path.Execution == self.execution_rid)
-            .link(execution_path, on=(exec_exec_path.Nested_Execution == execution_path.RID))
-            .entities()
-            .fetch()
+        records = fetch_nested_execution_rows(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+            direction="children",
         )
 
         for record in records:
@@ -500,17 +495,12 @@ class ExecutionRecord(BaseModel):
             return
         _visited.add(self.execution_rid)
 
-        pb = self._ml_instance.pathBuilder()
-        ml_schema = self._ml_instance.ml_schema
-        exec_exec_path = pb.schemas[ml_schema].Execution_Execution
-        execution_path = pb.schemas[ml_schema].Execution
+        from deriva_ml.execution._helpers import fetch_nested_execution_rows
 
-        # Query for parent executions (Execution column = parent, Nested_Execution = child)
-        records = list(
-            exec_exec_path.filter(exec_exec_path.Nested_Execution == self.execution_rid)
-            .link(execution_path, on=(exec_exec_path.Execution == execution_path.RID))
-            .entities()
-            .fetch()
+        records = fetch_nested_execution_rows(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+            direction="parents",
         )
 
         for record in records:
@@ -554,21 +544,16 @@ class ExecutionRecord(BaseModel):
             >>> # Or by RID
             >>> parent_record.add_nested_execution("3-XYZ9", sequence=1)
         """
+        from deriva_ml.execution._helpers import insert_nested_execution_link
+
         self._check_writable_catalog("add nested execution")
-
         child_rid = child.execution_rid if isinstance(child, ExecutionRecord) else child
-
-        pb = self._ml_instance.pathBuilder()
-        exec_exec_path = pb.schemas[self._ml_instance.ml_schema].Execution_Execution
-
-        record = {
-            "Execution": self.execution_rid,
-            "Nested_Execution": child_rid,
-        }
-        if sequence is not None:
-            record["Sequence"] = sequence
-
-        exec_exec_path.insert([record])
+        insert_nested_execution_link(
+            ml_instance=self._ml_instance,
+            parent_rid=self.execution_rid,
+            child_rid=child_rid,
+            sequence=sequence,
+        )
 
     def list_input_datasets(self) -> list["Dataset"]:
         """List datasets that were input to this execution.
