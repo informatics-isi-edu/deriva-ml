@@ -73,8 +73,9 @@ from deriva_ml.core.upload_layout import asset_type_path, flat_asset_dir
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from deriva_ml.asset.manifest import AssetManifest
+    from deriva_ml.asset.manifest import AssetEntry, AssetManifest
     from deriva_ml.execution.execution import Execution
+    from deriva_ml.execution.rid_lease import LeaseAggregator
 
     ProgressCallback = Callable[[UploadProgress], None]
 
@@ -194,6 +195,17 @@ def build_execution_bag(
         # callbacks can report a coherent 0-100 progression.
         total_assets = sum(len(es) for es in by_table.values())
         staged_so_far = 0
+
+        # All RID leases for the commit go through one aggregator
+        # so the whole bag costs **one** ``post_lease_batch`` POST,
+        # not one per asset-table + one per feature-group. Audit
+        # P1 Ex-batch — a 3-table 5-feature-group commit drops
+        # from 11 round trips to 1.
+        from deriva_ml.execution.rid_lease import LeaseAggregator
+
+        lease_agg = LeaseAggregator()
+        deferred_emits: list[tuple[str, list[dict[str, Any]]]] = []
+
         for asset_table_name, entries in by_table.items():
             staged_so_far = _add_asset_rows_to_bag(
                 bb=bb,
@@ -203,6 +215,8 @@ def build_execution_bag(
                 progress_callback=progress_callback,
                 staged_so_far=staged_so_far,
                 total_assets=total_assets,
+                lease_agg=lease_agg,
+                deferred_emits=deferred_emits,
             )
 
         _add_staged_feature_rows_to_bag(
@@ -210,7 +224,22 @@ def build_execution_bag(
             execution=execution,
             manifest=manifest,
             pending=pending,
+            lease_agg=lease_agg,
+            deferred_emits=deferred_emits,
         )
+
+        # One POST resolves every reserved token to its leased
+        # RID. The deferred emits below substitute the leased
+        # RID into each row's ``RID`` slot (rows carried a
+        # placeholder token there) and call ``bb.add_rows``.
+        lease_agg.flush(catalog=execution._ml_object.catalog)
+        for table_name, token_rows in deferred_emits:
+            for row in token_rows:
+                # Each row's "RID" field was set to a token at
+                # reserve-time. Replace with the leased RID
+                # post-flush.
+                row["RID"] = lease_agg.resolve(row["RID"])
+            bb.add_rows(table_name, token_rows)
 
         return bb.finalize(make_bdbag=True)
 
@@ -224,6 +253,8 @@ def _add_asset_rows_to_bag(
     progress_callback: "ProgressCallback | None" = None,
     staged_so_far: int = 0,
     total_assets: int = 0,
+    lease_agg: "LeaseAggregator",
+    deferred_emits: list[tuple[str, list[dict[str, Any]]]],
 ) -> int:
     """Add asset rows + ``*_Execution`` + ``*_Asset_Type`` rows for one table.
 
@@ -258,7 +289,6 @@ def _add_asset_rows_to_bag(
         global counter. Always non-negative.
     """
     model = execution._model
-    ml = execution._ml_object
     asset_table = model.name_to_table(asset_table_name)
 
     # See ``DerivaModel.asset_metadata_sorted`` — both this call
@@ -333,17 +363,18 @@ def _add_asset_rows_to_bag(
     # preserves the caller-supplied RID, blocking the server's
     # default). Sending without an RID lands a NULL and fails
     # the table's RID NOT-NULL unique constraint.
-    from deriva_ml.execution.rid_lease import (
-        generate_lease_token,
-        post_lease_batch,
-    )
+    #
+    # Pre-Ex-batch this function made two ``post_lease_batch``
+    # POSTs (one for exec_assoc rows, one for type rows). Now it
+    # reserves tokens against the shared ``lease_agg``; the
+    # driver flushes once at end-of-commit and resolves each
+    # row's placeholder ``RID`` token to its leased RID.
 
     exec_assoc, asset_fk, execution_fk = model.find_association(asset_table_name, "Execution")
-    exec_tokens = [generate_lease_token() for _filename, _e in entries]
-    exec_lease_map = post_lease_batch(catalog=ml.catalog, tokens=exec_tokens)
+    exec_tokens = lease_agg.reserve(len(entries))
     assoc_rows = [
         {
-            "RID": exec_lease_map[exec_tokens[i]],
+            "RID": exec_tokens[i],  # placeholder — driver resolves post-flush
             asset_fk: entry.rid,
             execution_fk: execution.execution_rid,
             "Asset_Role": "Output",
@@ -351,7 +382,7 @@ def _add_asset_rows_to_bag(
         for i, (_filename, entry) in enumerate(entries)
     ]
     if assoc_rows:
-        bb.add_rows(exec_assoc.name, assoc_rows)
+        deferred_emits.append((exec_assoc.name, assoc_rows))
 
     # {Asset}_Asset_Type association rows. Asset types live in a
     # per-execution JSONL file populated by ``asset_file_path``;
@@ -370,20 +401,18 @@ def _add_asset_rows_to_bag(
         for asset_type in type_map.get(_filename, []):
             type_pairs.append((entry, asset_type))
 
-    type_rows: list[dict[str, Any]] = []
     if type_pairs:
-        type_tokens = [generate_lease_token() for _ in type_pairs]
-        type_lease_map = post_lease_batch(catalog=ml.catalog, tokens=type_tokens)
+        type_tokens = lease_agg.reserve(len(type_pairs))
+        type_rows: list[dict[str, Any]] = []
         for i, (entry, asset_type) in enumerate(type_pairs):
             type_rows.append(
                 {
-                    "RID": type_lease_map[type_tokens[i]],
+                    "RID": type_tokens[i],  # placeholder
                     asset_table_name: entry.rid,
                     "Asset_Type": asset_type,
                 }
             )
-    if type_rows:
-        bb.add_rows(type_assoc.name, type_rows)
+        deferred_emits.append((type_assoc.name, type_rows))
 
     return staged_so_far
 
@@ -394,6 +423,8 @@ def _add_staged_feature_rows_to_bag(
     execution: "Execution",
     manifest: "AssetManifest",
     pending: dict[str, Any],
+    lease_agg: "LeaseAggregator",
+    deferred_emits: list[tuple[str, list[dict[str, Any]]]],
 ) -> None:
     """Add staged feature records to the bag, rewriting asset RIDs.
 
@@ -478,27 +509,24 @@ def _add_staged_feature_rows_to_bag(
     # association rows do: the loader inserts under
     # ``nondefaults=RID`` (commit semantics), so missing/empty
     # RID lands as NULL and the table's unique constraint fires.
-    # Lease one RID per row, write it into the payload, then
-    # ``add_rows``.
-    from deriva_ml.execution.rid_lease import (
-        generate_lease_token,
-        post_lease_batch,
-    )
-
+    # Reserve tokens against the shared aggregator and defer
+    # the ``bb.add_rows`` until after the driver's single
+    # ``flush()``. Audit P1 Ex-batch — pre-fix this loop made
+    # one POST per qualified feature-table group; now zero POSTs
+    # (the driver's single flush covers everything).
     for qualified, payloads in groups.items():
         # Strip any pre-existing RID values (the staged JSON may
         # carry empty strings from CSV → SQLite round-trip). We
         # supply the leased RID afresh.
         for p in payloads:
             p.pop("RID", None)
-        tokens = [generate_lease_token() for _ in payloads]
-        lease_map = post_lease_batch(catalog=ml.catalog, tokens=tokens)
+        tokens = lease_agg.reserve(len(payloads))
         for i, p in enumerate(payloads):
-            p["RID"] = lease_map[tokens[i]]
+            p["RID"] = tokens[i]  # placeholder — driver resolves post-flush
         # ``qualified`` is "schema.Table"; BagBuilder accepts the
         # qualified form natively, but the bag's per-schema CSV
         # layout uses the bare table name. ``add_rows`` resolves.
-        bb.add_rows(qualified, payloads)
+        deferred_emits.append((qualified, payloads))
 
 
 def load_execution_bag(

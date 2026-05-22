@@ -83,6 +83,136 @@ def post_lease_batch(
     return result
 
 
+class LeaseAggregator:
+    """Accumulate lease tokens from multiple call sites, flush in one POST.
+
+    Pre-extraction (audit P1 Ex-batch), ``bag_commit`` made three
+    separate ``post_lease_batch`` calls per commit — one for
+    ``*_Execution`` association rows, one for ``*_Asset_Type``
+    association rows, one for feature rows. Each is a serialized
+    round trip to ERMrest. For a 1,000-asset commit with 3 types
+    each + features, that's 3 sequential POSTs that could be one
+    batch.
+
+    This aggregator collapses them. Call sites:
+
+    1. ``reserve(n)`` — get a list of ``n`` fresh tokens and
+       register them with the aggregator. Returns the tokens so
+       the caller can map them onto rows (the production pattern
+       keeps token order aligned with row order).
+    2. After every site has reserved its tokens, call ``flush()``
+       once. This issues a single ``post_lease_batch`` for all
+       accumulated tokens.
+    3. ``resolve(token)`` — look up the leased RID for a token
+       after ``flush()``. Raises ``KeyError`` for an unknown
+       token (call ``reserve`` first) or if ``flush()`` hasn't
+       been called yet.
+
+    The aggregator is single-shot: ``flush()`` is intended to be
+    called once at the end of a commit. Multiple ``reserve`` →
+    one ``flush`` is the supported flow. Calling ``reserve``
+    after ``flush()`` raises :class:`RuntimeError` — would
+    create a token that was never POSTed.
+
+    Note: ``post_lease_batch`` is still the underlying primitive.
+    The aggregator just defers the call so multiple sites pay
+    one round-trip instead of N.
+
+    Example:
+        >>> from deriva_ml.execution.rid_lease import LeaseAggregator
+        >>> agg = LeaseAggregator()
+        >>> tokens_a = agg.reserve(2)
+        >>> tokens_b = agg.reserve(3)
+        >>> len(tokens_a) == 2
+        True
+        >>> len(tokens_b) == 3
+        True
+        >>> # agg.flush(catalog=cat) would POST 5 tokens in one batch
+    """
+
+    def __init__(self) -> None:
+        self._tokens: list[str] = []
+        self._lease_map: dict[str, str] | None = None
+
+    def reserve(self, n: int) -> list[str]:
+        """Reserve ``n`` lease tokens and register them with this aggregator.
+
+        Args:
+            n: How many tokens to reserve. Non-negative.
+
+        Returns:
+            List of ``n`` UUID4 strings. Order matches caller
+            insertion order; the production pattern is to zip
+            this list against row data so the leased RIDs land
+            in the right rows after ``flush()``.
+
+        Raises:
+            RuntimeError: If called after ``flush()`` —
+                creating a token post-flush would leave it
+                un-POSTed, breaking the invariant that
+                ``resolve()`` can always answer for any
+                reserved token.
+            ValueError: If ``n`` is negative.
+        """
+        if self._lease_map is not None:
+            raise RuntimeError(
+                "LeaseAggregator.reserve() called after flush(); "
+                "this aggregator is single-shot. Build a fresh aggregator "
+                "for any additional leases."
+            )
+        if n < 0:
+            raise ValueError(f"reserve() requires n >= 0, got {n}")
+        new_tokens = [generate_lease_token() for _ in range(n)]
+        self._tokens.extend(new_tokens)
+        return new_tokens
+
+    def flush(self, *, catalog: "ErmrestCatalog") -> dict[str, str]:
+        """POST every accumulated token in one batch; return token → RID.
+
+        Args:
+            catalog: Live :class:`ErmrestCatalog` to POST against.
+
+        Returns:
+            Dict mapping every reserved token to its leased
+            RID. Empty if ``reserve()`` was never called (a
+            no-op flush; useful in code paths where the
+            aggregator is unconditionally flushed but may
+            have nothing to lease).
+
+        Raises:
+            RuntimeError: If called twice. The aggregator is
+                single-shot.
+        """
+        if self._lease_map is not None:
+            raise RuntimeError(
+                "LeaseAggregator.flush() called twice; this aggregator "
+                "is single-shot."
+            )
+        self._lease_map = post_lease_batch(catalog=catalog, tokens=self._tokens)
+        return self._lease_map
+
+    def resolve(self, token: str) -> str:
+        """Return the leased RID for ``token``.
+
+        Args:
+            token: A token previously returned by ``reserve()``.
+
+        Returns:
+            The RID assigned to this token at flush time.
+
+        Raises:
+            RuntimeError: If ``flush()`` hasn't been called yet.
+            KeyError: If ``token`` was never reserved by this
+                aggregator.
+        """
+        if self._lease_map is None:
+            raise RuntimeError(
+                "LeaseAggregator.resolve() called before flush(); "
+                "no RID has been assigned to any token yet."
+            )
+        return self._lease_map[token]
+
+
 def _validate_pending_asset_leases(
     catalog: "ErmrestCatalog",
     entries: "Iterable[tuple[str, str]]",
