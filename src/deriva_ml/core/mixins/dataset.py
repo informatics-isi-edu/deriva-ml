@@ -174,15 +174,38 @@ class DatasetMixin:
             >>> dataset = ml.lookup_dataset("4HM")  # doctest: +SKIP
             >>> print(f"Version: {dataset.current_version}")  # doctest: +SKIP
         """
+        # Import here to avoid circular imports.
+        from deriva_ml.dataset.dataset import Dataset
+
         if isinstance(dataset, DatasetSpec):
             dataset_rid = dataset.rid
         else:
             dataset_rid = dataset
 
-        try:
-            return [ds for ds in self.find_datasets(deleted=deleted) if ds.dataset_rid == dataset_rid][0]
-        except IndexError:
+        # Server-side RID filter — the catalog returns exactly the
+        # row(s) matching this RID rather than every dataset in the
+        # catalog. The previous implementation fetched every dataset
+        # row and built every ``Dataset`` object just to filter
+        # client-side; for catalogs with thousands of datasets that
+        # was O(N) per lookup and a meaningful latency hit.
+        pb = self.pathBuilder()
+        dataset_path = pb.schemas[self._dataset_table.schema.name].tables[self._dataset_table.name]
+        filtered_path = dataset_path.filter(dataset_path.RID == dataset_rid)
+        if not deleted:
+            filtered_path = filtered_path.filter(
+                (dataset_path.Deleted == False) | (dataset_path.Deleted == None)  # noqa: E711, E712
+            )
+
+        rows = list(filtered_path.entities().fetch())
+        if not rows:
             raise DerivaMLException(f"Dataset {dataset_rid} not found.")
+
+        row = rows[0]
+        return Dataset(
+            self,  # type: ignore[arg-type]
+            dataset_rid=row["RID"],
+            description=row["Description"],
+        )
 
     def delete_dataset(self, dataset: "Dataset", recurse: bool = False) -> None:
         """Soft-delete a dataset by marking it as deleted in the catalog.
