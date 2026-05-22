@@ -348,16 +348,23 @@ class FeatureRecord(BaseModel):
         def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
             col = column
             if col is None:
-                # Auto-detect from feature metadata on the record class
+                # Auto-detect from feature metadata on the record class.
+                # ``term_columns`` is a ``set[Column]`` (see Feature.__init__),
+                # so we can't index it. Single-term features have exactly
+                # one element to pull out; multi-term features need an
+                # explicit ``column=`` from the caller.
                 record_cls = type(records[0])
                 if hasattr(record_cls, "feature") and record_cls.feature and record_cls.feature.term_columns:
-                    if len(record_cls.feature.term_columns) == 1:
-                        col = record_cls.feature.term_columns[0].name
+                    term_cols = record_cls.feature.term_columns
+                    if len(term_cols) == 1:
+                        col = next(iter(term_cols)).name
                     else:
+                        # Sort for a deterministic error message.
+                        available = sorted(c.name for c in term_cols)
                         raise DerivaMLException(
                             "select_majority_vote requires a column name for "
                             "features with multiple term columns. "
-                            f"Available: {[c.name for c in record_cls.feature.term_columns]}"
+                            f"Available: {available}"
                         )
                 else:
                     raise DerivaMLException(

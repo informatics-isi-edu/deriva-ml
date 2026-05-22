@@ -101,3 +101,109 @@ def test_select_majority_vote_with_explicit_column_overrides_auto_detect() -> No
     ]
     result = selector(records)
     assert result.Diagnosis == "benign"
+
+
+# ---------------------------------------------------------------------------
+# Regression: column=None auto-detect on a single-term feature (was broken)
+# ---------------------------------------------------------------------------
+#
+# Earlier versions of ``select_majority_vote`` did
+# ``record_cls.feature.term_columns[0].name`` to auto-detect the
+# single term column. ``term_columns`` is a ``set[Column]`` (see
+# ``Feature.__init__``), and Python sets aren't indexable: the
+# call crashed with ``TypeError: 'set' object is not subscriptable``
+# the moment a real caller (single-term feature, ``column=None``)
+# hit the happy path. The bug went undetected because the
+# pre-existing tests above all pass ``column=...`` explicitly or
+# hit the no-metadata error branch. The two tests below close that
+# gap.
+
+
+class _FakeColumn:
+    """Stand-in for ``deriva.core.ermrest_model.Column`` — only
+    ``.name`` is read by the selector under test.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _FakeFeature:
+    """Stand-in for ``Feature`` — only ``.term_columns`` is read."""
+
+    def __init__(self, term_column_names: list[str]) -> None:
+        # Matches Feature.__init__: a set, not a list.
+        self.term_columns: set[_FakeColumn] = {
+            _FakeColumn(n) for n in term_column_names
+        }
+
+
+def test_select_majority_vote_auto_detect_single_term_column() -> None:
+    """``column=None`` works when the record class's feature has one term column.
+
+    Regression test for the
+    ``term_columns[0]``-on-a-set TypeError. Before the fix, this
+    test failed with::
+
+        TypeError: 'set' object is not subscriptable
+
+    After the fix, the selector pulls the single column out via
+    ``next(iter(term_columns))`` and votes correctly.
+    """
+
+    # Bare subclass; we attach ``feature`` as a class attribute
+    # AFTER class creation so Pydantic doesn't pull it into the
+    # field machinery. The selector under test reads via
+    # ``hasattr(record_cls, "feature")`` + attribute access, which
+    # picks up class attributes the same as ClassVars.
+    class SingleTermRecord(FeatureRecord):
+        """Mimics what ``Feature.feature_record_class()`` returns
+        for a single-term feature."""
+
+    SingleTermRecord.feature = _FakeFeature(term_column_names=["Diagnosis"])
+
+    def _make(execution: str, rct: str, label: str) -> "SingleTermRecord":
+        rec = SingleTermRecord(
+            Execution=execution, Feature_Name="Diagnosis", RCT=rct
+        )
+        object.__setattr__(rec, "Diagnosis", label)
+        return rec
+
+    selector = FeatureRecord.select_majority_vote()  # column=None
+    records = [
+        _make("e1", "2024-01-01T00:00:00", "benign"),
+        _make("e2", "2024-01-02T00:00:00", "benign"),
+        _make("e3", "2024-01-03T00:00:00", "malignant"),
+    ]
+    result = selector(records)
+    assert result.Diagnosis == "benign"
+
+
+def test_select_majority_vote_auto_detect_rejects_multi_term_feature() -> None:
+    """``column=None`` on a multi-term feature raises with a clear message.
+
+    The error message lists the available column names so the
+    caller knows what to pass. Sorted for deterministic output
+    across set-iteration orders.
+    """
+
+    class MultiTermRecord(FeatureRecord):
+        pass
+
+    MultiTermRecord.feature = _FakeFeature(
+        term_column_names=["Diagnosis", "Severity"]
+    )
+
+    rec = MultiTermRecord(
+        Execution="e1", Feature_Name="Diagnosis", RCT="2024-01-01T00:00:00"
+    )
+    object.__setattr__(rec, "Diagnosis", "benign")
+
+    selector = FeatureRecord.select_majority_vote()  # column=None
+    with pytest.raises(DerivaMLException, match=r"multiple term columns") as exc_info:
+        selector([rec])
+    # Deterministic available-list in the message (sorted).
+    msg = str(exc_info.value)
+    assert "['Diagnosis', 'Severity']" in msg, (
+        f"Expected sorted column list in error; got: {msg}"
+    )
