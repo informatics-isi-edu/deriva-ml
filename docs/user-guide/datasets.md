@@ -281,13 +281,35 @@ Split (parent, type: "Split")
 └── Testing (child, type: "Testing")
 ```
 
+### Wrap split_dataset in an execution
+
+`split_dataset` runs inside an `Execution` the caller has already opened. The caller's workflow identifies the code making the splitting decision; deriva-ml never invents a workflow on the caller's behalf. Set this up once and reuse the same `exe` for every example below:
+
+```python
+from deriva_ml import DerivaML
+from deriva_ml.dataset.split import split_dataset
+from deriva_ml.execution import ExecutionConfiguration
+
+ml = DerivaML("localhost", "9")
+
+workflow = ml.create_workflow(
+    name="My splitting script",
+    workflow_type="Dataset_Split",
+    description="80/20 train/test for sleep-stage classifier v3",
+)
+config = ExecutionConfiguration(workflow=workflow)
+
+with ml.create_execution(config) as exe:
+    # ... split_dataset calls go here, reusing `exe` ...
+    pass
+exe.upload_execution_outputs(clean_folder=True)
+```
+
 ### Simple random split
 
 ```python
-from deriva_ml.dataset.split import split_dataset
-
 # 80/20 split, reproducible with seed=42
-result = split_dataset(ml, source_dataset_rid, test_size=0.2, seed=42)
+result = split_dataset(ml, source_dataset_rid, exe, test_size=0.2, seed=42)
 
 print(f"Split RID:    {result.split.rid} (v{result.split.version})")
 print(f"Training:     {result.training.rid} ({result.training.count} samples)")
@@ -301,7 +323,7 @@ Add `val_size` to create a validation partition:
 ```python
 # 70/10/20 train/val/test
 result = split_dataset(
-    ml, source_dataset_rid,
+    ml, source_dataset_rid, exe,
     test_size=0.2,
     val_size=0.1,
     seed=42,
@@ -320,7 +342,7 @@ Stratified splitting preserves class distribution across all partitions. Pass `s
 
 ```python
 result = split_dataset(
-    ml, source_dataset_rid,
+    ml, source_dataset_rid, exe,
     test_size=0.2,
     val_size=0.1,
     seed=42,
@@ -340,7 +362,7 @@ When all partitions need ground-truth labels (for example, ROC-curve evaluation 
 
 ```python
 result = split_dataset(
-    ml, source_dataset_rid,
+    ml, source_dataset_rid, exe,
     test_size=0.2,
     val_size=0.1,
     training_types=["Labeled"],
@@ -357,7 +379,7 @@ Preview split sizes without writing to the catalog:
 
 ```python
 result = split_dataset(
-    ml, source_dataset_rid,
+    ml, source_dataset_rid, exe,
     test_size=0.2,
     val_size=0.1,
     dry_run=True,
@@ -369,7 +391,7 @@ print(f"Strategy: {result.strategy}")
 
 ### Command-line interface
 
-The same functionality is available as `deriva-ml-split-dataset`:
+The same functionality is available as `deriva-ml-split-dataset`. The CLI opens its own execution internally, so no setup is needed:
 
 ```bash
 # Simple two-way split
@@ -394,7 +416,7 @@ deriva-ml-split-dataset --hostname localhost --catalog-id 9 \
 **Notes**
 
 - When the source dataset has members in only one element table, `split_dataset` auto-detects which table to split. If the dataset has multiple element types, specify `element_table="Image"` explicitly.
-- `split_dataset` creates a new execution internally for provenance tracking. You do not need to wrap it in your own `create_execution` context.
+- `split_dataset` requires the caller to open an `Execution` and pass it as the third argument. The execution's workflow identifies the code making the splitting decision; deriva-ml never invents a workflow on the caller's behalf. The CLI (`deriva-ml-split-dataset`) opens its own execution and is the right entry point when you don't have a long-running notebook or script.
 - `result.split.rid` is the RID of the parent `Split` dataset. Use this RID in `DatasetSpec` when you want an execution to download the full hierarchy.
 
 ## How to download a dataset as a bag
