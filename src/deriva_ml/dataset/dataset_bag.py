@@ -593,8 +593,6 @@ class DatasetBag:
             ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
             ... ))
         """
-        from collections import defaultdict
-
         from deriva_ml.dataset.bag_feature_cache import BagFeatureCache
 
         if not hasattr(self, "_feature_cache"):
@@ -643,18 +641,13 @@ class DatasetBag:
             yield from records
             return
 
-        # Group by target RID, then apply selector to every group (always call
-        # selector — never short-circuit for single-element groups).
-        grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
-        for rec in records:
-            target_rid = getattr(rec, target_col, None)
-            if target_rid is not None:
-                grouped[target_rid].append(rec)
+        # Group by target RID, then apply selector to every group
+        # — always call selector, never short-circuit for
+        # single-element groups. Shared helper so the three
+        # feature_values surfaces stay in lockstep.
+        from deriva_ml.feature import reduce_with_selector
 
-        for group in grouped.values():
-            chosen = selector(group)
-            if chosen is not None:
-                yield chosen
+        yield from reduce_with_selector(records, target_col, selector)
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """Look up a feature definition from bag metadata — works fully offline.

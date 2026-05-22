@@ -7,7 +7,6 @@ and listing feature values.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from functools import reduce
 from itertools import chain
 from operator import or_
@@ -522,16 +521,12 @@ class FeatureMixin:
             return
 
         # Group by target RID, apply selector, skip None results.
-        grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
-        for rec in records:
-            target_rid = getattr(rec, target_col, None)
-            if target_rid is not None:
-                grouped[target_rid].append(rec)
+        # Three sites (this one, Dataset.feature_values,
+        # DatasetBag.feature_values) share the same reduction
+        # shape; the helper pins it in one place.
+        from deriva_ml.feature import reduce_with_selector
 
-        for group in grouped.values():
-            chosen = selector(group)
-            if chosen is not None:
-                yield chosen
+        yield from reduce_with_selector(records, target_col, selector)
 
     @validate_call(config=VALIDATION_CONFIG)
     def list_workflow_executions(self, workflow: str) -> list[str]:

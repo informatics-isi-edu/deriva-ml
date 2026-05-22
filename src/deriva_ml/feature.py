@@ -32,10 +32,10 @@ Typical usage:
     >>> record = DiagnosisRecord(Diagnosis="benign", Confidence=0.97)  # doctest: +SKIP
 """
 
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from types import UnionType
-from typing import TYPE_CHECKING, Callable, ClassVar, Optional, Type
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterable, Iterator, Optional, Type
 
 from deriva.core.ermrest_model import Column, FindAssociationResult
 from pydantic import BaseModel, create_model
@@ -44,6 +44,63 @@ from deriva_ml.core.exceptions import DerivaMLException
 
 if TYPE_CHECKING:
     from deriva_ml.model.catalog import DerivaModel
+
+
+def reduce_with_selector(
+    records: Iterable["FeatureRecord"],
+    target_col: str,
+    selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"],
+) -> Iterator["FeatureRecord"]:
+    """Group records by target RID, apply ``selector`` per group, drop ``None`` results.
+
+    Centralises the three-step pattern that previously lived inline
+    in three places — ``feature_values`` on
+    :class:`~deriva_ml.core.mixins.feature.FeatureMixin`,
+    :class:`~deriva_ml.dataset.dataset.Dataset`, and
+    :class:`~deriva_ml.dataset.dataset_bag.DatasetBag`:
+
+    1. Group raw records by their target-RID column (the FK to the
+       target table, e.g. ``Image`` for an Image feature).
+    2. Apply the selector to each group; the selector picks one
+       record from the group (or returns ``None`` to drop).
+    3. Yield surviving selections.
+
+    Records whose ``target_col`` is missing or ``None`` are
+    silently dropped before grouping — they have no target to
+    group under.
+
+    Args:
+        records: Raw feature records to group + reduce. Iterated
+            once.
+        target_col: Name of the FK column on each record that
+            identifies its target row (e.g. ``"Image"``).
+        selector: Callable that takes a non-empty list of records
+            sharing one target RID and returns the chosen record
+            (or ``None`` to skip). Examples:
+            :meth:`FeatureRecord.select_newest`,
+            :meth:`FeatureRecord.select_by_workflow` (returned by
+            the closure factory of the same name).
+
+    Yields:
+        One :class:`FeatureRecord` per target RID for which the
+        selector returned a non-``None`` choice. Order is
+        unspecified (dict iteration order, i.e. insertion order
+        of first-seen target RIDs in ``records``).
+
+    Example:
+        >>> from deriva_ml.feature import FeatureRecord, reduce_with_selector
+        >>> callable(reduce_with_selector)
+        True
+    """
+    grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+    for rec in records:
+        target_rid = getattr(rec, target_col, None)
+        if target_rid is not None:
+            grouped[target_rid].append(rec)
+    for group in grouped.values():
+        chosen = selector(group)
+        if chosen is not None:
+            yield chosen
 
 
 class FeatureRecord(BaseModel):
