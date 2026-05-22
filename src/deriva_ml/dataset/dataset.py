@@ -546,6 +546,17 @@ class Dataset:
                 ``DerivaML.feature_values``; raises
                 ``DerivaMLMaterializeLimitExceeded`` if exceeded.
                 Default ``None`` preserves unbounded behavior.
+
+                **The cap applies to the catalog query, not to the
+                dataset-filtered result.** ``Dataset.feature_values``
+                fetches every feature row from the catalog first, then
+                drops rows whose target RID isn't a dataset member.
+                A feature with ``10*N`` catalog rows where only ``N/2``
+                belong to this dataset will trip the limit at ``N``
+                even though the post-filter yield would be small.
+                To bound the dataset-scope output instead, leave
+                ``materialize_limit`` unset and consume the iterator
+                with ``itertools.islice``.
             execution_rids: Optional filter forwarded to the upstream
                 catalog query. When set, only feature rows whose
                 ``Execution`` value is in this list are materialized.
