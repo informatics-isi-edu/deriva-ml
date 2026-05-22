@@ -2492,6 +2492,17 @@ class Dataset:
                 - total_estimated_bytes: asset + CSV bytes combined
                 - total_estimated_size: human-readable combined size
         """
+        # Post Ds-est extraction this method composes three free
+        # functions in ``dataset/_estimate.py``: query construction,
+        # async orchestration, and final assembly. The async-from-
+        # sync bridge (``run_async``) still lives here because it's
+        # the one piece tied to deriva-ml internals.
+        from deriva_ml.dataset._estimate import (
+            assemble_estimate,
+            build_estimate_queries,
+            run_estimate_queries,
+        )
+
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
@@ -2521,145 +2532,26 @@ class Dataset:
         else:
             catalog = AsyncErmrestCatalog(protocol, hostname, snapshot_catalog_id, credentials)
 
-        def _extract_path(uri: str) -> str:
-            """Extract the catalog-relative path from a full datapath URI.
+        # 1. Build the query plan (pure).
+        items = build_estimate_queries(table_queries)
 
-            Strips the ``https://host/ermrest/catalog/N`` prefix, returning the
-            path starting from ``/aggregate/``, ``/entity/``, ``/attribute/``, etc.
-            """
-            for marker in ("/aggregate/", "/entity/", "/attribute/"):
-                idx = uri.find(marker)
-                if idx >= 0:
-                    return uri[idx:]
-            raise ValueError(f"Cannot extract catalog path from URI: {uri}")
+        # 2. Execute the queries concurrently against the snapshot.
+        # ``run_async`` is the notebook-loop-fallback bridge used
+        # elsewhere in the codebase (e.g. bag-commit's
+        # ``BagCatalogLoader.arun``).
+        rids_by_table, asset_lengths_by_table, sample_rows_by_table = run_async(
+            run_estimate_queries(catalog, items, logger=self._logger)
+        )
 
-        # Build query paths using the datapath API.  For each
-        # (table_name, path_entries) we fetch RID lists (and RID+Length for
-        # assets) so we can compute the exact union across all FK paths.
-        # (table_name, query_path, query_type)
-        query_items: list[tuple[str, str, str]] = []
-        # Track which tables already have a sample query to avoid duplicates
-        # when multiple FK paths reach the same table.
-        sampled_tables: set[str] = set()
-
-        for table_name, path_entries in table_queries.items():
-            for dp, target_table, is_asset in path_entries:
-                # Fetch RID list for row-count union
-                rid_rs = dp.attributes(target_table.RID)
-                query_items.append((table_name, _extract_path(rid_rs.uri), "csv"))
-
-                if is_asset:
-                    entity_path = _extract_path(dp.uri).removeprefix("/entity/")
-                    fetch_path = f"/attribute/{entity_path}/RID,Length"
-                    query_items.append((table_name, fetch_path, "fetch"))
-
-                # Sample a few rows to estimate CSV serialization size.
-                # Only one sample per table (first path wins).
-                if table_name not in sampled_tables:
-                    sampled_tables.add(table_name)
-                    entity_path = _extract_path(dp.uri)
-                    sample_path = f"{entity_path}?limit=100"
-                    query_items.append((table_name, sample_path, "sample"))
-
-        # Execute all queries concurrently using asyncio.gather
-        import asyncio
-
-        async def _run_query(table_name: str, query_path: str, query_type: str) -> tuple[str, str, Any]:
-            try:
-                response = await catalog.get_async(query_path)
-                return table_name, query_type, response.json()
-            except Exception as exc:
-                self._logger.debug("estimate_bag_size query failed for %s (%s): %s", table_name, query_path, exc)
-                return table_name, query_type, []
-
-        async def _run_all_queries():
-            tasks = [_run_query(name, path, qtype) for name, path, qtype in query_items]
-            results = await asyncio.gather(*tasks)
-            await catalog.close()
-            return results
-
-        # Run the async queries from the sync context. See
-        # :func:`deriva_ml.core.async_helpers.run_async` — same
-        # notebook-loop-fallback dance that the bag-commit path
-        # uses for ``BagCatalogLoader.arun``.
-        all_results = run_async(_run_all_queries())
-
-        # Compute exact union of RIDs across all paths for each table.
-        rids_by_table: dict[str, set[str]] = defaultdict(set)
-        # For assets, collect {RID: Length} across paths (first wins; same asset = same Length).
-        asset_lengths_by_table: dict[str, dict[str, int]] = defaultdict(dict)
-        # Collect sample rows for CSV size estimation.
-        sample_rows_by_table: dict[str, list[dict]] = {}
-
-        for table_name, query_type, rows in all_results:
-            if query_type == "csv":
-                rids_by_table[table_name].update(r["RID"] for r in rows if "RID" in r)
-            elif query_type == "fetch":
-                for r in rows:
-                    rid = r.get("RID")
-                    if rid and rid not in asset_lengths_by_table[table_name]:
-                        asset_lengths_by_table[table_name][rid] = r.get("Length") or 0
-            elif query_type == "sample":
-                # Keep only the first sample per table (set during query building)
-                if table_name not in sample_rows_by_table and rows:
-                    sample_rows_by_table[table_name] = rows
-
-        # Estimate CSV size per table from sample rows.
-        csv_bytes_by_table: dict[str, int] = {}
-        for table_name, sample_rows in sample_rows_by_table.items():
-            row_count = len(rids_by_table.get(table_name, set()))
-            csv_bytes_by_table[table_name] = self._estimate_csv_bytes(sample_rows, row_count)
-
-        # Determine which tables are assets from the original table_queries
-        asset_tables = {
-            table_name for table_name, entries in table_queries.items() if any(is_asset for _, _, is_asset in entries)
-        }
-
-        table_estimates: dict[str, dict[str, Any]] = {}
-        total_rows = 0
-        total_asset_bytes = 0
-        total_csv_bytes = 0
-
-        for table_name, rids in rids_by_table.items():
-            row_count = len(rids)
-            is_asset = table_name in asset_tables
-            asset_bytes = sum(asset_lengths_by_table[table_name].values())
-            csv_bytes = csv_bytes_by_table.get(table_name, 0)
-            table_estimates[table_name] = {
-                "row_count": row_count,
-                "is_asset": is_asset,
-                "asset_bytes": asset_bytes,
-                "csv_bytes": csv_bytes,
-            }
-            total_rows += row_count
-            total_asset_bytes += asset_bytes
-            total_csv_bytes += csv_bytes
-
-        # Handle tables that only appear in fetch results (unlikely but safe)
-        for table_name, lengths in asset_lengths_by_table.items():
-            if table_name not in table_estimates:
-                csv_bytes = csv_bytes_by_table.get(table_name, 0)
-                table_estimates[table_name] = {
-                    "row_count": len(lengths),
-                    "is_asset": True,
-                    "asset_bytes": sum(lengths.values()),
-                    "csv_bytes": csv_bytes,
-                }
-                total_rows += len(lengths)
-                total_asset_bytes += sum(lengths.values())
-                total_csv_bytes += csv_bytes
-
-        total_size = total_asset_bytes + total_csv_bytes
-        return {
-            "tables": table_estimates,
-            "total_rows": total_rows,
-            "total_asset_bytes": total_asset_bytes,
-            "total_asset_size": self._human_readable_size(total_asset_bytes),
-            "total_csv_bytes": total_csv_bytes,
-            "total_csv_size": self._human_readable_size(total_csv_bytes),
-            "total_estimated_bytes": total_size,
-            "total_estimated_size": self._human_readable_size(total_size),
-        }
+        # 3. Assemble the final dict (pure).
+        return assemble_estimate(
+            table_queries=table_queries,
+            rids_by_table=rids_by_table,
+            asset_lengths_by_table=asset_lengths_by_table,
+            sample_rows_by_table=sample_rows_by_table,
+            estimate_csv_bytes=self._estimate_csv_bytes,
+            human_readable_size=self._human_readable_size,
+        )
 
     @validate_call(config=VALIDATION_CONFIG)
     def bag_info(
