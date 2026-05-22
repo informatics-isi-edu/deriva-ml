@@ -107,7 +107,8 @@ with ml.create_execution(config) as exe:
     exe.asset_file_path("Image", "/tmp/processed.png", copy_file=True)
     # Note: the return value is dropped here intentionally. The file is already
     # on disk; you don't need to reference the AssetFilePath afterward unless
-    # you plan to update its metadata via .set_metadata() or .set_asset_types().
+    # you plan to overwrite its metadata via the `.metadata = ...` setter or
+    # call .set_asset_types([...]).
 
     # 3. Rename during staging.
     exe.asset_file_path("Image", "/tmp/temp_scan.png",
@@ -123,7 +124,10 @@ with ml.create_execution(config) as exe:
         description="Preprocessed fundus image",
         metadata={"Subject": subject_rid, "Acquisition_Date": "2026-01-15"},
     )
-    path.set_metadata("Acquisition_Time", "14:30:00")  # update after registration
+    # The `metadata` setter replaces the entire metadata dict in one go.
+    # There is no per-key incremental update; merge into the existing dict
+    # yourself before assigning.
+    path.metadata = {**path.metadata, "Acquisition_Time": "14:30:00"}
 
 exe.upload_execution_outputs()
 ```
@@ -140,7 +144,7 @@ Every registration is written to a crash-safe JSON manifest (`asset-manifest.jso
 
 - `asset_name` must be a valid asset table in the catalog. For execution metadata files (configs, logs, metrics), use `"Execution_Metadata"`.
 - `asset_types` defaults to the asset table name if not provided.
-- The returned `AssetFilePath` object supports `.set_metadata(key, value)` and `.set_asset_types([...])` for post-registration updates.
+- The returned `AssetFilePath` object exposes a `.metadata` property (read returns a dict, write accepts a dict or an `AssetRecord` and **replaces** the entire metadata dict — there is no incremental per-key update) and a `.set_asset_types([...])` method for post-registration updates.
 - For feature-asset files (segmentation masks, embeddings), supply the path in the `FeatureRecord` field — the upload step substitutes the uploaded-asset RID automatically before inserting the feature record. See [Chapter 3](features.md) for details.
 
 ## How to write feature values
