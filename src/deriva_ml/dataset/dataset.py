@@ -603,16 +603,11 @@ class Dataset:
             yield from raw_in_scope
             return
 
-        grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
-        for rec in raw_in_scope:
-            target_rid = getattr(rec, target_col, None)
-            if target_rid is not None:
-                grouped[target_rid].append(rec)
+        # Group by target RID + apply selector — shared helper
+        # so the three feature_values surfaces stay in lockstep.
+        from deriva_ml.feature import reduce_with_selector
 
-        for group in grouped.values():
-            chosen = selector(group)
-            if chosen is not None:
-                yield chosen
+        yield from reduce_with_selector(raw_in_scope, target_col, selector)
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """Look up a Feature definition — delegates to the owning DerivaML.
