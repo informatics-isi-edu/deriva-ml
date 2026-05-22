@@ -211,7 +211,12 @@ def asset_table_upload_spec(model: DerivaModel, asset_table: str | Table, chunk_
     Returns:
         A dictionary containing the upload specification for the asset table.
     """
-    metadata_columns = sorted(model.asset_metadata(asset_table))
+    # ``asset_metadata_sorted`` pins the alphabetic-order
+    # invariant in one place — both this upload-spec builder
+    # and the bag-commit row writer must produce columns in the
+    # same order so the regex captures align with the recorded
+    # values.
+    metadata_columns = model.asset_metadata_sorted(asset_table)
     asset_table = model.name_to_table(asset_table)
     schema = model.name_to_table(asset_table).schema.name
 

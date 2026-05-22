@@ -261,7 +261,11 @@ def _add_asset_rows_to_bag(
     ml = execution._ml_object
     asset_table = model.name_to_table(asset_table_name)
 
-    metadata_cols = sorted(model.asset_metadata(asset_table_name))
+    # See ``DerivaModel.asset_metadata_sorted`` — both this call
+    # site and ``asset_table_upload_spec`` must produce metadata
+    # columns in the same alphabetic order, since the upload regex
+    # captures them positionally.
+    metadata_cols = model.asset_metadata_sorted(asset_table_name)
 
     asset_rows: list[dict[str, Any]] = []
     for filename, entry in entries:

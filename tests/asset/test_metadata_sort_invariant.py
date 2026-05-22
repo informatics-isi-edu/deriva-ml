@@ -2,19 +2,25 @@
 
 Closes audit P1 X2: the upload-spec regex order
 (``core/upload_layout.py``) and the bag-build row emit
-(``execution/bag_commit.py``) both rely on
-``sorted(model.asset_metadata(table))`` to produce a deterministic
+(``execution/bag_commit.py``) both rely on a deterministic
 metadata-column order. If one site switched to e.g. a bare
 ``list(...)`` or a different sort key, the regex would mismatch
 the directory layout the bag-build code emitted, and uploads
 would silently fail to match.
 
+Post-Y3 refactor both sites call
+``model.asset_metadata_sorted(table)`` (a centralised helper on
+:class:`DerivaModel`). The structural test pins that call shape;
+the behavioural test pins the underlying sort semantics
+(Python's default case-sensitive alphabetical sort, applied to
+the metadata-column-name set).
+
 Two layers of pin:
 
 1. **Structural** — both call sites use the literal
-   ``sorted(model.asset_metadata(...))`` pattern. A regression
-   that drops the ``sorted()`` wrapper fails this test
-   immediately.
+   ``model.asset_metadata_sorted(...)`` helper. A regression
+   that drops back to a bare ``list(model.asset_metadata(...))``
+   fails this test.
 
 2. **Behavioural** — when invoked with a mocked model that
    returns the same metadata-column set, the two sites produce
@@ -42,29 +48,52 @@ from deriva_ml.execution import bag_commit
 # ---------------------------------------------------------------------------
 
 
-_SORTED_PATTERN = re.compile(r"sorted\(\s*(?:\w+\.)?model\.asset_metadata\(")
+_SORTED_HELPER_PATTERN = re.compile(r"model\.asset_metadata_sorted\(")
 
 
-def test_upload_layout_uses_sorted_model_asset_metadata() -> None:
-    """``upload_layout.asset_table_upload_spec`` wraps its metadata read in ``sorted()``."""
+def test_upload_layout_uses_sorted_helper() -> None:
+    """``upload_layout.asset_table_upload_spec`` reads metadata via the centralised helper."""
     src = inspect.getsource(upload_layout.asset_table_upload_spec)
-    assert _SORTED_PATTERN.search(src), (
+    assert _SORTED_HELPER_PATTERN.search(src), (
         "upload_layout.asset_table_upload_spec must produce metadata "
-        "columns via sorted(model.asset_metadata(...)). A regression "
-        "that drops the sort would break the regex-vs-directory "
-        "layout invariant and silently fail uploads."
+        "columns via model.asset_metadata_sorted(...). A regression "
+        "that drops back to a bare list(model.asset_metadata(...)) "
+        "would break the regex-vs-directory layout invariant and "
+        "silently fail uploads."
     )
 
 
-def test_bag_commit_uses_sorted_model_asset_metadata() -> None:
-    """``bag_commit._add_asset_rows_to_bag`` wraps its metadata read in ``sorted()``."""
+def test_bag_commit_uses_sorted_helper() -> None:
+    """``bag_commit._add_asset_rows_to_bag`` reads metadata via the centralised helper."""
     src = inspect.getsource(bag_commit._add_asset_rows_to_bag)
-    assert _SORTED_PATTERN.search(src), (
+    assert _SORTED_HELPER_PATTERN.search(src), (
         "bag_commit._add_asset_rows_to_bag must produce metadata "
-        "columns via sorted(model.asset_metadata(...)). A regression "
-        "that drops the sort would break the directory-vs-regex "
-        "invariant on the upload path."
+        "columns via model.asset_metadata_sorted(...). A regression "
+        "that drops back to a bare list(model.asset_metadata(...)) "
+        "would break the directory-vs-regex invariant on the upload "
+        "path."
     )
+
+
+def test_sorted_helper_returns_sorted_names() -> None:
+    """The centralised helper actually returns alphabetically-sorted names.
+
+    Belt-and-braces with the structural test: catches a future
+    refactor that keeps the helper name but quietly drops the
+    ``sorted(...)`` wrapper inside.
+    """
+    from deriva_ml.model.catalog import DerivaModel
+
+    fake_model = MagicMock(spec=DerivaModel)
+    fake_model.asset_metadata.return_value = {
+        "Zebra",
+        "Acquisition_Date",
+        "Bravo",
+    }
+    # Call the unbound method against the mock so we exercise the
+    # real implementation, not a mock-out.
+    result = DerivaModel.asset_metadata_sorted(fake_model, "Image")
+    assert result == ["Acquisition_Date", "Bravo", "Zebra"]
 
 
 # ---------------------------------------------------------------------------

@@ -125,6 +125,11 @@ class Asset:
         self.description = description
         self._asset_types = asset_types or []
         self._execution_rid = execution_rid
+        # Lazy cache for ``_asset_type_path``. ``self.asset_table``
+        # is immutable for the wrapper's lifetime so a per-instance
+        # cache is safe; resolves the FK + datapath on first use,
+        # avoids redoing it on every type-mutation call.
+        self._asset_type_path_cache: tuple[Any, str] | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the Asset for debugging."""
@@ -132,6 +137,51 @@ class Asset:
             f"<deriva_ml.Asset at {hex(id(self))}: rid='{self.asset_rid}', "
             f"table='{self.asset_table}', file='{self.filename}', types={self._asset_types}>"
         )
+
+    def _asset_type_path(self) -> tuple[Any, str]:
+        """Return the ``Asset_Type`` association path + asset-FK column name.
+
+        Centralises three identical resolution blocks that previously
+        lived inline in :meth:`_load_asset_types`, :meth:`add_asset_type`,
+        and :meth:`remove_asset_type`. All three did the same dance:
+
+        1. Resolve ``self.asset_table`` to the model :class:`Table`.
+        2. Look up the ``Asset_Type`` association via
+           ``model.find_association(table, "Asset_Type")``.
+        3. Build the pathBuilder path
+           ``pb.schemas[<schema>].tables[<assoc-table>]``.
+
+        Result is cached on the instance because ``self.asset_table``
+        is immutable for the wrapper's lifetime — a per-instance
+        cache turns three round-trips through ``find_association``
+        into one.
+
+        Returns:
+            Tuple of ``(type_path, asset_fk_column_name)`` where
+            ``type_path`` is the pathBuilder datapath for the
+            association table and ``asset_fk_column_name`` is the
+            FK column name on that table that references the asset
+            row (e.g. ``"Image"`` on ``Image_Asset_Type``).
+
+        Raises:
+            NoAssociationException: When the asset table has no
+                ``Asset_Type`` association. Callers handle this
+                per their own taste (``_load_asset_types`` returns
+                an empty list, the mutators bubble it up).
+        """
+        if self._asset_type_path_cache is not None:
+            return self._asset_type_path_cache
+
+        asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
+        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
+            asset_table_obj, "Asset_Type"
+        )
+
+        pb = self._ml_instance.pathBuilder()
+        type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
+
+        self._asset_type_path_cache = (type_path, asset_fk)
+        return self._asset_type_path_cache
 
     @property
     def asset_types(self) -> list[str]:
@@ -146,17 +196,12 @@ class Asset:
 
     def _load_asset_types(self) -> None:
         """Load asset types from the catalog."""
-        # Find the asset type association table
-        asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
         try:
-            type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
+            type_path, asset_fk = self._asset_type_path()
         except NoAssociationException:
             # No type association for this asset table
             self._asset_types = []
             return
-
-        pb = self._ml_instance.pathBuilder()
-        type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
 
         types = list(
             type_path.filter(type_path.columns[asset_fk] == self.asset_rid).attributes(type_path.Asset_Type).fetch()
@@ -230,11 +275,7 @@ class Asset:
         Example:
             >>> asset.add_asset_type("Training_Data")  # doctest: +SKIP
         """
-        asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
-        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
-
-        pb = self._ml_instance.pathBuilder()
-        type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
+        type_path, asset_fk = self._asset_type_path()
 
         # Insert the association
         type_path.insert([{asset_fk: self.asset_rid, "Asset_Type": type_name}])
@@ -252,11 +293,7 @@ class Asset:
         Example:
             >>> asset.remove_asset_type("Temporary")  # doctest: +SKIP
         """
-        asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
-        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
-
-        pb = self._ml_instance.pathBuilder()
-        type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]
+        type_path, asset_fk = self._asset_type_path()
 
         # Delete the association
         type_path.filter((type_path.columns[asset_fk] == self.asset_rid) & (type_path.Asset_Type == type_name)).delete()

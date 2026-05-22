@@ -722,6 +722,42 @@ class DerivaModel:
             key=lambda c: c.name,
         )
 
+    def asset_metadata_sorted(self, table: TableInput) -> list[str]:
+        """Return the asset-metadata column **names** in deterministic order.
+
+        Sorted by name. Pins the alphabetic-order invariant in one
+        place so call sites stay in lockstep:
+
+        - :func:`~deriva_ml.core.upload_layout.asset_table_upload_spec`
+          builds the upload regex from these names; the directory
+          order in the staging tree must match the regex order.
+        - :func:`~deriva_ml.execution.bag_commit._add_asset_rows_to_bag`
+          emits metadata columns into the bag in the same order so
+          the recorded rows align with the upload regex captures.
+
+        Pre-extraction, each call site re-wrote
+        ``sorted(model.asset_metadata(table))`` inline. Centralising
+        the call shape means a future change to the ordering rule
+        (e.g. case-insensitive sort, or sorted by FK target) lands
+        once and everyone follows.
+
+        Args:
+            table: Asset table name or :class:`Table` instance.
+
+        Returns:
+            Sorted list of metadata column names. Empty list if
+            the table carries no extra columns.
+
+        Raises:
+            DerivaMLTableTypeError: If ``table`` isn't an asset table.
+
+        Example:
+            >>> from deriva_ml.model.catalog import DerivaModel  # doctest: +SKIP
+            >>> model.asset_metadata_sorted("Image")  # doctest: +SKIP
+            ['Asset_Role', 'Description']
+        """
+        return sorted(self.asset_metadata(table))
+
     def apply(self) -> None:
         """Apply pending annotation/schema changes via the underlying Model.
 
