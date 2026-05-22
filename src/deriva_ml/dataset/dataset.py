@@ -2810,7 +2810,12 @@ class Dataset:
         Returns:
             DerivaMLCatalog: Either a snapshot-bound catalog or the current catalog.
         """
-        if isinstance(dataset_version, str) and str:
+        # Empty-string ``dataset_version`` must skip the parse —
+        # ``DatasetVersion.parse("")`` raises. The original
+        # ``and str`` clause was a typo: ``str`` is the class and
+        # always truthy, so it never guarded anything. The intent
+        # is ``and dataset_version`` (non-empty string).
+        if isinstance(dataset_version, str) and dataset_version:
             dataset_version = DatasetVersion.parse(dataset_version)
         if dataset_version:
             return self._ml_instance.catalog_snapshot(self._version_snapshot_catalog_id(dataset_version))
