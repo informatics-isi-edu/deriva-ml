@@ -405,6 +405,83 @@ class TestFeatures:
                 bag_features.sort(key=lambda x: x[t])
                 assert catalog_features == bag_features
 
+    def test_bag_find_features_no_arg_dedups(self, dataset_test, tmp_path):
+        """``DatasetBag.find_features()`` (no arg) yields each feature exactly once.
+
+        Regression test for the bag-side counterpart of the
+        find_features-duplicates bug already fixed on the live
+        catalog. Earlier versions of ``DatasetBag.find_features``
+        iterated every schema-then-table and called the model's
+        per-table ``find_features(t)`` once per table; each
+        association table got revisited once per FK target it
+        carried (target table + ``Execution`` + every vocab it
+        references), yielding 3+ copies of every Feature object.
+
+        The fix delegates the no-arg case directly to the model's
+        no-arg ``find_features`` (which contains the canonical
+        dedup walk). This test pins that behaviour by checking
+        that:
+
+        1. The bag's no-arg call returns the same set of features
+           as the live catalog's no-arg call (modulo iteration
+           order).
+        2. The bag's result contains no duplicates by
+           ``(feature_table.schema.name, feature_table.name)``
+           qualified name.
+        3. The bag's result equals the union of its per-table
+           calls — i.e., the no-arg branch isn't missing features
+           that the per-table branch finds.
+        """
+        ml_instance = DerivaML(
+            dataset_test.catalog.hostname,
+            dataset_test.catalog.catalog_id,
+            working_dir=tmp_path,
+            use_minid=False,
+        )
+        dataset_rid = dataset_test.dataset_description.dataset.dataset_rid
+        bag = ml_instance.download_dataset_bag(
+            DatasetSpec(
+                rid=dataset_rid,
+                version=dataset_test.dataset_description.dataset.current_version,
+            )
+        )
+
+        bag_features = list(bag.find_features())
+        catalog_features = list(ml_instance.find_features())
+
+        # (1) Same set as the live catalog.
+        bag_keys = {
+            (f.feature_table.schema.name, f.feature_table.name) for f in bag_features
+        }
+        catalog_keys = {
+            (f.feature_table.schema.name, f.feature_table.name) for f in catalog_features
+        }
+        assert bag_keys == catalog_keys, (
+            f"bag.find_features() and ml.find_features() should agree on "
+            f"the feature set. bag only: {bag_keys - catalog_keys}; "
+            f"catalog only: {catalog_keys - bag_keys}."
+        )
+
+        # (2) No duplicates -- the regression we're guarding against.
+        bag_qnames = [
+            f"{f.feature_table.schema.name}.{f.feature_table.name}" for f in bag_features
+        ]
+        assert len(bag_qnames) == len(set(bag_qnames)), (
+            f"bag.find_features() emitted duplicates: {bag_qnames}. "
+            f"The bag's no-arg branch must delegate to the model's "
+            f"deduped walk, not iterate per-table itself."
+        )
+
+        # (3) No-arg result covers the per-table results.
+        per_table_keys: set[tuple[str, str]] = set()
+        for tname in ("Subject", "Image"):
+            for f in bag.find_features(tname):
+                per_table_keys.add((f.feature_table.schema.name, f.feature_table.name))
+        assert per_table_keys.issubset(bag_keys), (
+            f"bag.find_features() missed features that per-table calls "
+            f"surfaced: {per_table_keys - bag_keys}."
+        )
+
     def test_delete_feature_success(self, test_ml):
         """delete_feature returns True after a successful drop.
 

@@ -520,12 +520,17 @@ class DatasetBag:
             ...     print(f"{f.target_table.name}: {f.feature_name}")
         """
         if table is None:
-            # Walk every table in the bag and collect each table's features.
-            # The model's find_features takes a table; iterate to get the
-            # global view. Order is by schema-then-table for determinism.
-            for schema in sorted(self.model.schemas):
-                for t in sorted(self.model.schemas[schema].tables):
-                    yield from self.model.find_features(t)
+            # Delegate to the model's no-arg ``find_features``, which
+            # walks the catalog once with the right deduplication.
+            # Doing our own per-table loop here re-introduces the
+            # multi-FK-target duplicate bug fixed in ``catalog.py``:
+            # every feature whose association table has FKs to
+            # multiple tables (the common case for asset features
+            # with FKs to Execution + the target table + a vocab)
+            # would be yielded once per FK target instead of once.
+            # See ``DerivaModel.find_features`` (no-arg branch) for
+            # the canonical dedup.
+            yield from self.model.find_features()
             return
         yield from self.model.find_features(table)
 
