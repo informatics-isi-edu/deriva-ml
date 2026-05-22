@@ -28,6 +28,27 @@ def test_localize_result_defaults() -> None:
     assert result.assets_failed == 0
     assert result.errors == []
     assert result.localized_assets == []
+    assert result.source_hostnames == set()
+
+
+def test_localize_result_source_hostnames_accumulate_per_asset() -> None:
+    """``source_hostnames`` accumulates the per-asset source hostnames.
+
+    Pre-fix, ``_record_localize_provenance`` was called with the
+    caller's ``source_hostname`` parameter — only the fallback
+    used for relative URLs — and silently wrote a single
+    hostname even on mixed-source slices. The aggregated set
+    on ``LocalizeResult`` is the per-asset truth that
+    ``localize_assets`` now feeds to provenance.
+    """
+    result = LocalizeResult()
+    result.source_hostnames.add("source-a.example.org")
+    result.source_hostnames.add("source-b.example.org")
+    result.source_hostnames.add("source-a.example.org")  # duplicate, set absorbs
+    assert result.source_hostnames == {
+        "source-a.example.org",
+        "source-b.example.org",
+    }
 
 
 def test_localize_result_round_trip() -> None:
@@ -40,6 +61,7 @@ def test_localize_result_round_trip() -> None:
         localized_assets=[
             ("1-ABC", "https://src/hatrac/x", "https://dst/hatrac/y"),
         ],
+        source_hostnames={"source-a.example.org", "source-b.example.org"},
     )
     dumped = original.model_dump(mode="json")
     restored = LocalizeResult.model_validate(dumped)

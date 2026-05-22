@@ -114,7 +114,12 @@ class CloneDetails(BaseModel):
     add_ml_schema: bool = False
     copy_annotations: bool = True
     copy_policy: bool = True
-    reinitialize_dataset_versions: bool = True
+    # ``reinitialize_dataset_versions`` was a legacy field that
+    # was never populated. Deleted in the catalog/ P1 sweep
+    # (audit P1 1.4); ``create_ml_workspace`` still accepts the
+    # legacy kwarg of the same name as an accepted-but-ignored
+    # parameter, but the CloneDetails annotation no longer
+    # carries the field.
     rows_copied: int = 0
     rows_skipped: int = 0
     skipped_rids: list[str] = Field(default_factory=list)
