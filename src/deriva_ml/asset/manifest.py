@@ -71,8 +71,6 @@ class AssetManifest:
         execution_rid: RID of the execution this manifest covers.
     """
 
-    MANIFEST_VERSION = 2  # bumped: storage layer changed
-
     def __init__(self, store: "ManifestStore", execution_rid: str) -> None:
         self._store = store
         self._execution_rid = execution_rid
@@ -192,7 +190,6 @@ class AssetManifest:
         datetimes and Path values.
         """
         return {
-            "version": self.MANIFEST_VERSION,
             "execution_rid": self._execution_rid,
             "assets": {k: v.to_dict() for k, v in self.assets.items()},
         }

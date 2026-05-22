@@ -215,7 +215,9 @@ class TestAssetManifest:
 
         data = manifest.to_json()
 
-        assert data["version"] == 2
+        # ``version`` was deleted in the catalog-asset P1 sweep
+        # (audit D1) — the field was never read on load.
+        assert "version" not in data
         assert data["execution_rid"] == "4SP"
         assert "Image/scan.jpg" in data["assets"]
         assert data["assets"]["Image/scan.jpg"]["status"] == "pending"
@@ -509,6 +511,101 @@ class TestAssetRecord:
         record = TestRecord(Name="test")
         assert record.Notes is None
         assert record.model_dump() == {"Name": "test", "Notes": None}
+
+    def test_asset_record_class_builds_pydantic_model_from_asset_table(self):
+        """``asset_record_class`` reads an asset table and emits a typed Pydantic model.
+
+        Coverage gap from audit P1 B4: the factory function had no
+        end-to-end test against a mocked model. This test pins:
+
+        * The returned class is a Pydantic ``BaseModel`` subclass
+          named ``<TableName>AssetRecord``.
+        * Only metadata-column names (the set returned by
+          ``model.asset_metadata(table)``) become fields; system
+          + standard-asset columns are skipped via the same set
+          intersection.
+        * Field types are mapped by ERMrest type (text → str,
+          int4 → int, float8 → float, with nullable columns
+          becoming ``Optional[T]`` defaulting to ``None``).
+        * Constructed instances reject unknown fields (the base's
+          ``extra = "forbid"`` is inherited).
+        """
+        from unittest.mock import MagicMock
+
+        from deriva_ml.asset.asset_record import asset_record_class
+
+        def _fake_column(
+            name: str, typename: str, nullok: bool = False
+        ) -> MagicMock:
+            col = MagicMock()
+            col.name = name
+            col.type.typename = typename
+            col.nullok = nullok
+            col.default = None
+            return col
+
+        # Standard-asset + system columns the factory skips —
+        # ``model.asset_metadata`` excludes these, so the factory's
+        # ``if col.name not in metadata_col_names: continue`` filter
+        # drops them.
+        skip_columns = [
+            _fake_column(n, "text")
+            for n in (
+                "RID", "RCT", "RMT", "RCB", "RMB",
+                "URL", "Filename", "Length", "MD5", "Description",
+            )
+        ]
+        # Metadata columns the factory should pick up.
+        metadata_columns = [
+            _fake_column("Subject", "text"),                # required str
+            _fake_column("Acquisition_Year", "int4"),       # required int
+            _fake_column("Confidence", "float8", nullok=True),  # optional float
+        ]
+        metadata_names = {c.name for c in metadata_columns}
+
+        fake_table = MagicMock()
+        fake_table.name = "Image"
+        fake_table.columns = skip_columns + metadata_columns
+
+        fake_model = MagicMock()
+        fake_model.name_to_table.return_value = fake_table
+        # The factory walks ``model.asset_metadata(name)`` to find
+        # which columns are metadata-vs-standard. Return the set of
+        # metadata column names for our fake table.
+        fake_model.asset_metadata.return_value = metadata_names
+
+        ImageAssetRecord = asset_record_class(fake_model, "Image")
+        fake_model.name_to_table.assert_called_once_with("Image")
+        fake_model.asset_metadata.assert_called_once_with("Image")
+
+        # Class shape.
+        assert ImageAssetRecord.__name__ == "ImageAssetRecord"
+
+        # Happy-path construction with all required fields.
+        rec = ImageAssetRecord(Subject="2-DEF", Acquisition_Year=2026)
+        assert rec.Subject == "2-DEF"
+        assert rec.Acquisition_Year == 2026
+        # Nullable column defaults to None.
+        assert rec.Confidence is None
+
+        # Optional field can be set.
+        rec_with = ImageAssetRecord(
+            Subject="2-DEF", Acquisition_Year=2026, Confidence=0.97
+        )
+        assert rec_with.Confidence == 0.97
+
+        # Unknown fields rejected (extra="forbid" inherited from AssetRecord).
+        # In particular, standard-asset columns like ``URL`` /
+        # ``Filename`` must NOT appear as fields on the generated
+        # class — the metadata filter must have dropped them.
+        with pytest.raises(Exception):  # Pydantic ValidationError
+            ImageAssetRecord(
+                Subject="2-DEF", Acquisition_Year=2026, Bogus="x"
+            )
+        with pytest.raises(Exception):  # standard-asset column must be filtered out
+            ImageAssetRecord(
+                Subject="2-DEF", Acquisition_Year=2026, URL="/hatrac/...",
+            )
 
 
 # =============================================================================

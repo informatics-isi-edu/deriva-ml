@@ -221,25 +221,6 @@ class Asset:
         """
         return self._ml_instance.find_features(self.asset_table)
 
-    def list_feature_values(self, *args, **kwargs) -> list["FeatureRecord"]:
-        """Retired — use ``ml.feature_values(asset_table, feature_name)`` instead.
-
-        ``Asset.list_feature_values`` has been removed. Use ``feature_values``
-        on the DerivaML instance directly::
-
-            for rec in ml.feature_values(asset.asset_table, "Quality"):
-                if rec.Image == asset.asset_rid:
-                    ...
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        from deriva_ml.core.exceptions import DerivaMLException
-
-        raise DerivaMLException(
-            "Asset.list_feature_values() has been retired. Use ml.feature_values(asset_table, feature_name) instead."
-        )
-
     def add_asset_type(self, type_name: str) -> None:
         """Add an asset type to this asset.
 
@@ -284,16 +265,23 @@ class Asset:
         if type_name in self._asset_types:
             self._asset_types.remove(type_name)
 
-    def download(self, dest_dir: Path, update_catalog: bool = False) -> Path:
+    def download(self, dest_dir: Path) -> Path:
         """Download the asset file to a local directory.
 
+        For execution-context-tracked downloads (recording the
+        asset as an input to the current execution), use
+        :meth:`Execution.download_asset` instead — that path
+        carries the Input_File tagging and per-execution
+        provenance. This method is the bare-bytes primitive:
+        download the asset's bytes to ``dest_dir / filename``
+        with no catalog side effects.
+
         Args:
-            dest_dir: Directory to download the asset to.
-            update_catalog: If True and called within an execution context,
-                track this asset as an input to the current execution.
+            dest_dir: Directory to download the asset to. Created
+                if it doesn't exist.
 
         Returns:
-            Path to the downloaded file.
+            Path to the downloaded file (``dest_dir / filename``).
 
         Example:
             >>> local_path = asset.download(Path("/tmp/assets"))  # doctest: +SKIP
