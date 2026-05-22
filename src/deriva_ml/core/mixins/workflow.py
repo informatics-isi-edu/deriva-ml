@@ -35,9 +35,12 @@ class WorkflowMixin:
         find_workflows: Find all workflows in the catalog
         _add_workflow: Add a workflow to the catalog (internal factory)
         lookup_workflow: Look up a workflow by RID
-        find_workflow_by_url: Find a workflow by URL or checksum
+        lookup_workflow_by_url: Look up a workflow by URL or checksum
         create_workflow: Create a new workflow definition
-        list_workflow_executions: List execution RIDs for a workflow (via FeatureMixin)
+
+    The companion ``list_workflow_executions(workflow)`` lives in
+    :class:`FeatureMixin`, not here — it's documented from there
+    so future readers don't go searching for it in this class.
     """
 
     # Type hints for IDE support - actual attributes/methods from host class

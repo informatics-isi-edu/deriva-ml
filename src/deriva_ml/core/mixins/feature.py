@@ -522,47 +522,6 @@ class FeatureMixin:
             if chosen is not None:
                 yield chosen
 
-    def fetch_table_features(self, *args, **kwargs):
-        """Retired — use ``feature_values(table, name)`` or ``Denormalizer``.
-
-        ``DerivaML.fetch_table_features`` has been removed. To read feature
-        values for a single feature, use the new ``feature_values`` method::
-
-            for rec in ml.feature_values("Image", "Quality"):
-                ...
-
-        For wide-table denormalization across all features use the
-        ``Denormalizer`` subsystem.
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DerivaML.fetch_table_features() has been retired. "
-            "Use feature_values(table, feature_name) to read a single feature, "
-            "or Denormalizer for multi-feature wide tables."
-        )
-
-    def list_feature_values(self, *args, **kwargs) -> Iterable[FeatureRecord]:
-        """Retired — renamed to ``feature_values``.
-
-        ``DerivaML.list_feature_values`` has been removed. Use the new
-        ``feature_values`` method instead::
-
-            for rec in ml.feature_values("Image", "Quality"):
-                ...
-
-        The signature is identical (``table``, ``feature_name``, optional
-        ``selector``).
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DerivaML.list_feature_values() has been retired and renamed. "
-            "Use feature_values(table, feature_name, selector=...) instead."
-        )
-
     @validate_call(config=VALIDATION_CONFIG)
     def list_workflow_executions(self, workflow: str) -> list[str]:
         """Return execution RIDs that ran the given workflow.
@@ -625,23 +584,3 @@ class FeatureMixin:
             )
         return rids
 
-    def select_by_workflow(self, *args, **kwargs) -> FeatureRecord:
-        """Retired — use ``FeatureRecord.select_by_workflow(workflow, container=...)`` factory.
-
-        ``DerivaML.select_by_workflow`` has been removed. The replacement is a
-        classmethod factory that returns a selector callable compatible with the
-        ``selector`` parameter of ``feature_values``::
-
-            from deriva_ml.feature import FeatureRecord
-            sel = FeatureRecord.select_by_workflow(workflow, container=ml)
-            for rec in ml.feature_values("Image", "Quality", selector=sel):
-                ...
-
-        Raises:
-            DerivaMLException: Always. Points at the replacement API.
-        """
-        raise DerivaMLException(
-            "DerivaML.select_by_workflow() has been retired. "
-            "Use FeatureRecord.select_by_workflow(workflow, container=ml) to build a selector, "
-            "then pass it to feature_values(..., selector=sel)."
-        )
