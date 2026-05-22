@@ -128,6 +128,107 @@ class TestFeatures:
         assert len(image_quality_feature.term_columns()) == 1
         assert len(image_quality_feature.feature_columns()) == 1
 
+    def test_feature_init_classifies_columns_by_name_not_just_count(self, dataset_test, tmp_path):
+        """Inspect ``Feature.__init__``'s FK-classification by column name.
+
+        The existing ``test_create_feature`` only checks bucket
+        sizes. Bucket *contents* are uncovered: a regression that
+        swapped two columns between buckets (e.g. accidentally
+        put the structural ``Execution`` FK in ``value_columns``)
+        would pass that test while breaking selectors and asset
+        upload.
+
+        This test pins the classification by name:
+
+        1. Each known feature column lands in the named bucket.
+        2. The three structural FKs (``Execution``, ``Feature_Name``,
+           the target-table FK) are NOT in any of
+           ``asset_columns`` / ``term_columns`` / ``value_columns``.
+           See ``Feature.__init__``'s ``assoc_fkeys`` subtraction at
+           ``feature.py:546-558``.
+
+        Uses the demo catalog's three features (Health on Subject,
+        BoundingBox on Image, Quality on Image). Coverage gap from
+        audit P1 F-6.
+        """
+        ml_instance = DerivaML(
+            dataset_test.catalog.hostname,
+            dataset_test.catalog.catalog_id,
+            working_dir=tmp_path,
+            use_minid=False,
+        )
+
+        # --- Subject.Health: one term column, one value column,
+        # zero asset columns. The term column is the controlled-
+        # vocab FK ``SubjectHealth``; the value column is the
+        # int2 ``Scale`` metadata column (see demo_catalog.py's
+        # ``create_feature("Subject", "Health", terms=...,
+        # metadata=[ColumnDefinition("Scale", ...)])`` call).
+        health = next(
+            f for f in ml_instance.model.find_features("Subject")
+            if f.feature_name == "Health"
+        )
+        term_names = {c.name for c in health.term_columns}
+        value_names = {c.name for c in health.value_columns}
+        asset_names = {c.name for c in health.asset_columns}
+        assert term_names == {"SubjectHealth"}, (
+            f"Subject.Health.term_columns: expected {{'SubjectHealth'}}, "
+            f"got {term_names}."
+        )
+        assert value_names == {"Scale"}, (
+            f"Subject.Health.value_columns: expected {{'Scale'}}, "
+            f"got {value_names}."
+        )
+        assert asset_names == set()
+
+        # --- Image.BoundingBox: one asset column (the box-mask file),
+        # zero terms, zero plain values.
+        bbox = next(
+            f for f in ml_instance.model.find_features("Image")
+            if f.feature_name == "BoundingBox"
+        )
+        asset_names = {c.name for c in bbox.asset_columns}
+        assert len(asset_names) == 1, (
+            f"Image.BoundingBox.asset_columns: expected exactly one column; "
+            f"got {asset_names}."
+        )
+        assert {c.name for c in bbox.term_columns} == set()
+        assert {c.name for c in bbox.value_columns} == set()
+
+        # --- Image.Quality: one term column (the ImageQuality vocab FK),
+        # zero asset/value.
+        quality = next(
+            f for f in ml_instance.model.find_features("Image")
+            if f.feature_name == "Quality"
+        )
+        term_names = {c.name for c in quality.term_columns}
+        assert term_names == {"ImageQuality"}, (
+            f"Image.Quality.term_columns: expected {{'ImageQuality'}}, "
+            f"got {term_names}."
+        )
+        assert {c.name for c in quality.asset_columns} == set()
+        assert {c.name for c in quality.value_columns} == set()
+
+        # --- Structural FKs must not appear in ANY bucket.
+        # ``Feature.__init__`` subtracts them via ``assoc_fkeys``;
+        # this pin guards against a regression that drops the
+        # subtraction.
+        STRUCTURAL = {"Execution", "Feature_Name"}
+        for feat, target_fk in [(health, "Subject"), (bbox, "Image"), (quality, "Image")]:
+            all_buckets = (
+                {c.name for c in feat.asset_columns}
+                | {c.name for c in feat.term_columns}
+                | {c.name for c in feat.value_columns}
+            )
+            leaked = (STRUCTURAL | {target_fk}) & all_buckets
+            assert not leaked, (
+                f"{feat.target_table.name}.{feat.feature_name}: structural "
+                f"FK columns leaked into a classification bucket: {leaked}. "
+                f"Feature.__init__'s ``assoc_fkeys`` subtraction must "
+                f"remove every column whose FK constraint is part of the "
+                f"association table's primary key."
+            )
+
     def test_create_feature_with_non_asset_table_raises(self, test_ml):
         """create_feature surfaces the bad table name in the error.
 
