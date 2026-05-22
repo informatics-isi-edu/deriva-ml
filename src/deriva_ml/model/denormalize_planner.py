@@ -370,15 +370,21 @@ class DenormalizePlanner:
             planner._is_topological_association("Image")               # False (has ≤1 FK)
             planner._is_topological_association("Observation")         # False (has 1 FK)
         """
+        # Catch only ``DerivaMLException`` here — that's the
+        # specific failure mode for "table name not in the model"
+        # (raised by ``name_to_table``). Any other exception
+        # (attribute errors, type errors, real bugs) propagates
+        # so it surfaces loudly instead of silently returning
+        # False and producing wrong rule decisions downstream.
         try:
             tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.model.name_to_table(name_or_table)
-            fks = list(tbl.foreign_keys)
-            # Domain FKs exclude the system FKs to ERMrest_Client /
-            # ERMrest_Group that every table carries (for RCB/RMB).
-            domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
-            return len(domain_fks) == 2
-        except Exception:
+        except DerivaMLException:
             return False
+        fks = list(tbl.foreign_keys)
+        # Domain FKs exclude the system FKs to ERMrest_Client /
+        # ERMrest_Group that every table carries (for RCB/RMB).
+        domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
+        return len(domain_fks) == 2
 
     def _is_feature_association(self, name_or_table: str | Table) -> bool:
         """Predicate for DerivaML feature-association transparency.
@@ -435,21 +441,25 @@ class DenormalizePlanner:
             planner._is_feature_association("Image")                   # False (no Execution FK)
             planner._is_feature_association("Three_Way_Domain_Assoc")  # False (no FK to Execution)
         """
+        # Same narrowing as ``_is_topological_association``: only
+        # ``DerivaMLException`` from ``name_to_table`` is the
+        # legitimate "unknown table → False" path; everything else
+        # propagates.
         try:
             tbl = name_or_table if hasattr(name_or_table, "foreign_keys") else self.model.name_to_table(name_or_table)
-            fks = list(tbl.foreign_keys)
-            # Domain FKs exclude the system FKs to ERMrest_Client /
-            # ERMrest_Group that every table carries (for RCB/RMB).
-            domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
-            if len(domain_fks) != 3:
-                return False
-            ml_schema = self.model.ml_schema
-            execution_fks = [
-                fk for fk in domain_fks if fk.pk_table.name == "Execution" and fk.pk_table.schema.name == ml_schema
-            ]
-            return len(execution_fks) == 1
-        except Exception:
+        except DerivaMLException:
             return False
+        fks = list(tbl.foreign_keys)
+        # Domain FKs exclude the system FKs to ERMrest_Client /
+        # ERMrest_Group that every table carries (for RCB/RMB).
+        domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
+        if len(domain_fks) != 3:
+            return False
+        ml_schema = self.model.ml_schema
+        execution_fks = [
+            fk for fk in domain_fks if fk.pk_table.name == "Execution" and fk.pk_table.schema.name == ml_schema
+        ]
+        return len(execution_fks) == 1
 
     def _is_transparent_intermediate(self, name_or_table: str | Table) -> bool:
         """Return ``True`` if the table is transparent (assoc or feature-assoc).
@@ -1403,7 +1413,13 @@ class DenormalizePlanner:
             A ``JoinNode`` tree rooted at the element table.
 
         Raises:
-            DerivaMLException: If ambiguous paths cannot be resolved.
+            DerivaMLDenormalizeAmbiguousPath: If multiple FK paths
+                between the element table and a target table can't
+                be unambiguously resolved by ``include_tables`` /
+                ``via``. The exception carries ``paths`` (the
+                competing FK path lists) and
+                ``suggested_intermediates`` so callers can
+                introspect rather than parse the message.
         """
         via = via or set()
         covering = include_tables | via
@@ -1529,25 +1545,27 @@ class DenormalizePlanner:
                     selected_subpaths[target] = direct[0]
                     continue
 
-            # Ambiguity error
-            path_descriptions = []
+            # Ambiguity — raise the typed exception so callers can
+            # introspect ``paths`` and ``suggested_intermediates``
+            # rather than parsing the message string. The sibling
+            # raise in ``_prepare_wide_table`` (Phase 0 ambiguity
+            # detection) already uses ``DerivaMLDenormalizeAmbiguousPath``;
+            # we mirror it here so both ambiguity surfaces report
+            # the same shape.
+            from deriva_ml.core.exceptions import DerivaMLDenormalizeAmbiguousPath
+
+            path_name_lists: list[list[str]] = []
             all_ints: set[str] = set()
             for sp, ints in zip(unique, path_intermediates):
-                names = [t.name for t in sp]
-                path_descriptions.append(" → ".join(names))
+                path_name_lists.append([t.name for t in sp])
                 all_ints.update(ints)
 
-            suggestion_tables = all_ints - include_tables
-            suggestion = ""
-            if suggestion_tables:
-                suggestion = (
-                    f"\nInclude an intermediate table to disambiguate "
-                    f"(e.g., add {', '.join(sorted(suggestion_tables))} to include_tables)."
-                )
-
-            raise DerivaMLException(
-                f"Ambiguous path between {element_name} and {target}: "
-                f"found {len(unique)} FK paths:\n" + "\n".join(f"  {d}" for d in path_descriptions) + suggestion
+            suggestion_tables = sorted(all_ints - include_tables)
+            raise DerivaMLDenormalizeAmbiguousPath(
+                from_table=element_name,
+                to_table=target,
+                paths=path_name_lists,
+                suggested_intermediates=suggestion_tables,
             )
 
         # ── Step 3: merge selected paths into a tree ─────────────────────────
