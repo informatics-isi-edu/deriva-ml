@@ -304,7 +304,13 @@ def asset_annotation(asset_table: Table):
                 "MD5",
                 asset_type_source,
             ]
-            + [fkey_column(c) for c in asset_metadata],
+            # ``asset_metadata`` is a set; sort by column name for
+            # deterministic output. Without the sort, the visible-
+            # columns order jitters run-to-run on rebuilds and
+            # breaks downstream diffs of catalog annotations.
+            # Same family of invariant as the asset-manifest
+            # alphabetic-order rule documented in CLAUDE.md.
+            + [fkey_column(c) for c in sorted(asset_metadata)],
             "detailed": [
                 "RID",
                 "Filename",
@@ -318,7 +324,7 @@ def asset_annotation(asset_table: Table):
                 [schema, f"{asset_name}_RCB_fkey"],
                 [schema, f"{asset_name}_RMB_fkey"],
             ]
-            + [fkey_column(c) for c in asset_metadata],
+            + [fkey_column(c) for c in sorted(asset_metadata)],
             "filter": {
                 "and": [
                     {"source": "RID"},
@@ -503,7 +509,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 [schema, "Dataset_RMB_fkey"],
                 {
                     "source": [
-                        {"outbound": ["deriva-ml", "Dataset_Version_fkey"]},
+                        {"outbound": [schema, "Dataset_Version_fkey"]},
                         "Version",
                     ],
                     "markdown_name": "Dataset Version",
@@ -514,10 +520,10 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 "Description",
                 {
                     "source": [
-                        {"inbound": ["deriva-ml", "Dataset_Dataset_Type_Dataset_fkey"]},
+                        {"inbound": [schema, "Dataset_Dataset_Type_Dataset_fkey"]},
                         {
                             "outbound": [
-                                "deriva-ml",
+                                schema,
                                 "Dataset_Dataset_Type_Dataset_Type_fkey",
                             ]
                         },
@@ -527,7 +533,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 },
                 {
                     "source": [
-                        {"outbound": ["deriva-ml", "Dataset_Version_fkey"]},
+                        {"outbound": [schema, "Dataset_Version_fkey"]},
                         "Version",
                     ],
                     "markdown_name": "Dataset Version",
@@ -543,13 +549,13 @@ def generate_annotation(model: Model, schema: str) -> dict:
                         "source": [
                             {
                                 "inbound": [
-                                    "deriva-ml",
+                                    schema,
                                     "Dataset_Dataset_Type_Dataset_fkey",
                                 ]
                             },
                             {
                                 "outbound": [
-                                    "deriva-ml",
+                                    schema,
                                     "Dataset_Dataset_Type_Dataset_Type_fkey",
                                 ]
                             },

@@ -235,16 +235,32 @@ def create_asset_table(
         execution_table: The execution table for association.
         asset_type_table: The asset type vocabulary table.
         asset_role_table: The asset role vocabulary table.
-        use_hatrac: Whether to use Hatrac for file storage (default True).
+        use_hatrac: When ``True`` (default) the asset table's URL
+            column is wired with the Hatrac upload template
+            ``/hatrac/metadata/{{MD5}}.{{Filename}}`` — Chaise's
+            file-upload UI will deposit bytes into Hatrac at that
+            path. When ``False`` (used by the ``File`` table) the
+            template is omitted; the URL column carries a plain
+            string and no Hatrac upload UI is wired up. Previously
+            this parameter was accepted but silently ignored, so
+            the ``File`` table got the same Hatrac template as
+            ``Execution_Asset``.
 
     Returns:
         The created asset Table object.
     """
+    # ``hatrac_template=None`` (the AssetTableDef default) means
+    # "no Hatrac upload template" — the URL column is a plain
+    # string. The Hatrac template is wired up only when the
+    # caller asks for it via ``use_hatrac=True``.
+    hatrac_template = (
+        "/hatrac/metadata/{{MD5}}.{{Filename}}" if use_hatrac else None
+    )
     asset_table = schema.create_table(
         AssetTableDef(
             schema_name=schema.name,
             name=asset_name,
-            hatrac_template="/hatrac/metadata/{{MD5}}.{{Filename}}",
+            hatrac_template=hatrac_template,
         )
     )
     schema.create_table(
