@@ -185,7 +185,13 @@ class AssetSpec(BaseModel):
 # Interface for hydra-zen
 @hydrated_dataclass(AssetSpec)
 class AssetSpecConfig:
-    """Hydra-zen configuration interface for AssetSpec.
+    """Hydra-zen configuration interface for ``AssetSpec``.
+
+    Field-for-field parity with :class:`AssetSpec`; configuring
+    an asset via hydra-zen must be able to express everything that
+    constructing an ``AssetSpec`` directly can. Drift would mean
+    some asset semantics are quietly unreachable from hydra-zen
+    configs — silent feature loss.
 
     Use in hydra-zen store definitions to specify assets with caching:
 
@@ -195,7 +201,19 @@ class AssetSpecConfig:
         ...     [AssetSpecConfig(rid="6-EPNR", cache=True)],
         ...     name="cached_weights",
         ... )
+
+        >>> # Mark as an Output asset (e.g. for a workflow that
+        >>> # produces a model file):
+        >>> cfg = AssetSpecConfig(rid="6-EPNR", asset_role="Output")  # doctest: +SKIP
+
+    Attributes:
+        rid: Resource Identifier of the asset. Mirrors ``AssetSpec.rid``.
+        asset_role: Role of the asset (``"Input"`` or ``"Output"``).
+            Defaults to ``"Input"``. Mirrors ``AssetSpec.asset_role``.
+        cache: If True, cache the downloaded asset by MD5 checksum in
+            the DerivaML cache directory. Mirrors ``AssetSpec.cache``.
     """
 
     rid: str
+    asset_role: str = "Input"
     cache: bool = False

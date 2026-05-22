@@ -623,16 +623,33 @@ class Workflow(BaseModel):
         # Find the root directory for the repository
         repo_root = Workflow._get_git_root(executable_path)
 
-        # Now check to see if a file has been modified since the last commit.
+        # Check whether the working tree is clean. Any non-empty
+        # ``git status --porcelain`` output means *something* about
+        # the repo differs from HEAD -- staged, unstaged, untracked,
+        # renamed, deleted, or merge-conflicted. Provenance demands
+        # we treat all of these as dirty: a workflow's recorded
+        # commit hash only reproduces if every file the workflow
+        # could read from the repo matches that commit.
+        #
+        # The previous ``"M " in result.stdout.strip()`` heuristic
+        # only matched the two-letter code for "staged modified",
+        # silently missing unstaged edits (`` M``), untracked files
+        # (``??``), renames (``R ``), deletes (``D ``), conflicts
+        # (``UU``), etc. -- exactly the cases ``DERIVA_ML_ALLOW_DIRTY``
+        # is supposed to gate honesty about.
+        #
+        # ``cwd`` is the worktree's root; ``git status --porcelain``
+        # reports the whole worktree regardless of cwd, but anchoring
+        # at ``repo_root`` makes the call site explicit.
         try:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
-                cwd=executable_path.parent,
+                cwd=repo_root,
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            is_dirty = bool("M " in result.stdout.strip())  # Returns True if the output indicates a modified file
+            is_dirty = bool(result.stdout.strip())
         except subprocess.CalledProcessError:
             is_dirty = False  # If the Git command fails, assume no changes
 
