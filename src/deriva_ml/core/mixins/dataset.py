@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+import os
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
@@ -17,6 +18,13 @@ Table = _ermrest_model.Table
 from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetSpec
+from deriva_ml.config.ast_walker import parse_config_file
+from deriva_ml.config.validation import (
+    ConfigEntry,
+    ConfigEntryResult,
+    ConfigFileParseError,
+    ConfigValidationReport,
+)
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
 from deriva_ml.core.sort import SortSpec, resolve_sort
@@ -706,6 +714,153 @@ class DatasetMixin:
             cross_spec_issues=cross_spec_issues,
         )
 
+    def validate_config_file(
+        self,
+        path: str | os.PathLike[str],
+    ) -> ConfigValidationReport:
+        """Validate every spec constructor in one hydra-zen config file.
+
+        Parses the file via AST (no execution) and validates each
+        ``DatasetSpecConfig`` / ``AssetSpecConfig`` / ``Workflow`` /
+        ``DerivaMLConfig`` constructor call against the catalog.
+
+        Composes the existing :meth:`validate_dataset_specs`,
+        :meth:`_validate_asset_spec`, :meth:`_validate_workflow_rid`
+        primitives. For ``DerivaMLConfig`` entries the validator
+        compares the entry's ``hostname`` and ``catalog_id`` against
+        the catalog this :class:`DerivaML` instance is connected to;
+        a mismatch is reported but doesn't make catalog calls.
+
+        Args:
+            path: Path to the file. Accepts ``str``, ``Path``, or any
+                ``os.PathLike``.
+
+        Returns:
+            A :class:`ConfigValidationReport` with one
+            :class:`ConfigEntryResult` per constructor call found
+            (in source order). Files that fail to parse produce a
+            single :class:`ConfigFileParseError`; the entry list is
+            empty in that case.
+
+        Does not raise on syntax errors or missing files -- both are
+        reported structurally so a caller validating many files can
+        record them without aborting the walk.
+
+        Example:
+            Validate one file::
+
+                >>> report = ml.validate_config_file(  # doctest: +SKIP
+                ...     "src/configs/datasets.py"
+                ... )
+                >>> for r in report.results:  # doctest: +SKIP
+                ...     if not r.valid:
+                ...         print(r.entry.file, r.entry.line, r.reasons)
+        """
+        entries, parse_error = parse_config_file(path)
+        parse_errors: list[ConfigFileParseError] = (
+            [parse_error] if parse_error is not None else []
+        )
+        results = self._validate_config_entries(entries)
+        return ConfigValidationReport(
+            file_count=1 if parse_error is None else 0,
+            entry_count=len(entries),
+            all_valid=(not parse_errors) and all(r.valid for r in results),
+            results=results,
+            parse_errors=parse_errors,
+        )
+
+    def validate_config_directory(
+        self,
+        configs_dir: str | os.PathLike[str],
+        *,
+        recursive: bool = True,
+    ) -> ConfigValidationReport:
+        """Validate every ``*.py`` config file under ``configs_dir``.
+
+        Walks the directory, parses each Python file, validates every
+        constructor call against the catalog, and aggregates the per-
+        file reports into one :class:`ConfigValidationReport`. A
+        single broken file does not abort the walk -- the error is
+        recorded in ``parse_errors`` and the validator continues with
+        the next file.
+
+        Args:
+            configs_dir: Path to the configs directory (typically
+                ``src/configs``). ``__init__.py`` files are included;
+                ``__pycache__`` and dot-prefixed directories are
+                skipped.
+            recursive: When ``True`` (default), recurse into
+                subdirectories. ``configs/dev/`` per-environment
+                overrides are picked up.
+
+        Returns:
+            A :class:`ConfigValidationReport` with all entries from
+            all files, ordered first by file path then by line.
+
+        Example:
+            Validate the whole tree::
+
+                >>> report = ml.validate_config_directory(  # doctest: +SKIP
+                ...     "src/configs"
+                ... )
+                >>> if not report.all_valid:  # doctest: +SKIP
+                ...     for r in report.results:
+                ...         if not r.valid:
+                ...             print(r.entry.file, r.entry.line, r.reasons)
+                ...     for pe in report.parse_errors:
+                ...         print("UNPARSEABLE:", pe.file, pe.message)
+        """
+        from pathlib import Path as _Path
+
+        root = _Path(os.fspath(configs_dir))
+        if not root.exists():
+            return ConfigValidationReport(
+                file_count=0,
+                entry_count=0,
+                all_valid=False,
+                results=[],
+                parse_errors=[
+                    ConfigFileParseError(
+                        file=str(root),
+                        line=None,
+                        message=f"directory not found: {root}",
+                    )
+                ],
+            )
+
+        py_files: list[_Path] = []
+        if root.is_file():
+            if root.suffix == ".py":
+                py_files = [root]
+        else:
+            walker = root.rglob("*.py") if recursive else root.glob("*.py")
+            for p in walker:
+                # Skip __pycache__ and any dot-prefixed dir.
+                if any(part == "__pycache__" or part.startswith(".") for part in p.parts):
+                    continue
+                py_files.append(p)
+        py_files.sort()
+
+        all_entries: list[ConfigEntry] = []
+        parse_errors: list[ConfigFileParseError] = []
+        file_count = 0
+        for f in py_files:
+            entries, parse_error = parse_config_file(f)
+            if parse_error is not None:
+                parse_errors.append(parse_error)
+                continue
+            file_count += 1
+            all_entries.extend(entries)
+
+        results = self._validate_config_entries(all_entries)
+        return ConfigValidationReport(
+            file_count=file_count,
+            entry_count=len(all_entries),
+            all_valid=(not parse_errors) and all(r.valid for r in results),
+            results=results,
+            parse_errors=parse_errors,
+        )
+
     # -- private helpers ------------------------------------------------
 
     @staticmethod
@@ -953,3 +1108,143 @@ class DatasetMixin:
                 )
 
         return issues
+
+    def _validate_config_entries(
+        self,
+        entries: list[ConfigEntry],
+    ) -> list[ConfigEntryResult]:
+        """Validate parsed config entries against the catalog.
+
+        Groups entries by kind and batches dataset validation through
+        :meth:`validate_dataset_specs` (which has per-RID caching);
+        loops the per-RID validators for assets and workflows;
+        compares ``DerivaMLConfig`` entries against this connection's
+        hostname/catalog_id.
+
+        Args:
+            entries: List of parsed entries from :func:`parse_config_file`.
+
+        Returns:
+            One :class:`ConfigEntryResult` per input entry, in the
+            same order.
+        """
+        # Bucket by kind so dataset validation can be batched.
+        dataset_entries: list[tuple[int, ConfigEntry]] = []
+        asset_entries: list[tuple[int, ConfigEntry]] = []
+        workflow_entries: list[tuple[int, ConfigEntry]] = []
+        deriva_entries: list[tuple[int, ConfigEntry]] = []
+        unresolvable_idx: set[int] = set()
+
+        for i, e in enumerate(entries):
+            if e.entry_kind == "DerivaMLConfig":
+                deriva_entries.append((i, e))
+                continue
+            if e.rid is None:
+                unresolvable_idx.add(i)
+                continue
+            if e.entry_kind == "DatasetSpecConfig":
+                dataset_entries.append((i, e))
+            elif e.entry_kind == "AssetSpecConfig":
+                asset_entries.append((i, e))
+            elif e.entry_kind == "Workflow":
+                workflow_entries.append((i, e))
+
+        results: list[ConfigEntryResult | None] = [None] * len(entries)
+
+        # Unresolvable -- AST couldn't pull a RID. Surface, don't guess.
+        for i in unresolvable_idx:
+            results[i] = ConfigEntryResult(
+                entry=entries[i],
+                valid=False,
+                reasons=["rid_unresolvable"],
+            )
+
+        # Datasets -- batch through validate_dataset_specs.
+        if dataset_entries:
+            specs_for_validate: list[DatasetSpec] = []
+            for _, e in dataset_entries:
+                # version_missing is OUR diagnostic; the singular
+                # validator requires a version. Default missing
+                # versions to a sentinel so they round-trip through
+                # validate_dataset_specs as version_not_found, and we
+                # rewrite the reason afterwards.
+                version = e.version or "0.0.0"
+                specs_for_validate.append(DatasetSpec(rid=e.rid, version=version))
+            ds_report = self.validate_dataset_specs(specs=specs_for_validate)
+            for (idx, entry), spec_result in zip(dataset_entries, ds_report.results):
+                reasons: list[Any] = list(spec_result.reasons)
+                if entry.version is None and "version_not_found" in reasons:
+                    # Replace the misleading inner reason with our own.
+                    reasons = [r for r in reasons if r != "version_not_found"]
+                    reasons.append("version_missing")
+                results[idx] = ConfigEntryResult(
+                    entry=entry,
+                    valid=spec_result.valid and entry.version is not None,
+                    reasons=reasons,
+                    actual_table=spec_result.actual_table,
+                    available_versions=spec_result.available_versions,
+                    resolved_name=spec_result.dataset_name,
+                )
+
+        # Assets -- per-RID loop (lookup_asset has no batched form yet).
+        for idx, entry in asset_entries:
+            asset_result = self._validate_asset_spec(AssetSpec(rid=entry.rid))
+            results[idx] = ConfigEntryResult(
+                entry=entry,
+                valid=asset_result.valid,
+                reasons=list(asset_result.reasons),
+                actual_table=asset_result.actual_table,
+                resolved_name=asset_result.filename,
+            )
+
+        # Workflows -- per-RID.
+        for idx, entry in workflow_entries:
+            wf_result = self._validate_workflow_rid(entry.rid)
+            results[idx] = ConfigEntryResult(
+                entry=entry,
+                valid=wf_result.valid,
+                reasons=list(wf_result.reasons),
+                actual_table=wf_result.actual_table,
+                resolved_name=wf_result.workflow_name,
+            )
+
+        # DerivaMLConfig -- compare against THIS connection's host/catalog.
+        # No catalog call here; we just check the entry matches what
+        # self is connected to. A heavy "is the catalog reachable"
+        # check would re-issue every call validate_dataset_specs
+        # already does -- caller decides separately whether to test
+        # the connection (a single deriva_ml_list_datasets call is
+        # enough).
+        self_hostname = getattr(self, "host_name", None)
+        self_catalog_id = getattr(self, "catalog_id", None)
+        for idx, entry in deriva_entries:
+            reasons: list[Any] = []
+            if entry.hostname and self_hostname and entry.hostname != self_hostname:
+                reasons.append("catalog_hostname_mismatch")
+            if entry.catalog_id and self_catalog_id is not None:
+                if str(entry.catalog_id) != str(self_catalog_id):
+                    reasons.append("catalog_id_mismatch")
+            results[idx] = ConfigEntryResult(
+                entry=entry,
+                valid=not reasons,
+                reasons=reasons,
+                resolved_name=(
+                    f"{self_hostname or '?'}/{self_catalog_id or '?'}"
+                    if not reasons
+                    else None
+                ),
+            )
+
+        # Replace any leftover Nones with an internal-error result.
+        # Shouldn't happen if the bucketing covers every kind, but
+        # defense in depth.
+        return [
+            r
+            if r is not None
+            else ConfigEntryResult(
+                entry=entries[i],
+                valid=False,
+                reasons=["rid_unresolvable"],
+            )
+            for i, r in enumerate(results)
+        ]
