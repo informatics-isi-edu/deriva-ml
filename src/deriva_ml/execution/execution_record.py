@@ -577,24 +577,12 @@ class ExecutionRecord(BaseModel):
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
 
-        pb = self._ml_instance.pathBuilder()
-        dataset_exec_path = pb.schemas[self._ml_instance.ml_schema].Dataset_Execution
+        from deriva_ml.execution._helpers import list_input_datasets as _list_input_datasets
 
-        records = list(dataset_exec_path.filter(dataset_exec_path.Execution == self.execution_rid).entities().fetch())
-
-        # Look up each dataset and return Dataset objects, excluding
-        # any that this execution itself produced (those go on the
-        # output side; the Dataset_Execution table conflates both).
-        datasets = []
-        for record in records:
-            dataset_rid = record.get("Dataset")
-            if not dataset_rid:
-                continue
-            producer = self._ml_instance._producer_of_dataset(dataset_rid)
-            if producer == self.execution_rid:
-                continue
-            datasets.append(self._ml_instance.lookup_dataset(dataset_rid))
-        return datasets
+        return _list_input_datasets(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+        )
 
     def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List assets associated with this execution.
@@ -621,37 +609,14 @@ class ExecutionRecord(BaseModel):
         if self._ml_instance is None:
             raise DerivaMLException("ExecutionRecord is not bound to a catalog")
 
-        # Find all *_Execution association tables and query them
-        # Search both the domain schemas and the ML schema
-        assets: list[Asset] = []
-        schemas_to_search = [*self._ml_instance.domain_schemas, self._ml_instance.ml_schema]
+        from deriva_ml.execution._helpers import list_assets as _list_assets
 
-        for schema_name in schemas_to_search:
-            for table in self._ml_instance.model.model.schemas[schema_name].tables.values():
-                if table.name.endswith("_Execution") and table.name != "Dataset_Execution":
-                    # Extract asset table name from association table name
-                    # e.g., "Image_Execution" -> "Image", "Execution_Asset_Execution" -> "Execution_Asset"
-                    asset_table_name = table.name.replace("_Execution", "")
-
-                    pb = self._ml_instance.pathBuilder()
-                    table_path = pb.schemas[schema_name].tables[table.name]
-                    try:
-                        query = table_path.filter(table_path.Execution == self.execution_rid)
-                        if asset_role:
-                            query = query.filter(table_path.Asset_Role == asset_role)
-                        records = list(query.entities().fetch())
-
-                        # Look up each asset and convert to Asset object
-                        for record in records:
-                            asset_rid = record.get(asset_table_name)
-                            if asset_rid:
-                                try:
-                                    assets.append(self._ml_instance.lookup_asset(asset_rid))
-                                except Exception as e:
-                                    logger.debug(f"Could not look up asset {asset_rid}: {e}")
-                    except Exception as e:
-                        logger.debug(f"Could not query asset table {table.name}: {e}")
-        return assets
+        return _list_assets(
+            ml_instance=self._ml_instance,
+            execution_rid=self.execution_rid,
+            asset_role=asset_role,
+            logger=logger,
+        )
 
     def __str__(self) -> str:
         """Return string representation of the execution record."""

@@ -2199,20 +2199,17 @@ class Execution:
         if self._execution_record is not None:
             return self._execution_record.list_input_datasets()
 
-        # Fallback for dry_run mode — apply the same producer filter so
-        # dry-run lineage queries agree with the persistent path.
-        pb = self._ml_object.pathBuilder()
-        dataset_exec = pb.schemas[self._ml_object.ml_schema].Dataset_Execution
+        # Fallback for dry-run mode (no execution record bound).
+        # Delegates to the shared helper so the dry-run path
+        # and the canonical ``ExecutionRecord.list_input_datasets``
+        # path stay in lockstep — pre-fix they re-implemented the
+        # same producer-filter walk in two places.
+        from deriva_ml.execution._helpers import list_input_datasets as _list_input_datasets
 
-        records = list(dataset_exec.filter(dataset_exec.Execution == self.execution_rid).entities().fetch())
-
-        datasets: list[Dataset] = []
-        for r in records:
-            rid = r["Dataset"]
-            if self._ml_object._producer_of_dataset(rid) == self.execution_rid:
-                continue
-            datasets.append(self._ml_object.lookup_dataset(rid))
-        return datasets
+        return _list_input_datasets(
+            ml_instance=self._ml_object,
+            execution_rid=self.execution_rid,
+        )
 
     def list_assets(self, asset_role: str | None = None) -> list["Asset"]:
         """List all assets that were inputs or outputs of this execution.
@@ -2230,25 +2227,23 @@ class Execution:
         if self._execution_record is not None:
             return self._execution_record.list_assets(asset_role=asset_role)
 
-        # Fallback for dry_run mode
+        # Fallback for dry-run mode (no execution record bound).
+        # Delegates to the shared helper so the dry-run path
+        # and the canonical ``ExecutionRecord.list_assets`` path
+        # stay in lockstep — pre-fix the dry-run path only
+        # walked ``Execution_Asset_Execution`` while the
+        # canonical path walked every ``*_Execution`` association
+        # across all schemas. That mismatch was invisible until a
+        # dry-run scenario exercised assets in a domain-schema
+        # table other than ``Execution_Asset``; now both paths
+        # do the full walk.
+        from deriva_ml.execution._helpers import list_assets as _list_assets
 
-        pb = self._ml_object.pathBuilder()
-        asset_exec = pb.schemas[self._ml_object.ml_schema].Execution_Asset_Execution
-
-        query = asset_exec.filter(asset_exec.Execution == self.execution_rid)
-        if asset_role:
-            query = query.filter(asset_exec.Asset_Role == asset_role)
-
-        records = list(query.entities().fetch())
-
-        assets = []
-        for r in records:
-            try:
-                asset = self._ml_object.lookup_asset(r["Execution_Asset"])
-                assets.append(asset)
-            except Exception:
-                pass  # Skip assets that can't be looked up
-        return assets
+        return _list_assets(
+            ml_instance=self._ml_object,
+            execution_rid=self.execution_rid,
+            asset_role=asset_role,
+        )
 
     @validate_call(config=VALIDATION_CONFIG)
     def create_dataset(

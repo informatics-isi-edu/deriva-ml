@@ -190,6 +190,134 @@ def fetch_nested_execution_rows(
     return list(path.entities().fetch())
 
 
+def list_input_datasets(
+    *,
+    ml_instance: Any,
+    execution_rid: str,
+) -> list:
+    """Return the input :class:`Dataset` list for an execution.
+
+    Filters the ``Dataset_Execution`` association table for rows
+    referencing ``execution_rid``, then drops any dataset that
+    this same execution itself *produced* (its
+    ``Dataset_Version.Execution`` link points back). The
+    catalog has no role column on ``Dataset_Execution``, so
+    authorship via the version row is the source of truth.
+
+    Replaces parallel implementations on
+    :meth:`Execution.list_input_datasets` (dry-run fallback)
+    and :meth:`ExecutionRecord.list_input_datasets`. Both
+    classes now delegate here.
+
+    Args:
+        ml_instance: The bound :class:`DerivaML` instance.
+        execution_rid: The anchor execution RID.
+
+    Returns:
+        List of :class:`Dataset` objects. Empty when the
+        execution has no input datasets or every dataset on
+        the association table was produced by this execution.
+    """
+    pb = ml_instance.pathBuilder()
+    dataset_exec = pb.schemas[ml_instance.ml_schema].Dataset_Execution
+    records = list(
+        dataset_exec.filter(dataset_exec.Execution == execution_rid)
+        .entities()
+        .fetch()
+    )
+    datasets = []
+    for record in records:
+        dataset_rid = record.get("Dataset")
+        if not dataset_rid:
+            continue
+        producer = ml_instance._producer_of_dataset(dataset_rid)
+        if producer == execution_rid:
+            continue
+        datasets.append(ml_instance.lookup_dataset(dataset_rid))
+    return datasets
+
+
+def list_assets(
+    *,
+    ml_instance: Any,
+    execution_rid: str,
+    asset_role: str | None = None,
+    logger: Any = None,
+) -> list:
+    """Return the :class:`Asset` list associated with an execution.
+
+    Walks every ``*_Execution`` association table across the
+    domain + ml schemas (excluding ``Dataset_Execution``,
+    which is the dataset linkage and handled separately by
+    :func:`list_input_datasets`), filters by the anchor
+    execution and optionally by ``asset_role``, and looks up
+    each matched asset.
+
+    Replaces parallel implementations on
+    :meth:`Execution.list_assets` (dry-run fallback path) and
+    :meth:`ExecutionRecord.list_assets`.
+
+    Args:
+        ml_instance: The bound :class:`DerivaML` instance.
+        execution_rid: The anchor execution RID.
+        asset_role: Optional filter — ``"Input"`` or
+            ``"Output"`` from the ``Asset_Role`` vocabulary.
+            ``None`` returns all.
+        logger: Optional logger for per-asset debug lines
+            ("could not look up asset", "could not query
+            asset table"). Defaults to the module logger if
+            ``None``.
+
+    Returns:
+        List of :class:`Asset` objects. Per-asset lookup
+        failures are swallowed with a debug log so a
+        single asset's catalog issue doesn't break the
+        whole listing.
+    """
+    if logger is None:
+        from deriva_ml.core.logging_config import get_logger
+
+        logger = get_logger(__name__)
+
+    assets = []
+    schemas_to_search = [
+        *ml_instance.domain_schemas,
+        ml_instance.ml_schema,
+    ]
+    pb = ml_instance.pathBuilder()
+
+    for schema_name in schemas_to_search:
+        schema_obj = ml_instance.model.model.schemas[schema_name]
+        for table in schema_obj.tables.values():
+            if not table.name.endswith("_Execution"):
+                continue
+            if table.name == "Dataset_Execution":
+                continue
+            # ``Image_Execution`` → asset_table_name == ``"Image"``.
+            asset_table_name = table.name.replace("_Execution", "")
+            table_path = pb.schemas[schema_name].tables[table.name]
+            try:
+                query = table_path.filter(table_path.Execution == execution_rid)
+                if asset_role:
+                    query = query.filter(table_path.Asset_Role == asset_role)
+                records = list(query.entities().fetch())
+                for record in records:
+                    asset_rid = record.get(asset_table_name)
+                    if not asset_rid:
+                        continue
+                    try:
+                        assets.append(ml_instance.lookup_asset(asset_rid))
+                    except Exception as e:
+                        logger.debug(
+                            "Could not look up asset %s: %s", asset_rid, e
+                        )
+            except Exception as e:
+                logger.debug(
+                    "Could not query asset table %s: %s", table.name, e
+                )
+    return assets
+
+
 def insert_nested_execution_link(
     *,
     ml_instance: Any,
@@ -227,5 +355,7 @@ __all__ = [
     "check_writable_catalog",
     "fetch_nested_execution_rows",
     "insert_nested_execution_link",
+    "list_assets",
+    "list_input_datasets",
     "update_field_in_catalog",
 ]
