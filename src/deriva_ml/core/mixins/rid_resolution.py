@@ -23,7 +23,7 @@ Table = _ermrest_model.Table
 
 
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLRidsNotFound
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -206,8 +206,13 @@ class RidResolutionMixin:
                     )
                     remaining_rids.remove(rid)
 
-        # Check if any RIDs were not found
+        # Check if any RIDs were not found. Raise the typed
+        # ``DerivaMLRidsNotFound`` so callers can pull the unresolved
+        # set off ``e.missing_rids`` without string-parsing the
+        # message — see ``DerivaML.validate_rids``, which previously
+        # had to grep the message for ``"Invalid RIDs:"`` because
+        # this raise site emitted a bare ``DerivaMLException``.
         if remaining_rids:
-            raise DerivaMLException(f"Invalid RIDs: {remaining_rids}")
+            raise DerivaMLRidsNotFound(remaining_rids)
 
         return results

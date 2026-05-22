@@ -46,6 +46,7 @@ from deriva_ml.core.definitions import ML_SCHEMA, RID, TableDefinition, Vocabula
 from deriva_ml.core.exceptions import (
     DerivaMLConfigurationError,
     DerivaMLException,
+    DerivaMLOfflineError,
     DerivaMLReadOnlyError,
     DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
@@ -542,7 +543,7 @@ class DerivaML(
                 pending rows. Does NOT bypass a pin.
 
         Raises:
-            DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLOfflineError: If called in offline mode.
             DerivaMLSchemaPinned: If the disk cache is pinned (any
                 ``force`` value).
             DerivaMLSchemaRefreshBlocked: If ``force=False`` and the
@@ -552,7 +553,7 @@ class DerivaML(
         from deriva_ml.model.catalog import DerivaModel
 
         if self._mode is not ConnectionMode.online:
-            raise DerivaMLReadOnlyError("refresh_schema requires online mode")
+            raise DerivaMLOfflineError("refresh_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         if cache.exists() and cache.pin_status().pinned:
             pin_info = cache.pin_status()
@@ -698,13 +699,13 @@ class DerivaML(
             A :class:`SchemaDiff`, possibly empty.
 
         Raises:
-            DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLOfflineError: If called in offline mode.
             FileNotFoundError: If the workspace has no cache file.
         """
         from deriva_ml.core.schema_diff import _compute_diff
 
         if self._mode is not ConnectionMode.online:
-            raise DerivaMLReadOnlyError("diff_schema requires online mode")
+            raise DerivaMLOfflineError("diff_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         cached_payload = cache.load()
         # See refresh_schema for the purge+get rationale.

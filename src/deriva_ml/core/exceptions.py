@@ -17,6 +17,7 @@ Exception Hierarchy:
     │   │   ├── DerivaMLDatasetNotFound (dataset lookup failures)
     │   │   ├── DerivaMLTableNotFound (table lookup failures)
     │   │   ├── DerivaMLInvalidTerm (vocabulary term not found)
+    │   │   ├── DerivaMLRidsNotFound (one or more RIDs unresolved)
     │   │   └── NoAssociationException (find_association: zero matches)
     │   ├── DerivaMLTableTypeError (wrong table type)
     │   ├── DerivaMLValidationError (data validation failures)
@@ -64,6 +65,7 @@ __all__ = [
     "DerivaMLTableNotFound",
     "DerivaMLFeatureNotFound",
     "DerivaMLInvalidTerm",
+    "DerivaMLRidsNotFound",
     "DerivaMLTableTypeError",
     "DerivaMLValidationError",
     "DerivaMLMaterializeLimitExceeded",
@@ -326,6 +328,37 @@ class DerivaMLInvalidTerm(DerivaMLNotFoundError):
         super().__init__(f"Invalid term {term} in vocabulary {vocabulary}: {msg}.")
         self.vocabulary = vocabulary
         self.term = term
+
+
+class DerivaMLRidsNotFound(DerivaMLNotFoundError):
+    """Exception raised when one or more RIDs cannot be resolved in the catalog.
+
+    Raised by ``DerivaML.resolve_rids`` when the batch resolution
+    walks all tables in scope and some of the requested RIDs are
+    still unaccounted for. Carries the unresolved set as a
+    structured attribute so callers can report per-RID failures
+    without parsing the error message string.
+
+    Args:
+        missing_rids: Set of RIDs that were requested but could not
+            be located in the catalog.
+        msg: Additional context. Defaults to "RIDs not found in catalog".
+
+    Example:
+        >>> raise DerivaMLRidsNotFound({"3JSE", "WX01"})  # doctest: +SKIP
+        DerivaMLRidsNotFound: RIDs not found in catalog: {'3JSE', 'WX01'}
+    """
+
+    def __init__(
+        self,
+        missing_rids: "set[str] | list[str] | tuple[str, ...]",
+        msg: str = "RIDs not found in catalog",
+    ) -> None:
+        # Materialize and sort so the message is deterministic
+        # regardless of set-iteration order.
+        sorted_rids = sorted(missing_rids)
+        super().__init__(f"{msg}: {sorted_rids}")
+        self.missing_rids: set[str] = set(missing_rids)
 
 
 class DerivaMLTableTypeError(DerivaMLDataError):
