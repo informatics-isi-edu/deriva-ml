@@ -143,6 +143,7 @@ See Also
 from __future__ import annotations
 
 import atexit
+import dataclasses
 import inspect
 import logging
 from pathlib import Path
@@ -172,12 +173,20 @@ T = TypeVar("T", bound="DerivaML")
 # =============================================================================
 
 
+@dataclasses.dataclass
 class MultirunState:
     """Manages state for multirun (sweep) executions.
 
     In multirun mode, we create a parent execution that groups all the
     individual sweep jobs. This class holds the shared state needed to
     coordinate between jobs.
+
+    A ``@dataclass`` (instance fields) rather than the previous
+    plain class with class-level defaults — the latter pattern
+    silently shared state through the class object if anyone
+    instantiated a second ``MultirunState`` or subclassed it.
+    The module-level singleton ``_multirun_state`` is the
+    documented usage, so instance-level fields match intent.
 
     Attributes:
         parent_execution_rid: RID of the parent execution (created on first job)
@@ -256,8 +265,17 @@ def _complete_parent_execution() -> None:
             f"Completed parent execution: {_multirun_state.parent_execution_rid} "
             f"({_multirun_state.job_sequence} child jobs)"
         )
-    except Exception as e:
-        logging.warning(f"Failed to complete parent execution: {e}")
+    except Exception:
+        # Log with full stack so a swallowed atexit failure is
+        # at least debuggable from logs. Pre-fix this used
+        # ``logging.warning(f"... {e}")`` which lost the
+        # traceback — an operator seeing the warning had no
+        # way to know what failed inside the upload (catalog
+        # error, network, state machine refusal, etc.).
+        # ``logging.exception`` is bound to the WARNING level
+        # of the root logger by default for this call (see
+        # the ``exc_info=True`` semantics in stdlib logging).
+        logging.exception("Failed to complete parent execution.")
     finally:
         # Clear the state
         reset_multirun_state()
