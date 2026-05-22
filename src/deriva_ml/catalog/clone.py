@@ -119,7 +119,20 @@ def create_ml_workspace(
     Reimplementation of the legacy clone surface on top of the
     bag pipeline (ADR-0006). The parameter list matches the
     pre-migration signature for back-compat, but several knobs
-    are no longer load-bearing — see "Legacy parameters" below.
+    are no longer load-bearing.
+
+    **⚠ Legacy parameters (accepted, no-op, logged as warnings)**:
+    these belonged to the bespoke three-stage clone that was
+    retired in v1.36.0 and have no direct equivalents in the
+    bag pipeline. They're accepted so existing call-sites don't
+    error; explicit non-default values trigger a deprecation
+    warning. Each one is also marked inline below in the
+    ``Args:`` block with ``[NO-OP]``. The full set:
+    ``prune_hidden_fkeys``, ``truncate_oversized``,
+    ``reinitialize_dataset_versions``, ``table_concurrency``,
+    ``progress_callback``, ``copy_annotations``,
+    ``copy_policy``, ``add_ml_schema``, ``alias``,
+    ``include_associations``, ``include_vocabularies``.
 
     Args:
         source_hostname: Hostname of the source ERMrest server.
@@ -131,25 +144,43 @@ def create_ml_workspace(
             non-empty, treated as ``policy.schemas``. Each entry
             is parsed as ``"schema:table"`` and the schema name
             extracted.
+        include_associations: **[NO-OP]** Legacy; ignored.
+        include_vocabularies: **[NO-OP]** Legacy; ignored.
         exclude_objects: ``"schema:table"`` entries to exclude.
             Mapped to ``policy.exclude_tables``.
         exclude_schemas: Schemas to skip during the walk. Merged
             into ``policy.exclude_schemas``.
         dest_hostname: Destination hostname. Defaults to
             ``source_hostname`` (same-server clone).
+        alias: **[NO-OP]** Legacy; ignored.
+        add_ml_schema: **[NO-OP]** Legacy; ignored.
+        asset_mode: An :class:`AssetMode` value. Legacy string
+            spellings ``"refs"``/``"REFERENCES"`` map to
+            ``ROWS_ONLY`` and ``"full"``/``"FULL"`` maps to
+            ``UPLOAD_IF_MISSING`` via :func:`_coerce_asset_mode`.
+        copy_annotations: **[NO-OP]** Legacy; ignored.
+        copy_policy: **[NO-OP]** Legacy; ignored.
+        source_credential: Optional credential dict for the
+            source server. ``None`` triggers :func:`get_credential`
+            on ``source_hostname``.
+        dest_credential: Optional credential dict for the
+            destination server. ``None`` triggers
+            :func:`get_credential` on the destination hostname.
+        orphan_strategy: Maps to :attr:`FKTraversalPolicy.dangling_fk_strategy`.
+        prune_hidden_fkeys: **[NO-OP]** Legacy; ignored.
+        truncate_oversized: **[NO-OP]** Legacy; ignored.
+        reinitialize_dataset_versions: **[NO-OP]** Legacy;
+            ignored. The bag-pipeline clone preserves source-
+            catalog ``Dataset_Version`` rows verbatim. If you
+            need destination-snapshot re-seeding, do it
+            explicitly after the clone returns.
+        table_concurrency: **[NO-OP]** Legacy; ignored.
+        progress_callback: **[NO-OP]** Legacy; ignored.
         dest_catalog_id: Destination catalog ID. **Required** for
             the bag pipeline — the new path does not create the
             destination catalog. Use deriva-py's
             :meth:`DerivaServer.create_ermrest_catalog` separately
             if you need to materialize one.
-        asset_mode: An :class:`AssetMode` value. Legacy string
-            spellings ``"refs"``/``"REFERENCES"`` map to
-            ``ROWS_ONLY`` and ``"full"``/``"FULL"`` maps to
-            ``UPLOAD_IF_MISSING`` via :func:`_coerce_asset_mode`.
-        orphan_strategy: Maps to :attr:`FKTraversalPolicy.dangling_fk_strategy`.
-        source_credential, dest_credential: Optional credential
-            dicts. ``None`` triggers :func:`get_credential` on
-            the relevant hostname.
         output_dir: Where the intermediate bag lives. Defaults to
             ``./clone-{source_catalog_id}-to-{dest_catalog_id}/``.
 
@@ -157,17 +188,6 @@ def create_ml_workspace(
         :class:`~deriva_ml.catalog.clone_via_bag.CloneViaBagResult`
         from the underlying ``clone_via_bag`` call. **Not** the
         old ``CloneCatalogResult`` — that class no longer exists.
-
-    Legacy parameters (accepted, no-op, logged as warnings):
-        ``prune_hidden_fkeys``, ``truncate_oversized``,
-        ``reinitialize_dataset_versions``, ``table_concurrency``,
-        ``progress_callback``, ``copy_annotations``,
-        ``copy_policy``, ``add_ml_schema``, ``alias``,
-        ``include_associations``, ``include_vocabularies``.
-        These belonged to the bespoke three-stage clone and have
-        no direct equivalents in the bag pipeline. They're
-        accepted so existing call-sites don't error; explicit
-        non-default values trigger a deprecation warning.
 
     Raises:
         ValueError: If ``dest_catalog_id`` is not supplied (the

@@ -306,13 +306,17 @@ Import from: `from deriva_ml.interfaces import ...`
 
 ## Catalog Cloning
 
-**`create_ml_workspace`** (`src/deriva_ml/catalog/clone.py`): Creates partial catalog clones:
-- Three-stage approach: schema without FKs → async data copy → FK application with orphan handling
-- Export annotation parsing for guided table discovery
-- Orphan strategies: FAIL, DELETE, NULLIFY for incoherent row-level policies
-- Dataset version reinitialization with proper catalog snapshots
+**`clone_via_bag`** (`src/deriva_ml/catalog/clone_via_bag.py`): The current catalog-clone path. Builds a BDBag from the source catalog (using the export pipeline + an explicit traversal policy), then loads the bag into a schema-ready destination catalog via deriva-py's `BagCatalogLoader`. The legacy three-stage approach (schema without FKs → async data copy → FK application) was retired in v1.36.0 in favor of this single-call pipeline.
 
-**`localize_assets`** (`src/deriva_ml/catalog/localize.py`): Copies assets from source to local Hatrac after cloning with `asset_mode=REFERENCES`.
+Key parameters:
+- `root_rid` — anchor for the bag's content slice. Translated to a `RIDAnchor` and merged with the policy's existing anchors.
+- `policy` — `FKTraversalPolicy` controlling traversal scope and per-table behaviour. The caller's policy is merged with deriva-ml defaults (vocab export FULL, terminal tables {Execution, Workflow}, dangling FK strategy DELETE) — caller-provided non-default values win.
+- `asset_mode` — `AssetMode.UPLOAD` (default) copies asset bytes into the destination Hatrac; `AssetMode.ROWS_ONLY` skips asset upload (rows are still inserted with their source-Hatrac URLs); `AssetMode.REFERENCES` preserves source URLs for later localization.
+- `dangling_fk_strategy` — `FAIL` (refuse), `DELETE` (drop the row), or `NULLIFY` (set the FK column NULL).
+
+**`create_ml_workspace`** (`src/deriva_ml/catalog/clone.py`): Legacy wrapper preserved for callers that haven't migrated. Routes to `clone_via_bag` under the hood; several historical parameters (e.g., `reinitialize_dataset_versions`, `prune_hidden_fkeys`, `truncate_oversized`, `table_concurrency`, `copy_annotations`) are accepted-but-ignored and logged as deprecation warnings. New code should call `clone_via_bag` directly.
+
+**`localize_assets`** (`src/deriva_ml/catalog/localize.py`): Phase-2 leg of the split-phase clone. After a `clone_via_bag(asset_mode=REFERENCES)` (or `ROWS_ONLY`) leaves the destination with source-Hatrac URLs, `localize_assets` copies the bytes server-to-server (download from source, upload to dest) and rewrites the catalog rows to point at the destination Hatrac. Records phase-2 stats on the catalog provenance annotation.
 
 ### create_ml_schema CASCADE Warning
 
