@@ -546,6 +546,58 @@ class DerivaModel:
         table = self.name_to_table(table)
         return table.is_asset()
 
+    def find_asset_execution_tables(self) -> list[tuple[str, str]]:
+        """Return the ``*_Execution`` association tables across all schemas.
+
+        Walks every domain + ML schema once, finds tables whose
+        name ends with ``_Execution`` (excluding
+        ``Dataset_Execution``, which is the dataset linkage and
+        not an asset association), and caches the result on the
+        instance. Subsequent calls re-use the cache so callers
+        that walk these tables repeatedly (e.g.
+        :func:`~deriva_ml.execution._helpers.list_assets`) pay
+        the schema-iteration cost exactly once per
+        :class:`DerivaModel` lifetime.
+
+        The cache is invalidated whenever the underlying model
+        object identity changes (e.g. after a catalog
+        ``Model.fromcatalog`` refetch). In practice the model is
+        only refreshed in long-lived sessions that mutate schema
+        — the common case (read-mostly scripts) hits the cache
+        on every call after the first.
+
+        Returns:
+            List of ``(schema_name, table_name)`` pairs, ordered
+            by schema-then-table for deterministic iteration.
+
+        Example:
+            >>> from deriva_ml.model.catalog import DerivaModel  # doctest: +SKIP
+            >>> model.find_asset_execution_tables()  # doctest: +SKIP
+            [('deriva-ml', 'Execution_Asset_Execution'),
+             ('test_schema', 'Image_Execution')]
+        """
+        # Cache key is the underlying model object's identity —
+        # a refetch swaps it out and we recompute. Cheap, safe.
+        cached = getattr(self, "_asset_execution_tables_cache", None)
+        if cached is not None and cached[0] is self.model:
+            return cached[1]
+
+        result: list[tuple[str, str]] = []
+        schemas_to_search = [*sorted(self.domain_schemas), self.ml_schema]
+        for schema_name in schemas_to_search:
+            schema_obj = self.model.schemas.get(schema_name)
+            if schema_obj is None:
+                continue
+            for table in schema_obj.tables.values():
+                if not table.name.endswith("_Execution"):
+                    continue
+                if table.name == "Dataset_Execution":
+                    continue
+                result.append((schema_name, table.name))
+
+        self._asset_execution_tables_cache = (self.model, result)
+        return result
+
     def find_assets(self) -> list[Table]:
         """Return the list of asset tables in the current model."""
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
