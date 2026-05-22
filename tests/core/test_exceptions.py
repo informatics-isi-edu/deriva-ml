@@ -75,3 +75,42 @@ def test_ambiguous_association_exception_inherits_data_error_and_base():
     assert "2 association tables" in str(err)
     assert "Image" in str(err)
     assert "Dataset" in str(err)
+
+
+def test_definitions_reexports_every_exception_from_exceptions():
+    """``deriva_ml.core.definitions`` must re-export every public
+    exception class declared in ``deriva_ml.core.exceptions``.
+
+    The module-level docstring of ``definitions`` recommends users
+    import exceptions from there ("From: deriva_ml.core.definitions
+    or deriva_ml.exceptions"). Before this test, ``definitions.
+    __all__`` lagged behind: every class added since Phase 2
+    (``DerivaMLFeatureNotFound``, ``DerivaMLOfflineError``,
+    ``DerivaMLStateInconsistency``, ``DerivaMLDirtyWorkflowError``,
+    ``NoAssociationException``, ``AmbiguousAssociationException``,
+    ``DerivaMLSchemaRefreshBlocked``, ``DerivaMLSchemaPinned``,
+    ``DerivaMLMaterializeLimitExceeded``, ``DerivaMLDenormalizeError``
+    + 5 subclasses, ``DerivaMLRidsNotFound``) was missing. Users
+    following the recommended import path couldn't actually import
+    them from there.
+
+    This test pins the parity contract: the set of exception names
+    in ``definitions.__all__`` must equal the set in
+    ``exceptions.__all__``. Any new exception class added to
+    exceptions.py and forgotten in definitions.py fails this test.
+    """
+    from deriva_ml.core import definitions, exceptions
+
+    exception_names = set(exceptions.__all__)
+    definitions_exception_names = {
+        name
+        for name in definitions.__all__
+        if name in exception_names
+    }
+    missing = exception_names - definitions_exception_names
+    assert not missing, (
+        f"deriva_ml.core.definitions does not re-export these "
+        f"exception classes: {sorted(missing)}. Add them to "
+        f"``definitions.__all__`` and the corresponding import "
+        f"block so the recommended import path works."
+    )

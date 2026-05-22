@@ -136,21 +136,55 @@ class DerivaMLConfig(BaseModel):
     def init_working_dir(self) -> "DerivaMLConfig":
         """Initialize working directory and resolve use_minid after model validation.
 
-        Sets up the working directory path, computing a default if not specified.
-        Also captures Hydra's runtime output directory for logging and outputs.
+        Working-directory resolution mirrors ``DerivaML.__init__`` so the
+        two construction paths produce the same effective path:
+
+        * If the user explicitly passed ``working_dir=...``, that exact
+          path is honored as-is (made absolute). The auto-namespace
+          append of ``<user>/deriva-ml/<host>/<catalog>`` is **not**
+          applied — silently appending to a path the user explicitly
+          chose would be a surprise (a user passing
+          ``working_dir="/tmp/wd"`` would have ended up at
+          ``/tmp/wd/<user>/deriva-ml/<host>/<catalog>`` and not been
+          told).
+        * If ``working_dir`` is None, ``compute_workdir`` produces the
+          default per-host/catalog-namespaced path under
+          ``~/.deriva-ml/...``.
+
+        The Hydra runtime output dir is read defensively: when the
+        config is instantiated outside a Hydra context (notebook,
+        ad-hoc script, MCP server, unit test), ``HydraConfig.get()``
+        raises ``ValueError: HydraConfig was not set``. We treat that
+        as "no Hydra runtime output dir" rather than a fatal config
+        error.
 
         Resolves the use_minid flag based on s3_bucket configuration:
         - If use_minid is explicitly set, use that value (but it only takes effect if s3_bucket is set)
         - If use_minid is None (auto), set it to True if s3_bucket is configured, False otherwise
 
-        This validator runs after all field validation and ensures the working
-        directory is available for Hydra configuration resolution.
-
         Returns:
             Self: The configuration instance with initialized paths.
         """
-        self.working_dir = DerivaMLConfig.compute_workdir(self.working_dir, self.catalog_id, self.hostname)
-        self.hydra_runtime_output_dir = Path(HydraConfig.get().runtime.output_dir)
+        # Honor an explicit working_dir as-is; only compute the
+        # default when the user didn't specify one. See the
+        # docstring above for the symmetry with DerivaML.__init__.
+        if self.working_dir is not None:
+            self.working_dir = Path(self.working_dir).absolute()
+        else:
+            self.working_dir = DerivaMLConfig.compute_workdir(
+                None, self.catalog_id, self.hostname
+            )
+
+        # HydraConfig is only available inside a Hydra run. Outside
+        # that context (e.g. constructing the config in a notebook),
+        # leave ``hydra_runtime_output_dir`` unset rather than
+        # crashing the whole constructor.
+        try:
+            self.hydra_runtime_output_dir = Path(
+                HydraConfig.get().runtime.output_dir
+            )
+        except ValueError:
+            self.hydra_runtime_output_dir = None
 
         # Resolve use_minid based on s3_bucket configuration
         if self.use_minid is None:

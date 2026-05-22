@@ -532,3 +532,81 @@ class TestWorkingDirectoryIntegration:
         assert getpass.getuser() in str(computed)
         assert "ml.example.org" in str(computed)
         assert "123" in str(computed)
+
+
+class TestInitWorkingDirOutsideHydra:
+    """Regression coverage for ``DerivaMLConfig.init_working_dir``.
+
+    Pre-fix, the validator did two surprising things:
+
+    1. Silently overwrote an explicitly-provided ``working_dir`` by
+       appending ``<user>/deriva-ml/<host>/<catalog>``. A user
+       passing ``working_dir="/tmp/wd"`` ended up at
+       ``/tmp/wd/<user>/deriva-ml/<host>/<catalog>`` without being
+       told. The sibling code in ``DerivaML.__init__`` honored
+       explicit ``working_dir`` as-is — the two paths disagreed.
+
+    2. Read ``HydraConfig.get().runtime.output_dir`` unconditionally,
+       which raises ``ValueError: HydraConfig was not set`` outside
+       a Hydra run. Notebook / MCP / ad-hoc Python callers couldn't
+       construct the config at all without mocking HydraConfig.
+
+    Both behaviors are fixed; these tests pin the new contract.
+    """
+
+    def test_explicit_working_dir_is_honored_as_is(self, tmp_path):
+        """An explicit ``working_dir`` is used verbatim.
+
+        Mirrors ``DerivaML.__init__``: explicit user input wins.
+        The auto-namespace append only kicks in when the user
+        didn't specify a path.
+        """
+        custom = tmp_path / "my_explicit_wd"
+        config = DerivaMLConfig(
+            hostname="test.example.org",
+            catalog_id="42",
+            working_dir=custom,
+        )
+        assert config.working_dir == custom.absolute(), (
+            f"Expected working_dir {custom.absolute()!r}; got "
+            f"{config.working_dir!r}. The validator must not silently "
+            f"append <user>/deriva-ml/<host>/<catalog> to an explicit "
+            f"user path."
+        )
+
+    def test_default_working_dir_uses_namespace_when_none(self):
+        """When ``working_dir`` is None, the validator computes the namespaced default.
+
+        Pre-fix this branch already worked; the test pins it so a
+        future refactor doesn't accidentally drop the auto-namespace.
+        """
+        config = DerivaMLConfig(
+            hostname="test.example.org",
+            catalog_id="42",
+            working_dir=None,
+        )
+        # The default path includes the canonical namespacing.
+        assert config.working_dir is not None
+        s = str(config.working_dir)
+        assert ".deriva-ml" in s
+        assert "test.example.org" in s
+        assert s.endswith("/42")
+
+    def test_construction_outside_hydra_context_succeeds(self):
+        """Constructing ``DerivaMLConfig`` outside a Hydra run no longer crashes.
+
+        Pre-fix, ``HydraConfig.get()`` raised
+        ``ValueError: HydraConfig was not set``. Now the validator
+        catches that and sets ``hydra_runtime_output_dir = None``.
+        """
+        # No ``with patch("deriva_ml.core.config.HydraConfig")`` —
+        # constructing bare-bones from a non-Hydra context.
+        config = DerivaMLConfig(
+            hostname="test.example.org",
+            catalog_id="42",
+        )
+        assert config.hostname == "test.example.org"
+        assert config.hydra_runtime_output_dir is None, (
+            "Outside a Hydra context, hydra_runtime_output_dir should "
+            "be None — not crash, not stale, not a synthesized value."
+        )

@@ -211,7 +211,7 @@ def validate_rids(
         OK Validation passed
           Validated 3 RID(s)
     """
-    from deriva_ml.core.exceptions import DerivaMLException
+    from deriva_ml.core.exceptions import DerivaMLException, DerivaMLRidsNotFound
 
     result = ValidationResult()
 
@@ -251,17 +251,19 @@ def validate_rids(
                 "table": info.table_name,
                 "schema": info.schema_name,
             }
+    except DerivaMLRidsNotFound as e:
+        # Read the unresolved set directly off the typed exception —
+        # no string parsing. Each unresolved RID gets a category-
+        # qualified error message so callers see exactly which input
+        # failed to resolve.
+        for rid in e.missing_rids:
+            category = rid_categories.get(rid, "unknown")
+            result.add_error(f"{category.title()} RID '{rid}' does not exist in catalog")
     except DerivaMLException as e:
-        # Extract invalid RIDs from the error message
-        error_msg = str(e)
-        if "Invalid RIDs:" in error_msg:
-            # Parse out the invalid RIDs - report each one
-            for rid in all_rids:
-                if rid not in result.validated_rids:
-                    category = rid_categories.get(rid, "unknown")
-                    result.add_error(f"{category.title()} RID '{rid}' does not exist in catalog")
-        else:
-            result.add_error(f"RID validation failed: {e}")
+        # Any other DerivaML failure during resolution (catalog
+        # error, network issue, etc.) is reported as a generic
+        # validation failure rather than per-RID.
+        result.add_error(f"RID validation failed: {e}")
 
     # Validate dataset versions if specified
     if dataset_versions and dataset_rids:

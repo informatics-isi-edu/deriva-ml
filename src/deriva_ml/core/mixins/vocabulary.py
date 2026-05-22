@@ -214,7 +214,9 @@ class VocabularyMixin:
             VocabularyTermHandle: The matching vocabulary term, with methods to modify it.
 
         Raises:
-            DerivaMLVocabularyException: If the table is not a vocabulary table, or term is not found.
+            DerivaMLTableTypeError: If the table is not a vocabulary table.
+            DerivaMLInvalidTerm: If ``term_name`` is not a valid term or synonym
+                of any row in the vocabulary table.
 
         Examples:
             Look up by primary name:
@@ -229,10 +231,12 @@ class VocabularyMixin:
                 >>> term.description = "Updated description"
                 >>> term.synonyms = ("epithelium", "epithelial_tissue")
         """
-        # Get and validate vocabulary table reference
+        # Get and validate vocabulary table reference. Mirror
+        # add_term's typed guard so all three "not a vocabulary
+        # table" call sites raise the same exception class.
         vocab_table = self.model.name_to_table(table)
         if not self.model.is_vocabulary(vocab_table):
-            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
+            raise DerivaMLTableTypeError("vocabulary", vocab_table.name)
 
         # Get schema and table names
         schema_name, table_name = vocab_table.schema.name, vocab_table.name
@@ -323,9 +327,11 @@ class VocabularyMixin:
         pb = self.pathBuilder()
         table = self.model.name_to_table(table.value if isinstance(table, MLVocab) else table)
 
-        # Validate table is a vocabulary table
+        # Validate table is a vocabulary table. Mirror add_term and
+        # lookup_term so all three "not a vocabulary table" call
+        # sites raise the same exception class.
         if not (self.model.is_vocabulary(table)):
-            raise DerivaMLException(f"The table {table} is not a controlled vocabulary")
+            raise DerivaMLTableTypeError("vocabulary", table.name)
 
         # Fetch and convert all terms to VocabularyTerm objects
         return [VocabularyTerm(**v) for v in pb.schemas[table.schema.name].tables[table.name].entities().fetch()]

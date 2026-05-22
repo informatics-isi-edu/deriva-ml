@@ -46,6 +46,7 @@ from deriva_ml.core.definitions import ML_SCHEMA, RID, TableDefinition, Vocabula
 from deriva_ml.core.exceptions import (
     DerivaMLConfigurationError,
     DerivaMLException,
+    DerivaMLOfflineError,
     DerivaMLReadOnlyError,
     DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
@@ -542,7 +543,7 @@ class DerivaML(
                 pending rows. Does NOT bypass a pin.
 
         Raises:
-            DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLOfflineError: If called in offline mode.
             DerivaMLSchemaPinned: If the disk cache is pinned (any
                 ``force`` value).
             DerivaMLSchemaRefreshBlocked: If ``force=False`` and the
@@ -552,7 +553,7 @@ class DerivaML(
         from deriva_ml.model.catalog import DerivaModel
 
         if self._mode is not ConnectionMode.online:
-            raise DerivaMLReadOnlyError("refresh_schema requires online mode")
+            raise DerivaMLOfflineError("refresh_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         if cache.exists() and cache.pin_status().pinned:
             pin_info = cache.pin_status()
@@ -698,13 +699,13 @@ class DerivaML(
             A :class:`SchemaDiff`, possibly empty.
 
         Raises:
-            DerivaMLReadOnlyError: If called in offline mode.
+            DerivaMLOfflineError: If called in offline mode.
             FileNotFoundError: If the workspace has no cache file.
         """
         from deriva_ml.core.schema_diff import _compute_diff
 
         if self._mode is not ConnectionMode.online:
-            raise DerivaMLReadOnlyError("diff_schema requires online mode")
+            raise DerivaMLOfflineError("diff_schema requires online mode")
         cache = SchemaCache(self.working_dir)
         cached_payload = cache.load()
         # See refresh_schema for the purge+get rationale.
@@ -759,18 +760,43 @@ class DerivaML(
         Catalog snapshots provide a read-only, point-in-time view of the catalog.
         The snapshot identifier is typically obtained from a dataset version record.
 
+        Every connection-shaping kwarg the original instance was
+        constructed with (``working_dir``, ``cache_dir``,
+        ``domain_schemas``, ``default_schema``, ``s3_bucket``,
+        ``use_minid``, ``credential``, ``mode``, ``ml_schema``,
+        ``project_name``, ``clean_execution_dir``, plus the two
+        logging levels) is forwarded to the snapshot instance.
+        Without this forwarding, the snapshot would silently default
+        ``working_dir`` to ``~/deriva_ml`` even when the user
+        constructed ``self`` with an explicit shared-tree path, and
+        would re-fetch credentials and re-detect domain schemas
+        (which can pick differently from the snapshot than the live
+        catalog did) — both observable behaviour drifts.
+
         Args:
             version_snapshot: Snapshot identifier string (e.g., ``"2T-SXEH-JH4A"``),
                 usually the ``snapshot`` field from a :class:`DatasetHistory` entry.
 
         Returns:
-            A new DerivaML instance connected to the specified catalog snapshot.
+            A new DerivaML instance connected to the specified catalog snapshot,
+            inheriting every connection-shaping kwarg from ``self``.
         """
         return DerivaML(
             self.host_name,
             version_snapshot,
+            domain_schemas=self.domain_schemas,
+            default_schema=self.default_schema,
+            project_name=self.project_name,
+            cache_dir=self.cache_dir,
+            working_dir=self.working_dir,
+            ml_schema=self.ml_schema,
             logging_level=self._logging_level,
             deriva_logging_level=self._deriva_logging_level,
+            credential=self.credential,
+            s3_bucket=self.s3_bucket,
+            use_minid=self.use_minid,
+            clean_execution_dir=self.clean_execution_dir,
+            mode=self._mode,
         )
 
     @property
@@ -1463,7 +1489,7 @@ class DerivaML(
         stats["total_mb"] = stats["total_bytes"] / (1024 * 1024)
         return stats
 
-    def list_execution_dirs(self) -> list[dict[str, any]]:
+    def list_execution_dirs(self) -> list[dict[str, Any]]:
         """List execution working directories.
 
         Returns information about each execution directory in the working directory,
@@ -1586,7 +1612,7 @@ class DerivaML(
 
         return stats
 
-    def get_storage_summary(self) -> dict[str, any]:
+    def get_storage_summary(self) -> dict[str, Any]:
         """Get a summary of local storage usage.
 
         Returns:

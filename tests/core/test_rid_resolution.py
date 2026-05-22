@@ -54,10 +54,20 @@ class TestRidResolution:
         assert results == {}
 
     def test_resolve_rids_invalid(self, test_ml):
-        """Test batch resolution with invalid RIDs raises exception."""
+        """Test batch resolution with invalid RIDs raises typed exception.
+
+        ``resolve_rids`` raises ``DerivaMLRidsNotFound`` (a
+        ``DerivaMLNotFoundError`` subclass) carrying the
+        unresolved set as ``e.missing_rids`` — callers can read
+        that attribute directly without string-parsing the
+        message.
+        """
+        from deriva_ml.core.exceptions import DerivaMLRidsNotFound
+
         ml_instance = test_ml
-        with pytest.raises(DerivaMLException, match="Invalid RIDs"):
+        with pytest.raises(DerivaMLRidsNotFound) as exc_info:
             ml_instance.resolve_rids(["INVALID-RID-123"])
+        assert exc_info.value.missing_rids == {"INVALID-RID-123"}
 
     def test_resolve_rids_with_candidate_tables(self, catalog_with_datasets):
         """Test batch resolution with specific candidate tables."""

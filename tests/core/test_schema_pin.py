@@ -86,7 +86,7 @@ def test_pin_status_reflects_cache_state(tmp_path):
 
 def test_diff_schema_offline_raises(tmp_path):
     from deriva_ml import ConnectionMode, DerivaML
-    from deriva_ml.core.exceptions import DerivaMLReadOnlyError
+    from deriva_ml.core.exceptions import DerivaMLOfflineError
     from deriva_ml.core.schema_cache import SchemaCache
     SchemaCache(tmp_path).write(
         snapshot_id="s0", hostname="h", catalog_id="1",
@@ -95,7 +95,7 @@ def test_diff_schema_offline_raises(tmp_path):
     )
     ml = DerivaML(hostname="h", catalog_id="1",
                   mode=ConnectionMode.offline, working_dir=tmp_path)
-    with pytest.raises(DerivaMLReadOnlyError):
+    with pytest.raises(DerivaMLOfflineError):
         ml.diff_schema()
 
 
