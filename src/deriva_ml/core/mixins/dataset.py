@@ -19,6 +19,17 @@ from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.config.ast_walker import parse_config_file
+from deriva_ml.config.bootstrap import (
+    DEFAULT_DATASET_TYPE_FILTER,
+    BootstrapReport,
+    BootstrapSkipped,
+    BootstrapSuggestion,
+    _format_asset_spec,
+    _format_dataset_spec,
+    _format_deriva_ml_spec,
+    _format_workflow_spec,
+    _sanitize_config_name,
+)
 from deriva_ml.config.validation import (
     ConfigEntry,
     ConfigEntryResult,
@@ -859,6 +870,226 @@ class DatasetMixin:
             all_valid=(not parse_errors) and all(r.valid for r in results),
             results=results,
             parse_errors=parse_errors,
+        )
+
+    def bootstrap_config(
+        self,
+        *,
+        kinds: list[str] | None = None,
+        dataset_type_filter: list[str] | None = None,
+    ) -> BootstrapReport:
+        """Suggest config entries by reading the catalog.
+
+        Walks the catalog and produces structured :class:`BootstrapSuggestion`
+        objects -- one per dataset / asset / workflow row a fresh
+        project's ``src/configs/`` might want to pin. Does NOT write
+        files. The skill prose layer formats the suggestions into the
+        right config file (per-skill ownership of "which file" --
+        ``dataset-lifecycle`` for datasets, ``work-with-assets`` for
+        assets, ``write-hydra-config`` for the umbrella).
+
+        Three use cases:
+
+        - **New project, empty configs/.** Run unfiltered to see every
+          candidate entry; pick the subset that's relevant.
+        - **Catalog clone or environment switch.** Bootstrap to repoint
+          configs at the new catalog, then validate to catch any
+          stragglers.
+        - **Incremental update.** Pass ``kinds=["datasets"]`` to see
+          fresh dataset suggestions after a release without
+          enumerating assets / workflows.
+
+        Args:
+            kinds: Which config groups to suggest entries for. Default
+                is all four (``deriva_ml``, ``datasets``, ``assets``,
+                ``workflow``). Skipping ``experiments``,
+                ``multiruns``, ``model_config`` is intentional --
+                those are project code, not catalog state.
+            dataset_type_filter: When suggesting datasets, restrict
+                to these ``Dataset_Type`` terms. Default is
+                ``["Training", "Testing", "Validation", "Complete",
+                "Labeled"]`` -- the partition-role + annotation tags
+                experiments typically pin. Pass ``[]`` (empty list)
+                to include every type. Pass ``None`` (default) to
+                use the default filter.
+
+        Returns:
+            A :class:`BootstrapReport` with suggestions grouped (by
+            ``kind`` field), and a ``skipped`` list explaining why
+            specific entities weren't suggested.
+
+        Example:
+            One-shot bootstrap::
+
+                >>> report = ml.bootstrap_config()  # doctest: +SKIP
+                >>> for s in report.suggestions:  # doctest: +SKIP
+                ...     print(s.kind, s.config_name, s.spec_string)
+        """
+        requested_kinds = set(kinds) if kinds is not None else {
+            "deriva_ml",
+            "datasets",
+            "assets",
+            "workflow",
+        }
+        if dataset_type_filter is None:
+            type_filter = set(DEFAULT_DATASET_TYPE_FILTER)
+        else:
+            type_filter = set(dataset_type_filter)  # may be empty (= no filter)
+
+        suggestions: list[BootstrapSuggestion] = []
+        skipped: list[BootstrapSkipped] = []
+
+        if "deriva_ml" in requested_kinds:
+            suggestions.append(
+                BootstrapSuggestion(
+                    kind="deriva_ml",
+                    config_name="default_deriva",
+                    rid="",  # connection groups don't pin a RID
+                    spec_string=_format_deriva_ml_spec(
+                        str(getattr(self, "host_name", "")),
+                        str(getattr(self, "catalog_id", "")),
+                    ),
+                    description=(
+                        f"Connection to {getattr(self, 'host_name', '?')} "
+                        f"catalog {getattr(self, 'catalog_id', '?')}"
+                    ),
+                    rationale="Connection group; pin this DerivaML instance.",
+                )
+            )
+
+        if "datasets" in requested_kinds:
+            datasets_iter = self.find_datasets()  # type: ignore[attr-defined]
+            for ds in datasets_iter:
+                ds_rid = ds.dataset_rid
+                ds_types = list(ds.dataset_types or [])
+                # Apply type filter if non-empty.
+                if type_filter and not (set(ds_types) & type_filter):
+                    skipped.append(
+                        BootstrapSkipped(
+                            kind="datasets",
+                            rid=ds_rid,
+                            reason=(
+                                f"dataset_types={ds_types} -- not in filter "
+                                f"{sorted(type_filter)}"
+                            ),
+                        )
+                    )
+                    continue
+                # Need a released version to pin -- dev labels would
+                # break reproducibility on consumers.
+                current = ds.current_version  # type: ignore[attr-defined]
+                if current is None:
+                    skipped.append(
+                        BootstrapSkipped(
+                            kind="datasets",
+                            rid=ds_rid,
+                            reason="no current version",
+                        )
+                    )
+                    continue
+                version_str = str(current)
+                if ".dev" in version_str or ".post" in version_str:
+                    skipped.append(
+                        BootstrapSkipped(
+                            kind="datasets",
+                            rid=ds_rid,
+                            reason=(
+                                f"current_version={version_str!r} is a dev label; "
+                                "call deriva_ml_release(...) to mint a released version"
+                            ),
+                        )
+                    )
+                    continue
+                desc = getattr(ds, "description", "") or ""
+                config_name = _sanitize_config_name(desc, fallback=ds_rid)
+                primary_type = (
+                    next(iter(set(ds_types) & type_filter), None)
+                    if type_filter
+                    else (ds_types[0] if ds_types else "Dataset")
+                )
+                rationale = (
+                    f"Dataset type {primary_type or '?'}; latest released "
+                    f"version {version_str}."
+                )
+                suggestions.append(
+                    BootstrapSuggestion(
+                        kind="datasets",
+                        config_name=config_name,
+                        rid=ds_rid,
+                        version=version_str,
+                        spec_string=_format_dataset_spec(ds_rid, version_str),
+                        description=desc or None,
+                        rationale=rationale,
+                    )
+                )
+
+        if "assets" in requested_kinds:
+            for table in self.list_asset_tables():  # type: ignore[attr-defined]
+                # Skip the built-in DerivaML asset tables -- they hold
+                # auto-generated metadata files (execution config dumps,
+                # uploaded notebooks). Users don't pin those by RID
+                # from experiment configs; they're navigated through
+                # the producing execution.
+                if table.name in {"Execution_Metadata", "Execution_Asset"}:
+                    skipped.append(
+                        BootstrapSkipped(
+                            kind="assets",
+                            rid=table.name,
+                            reason=(
+                                "built-in ml-schema asset table; navigate via "
+                                "Execution_RID rather than pinning by asset RID"
+                            ),
+                        )
+                    )
+                    continue
+                assets = self.list_assets(table)  # type: ignore[attr-defined]
+                for asset in assets:
+                    asset_rid = asset.asset_rid
+                    filename = getattr(asset, "filename", None) or ""
+                    config_name = _sanitize_config_name(filename, fallback=asset_rid)
+                    suggestions.append(
+                        BootstrapSuggestion(
+                            kind="assets",
+                            config_name=config_name,
+                            rid=asset_rid,
+                            spec_string=_format_asset_spec(asset_rid),
+                            description=filename or None,
+                            rationale=(
+                                f"Asset in {table.name}"
+                                + (f" ({filename})" if filename else "")
+                            ),
+                        )
+                    )
+
+        if "workflow" in requested_kinds:
+            workflows = self.find_workflows()  # type: ignore[attr-defined]
+            for wf in workflows:
+                wf_rid = getattr(wf, "rid", None)
+                if wf_rid is None:
+                    continue  # in-memory Workflow without a catalog row
+                wf_name = getattr(wf, "name", "") or ""
+                config_name = _sanitize_config_name(wf_name, fallback=wf_rid)
+                suggestions.append(
+                    BootstrapSuggestion(
+                        kind="workflow",
+                        config_name=config_name,
+                        rid=wf_rid,
+                        spec_string=_format_workflow_spec(wf_rid),
+                        description=wf_name or None,
+                        rationale=(
+                            "Existing Workflow row; pin by RID to reuse "
+                            "across executions."
+                        ),
+                    )
+                )
+
+        return BootstrapReport(
+            catalog={
+                "hostname": str(getattr(self, "host_name", "")),
+                "catalog_id": str(getattr(self, "catalog_id", "")),
+            },
+            suggestions=suggestions,
+            skipped=skipped,
         )
 
     # -- private helpers ------------------------------------------------

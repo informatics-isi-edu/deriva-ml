@@ -54,6 +54,12 @@ Example:
 from __future__ import annotations
 
 from deriva_ml.config.ast_walker import parse_config_file
+from deriva_ml.config.bootstrap import (
+    BootstrapReport,
+    BootstrapSkipped,
+    BootstrapSuggestion,
+    ConfigKind,
+)
 from deriva_ml.config.validation import (
     ConfigEntry,
     ConfigEntryReason,
@@ -62,9 +68,13 @@ from deriva_ml.config.validation import (
 )
 
 __all__ = [
+    "BootstrapReport",
+    "BootstrapSkipped",
+    "BootstrapSuggestion",
     "ConfigEntry",
     "ConfigEntryResult",
     "ConfigEntryReason",
+    "ConfigKind",
     "ConfigValidationReport",
     "parse_config_file",
 ]
