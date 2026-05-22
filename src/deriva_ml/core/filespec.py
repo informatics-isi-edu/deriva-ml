@@ -140,8 +140,16 @@ class FileSpec(BaseModel):
             hashes = hash_utils.compute_file_hashes(file_path, hashes=frozenset(["md5", "sha256"]))
             md5 = hashes["md5"][0]
             type_list = file_types_fn(file_path)
+            # ``length`` must reflect this specific file, not the outer
+            # ``path`` (which is the directory when callers pass one
+            # for a recursive walk). The original code closed over
+            # ``path.stat().st_size``, so every file under a directory
+            # walk got the directory's stat size (typically ~64 bytes
+            # on macOS / ~4096 bytes on Linux) instead of its own.
+            # Asset upload metadata was silently wrong for every
+            # directory-mode call.
             return FileSpec(
-                length=path.stat().st_size,
+                length=file_path.stat().st_size,
                 md5=md5,
                 description=description,
                 url=file_path.as_posix(),

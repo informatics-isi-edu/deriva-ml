@@ -197,3 +197,83 @@ class TestFile:
             assert read.description == original.description
             assert read.md5 == original.md5
             assert read.length == original.length
+
+
+class TestCreateFilespecsLength:
+    """Regression tests for ``FileSpec.create_filespecs`` length reporting.
+
+    Earlier versions of ``create_spec`` (the inner closure) used the
+    outer ``path`` for ``length`` instead of the per-file
+    ``file_path``. In single-file mode this happened to work (``path``
+    and ``file_path`` referenced the same file); in directory mode
+    every emitted FileSpec reported the *directory's* ``stat().st_size``
+    rather than the file's. Asset uploads silently recorded wrong
+    sizes — the manifest layer recorded a constant ``~64`` or
+    ``~4096`` for every file under a directory walk.
+
+    Pure-Python tests; no catalog required.
+    """
+
+    def test_single_file_length_matches_file_size(self, tmp_path):
+        """``create_filespecs`` on a single file reports that file's size."""
+        f = tmp_path / "lone.txt"
+        payload = b"hello world\n"  # 12 bytes
+        f.write_bytes(payload)
+
+        specs = list(FileSpec.create_filespecs(f, "single"))
+        assert len(specs) == 1
+        assert specs[0].length == len(payload)
+
+    def test_directory_walk_reports_per_file_length(self, tmp_path):
+        """Each FileSpec in a directory walk reports its own file's size.
+
+        The original bug: every file's ``length`` was the directory's
+        stat size, not the file's. This test creates three files of
+        distinct sizes (10 / 100 / 1000 bytes) and asserts each
+        emitted spec carries the correct one — they must be three
+        distinct values, not three copies of the directory's size.
+        """
+        sizes = {"small.txt": 10, "medium.txt": 100, "large.txt": 1000}
+        for name, n in sizes.items():
+            (tmp_path / name).write_bytes(b"x" * n)
+
+        specs = {Path(s.url).name: s for s in FileSpec.create_filespecs(tmp_path, "walk")}
+        assert set(specs) == set(sizes), (
+            f"Expected one spec per file; got {set(specs)} vs {set(sizes)}"
+        )
+        for name, expected in sizes.items():
+            assert specs[name].length == expected, (
+                f"FileSpec for {name!r} reported length {specs[name].length}, "
+                f"expected {expected}. The pre-fix bug would have reported "
+                f"the directory's stat().st_size here, identical across all "
+                f"three files."
+            )
+
+        # Strongest pin: the three lengths must be the file sizes
+        # we actually wrote, not all-equal-to-the-directory-size.
+        observed_lengths = {s.length for s in specs.values()}
+        assert observed_lengths == set(sizes.values()), (
+            f"All filespecs got the same length {observed_lengths} — "
+            f"this is the closure-shadowing bug. Each file's length "
+            f"must reflect its own stat().st_size."
+        )
+
+    def test_nested_directory_walk_reports_per_file_length(self, tmp_path):
+        """Recursive walk also reports per-file lengths.
+
+        ``create_filespecs`` uses ``rglob("*")``; a regression that
+        re-introduced the closure shadowing would emit the same wrong
+        length whether the file lived directly under ``path`` or in
+        a nested subdir. Test both layouts in one walk.
+        """
+        (tmp_path / "top.txt").write_bytes(b"a" * 7)
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "nested.txt").write_bytes(b"b" * 77)
+        (sub / "deep").mkdir()
+        (sub / "deep" / "deepfile.txt").write_bytes(b"c" * 777)
+
+        specs = {Path(s.url).name: s for s in FileSpec.create_filespecs(tmp_path, "deep")}
+        assert specs["top.txt"].length == 7
+        assert specs["nested.txt"].length == 77
+        assert specs["deepfile.txt"].length == 777
