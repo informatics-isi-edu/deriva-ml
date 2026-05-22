@@ -9,7 +9,7 @@ This module defines helper classes for asset operations including:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any, Literal, TYPE_CHECKING
 
 from hydra_zen import hydrated_dataclass
 from pydantic import BaseModel, model_validator
@@ -159,7 +159,14 @@ class AssetSpec(BaseModel):
 
     Attributes:
         rid: Resource Identifier of the asset.
-        asset_role: Role of the asset ("Input" or "Output"). Defaults to "Input".
+        asset_role: Role of the asset (``"Input"`` or ``"Output"``).
+            Defaults to ``"Input"``. ``Literal``-typed so a typo
+            (``"Imput"``) or case mismatch (``"input"``) is
+            rejected by Pydantic validation rather than silently
+            flowing through to the catalog as a free-form string
+            and either no-op'ing or failing on FK lookup. The two
+            values match the ``Asset_Role`` controlled-vocabulary
+            terms seeded by ``initialize_ml_schema``.
         cache: If True, cache the downloaded asset by MD5 checksum in the
             DerivaML cache directory. Cached assets are reused across executions
             when the checksum matches, avoiding repeated downloads of large files.
@@ -167,10 +174,11 @@ class AssetSpec(BaseModel):
     Example:
         >>> spec = AssetSpec(rid="3JSE")
         >>> spec = AssetSpec(rid="3JSE", cache=True)  # enable caching
+        >>> spec = AssetSpec(rid="3JSE", asset_role="Output")  # mark as output
     """
 
     rid: RID
-    asset_role: str = "Input"
+    asset_role: Literal["Input", "Output"] = "Input"
     cache: bool = False
 
     model_config = VALIDATION_CONFIG
@@ -215,5 +223,5 @@ class AssetSpecConfig:
     """
 
     rid: str
-    asset_role: str = "Input"
+    asset_role: Literal["Input", "Output"] = "Input"
     cache: bool = False

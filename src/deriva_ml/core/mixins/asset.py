@@ -447,6 +447,6 @@ class AssetMixin:
             >>> record = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")  # doctest: +SKIP
             >>> path = exe.asset_file_path("Image", "scan.jpg", metadata=record)  # doctest: +SKIP
         """
-        from deriva_ml.asset.asset_record import _asset_record_class
+        from deriva_ml.asset.asset_record import asset_record_class
 
-        return _asset_record_class(self.model, asset_table_name)
+        return asset_record_class(self.model, asset_table_name)
