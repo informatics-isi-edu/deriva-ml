@@ -44,6 +44,17 @@ class LocalizeResult(BaseModel):
         errors: List of error messages for failed assets.
         localized_assets: List of (RID, old_url, new_url) tuples for
             successfully localized assets.
+        source_hostnames: Set of hostnames the localized assets were
+            moved *from*. Populated per-asset as each localization
+            succeeds. Used by ``_record_localize_provenance`` to
+            decide what to write to the ``asset_source_hostname``
+            field: a single hostname when the slice was uniform-
+            sourced, or ``None`` (plus a log warning) when the
+            slice was mixed-source. Pre-fix, the provenance
+            annotation always carried the caller's
+            ``source_hostname`` parameter — which only describes
+            the fallback hostname for relative URLs, not the
+            actual source of each asset.
     """
 
     model_config = VALIDATION_CONFIG
@@ -53,6 +64,7 @@ class LocalizeResult(BaseModel):
     assets_failed: int = 0
     errors: list[str] = Field(default_factory=list)
     localized_assets: list[tuple[str, str, str]] = Field(default_factory=list)
+    source_hostnames: set[str] = Field(default_factory=set)
 
 
 def localize_assets(
@@ -359,6 +371,13 @@ def localize_assets(
                 logger.info("Localized asset %s: %s -> %s", rid, current_url, new_url)
                 result.assets_processed += 1
                 result.localized_assets.append((rid, current_url, new_url))
+                # Record the per-asset source for the provenance
+                # annotation. We aggregate into a set rather than
+                # writing the caller's ``source_hostname`` parameter
+                # (which is only the fallback for relative URLs)
+                # so a mixed-source slice is observable downstream.
+                if asset_src_host:
+                    result.source_hostnames.add(asset_src_host)
 
                 # Clean up scratch file
                 if local_file.exists():
@@ -396,10 +415,35 @@ def localize_assets(
     # clone_via_bag step wrote phase-1 provenance; we mutate it
     # rather than replace.
     if not dry_run:
+        # Resolve the source hostname based on what the per-asset
+        # walk actually observed, not the caller's
+        # ``source_hostname`` parameter (which is only the fallback
+        # used when the asset URL is relative). A uniform-sourced
+        # slice writes the single hostname; a mixed-source slice
+        # writes ``None`` + emits a warning so the annotation
+        # doesn't lie about which hostname the assets came from.
+        if len(result.source_hostnames) == 1:
+            resolved_source_hostname: str | None = next(iter(result.source_hostnames))
+        elif len(result.source_hostnames) > 1:
+            logger.warning(
+                "Mixed-source slice: assets came from %d distinct "
+                "hostnames %s; provenance annotation will record "
+                "asset_source_hostname=None.",
+                len(result.source_hostnames),
+                sorted(result.source_hostnames),
+            )
+            resolved_source_hostname = None
+        else:
+            # No assets actually localized (everything was
+            # skipped or failed). Fall back to the caller's
+            # ``source_hostname`` parameter so the annotation
+            # still carries useful context.
+            resolved_source_hostname = source_hostname
+
         _record_localize_provenance(
             ermrest_catalog,
             result=result,
-            asset_source_hostname=source_hostname,
+            asset_source_hostname=resolved_source_hostname,
         )
 
     return result
