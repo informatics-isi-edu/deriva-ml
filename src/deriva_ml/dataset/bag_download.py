@@ -386,6 +386,243 @@ def create_dataset_minid(
             return zip_path.as_uri()
 
 
+def _resolve_version_record(dataset: "Dataset", version: DatasetVersion) -> Any:
+    """Look up the ``DatasetHistory`` row for ``version`` on ``dataset``.
+
+    Args:
+        dataset: The dataset whose history to walk.
+        version: The version to find.
+
+    Returns:
+        The ``DatasetHistory`` record carrying ``snapshot``, ``minid``,
+        and ``spec_hash`` for the version.
+
+    Raises:
+        DerivaMLException: If no history record matches ``version``.
+    """
+    version_str = str(version)
+    try:
+        return next(v for v in dataset.dataset_history() if str(v.dataset_version) == version_str)
+    except StopIteration:
+        raise DerivaMLException(
+            f"Version {version_str} does not exist for RID {dataset.dataset_rid}"
+        ) from None
+
+
+def _build_version_rid(dataset_rid: str, snapshot: str | None) -> str:
+    """Format a version RID, omitting the ``@snap`` suffix when no snapshot.
+
+    The ``DatasetMinid.RID`` pattern accepts both ``{rid}`` and
+    ``{rid}@{snap}``; a literal ``{rid}@None`` from an f-string
+    fails the pattern validator with a cryptic regex error.
+    Centralised here because Tier 1 and Tier 3 both needed the
+    guard pre-extraction.
+
+    Args:
+        dataset_rid: The dataset's RID.
+        snapshot: Optional snapshot identifier; ``None`` is a
+            legitimate value for in-progress datasets that have
+            not yet been snapshotted.
+
+    Returns:
+        Either ``"{rid}"`` (when snapshot is ``None``) or
+        ``"{rid}@{snapshot}"``.
+
+    Example:
+        >>> _build_version_rid("3WX", "2026-05-22T12:00:00")
+        '3WX@2026-05-22T12:00:00'
+        >>> _build_version_rid("3WX", None)
+        '3WX'
+    """
+    if snapshot is None:
+        return dataset_rid
+    return f"{dataset_rid}@{snapshot}"
+
+
+def _tier1_local_cache_lookup(
+    dataset: "Dataset",
+    version: DatasetVersion,
+    cache_suffix: str,
+    snapshot: str | None,
+) -> DatasetMinid | None:
+    """Check the local ``BagCacheIndex`` for a bag matching ``cache_suffix``.
+
+    Returns the resolved :class:`DatasetMinid` on a hit, ``None``
+    on a miss. The miss path is silent — callers fall through to
+    Tier 2 or Tier 3.
+
+    Args:
+        dataset: The dataset whose cache to consult.
+        version: The version being downloaded; copied into the
+            returned :class:`DatasetMinid`.
+        cache_suffix: ``{spec_hash[:16]}_{snapshot}`` — must match
+            both the schema-derived spec hash and the data
+            snapshot to count as a hit.
+        snapshot: Same snapshot threaded through to
+            :func:`_build_version_rid`.
+
+    Returns:
+        :class:`DatasetMinid` pointing at the cached bag, or
+        ``None`` when no matching bag is on disk.
+    """
+    from deriva.bag.cache_index import BagCacheIndex
+
+    index = BagCacheIndex(dataset._ml_instance.cache_dir)
+    try:
+        cached_checksums = index.find_bags_for_rid(table="Dataset", rid=dataset.dataset_rid)
+    finally:
+        index.dispose()
+
+    if cache_suffix not in cached_checksums:
+        return None
+
+    # Re-open the index in a short scope to compute the bag path.
+    cached_bag_path = (
+        BagCacheIndex(dataset._ml_instance.cache_dir).bag_dir_for(cache_suffix)
+        / f"Dataset_{dataset.dataset_rid}"
+    )
+    if not cached_bag_path.exists():
+        return None
+
+    dataset._logger.info(
+        "Local cache hit for %s version %s (spec+snapshot match: %s)",
+        dataset.dataset_rid,
+        version,
+        cache_suffix,
+    )
+    return DatasetMinid(
+        dataset_version=version,
+        RID=_build_version_rid(dataset.dataset_rid, snapshot),
+        location=cached_bag_path.parent.as_uri(),
+        checksums=[{"function": "sha256", "value": cache_suffix}],
+    )
+
+
+def _tier2_minid_path(
+    dataset: "Dataset",
+    version: DatasetVersion,
+    version_record: Any,
+    spec: Any,
+    spec_hash: str,
+    minid_url: str | None,
+    create: bool,
+    exclude_tables: set[str] | None,
+    timeout: tuple[int, int] | None,
+) -> DatasetMinid:
+    """Tier 2 — fetch existing MINID or regenerate when spec drifted.
+
+    Args:
+        dataset: The dataset to resolve a bag for.
+        version: The version being downloaded.
+        version_record: The :class:`DatasetHistory` record from
+            :func:`_resolve_version_record`.
+        spec: Current download spec — passed to
+            :func:`create_dataset_minid` if we need to regenerate.
+        spec_hash: SHA-256 of ``spec``; compared against the
+            stored ``Minid_Spec_Hash`` to detect schema drift.
+        minid_url: Previously-registered MINID URL (if any).
+        create: When ``False`` and no MINID is registered, raise
+            instead of regenerating.
+        exclude_tables: Threaded into bag regeneration.
+        timeout: Threaded into bag regeneration.
+
+    Returns:
+        :class:`DatasetMinid` pointing at the MINID metadata URL.
+
+    Raises:
+        DerivaMLException: When ``create=False`` and no
+            MINID is registered (or spec drift would require
+            regeneration).
+    """
+    if minid_url and version_record.spec_hash == spec_hash:
+        # S3 bag is current — download it (populates local cache for Tier 1).
+        return fetch_minid_metadata(dataset, version, minid_url)
+
+    # No MINID, or spec has changed — need to regenerate.
+    if not create:
+        raise DerivaMLException(f"Minid for dataset {dataset.dataset_rid} doesn't exist")
+    if minid_url:
+        dataset._logger.info(
+            "Spec hash changed for dataset %s version %s — regenerating MINID bag.",
+            dataset.dataset_rid,
+            version,
+        )
+    else:
+        dataset._logger.info("Creating new MINID for dataset %s", dataset.dataset_rid)
+    new_minid_url = create_dataset_minid(
+        dataset,
+        version,
+        use_minid=True,
+        exclude_tables=exclude_tables,
+        spec=spec,
+        spec_hash=spec_hash,
+        timeout=timeout,
+    )
+    return fetch_minid_metadata(dataset, version, new_minid_url)
+
+
+def _tier3_client_path(
+    dataset: "Dataset",
+    version: DatasetVersion,
+    spec: Any,
+    spec_hash: str,
+    snapshot: str | None,
+    minid_url: str | None,
+    create: bool,
+    cache_suffix: str,
+    exclude_tables: set[str] | None,
+    timeout: tuple[int, int] | None,
+) -> DatasetMinid:
+    """Tier 3 — generate the bag client-side under the deterministic cache key.
+
+    Args:
+        dataset: The dataset to resolve a bag for.
+        version: The version being downloaded.
+        spec: Current download spec.
+        spec_hash: SHA-256 of ``spec``; embedded in the returned
+            checksum so Tier 1 finds the bag next time.
+        snapshot: Threaded through to :func:`_build_version_rid`.
+        minid_url: Existing MINID URL (if any) — only consulted
+            for the ``create=False`` guard.
+        create: When ``False`` and no MINID is registered, raise.
+        cache_suffix: ``{spec_hash[:16]}_{snapshot}`` — used as
+            both the bag's storage suffix and the returned
+            checksum.
+        exclude_tables: Threaded into bag generation.
+        timeout: Threaded into bag generation.
+
+    Returns:
+        :class:`DatasetMinid` pointing at the generated bag URL.
+
+    Raises:
+        DerivaMLException: When ``create=False`` and no existing
+            MINID URL is registered.
+    """
+    if not create and not minid_url:
+        raise DerivaMLException(f"Minid for dataset {dataset.dataset_rid} doesn't exist")
+
+    dataset._logger.info(
+        "Cache miss for %s version %s — generating bag client-side",
+        dataset.dataset_rid,
+        version,
+    )
+    bag_url = create_dataset_minid(
+        dataset,
+        version,
+        use_minid=False,
+        exclude_tables=exclude_tables,
+        spec=spec,
+        spec_hash=spec_hash,
+        timeout=timeout,
+    )
+    return DatasetMinid(
+        dataset_version=version,
+        RID=_build_version_rid(dataset.dataset_rid, snapshot),
+        location=bag_url,
+        checksums=[{"function": "sha256", "value": cache_suffix}],
+    )
+
+
 def get_dataset_minid(
     dataset: "Dataset",
     version: DatasetVersion,
@@ -448,29 +685,19 @@ def get_dataset_minid(
         DerivaMLException: If the version doesn't exist, or if
             ``create=False`` and no cached/registered bag is available.
     """
-    # ----- Resolve version record -----------------------------------------
-    version_str = str(version)
-    history = dataset.dataset_history()
-    try:
-        version_record = next(v for v in history if str(v.dataset_version) == version_str)
-    except StopIteration:
-        raise DerivaMLException(f"Version {version_str} does not exist for RID {dataset.dataset_rid}")
+    # Post Ds-minid extraction this function is the three-tier
+    # dispatcher; the per-tier work lives in
+    # ``_tier{1,2,3}_*`` helpers and the shared
+    # ``_build_version_rid`` collapses the snapshot-vs-None guard
+    # that used to be duplicated across Tier 1 and Tier 3.
 
+    # 1. Resolve the version record (raises on miss).
+    version_record = _resolve_version_record(dataset, version)
     snapshot = version_record.snapshot
     minid_url = version_record.minid
 
-    # =====================================================================
-    # Compute spec_hash upfront (required for all tiers).
-    #
-    # The download spec defines which FK paths and tables are included in
-    # the bag. If the schema changes (new tables, new FKs), the spec_hash
-    # changes even for the same snapshot. We MUST include the spec_hash in
-    # the cache key to avoid returning stale bags that are missing tables
-    # added after the cached bag was created.
-    #
-    # Cost: one schema introspection query (no data queries). This is
-    # cheap and necessary for correctness.
-    # =====================================================================
+    # 2. Compute spec_hash upfront (required for all tiers).
+    # Cost: one schema introspection query (no data queries).
     version_snapshot_catalog = dataset._version_snapshot_catalog(version)
     downloader = DatasetBagBuilder(
         ml_instance=version_snapshot_catalog,
@@ -480,128 +707,37 @@ def get_dataset_minid(
     )
     spec = downloader.generate_dataset_download_spec(dataset)
     spec_hash = _hash_spec(spec)
-
-    # The deterministic cache key: {spec_hash[:16]}_{snapshot}
-    # - spec_hash[:16] captures the FK traversal plan (schema-dependent)
-    # - snapshot captures the catalog data state (immutable point-in-time)
-    # Together they uniquely identify the bag contents.
     cache_suffix = f"{spec_hash[:16]}_{snapshot}"
 
-    # =====================================================================
-    # Tier 1: Local deterministic cache (index lookup, no network).
-    #
-    # Look for a cached bag with BOTH the same spec_hash and snapshot.
-    # A snapshot-only match would return stale bags created before schema
-    # changes (e.g., new tables added to the FK traversal).
-    #
-    # Post-cutover layout (docs/design/bag-client-cutover-2026-05.md):
-    # bags are recorded in ``BagCacheIndex`` (SQLite reverse index) and
-    # stored at ``{cache_dir}/bags/{checksum}/Dataset_{rid}/``.
-    # =====================================================================
-    from deriva.bag.cache_index import BagCacheIndex
+    # 3. Tier 1 — local deterministic cache.
+    cached = _tier1_local_cache_lookup(dataset, version, cache_suffix, snapshot)
+    if cached is not None:
+        return cached
 
-    index = BagCacheIndex(dataset._ml_instance.cache_dir)
-    try:
-        cached_checksums = index.find_bags_for_rid(table="Dataset", rid=dataset.dataset_rid)
-    finally:
-        index.dispose()
-
-    if cache_suffix in cached_checksums:
-        # Re-open the index in a short scope to compute the bag path.
-        cached_bag_path = (
-            BagCacheIndex(dataset._ml_instance.cache_dir).bag_dir_for(cache_suffix)
-            / f"Dataset_{dataset.dataset_rid}"
-        )
-        if cached_bag_path.exists():
-            dataset._logger.info(
-                "Local cache hit for %s version %s (spec+snapshot match: %s)",
-                dataset.dataset_rid,
-                version,
-                cache_suffix,
-            )
-            # ``DatasetVersion.snapshot`` is ``str | None`` — a
-            # version without an associated snapshot is legitimate
-            # (e.g. an in-progress dataset that hasn't been
-            # snapshotted yet). The ``DatasetMinid.RID`` pattern
-            # accepts both ``{rid}`` and ``{rid}@{snap}``; only
-            # append the snapshot segment when there's a real
-            # snapshot to point at. Without this guard the
-            # f-string produces ``{rid}@None`` which fails the
-            # pattern validator with a cryptic regex error.
-            version_rid = f"{dataset.dataset_rid}@{snapshot}" if snapshot is not None else dataset.dataset_rid
-            return DatasetMinid(
-                dataset_version=version,
-                RID=version_rid,
-                location=cached_bag_path.parent.as_uri(),
-                checksums=[{"function": "sha256", "value": cache_suffix}],
-            )
-
-    # =====================================================================
-    # Tier 2: MINID / S3 download (use_minid=True only).
-    #
-    # Compare spec_hash to the stored Minid_Spec_Hash. If they match,
-    # the S3 bag is still current. If not, regenerate.
-    # =====================================================================
+    # 4. Tier 2 or Tier 3 dispatch on ``use_minid``.
     if use_minid:
-        if minid_url and version_record.spec_hash == spec_hash:
-            # S3 bag is current — download it (populates local cache for Tier 1).
-            return fetch_minid_metadata(dataset, version, minid_url)
-
-        # No MINID, or spec has changed — need to regenerate.
-        if not create:
-            raise DerivaMLException(f"Minid for dataset {dataset.dataset_rid} doesn't exist")
-        if minid_url:
-            dataset._logger.info(
-                "Spec hash changed for dataset %s version %s — regenerating MINID bag.",
-                dataset.dataset_rid,
-                version,
-            )
-        else:
-            dataset._logger.info("Creating new MINID for dataset %s", dataset.dataset_rid)
-        minid_url = create_dataset_minid(
+        return _tier2_minid_path(
             dataset,
             version,
-            use_minid=True,
-            exclude_tables=exclude_tables,
-            spec=spec,
-            spec_hash=spec_hash,
-            timeout=timeout,
+            version_record,
+            spec,
+            spec_hash,
+            minid_url,
+            create,
+            exclude_tables,
+            timeout,
         )
-        return fetch_minid_metadata(dataset, version, minid_url)
-
-    # =====================================================================
-    # Tier 3: Client-side bag generation (use_minid=False).
-    #
-    # Build the bag locally. Store under the deterministic cache key
-    # {rid}_{spec_hash[:16]}_{snapshot} so Tier 1 finds it next time.
-    # =====================================================================
-    if not create and not minid_url:
-        raise DerivaMLException(f"Minid for dataset {dataset.dataset_rid} doesn't exist")
-
-    dataset._logger.info(
-        "Cache miss for %s version %s — generating bag client-side",
-        dataset.dataset_rid,
-        version,
-    )
-    minid_url = create_dataset_minid(
+    return _tier3_client_path(
         dataset,
         version,
-        use_minid=False,
-        exclude_tables=exclude_tables,
-        spec=spec,
-        spec_hash=spec_hash,
-        timeout=timeout,
-    )
-    # See the cache-hit branch above for why this guard is
-    # needed — ``snapshot`` is ``str | None`` and the
-    # ``DatasetMinid.RID`` pattern requires either ``{rid}`` or
-    # ``{rid}@{snap}``, not ``{rid}@None``.
-    version_rid = f"{dataset.dataset_rid}@{snapshot}" if snapshot is not None else dataset.dataset_rid
-    return DatasetMinid(
-        dataset_version=version,
-        RID=version_rid,
-        location=minid_url,
-        checksums=[{"function": "sha256", "value": cache_suffix}],
+        spec,
+        spec_hash,
+        snapshot,
+        minid_url,
+        create,
+        cache_suffix,
+        exclude_tables,
+        timeout,
     )
 
 
