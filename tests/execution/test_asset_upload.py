@@ -1,4 +1,4 @@
-"""Unit tests for ``deriva_ml.execution.asset_upload`` (audit P1 Ex-god first + second sweeps).
+"""Unit tests for ``deriva_ml.execution.asset_upload`` (audit P1 Ex-god 1st/2nd/3rd sweeps).
 
 Pre-extraction these helpers lived on ``Execution`` as
 methods. Each could only be exercised by spinning up a real
@@ -19,9 +19,16 @@ Coverage layers:
    missing dir.
 5. ``clean_folder_contents`` — pure filesystem op with
    bounded retry.
-6. ``update_asset_execution_table`` (second sweep) — per-role
-   dispatch (Input vs Output), dry-run skip, Asset_Role
-   vocab lookup.
+6. ``update_asset_execution_table`` — per-role dispatch
+   (Input vs Output), dry-run skip, Asset_Role vocab lookup.
+7. ``asset_file_path`` — manifest registration, asset-type
+   JSONL writeback, empty-list-types preservation, metadata
+   normalization.
+8. ``metrics_file`` — thin sugar over ``asset_file_path``.
+9. ``upload_execution_outputs`` — state-machine bracketing
+   for dry-run, Running auto-stop, Uploaded short-circuit,
+   Stopped → Pending_Upload → Uploaded happy path,
+   Pending_Upload → Failed on exception.
 
 Pure-Python tests; no live catalog required.
 """
@@ -32,12 +39,17 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from deriva_ml.execution.asset_upload import (
+    asset_file_path,
     clean_folder_contents,
     get_metadata_description,
+    metrics_file,
     save_runtime_environment,
     set_asset_descriptions,
     update_asset_execution_table,
+    upload_execution_outputs,
     upload_hydra_config_assets,
 )
 
@@ -617,3 +629,415 @@ class TestUpdateAssetExecutionTable:
         )
 
         exe._ml_object.lookup_term.assert_called_once_with("My_Custom_Vocab", "Input")
+
+
+# ---------------------------------------------------------------------------
+# asset_file_path — third sweep
+# ---------------------------------------------------------------------------
+
+
+class TestAssetFilePath:
+    """Pin the asset-staging contract for the third sweep extraction."""
+
+    def _build_execution(self, tmp_path: Path):
+        """Build an ``Execution`` mock with the minimum surface the helper reads."""
+        exe = MagicMock()
+        exe._working_dir = str(tmp_path)
+        exe.execution_rid = "EX-1"
+
+        # Model: ``Image`` is the only asset table.
+        def is_asset(name):
+            return name in ("Image", "Execution_Metadata")
+
+        def name_to_table(name):
+            t = MagicMock()
+            t.name = name
+            t.schema.name = "deriva-ml"
+            return t
+
+        exe._model.is_asset.side_effect = is_asset
+        exe._model.name_to_table.side_effect = name_to_table
+
+        # Manifest mock: ``add_asset`` records the call.
+        manifest = MagicMock()
+        exe._get_manifest.return_value = manifest
+
+        return exe, manifest
+
+    def _flat_dir_fn(self, tmp_path: Path):
+        """Build a ``flat_asset_dir`` stand-in that mkdirs and returns a path."""
+        def _fn(working_dir, exec_rid, asset_name):
+            p = Path(working_dir) / "flat" / exec_rid / asset_name
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+
+        return _fn
+
+    def _type_path_fn(self, tmp_path: Path):
+        """Build an ``asset_type_path`` stand-in that returns a writable JSONL path."""
+        def _fn(working_dir, exec_rid, asset_table):
+            p = Path(working_dir) / "type-jsonl" / exec_rid
+            p.mkdir(parents=True, exist_ok=True)
+            return p / f"{asset_table.name}.jsonl"
+
+        return _fn
+
+    def test_rejects_non_asset_table(self, tmp_path):
+        """Non-asset table → ``DerivaMLException``."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        exe, _ = self._build_execution(tmp_path)
+        exe._model.is_asset.side_effect = lambda name: False
+
+        with pytest.raises(DerivaMLException, match="not an asset"):
+            asset_file_path(
+                exe,
+                "Subject",
+                "subj.csv",
+                asset_type_vocab_term="Asset_Type",
+                flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+                asset_type_path_fn=self._type_path_fn(tmp_path),
+            )
+
+    def test_defaults_asset_types_to_asset_name(self, tmp_path):
+        """``asset_types=None`` defaults to ``[asset_name]`` (with vocab lookup)."""
+        exe, manifest = self._build_execution(tmp_path)
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+        )
+
+        # Vocab lookup happened with the default.
+        exe._ml_object.lookup_term.assert_called_once_with("Asset_Type", "Image")
+
+    def test_empty_list_asset_types_preserved(self, tmp_path):
+        """Explicit ``asset_types=[]`` is honored — no fallback to asset_name.
+
+        Pre-fix the inline ``or`` chain collapsed an empty list
+        to ``asset_name`` and then ``lookup_term`` would fail on
+        the table name (audit P1 ``asset_file_path`` falsy bug).
+        Pin the ``is None`` semantic against future regressions.
+        """
+        exe, _ = self._build_execution(tmp_path)
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_types=[],
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+        )
+
+        # No vocab lookup — empty list is honored.
+        exe._ml_object.lookup_term.assert_not_called()
+
+    def test_legacy_asset_type_kwarg_fallback(self, tmp_path):
+        """``legacy_kwargs={"Asset_Type": "X"}`` is used when ``asset_types`` is None."""
+        exe, _ = self._build_execution(tmp_path)
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+            legacy_kwargs={"Asset_Type": "Training_Data"},
+        )
+
+        exe._ml_object.lookup_term.assert_called_once_with("Asset_Type", "Training_Data")
+
+    def test_registers_in_manifest_with_correct_key(self, tmp_path):
+        """Manifest is keyed as ``{asset_name}/{target_name}``."""
+        exe, manifest = self._build_execution(tmp_path)
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+        )
+
+        assert manifest.add_asset.call_count == 1
+        manifest_key = manifest.add_asset.call_args.args[0]
+        assert manifest_key == "Image/photo.jpg"
+
+    def test_writes_asset_type_jsonl(self, tmp_path):
+        """The asset-type JSONL file gets a line per call (legacy upload contract)."""
+        exe, _ = self._build_execution(tmp_path)
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_types=["Training_Data"],
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+        )
+
+        jsonl = tmp_path / "type-jsonl" / "EX-1" / "Image.jsonl"
+        assert jsonl.exists()
+        line = jsonl.read_text().strip()
+        # The JSONL maps target-filename to asset_types list.
+        parsed = json.loads(line)
+        assert parsed == {"photo.jpg": ["Training_Data"]}
+
+    def test_metadata_dict_passed_through(self, tmp_path):
+        """``metadata`` dict is merged with ``legacy_kwargs`` and stored."""
+        exe, manifest = self._build_execution(tmp_path)
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+            metadata={"Subject": "2-DEF"},
+            legacy_kwargs={"Acquisition_Date": "2026-01-15"},
+        )
+
+        # The AssetEntry passed to manifest.add_asset has both keys.
+        entry = manifest.add_asset.call_args.args[1]
+        assert entry.metadata == {
+            "Subject": "2-DEF",
+            "Acquisition_Date": "2026-01-15",
+        }
+
+    def test_asset_record_model_dump_normalized(self, tmp_path):
+        """A Pydantic AssetRecord's ``model_dump()`` is used, ``None`` values stripped."""
+        exe, manifest = self._build_execution(tmp_path)
+
+        record = MagicMock()
+        record.model_dump.return_value = {
+            "Subject": "2-DEF",
+            "Acquisition_Date": None,  # stripped
+        }
+
+        asset_file_path(
+            exe,
+            "Image",
+            "photo.jpg",
+            asset_type_vocab_term="Asset_Type",
+            flat_asset_dir_fn=self._flat_dir_fn(tmp_path),
+            asset_type_path_fn=self._type_path_fn(tmp_path),
+            metadata=record,
+        )
+
+        entry = manifest.add_asset.call_args.args[1]
+        assert entry.metadata == {"Subject": "2-DEF"}
+
+
+# ---------------------------------------------------------------------------
+# metrics_file — thin sugar over asset_file_path
+# ---------------------------------------------------------------------------
+
+
+class TestMetricsFile:
+    def test_delegates_with_correct_asset_type(self):
+        """``metrics_file(filename)`` calls
+        ``execution.asset_file_path(execution_metadata, filename,
+        asset_types=metrics_file_tag)``."""
+        exe = MagicMock()
+        exe.asset_file_path.return_value = "<AssetFilePath>"
+
+        result = metrics_file(
+            exe,
+            "metrics.jsonl",
+            execution_metadata_asset_name="Execution_Metadata",
+            metrics_file_asset_type="Metrics_File",
+        )
+
+        assert result == "<AssetFilePath>"
+        exe.asset_file_path.assert_called_once_with(
+            "Execution_Metadata",
+            "metrics.jsonl",
+            asset_types="Metrics_File",
+        )
+
+
+# ---------------------------------------------------------------------------
+# upload_execution_outputs — state-machine bracketing
+# ---------------------------------------------------------------------------
+
+
+class TestUploadExecutionOutputs:
+    """Pin the state-machine transitions around the upload work."""
+
+    def _build_execution(
+        self,
+        *,
+        status,
+        dry_run: bool = False,
+        pending: dict | None = None,
+    ):
+        """Build an ``Execution`` mock for the upload orchestrator."""
+        exe = MagicMock()
+        exe._dry_run = dry_run
+        exe.execution_rid = "EX-1"
+        exe.status = status
+
+        manifest = MagicMock()
+        manifest.pending_assets.return_value = pending if pending is not None else {"K": "v"}
+        exe._get_manifest.return_value = manifest
+
+        exe._bag_commit_upload.return_value = {"schema/Image": []}
+        return exe
+
+    def _statuses(self):
+        """Use sentinel enum-like objects so ``is`` comparisons work."""
+        class _StatusSentinel:
+            def __init__(self, name):
+                self.name = name
+
+            def __repr__(self):
+                return f"<Status.{self.name}>"
+
+        return {
+            "Running": _StatusSentinel("Running"),
+            "Stopped": _StatusSentinel("Stopped"),
+            "Pending_Upload": _StatusSentinel("Pending_Upload"),
+            "Uploaded": _StatusSentinel("Uploaded"),
+            "Failed": _StatusSentinel("Failed"),
+        }
+
+    def test_dry_run_returns_empty(self):
+        """Dry-run executions short-circuit to ``{}``."""
+        s = self._statuses()
+        exe = self._build_execution(status=s["Stopped"], dry_run=True)
+
+        result = upload_execution_outputs(
+            exe,
+            pending_upload_status=s["Pending_Upload"],
+            uploaded_status=s["Uploaded"],
+            failed_status=s["Failed"],
+            running_status=s["Running"],
+            stopped_status=s["Stopped"],
+            format_duration_fn=lambda a, b: "0s",
+        )
+        assert result == {}
+        # No state transitions, no bag-commit calls.
+        exe._bag_commit_upload.assert_not_called()
+        exe.update_status.assert_not_called()
+
+    def test_uploaded_short_circuit_when_no_pending(self):
+        """``status=Uploaded`` + no pending → return ``uploaded_assets``, no transition."""
+        s = self._statuses()
+        exe = self._build_execution(status=s["Uploaded"], pending={})
+        exe.uploaded_assets = {"schema/Image": []}
+
+        result = upload_execution_outputs(
+            exe,
+            pending_upload_status=s["Pending_Upload"],
+            uploaded_status=s["Uploaded"],
+            failed_status=s["Failed"],
+            running_status=s["Running"],
+            stopped_status=s["Stopped"],
+            format_duration_fn=lambda a, b: "0s",
+        )
+        assert result == {"schema/Image": []}
+        exe._bag_commit_upload.assert_not_called()
+        exe.update_status.assert_not_called()
+
+    def test_running_auto_stops(self):
+        """``status=Running`` → auto-call ``execution_stop()`` before upload."""
+        s = self._statuses()
+        # After execution_stop, status transitions to Stopped (and then
+        # Pending_Upload, then Uploaded). We simulate by toggling the
+        # status attribute via a side_effect on execution_stop.
+        exe = self._build_execution(status=s["Running"])
+
+        def _stop_fn():
+            exe.status = s["Stopped"]
+
+        exe.execution_stop.side_effect = _stop_fn
+
+        # After update_status(Pending_Upload), status becomes Pending_Upload.
+        # After the successful upload, the helper transitions to Uploaded.
+        update_calls = []
+
+        def _update_fn(target, **kwargs):
+            update_calls.append(target)
+            exe.status = target
+
+        exe.update_status.side_effect = _update_fn
+
+        upload_execution_outputs(
+            exe,
+            pending_upload_status=s["Pending_Upload"],
+            uploaded_status=s["Uploaded"],
+            failed_status=s["Failed"],
+            running_status=s["Running"],
+            stopped_status=s["Stopped"],
+            format_duration_fn=lambda a, b: "0s",
+        )
+
+        # execution_stop was called once.
+        assert exe.execution_stop.call_count == 1
+        # Status transitions: Pending_Upload, then Uploaded.
+        assert update_calls == [s["Pending_Upload"], s["Uploaded"]]
+
+    def test_failure_transitions_to_failed(self):
+        """``_bag_commit_upload`` raises → ``Pending_Upload → Failed``."""
+        s = self._statuses()
+        exe = self._build_execution(status=s["Stopped"])
+
+        exe._bag_commit_upload.side_effect = RuntimeError("bag-load failed")
+
+        update_calls = []
+
+        def _update_fn(target, **kwargs):
+            update_calls.append((target, kwargs))
+            exe.status = target
+
+        exe.update_status.side_effect = _update_fn
+
+        with pytest.raises(RuntimeError, match="bag-load failed"):
+            upload_execution_outputs(
+                exe,
+                pending_upload_status=s["Pending_Upload"],
+                uploaded_status=s["Uploaded"],
+                failed_status=s["Failed"],
+                running_status=s["Running"],
+                stopped_status=s["Stopped"],
+                format_duration_fn=lambda a, b: "0s",
+            )
+
+        # Status transitions: Pending_Upload (pre-upload bracket),
+        # then Failed (catch handler).
+        assert [c[0] for c in update_calls] == [s["Pending_Upload"], s["Failed"]]
+        # Failed transition carried an error= kwarg.
+        assert "error" in update_calls[1][1]
+
+    def test_happy_path_clean_folder_runs(self):
+        """Successful upload with ``clean_folder=True`` cleans the execution root."""
+        s = self._statuses()
+        exe = self._build_execution(status=s["Stopped"])
+
+        def _update_fn(target, **kwargs):
+            exe.status = target
+
+        exe.update_status.side_effect = _update_fn
+
+        upload_execution_outputs(
+            exe,
+            clean_folder=True,
+            pending_upload_status=s["Pending_Upload"],
+            uploaded_status=s["Uploaded"],
+            failed_status=s["Failed"],
+            running_status=s["Running"],
+            stopped_status=s["Stopped"],
+            format_duration_fn=lambda a, b: "0s",
+        )
+
+        exe._clean_folder_contents.assert_called_once_with(exe._execution_root)

@@ -34,24 +34,20 @@ import hashlib
 import json
 import logging
 import os
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, List
-
-from deriva.core import format_exception
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.execution.pending_summary import PendingSummary
     from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.local_db.manifest_store import ManifestStore
-from deriva.core.hatrac_store import HatracStore
 from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetFilePath
-from deriva_ml.asset.manifest import AssetEntry, AssetManifest
+from deriva_ml.asset.manifest import AssetManifest
 from deriva_ml.core.base import DerivaML
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import (
@@ -1438,83 +1434,18 @@ class Execution:
             ``AssetFilePath.file_name`` is the canonical access path — read from it
             rather than hand-constructing a path from the asset table or filename.
         """
+        from deriva_ml.execution.asset_upload import download_asset as _download_asset
 
-        asset_table = _asset_table if _asset_table is not None else self._ml_object.resolve_rid(asset_rid).table
-        if not self._model.is_asset(asset_table):
-            raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
-
-        asset_record = self._ml_object._retrieve_rid(asset_rid)
-        asset_metadata = {k: v for k, v in asset_record.items() if k in self._model.asset_metadata(asset_table)}
-        asset_url = asset_record["URL"]
-        asset_filename = dest_dir / asset_record["Filename"]
-        expected_md5 = asset_record.get("MD5")
-
-        # Check cache before downloading
-        cache_hit = False
-        if use_cache:
-            md5 = expected_md5
-            if md5:
-                asset_cache_dir = self._ml_object.cache_dir / "assets"
-                asset_cache_dir.mkdir(parents=True, exist_ok=True)
-                cache_key = f"{asset_rid}_{md5}"
-                cached_file = asset_cache_dir / cache_key / asset_record["Filename"]
-                if cached_file.exists():
-                    # Cache hit — symlink from cache to destination. The
-                    # cached file's bytes ARE the asset's expected bytes
-                    # by construction (cache_key includes md5), so reuse
-                    # ``expected_md5`` as the "about to be written" md5
-                    # in the overwrite check.
-                    _check_overwrite_safe(asset_filename, expected_md5, asset_rid)
-                    self._logger.info(f"Using cached asset {asset_rid} (MD5: {md5})")
-                    if asset_filename.exists() or asset_filename.is_symlink():
-                        asset_filename.unlink()
-                    asset_filename.symlink_to(cached_file)
-                    cache_hit = True
-
-        if not cache_hit:
-            _check_overwrite_safe(asset_filename, expected_md5, asset_rid)
-            hs = HatracStore("https", self._ml_object.host_name, self._ml_object.credential)
-            hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
-
-            # Store in cache for future use
-            if use_cache:
-                md5 = asset_record.get("MD5")
-                if md5:
-                    asset_cache_dir = self._ml_object.cache_dir / "assets"
-                    asset_cache_dir.mkdir(parents=True, exist_ok=True)
-                    cache_key = f"{asset_rid}_{md5}"
-                    cache_entry_dir = asset_cache_dir / cache_key
-                    cache_entry_dir.mkdir(parents=True, exist_ok=True)
-                    cached_file = cache_entry_dir / asset_record["Filename"]
-                    # Move file to cache, then symlink back
-                    shutil.move(str(asset_filename), str(cached_file))
-                    asset_filename.symlink_to(cached_file)
-                    self._logger.info(f"Cached asset {asset_rid} (MD5: {md5})")
-
-        asset_type_table, _col_l, _col_r = self._model.find_association(asset_table, MLVocab.asset_type)
-        type_path = self._ml_object.pathBuilder().schemas[asset_type_table.schema.name].tables[asset_type_table.name]
-        asset_types = [
-            asset_type[MLVocab.asset_type.value]
-            for asset_type in type_path.filter(type_path.columns[asset_table.name] == asset_rid)
-            .attributes(type_path.Asset_Type)
-            .fetch()
-        ]
-
-        asset_path = AssetFilePath(
-            file_name=asset_filename,
-            asset_rid=asset_rid,
-            asset_path=asset_filename,
-            asset_metadata=asset_metadata,
-            asset_table=asset_table.name,
-            asset_types=asset_types,
+        return _download_asset(
+            self,
+            asset_rid,
+            dest_dir,
+            update_catalog=update_catalog,
+            use_cache=use_cache,
+            _asset_table=_asset_table,
+            asset_type_vocab_term=MLVocab.asset_type,
+            check_overwrite_safe_fn=_check_overwrite_safe,
         )
-
-        if update_catalog:
-            self._update_asset_execution_table(
-                {f"{asset_table.schema.name}/{asset_table.name}": [asset_path]},
-                asset_role="Input",
-            )
-        return asset_path
 
     @validate_call(config=VALIDATION_CONFIG)
     def upload_execution_outputs(
@@ -1554,98 +1485,21 @@ class Execution:
             ...     path = exe.asset_file_path("Model", "model.pt")  # doctest: +SKIP
             >>> uploaded = exe.upload_execution_outputs()  # doctest: +SKIP
         """
-        if self._dry_run:
-            return {}
+        from deriva_ml.execution.asset_upload import (
+            upload_execution_outputs as _upload_execution_outputs,
+        )
 
-        # Use DerivaML instance setting if not explicitly provided
-        if clean_folder is None:
-            clean_folder = getattr(self._ml_object, "clean_execution_dir", True)
-
-        # Auto-stop a still-Running execution. Notebook code paths
-        # (``run_notebook`` + per-cell user code) and other imperative
-        # callers that don't use a ``with`` block reach this method with
-        # status=Running because no ``__exit__`` ever fired — by the time
-        # they're calling ``upload_execution_outputs()`` they're done with
-        # work and just haven't transitioned. Convert that final
-        # transition into a single call instead of forcing every notebook
-        # cell to know about ``execution_stop()``.
-        if self.status is ExecutionStatus.Running:
-            self.execution_stop()
-
-        # Additive upload path: the execution already finished a prior
-        # upload batch (status=Uploaded) and the caller has registered
-        # additional assets that need to ship. If there's nothing
-        # pending, treat the call as a no-op and return early — the
-        # state machine has no Uploaded → Uploaded edge, and we shouldn't
-        # cycle Uploaded → Pending_Upload → Uploaded just to do nothing.
-        # Typical caller: the runner harness in run_notebook.py
-        # registering the Hydra job log after the kernel's own upload
-        # completed. See state_machine.ALLOWED_TRANSITIONS for the
-        # documented Uploaded → Pending_Upload edge.
-        if self.status is ExecutionStatus.Uploaded:
-            manifest = self._get_manifest()
-            if not manifest.pending_assets():
-                # Short-circuit: no new work. Return the full
-                # manifest view of what's been uploaded for this
-                # execution (the ``uploaded_assets`` property reads
-                # the manifest). Pre-Phase-3 this returned the
-                # most-recent call's subset; the manifest view is
-                # more useful for the typical caller ("what assets
-                # did this execution produce so far?").
-                return self.uploaded_assets
-            self.update_status(ExecutionStatus.Pending_Upload)
-
-        # Transition to Pending_Upload BEFORE starting the upload work. This
-        # ensures that an exception during _bag_commit_upload can legally
-        # transition to Failed (Stopped → Failed is not a legal transition,
-        # but Pending_Upload → Failed is; see state_machine.ALLOWED_TRANSITIONS).
-        if self.status is ExecutionStatus.Stopped:
-            self.update_status(ExecutionStatus.Pending_Upload)
-
-        # Bracket the upload work with timestamps so Upload_Duration
-        # gets populated regardless of whether the call succeeds or
-        # raises. The write goes to SQLite *before* the terminal status
-        # transition so the state-machine PUT that follows carries the
-        # measurement to the catalog. See
-        # docs/bugs/2026-05-19-execution-phase-durations-design.md.
-        from datetime import timezone
-
-        _upload_start = datetime.now(timezone.utc)
-        try:
-            # ``_bag_commit_upload`` returns the per-call subset of
-            # uploaded assets (see ``report_to_asset_map``). External
-            # callers of ``upload_execution_outputs`` depend on this
-            # per-call shape; the ``uploaded_assets`` property is the
-            # full-manifest view.
-            uploaded = self._bag_commit_upload(
-                progress_callback=progress_callback,
-            )
-            self._set_asset_descriptions(uploaded)
-            # Record Upload_Duration just before the terminal transition
-            # so the catalog PUT for Pending_Upload → Uploaded carries
-            # the new value (state machine reads the full SQLite row
-            # via _catalog_body_for_execution).
-            self._ml_object.workspace.execution_state_store().update_execution(
-                self.execution_rid,
-                upload_duration=_format_duration(_upload_start, datetime.now(timezone.utc)),
-            )
-            # Successful end of upload: Pending_Upload → Uploaded.
-            if self.status is ExecutionStatus.Pending_Upload:
-                self.update_status(ExecutionStatus.Uploaded)
-            if clean_folder:
-                self._clean_folder_contents(self._execution_root)
-            return uploaded
-        except Exception as e:
-            # Capture partial upload duration before transitioning to
-            # Failed — same write-then-transition order so the failure
-            # PUT carries the partial measurement.
-            self._ml_object.workspace.execution_state_store().update_execution(
-                self.execution_rid,
-                upload_duration=_format_duration(_upload_start, datetime.now(timezone.utc)),
-            )
-            error = format_exception(e)
-            self.update_status(ExecutionStatus.Failed, error=error)
-            raise e
+        return _upload_execution_outputs(
+            self,
+            clean_folder=clean_folder,
+            progress_callback=progress_callback,
+            pending_upload_status=ExecutionStatus.Pending_Upload,
+            uploaded_status=ExecutionStatus.Uploaded,
+            failed_status=ExecutionStatus.Failed,
+            running_status=ExecutionStatus.Running,
+            stopped_status=ExecutionStatus.Stopped,
+            format_duration_fn=_format_duration,
+        )
 
     def _bag_commit_upload(
         self,
@@ -1740,6 +1594,11 @@ class Execution:
         (an AssetRecord or dict) or incrementally after via the returned
         AssetFilePath's ``metadata`` property.
 
+        Thin delegate to ``asset_upload.asset_file_path``;
+        see that helper for the per-mode logic and the
+        ``asset_types is None`` vs explicit-empty-list
+        normalization.
+
         Args:
             asset_name: Name of the asset table. Must be a valid asset table.
             file_name: Name of file to be uploaded, or path to an existing file.
@@ -1757,86 +1616,22 @@ class Execution:
             DerivaMLException: If the asset table doesn't exist.
             DerivaMLValidationError: If asset_types contains invalid terms.
         """
-        if not self._model.is_asset(asset_name):
-            raise DerivaMLException(f"Table {asset_name} is not an asset")
+        from deriva_ml.execution.asset_upload import asset_file_path as _asset_file_path
 
-        asset_table = self._model.name_to_table(asset_name)
-        schema = asset_table.schema.name
-
-        # Validate and normalize asset types. Use ``is None`` rather
-        # than ``or`` so an explicit ``asset_types=[]`` (the user
-        # saying "no content tags") is honored as-is — the previous
-        # ``or`` chain collapsed an empty list to ``asset_name`` and
-        # then ``lookup_term`` would fail on the table name. The
-        # legacy ``Asset_Type`` kwarg keeps its fallback role.
-        if asset_types is None:
-            asset_types = kwargs.pop("Asset_Type", None)
-            if asset_types is None:
-                asset_types = asset_name
-        asset_types = [asset_types] if isinstance(asset_types, str) else asset_types
-        for t in asset_types:
-            self._ml_object.lookup_term(MLVocab.asset_type, t)
-
-        # Resolve metadata from AssetRecord, dict, or kwargs
-        metadata_dict: dict[str, Any] = {}
-        if metadata is not None:
-            if hasattr(metadata, "model_dump"):
-                metadata_dict = {k: v for k, v in metadata.model_dump().items() if v is not None}
-            else:
-                metadata_dict = dict(metadata)
-        # Merge any kwargs that aren't standard parameters
-        metadata_dict.update(kwargs)
-
-        # Determine file name and path
-        file_name = Path(file_name)
-        if file_name.name == "_implementations.log":
-            file_name = file_name.with_name("-implementations.log")
-
-        if not file_name.is_absolute():
-            file_name = file_name.resolve()
-
-        target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
-
-        # Store file in flat per-table directory
-        flat_dir = flat_asset_dir(self._working_dir, self.execution_rid, asset_name)
-        flat_path = flat_dir / target_name.name
-
-        if file_name.exists():
-            if copy_file:
-                flat_path.write_bytes(file_name.read_bytes())
-            else:
-                try:
-                    flat_path.symlink_to(file_name)
-                except (OSError, PermissionError):
-                    flat_path.write_bytes(file_name.read_bytes())
-
-        # Register in manifest (write-through + fsync)
-        manifest = self._get_manifest()
-        manifest_key = f"{asset_name}/{target_name.name}"
-        manifest.add_asset(
-            manifest_key,
-            AssetEntry(
-                asset_table=asset_name,
-                schema=schema,
-                asset_types=asset_types,
-                metadata=metadata_dict,
-                description=description,
-            ),
-        )
-
-        # Also write legacy asset-type JSONL for backward compatibility with upload
-        with Path(asset_type_path(self._working_dir, self.execution_rid, asset_table)).open("a") as f:
-            f.write(json.dumps({target_name.name: asset_types}) + "\n")
-
-        result = AssetFilePath(
-            asset_path=flat_path,
-            asset_table=asset_name,
-            file_name=target_name.name,
-            asset_metadata=metadata_dict,
+        return _asset_file_path(
+            self,
+            asset_name,
+            file_name,
             asset_types=asset_types,
+            copy_file=copy_file,
+            rename_file=rename_file,
+            metadata=metadata,
+            description=description,
+            asset_type_vocab_term=MLVocab.asset_type,
+            flat_asset_dir_fn=flat_asset_dir,
+            asset_type_path_fn=asset_type_path,
+            legacy_kwargs=kwargs,
         )
-        result._bind_manifest(manifest, manifest_key)
-        return result
 
     def metrics_file(self, filename: str = "metrics.jsonl") -> AssetFilePath:
         """Return a path for writing training-metric records.
@@ -1909,10 +1704,13 @@ class Execution:
             ...         f.write("\\n")  # doctest: +SKIP
             >>> exe.upload_execution_outputs()  # doctest: +SKIP
         """
-        return self.asset_file_path(
-            MLAsset.execution_metadata,
+        from deriva_ml.execution.asset_upload import metrics_file as _metrics_file
+
+        return _metrics_file(
+            self,
             filename,
-            asset_types=ExecMetadataType.metrics_file.value,
+            execution_metadata_asset_name=MLAsset.execution_metadata,
+            metrics_file_asset_type=ExecMetadataType.metrics_file.value,
         )
 
     def _get_manifest(self) -> AssetManifest:
