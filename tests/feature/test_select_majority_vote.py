@@ -207,3 +207,30 @@ def test_select_majority_vote_auto_detect_rejects_multi_term_feature() -> None:
     assert "['Diagnosis', 'Severity']" in msg, (
         f"Expected sorted column list in error; got: {msg}"
     )
+
+
+def test_select_majority_vote_returns_none_on_empty_records() -> None:
+    """Empty ``records`` → ``None``, matching the selector convention.
+
+    Pre-fix (audit F-2) the inner ``records[0]`` access raised
+    ``IndexError`` on empty input; ``select_by_workflow`` and
+    ``select_by_execution`` already returned ``None`` in the
+    same situation. The fix aligned ``select_majority_vote``
+    with the convention; ``feature_values`` (and friends)
+    drop ``None`` survivors during group reduction, so a
+    feature with no records for an asset is silently skipped
+    rather than crashing the whole iteration.
+
+    Audit F-20 #3 — explicit empty-records test.
+    """
+    selector = FeatureRecord.select_majority_vote()  # column=None
+    # Pass an empty list with no record-class context — the
+    # auto-detect branch must not run.
+    result = selector([])
+    assert result is None
+
+    # Same behavior with an explicit column — pinning the
+    # short-circuit so a future "split the column-vs-no-column
+    # branches" refactor doesn't lose the empty guard.
+    selector_with_col = FeatureRecord.select_majority_vote(column="Anything")
+    assert selector_with_col([]) is None

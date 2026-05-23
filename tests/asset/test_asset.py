@@ -326,6 +326,79 @@ class TestAssetMetadata:
 
 
 # =============================================================================
+# TestAssetDownload - bare-bytes download primitive (audit P1 A3)
+# =============================================================================
+
+
+class TestAssetDownload:
+    """Tests for ``Asset.download`` — the bare-bytes download primitive.
+
+    Pre-coverage (audit P1 A3) this method had no test. The
+    method is documented as the no-catalog-side-effects
+    alternative to :meth:`Execution.download_asset`; tests
+    here pin the file-on-disk contract and the lack of
+    catalog-side-effects.
+    """
+
+    def test_download_writes_file_to_dest_dir(self, basic_execution, tmp_path):
+        """``download(dest_dir)`` writes ``dest_dir/filename`` and returns its Path."""
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "download_test.txt", "Download content")
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        asset = ml.lookup_asset(asset_rid)
+        dest = tmp_path / "out"
+        result = asset.download(dest)
+
+        # Returned path is the file inside dest_dir.
+        assert result == dest / "download_test.txt"
+        # File exists and has the original bytes.
+        assert result.exists()
+        assert result.read_text() == "Download content"
+
+    def test_download_creates_dest_dir_if_missing(self, basic_execution, tmp_path):
+        """``dest_dir`` is created when it doesn't exist (mkdir parents=True)."""
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "mkdir_test.txt", "mkdir content")
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        asset = ml.lookup_asset(asset_rid)
+        # Two levels of nesting — none of these exist yet.
+        dest = tmp_path / "a" / "b" / "c"
+        assert not dest.exists()
+        result = asset.download(dest)
+
+        assert dest.is_dir()
+        assert result.exists()
+
+    def test_download_accepts_string_dest_dir(self, basic_execution, tmp_path):
+        """``dest_dir`` accepts ``str`` (not just ``Path``).
+
+        The method docstring uses ``Path`` examples but the body
+        wraps the arg with ``Path(dest_dir)``. Pin that contract.
+        """
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "str_dest.txt", "str dest content")
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        asset = ml.lookup_asset(asset_rid)
+        # Pass a string path, not a Path object.
+        dest = str(tmp_path / "str-out")
+        result = asset.download(dest)
+        assert result.exists()
+        assert result.read_text() == "str dest content"
+
+
+# =============================================================================
 # TestAssetRepr - Asset representation
 # =============================================================================
 

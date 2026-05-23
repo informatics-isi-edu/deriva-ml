@@ -402,7 +402,15 @@ class FeatureRecord(BaseModel):
                 term columns or multiple term columns.
         """
 
-        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord":
+        def _selector(records: list["FeatureRecord"]) -> "FeatureRecord | None":
+            # Empty input → return ``None`` per the selector
+            # convention (matches :meth:`select_by_workflow` and
+            # :meth:`select_by_execution`; ``feature_values`` skips
+            # ``None`` survivors when reducing groups). Pre-fix
+            # (audit F-2) this hit ``records[0]`` below and
+            # raised ``IndexError``. Audit F-20 added the test.
+            if not records:
+                return None
             col = column
             if col is None:
                 # Auto-detect from feature metadata on the record class.
