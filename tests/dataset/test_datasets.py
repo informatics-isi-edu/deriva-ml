@@ -77,6 +77,46 @@ class TestDataset:
         assert new_dataset.description == "Dataset for testing"
         assert new_dataset.dataset_types == ["Testing"]
 
+    def test_dataset_description_setter_writes_to_catalog(self, deriva_catalog, tmp_path):
+        """``dataset.description = "new"`` writes through to the catalog row.
+
+        Pins the issue #70 contract: Asset and Dataset now have
+        write-through description setters mirroring the
+        Workflow + ExecutionRecord pattern. Pre-fix this would
+        only update the in-memory attribute; the catalog row
+        was unchanged.
+        """
+        ml_instance = DerivaML(
+            deriva_catalog.hostname,
+            deriva_catalog.catalog_id,
+            working_dir=tmp_path,
+            use_minid=False,
+        )
+        ml_instance.add_term(MLVocab.dataset_type, "Testing", description="A test dataset", exists_ok=True)
+        ml_instance.add_term(
+            MLVocab.workflow_type, "Manual Workflow", description="A manual workflow", exists_ok=True
+        )
+        workflow = ml_instance.create_workflow(
+            name="Description Setter Test Workflow",
+            workflow_type="Manual Workflow",
+            description="Workflow for testing description setter",
+        )
+        execution = ml_instance.create_execution(
+            ExecutionConfiguration(description="Test Execution", workflow=workflow)
+        )
+        dataset = execution.create_dataset(description="Initial description", dataset_types=["Testing"])
+
+        # Write-through assignment.
+        new_desc = "Updated via setter — issue #70"
+        dataset.description = new_desc
+
+        # In-memory side updated.
+        assert dataset.description == new_desc
+
+        # Catalog round-trip: a fresh lookup sees the new value.
+        refreshed = ml_instance.lookup_dataset(dataset.dataset_rid)
+        assert refreshed.description == new_desc
+
     def test_nested_datasets(self, dataset_test, tmp_path):
         """Test finding datasets."""
         # Find all datasets

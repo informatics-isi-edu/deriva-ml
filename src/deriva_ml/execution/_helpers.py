@@ -104,6 +104,7 @@ def update_field_in_catalog(
     ml_instance: Any,
     table_name: str,
     updates: dict[str, Any],
+    schema_name: str | None = None,
 ) -> None:
     """Write column updates to one RID-keyed catalog row.
 
@@ -116,19 +117,28 @@ def update_field_in_catalog(
         rid: The row's RID.
         ml_instance: The bound :class:`DerivaML` instance — used
             to reach the pathBuilder + schema.
-        table_name: The table to update under
+        table_name: The table to update. Looked up under
+            ``schema_name`` if given, otherwise
             ``ml_instance.ml_schema``. Examples: ``"Execution"``,
-            ``"Workflow"``.
+            ``"Workflow"``, ``"Dataset"`` (all in the ML schema);
+            ``"Image"``, ``"Subject"`` (in a domain schema —
+            require ``schema_name``).
         updates: Column → value dict. The ``"RID"`` key is added
             automatically; callers pass the per-column updates
             only.
+        schema_name: Optional explicit schema. When ``None``
+            (default), uses ``ml_instance.ml_schema`` — the
+            common case for the ML-schema tables. Pass an
+            explicit name for Asset rows that live in domain
+            schemas.
 
     Raises:
         DerivaMLException: If ``ml_instance`` is None, ``rid`` is
             empty, or the catalog rejects the update.
     """
     pb = ml_instance.pathBuilder()
-    table_path = pb.schemas[ml_instance.ml_schema].tables[table_name]
+    schema = schema_name if schema_name is not None else ml_instance.ml_schema
+    table_path = pb.schemas[schema].tables[table_name]
     payload = {"RID": rid, **updates}
     table_path.update([payload])
 

@@ -136,7 +136,84 @@ class Dataset:
         self.dataset_rid = dataset_rid
         self.execution_rid = execution_rid
         self._ml_instance = catalog
-        self.description = description
+        # ``description`` is exposed via a @property/@setter (below)
+        # for write-through to the catalog. Store the underlying
+        # value in ``_description`` so the setter has somewhere
+        # to write without invoking itself.
+        self._description = description
+
+    @property
+    def description(self) -> str:
+        """The dataset's human-readable description.
+
+        Read returns the cached in-memory value. Write performs a
+        **write-through** update: assigning
+        ``dataset.description = "new"`` updates both the in-memory
+        attribute and the ``Description`` column on the
+        ``Dataset`` catalog row.
+
+        This is the symmetric counterpart of
+        :attr:`Workflow.description` and
+        :attr:`ExecutionRecord.description` — every typed-entity
+        class with a catalog-backed description now writes
+        through on assignment. Issue #70.
+
+        Returns:
+            The description string, or empty string when none
+            was set.
+
+        Example:
+            >>> ds = ml.lookup_dataset("4HM")  # doctest: +SKIP
+            >>> ds.description = "Curated 2026-05 release"  # doctest: +SKIP
+            >>> # Catalog ``Dataset.Description`` is now updated;
+            >>> # ``ds.description`` reads "Curated 2026-05 release".
+        """
+        return self._description
+
+    @description.setter
+    def description(self, value: str) -> None:
+        """Update the dataset description in the catalog and in memory.
+
+        Args:
+            value: The new description text.
+
+        Raises:
+            DerivaMLException: If the dataset is bound to a
+                read-only catalog snapshot or the catalog
+                connection is missing.
+        """
+        if self._ml_instance is not None:
+            self._update_description_in_catalog(value)
+        self._description = value
+
+    def _update_description_in_catalog(self, new_description: str) -> None:
+        """Write the description to the ``Dataset`` catalog row.
+
+        Dataset rows live in the ML schema, so the helper uses
+        ``ml_instance.ml_schema`` (the default) — no schema-name
+        threading needed (unlike :meth:`Asset._update_description_in_catalog`,
+        whose asset tables may live in domain schemas).
+
+        Raises:
+            DerivaMLException: If the catalog is unwritable.
+        """
+        from deriva_ml.execution._helpers import (
+            check_writable_catalog,
+            update_field_in_catalog,
+        )
+
+        check_writable_catalog(
+            rid=self.dataset_rid,
+            ml_instance=self._ml_instance,
+            entity_label="Dataset",
+            operation="update description",
+        )
+        update_field_in_catalog(
+            rid=self.dataset_rid,
+            ml_instance=self._ml_instance,
+            table_name="Dataset",
+            updates={"Description": new_description},
+        )
 
     def __repr__(self) -> str:
         """Return a string representation of the Dataset for debugging."""
