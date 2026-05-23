@@ -448,13 +448,27 @@ def update_asset_execution_table(
     execution-link is unchanged.
 
     Pre-extraction this was an ``Execution`` method. The
-    audit (P1) noted that **only the Input branch is exercised
-    in production** — the Output flow now lives in
-    :func:`bag_commit._add_asset_rows_to_bag`. The Output
-    branch is preserved here for now because it's pinned by
-    the asset-role-auto-tag tests; dropping it requires
-    rewriting those tests against the bag-commit path. Tracked
-    as a follow-up.
+    audit (P1) recommended **dropping the Output branch as
+    "dead in production"** because the only production caller
+    in ``execution.py`` invokes the Input branch. **That
+    recommendation is rejected.** ``Asset_Role`` Input vs
+    Output is real public-API behaviour:
+    ``execution.list_assets(asset_role="Input"|"Output")``
+    queries the per-execution-link direction tag written by
+    this method. A prior pass eliminated this in error; the
+    audit's framing reflected that mistaken state. Do NOT
+    drop the Output branch without first migrating the
+    consumers that depend on the Output role assignment
+    (``test_asset_role_auto_tag.py`` and any catalog query
+    that filters by ``Asset_Role == "Output"``).
+
+    The bag-commit Output flow in
+    :func:`bag_commit._add_asset_rows_to_bag` writes the same
+    rows for assets that go through the bag pipeline; this
+    branch handles assets that don't. The audit's
+    consolidation suggestion ("drop the branch, route
+    everything through bag-commit") is a future cleanup
+    project, not a current-PR change.
 
     Args:
         execution: The bound :class:`Execution`. Reads

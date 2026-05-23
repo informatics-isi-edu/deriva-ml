@@ -1588,14 +1588,19 @@ class Execution:
         """Link assets to this execution and auto-tag them by role.
 
         Thin delegate to ``asset_upload.update_asset_execution_table``;
-        see that helper for the per-branch (Input/Output) logic.
-        Audit ledger: only the Input branch is exercised in
-        production — the Output flow now lives in
-        :func:`bag_commit._add_asset_rows_to_bag`. The Output
-        branch stays for now because the asset-role-auto-tag
-        tests pin it; dropping it requires rewriting those
-        tests against the bag-commit path. Tracked as a
-        follow-up.
+        see that helper for the per-branch (Input/Output)
+        logic.
+
+        **Audit ledger note (Output branch is NOT dead):**
+        The 2026-05-22 audit recommended dropping the Output
+        branch as "dead in production." That recommendation
+        is rejected — ``Asset_Role`` Input vs Output is real
+        public-API behaviour (``execution.list_assets(asset_role=...)``).
+        A prior pass eliminated this in error; do not repeat
+        that mistake. The bag-commit Output flow at
+        ``bag_commit._add_asset_rows_to_bag`` writes the same
+        rows for bag-pipeline assets; this branch handles
+        non-bag callers.
         """
         from deriva_ml.execution.asset_upload import update_asset_execution_table
 
