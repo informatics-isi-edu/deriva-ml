@@ -1,4 +1,4 @@
-"""Unit tests for ``deriva_ml.execution.asset_upload`` (audit P1 Ex-god first sweep).
+"""Unit tests for ``deriva_ml.execution.asset_upload`` (audit P1 Ex-god first + second sweeps).
 
 Pre-extraction these helpers lived on ``Execution`` as
 methods. Each could only be exercised by spinning up a real
@@ -19,6 +19,9 @@ Coverage layers:
    missing dir.
 5. ``clean_folder_contents`` — pure filesystem op with
    bounded retry.
+6. ``update_asset_execution_table`` (second sweep) — per-role
+   dispatch (Input vs Output), dry-run skip, Asset_Role
+   vocab lookup.
 
 Pure-Python tests; no live catalog required.
 """
@@ -34,6 +37,7 @@ from deriva_ml.execution.asset_upload import (
     get_metadata_description,
     save_runtime_environment,
     set_asset_descriptions,
+    update_asset_execution_table,
     upload_hydra_config_assets,
 )
 
@@ -423,3 +427,193 @@ class TestCleanFolderContents:
 
         # Restore for safety.
         monkeypatch.setattr(Path, "unlink", original_unlink)
+
+
+# ---------------------------------------------------------------------------
+# update_asset_execution_table — second sweep (audit Ex-god)
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateAssetExecutionTable:
+    """Pin the per-role dispatch for asset → execution association rows."""
+
+    def _build_execution_mock(
+        self,
+        *,
+        dry_run: bool = False,
+        with_associations: bool = True,
+    ) -> MagicMock:
+        """Build an ``Execution`` mock with the minimum surface the helper reads."""
+        exe = MagicMock()
+        exe._dry_run = dry_run
+        exe.execution_rid = "EX-1"
+        exe._working_dir = "/tmp/wdir"
+
+        # ``_model.find_association`` returns
+        # ``(assoc_table_obj, asset_fk_col, exec_fk_col)``.
+        assoc_table = MagicMock()
+        assoc_table.schema.name = "deriva-ml"
+        assoc_table.name = "Image_Execution"
+
+        type_assoc_table = MagicMock()
+        type_assoc_table.schema.name = "deriva-ml"
+        type_assoc_table.name = "Image_Asset_Type"
+
+        if with_associations:
+            def fake_find_assoc(table_name, partner):
+                if partner == "Execution":
+                    return (assoc_table, "Image", "Execution")
+                if partner == "Asset_Type":
+                    return (type_assoc_table, None, None)
+                raise KeyError(partner)
+
+            exe._model.find_association.side_effect = fake_find_assoc
+        return exe
+
+    def _drill_to_table(self, exe, schema, table):
+        """Drill into the pathBuilder mock chain to a specific table_path."""
+        return exe._ml_object.pathBuilder.return_value.schemas.__getitem__.return_value.tables.__getitem__.return_value
+
+    def test_dry_run_skips_all_work(self):
+        """``execution._dry_run`` is True → the helper returns immediately.
+
+        No catalog calls, no vocab lookup, no pathBuilder access.
+        """
+        exe = self._build_execution_mock(dry_run=True)
+        asset = MagicMock()
+        asset.asset_rid = "ASSET-1"
+
+        update_asset_execution_table(
+            exe,
+            {"deriva-ml/Image": [asset]},
+            asset_role="Input",
+            asset_role_vocab_term="Asset_Role",
+            input_file_tag="Input_File",
+            output_file_tag="Output_File",
+            asset_type_path_fn=lambda *_: Path("/never/called"),
+        )
+
+        # No vocab lookup, no pathBuilder access in dry-run.
+        exe._ml_object.lookup_term.assert_not_called()
+        exe._ml_object.pathBuilder.assert_not_called()
+
+    def test_input_branch_inserts_execution_and_input_file_tag(self):
+        """Input role → ``{Asset}_Execution`` insert + ``Input_File`` tag insert."""
+        exe = self._build_execution_mock()
+        asset = MagicMock()
+        asset.asset_rid = "ASSET-1"
+
+        update_asset_execution_table(
+            exe,
+            {"deriva-ml/Image": [asset]},
+            asset_role="Input",
+            asset_role_vocab_term="Asset_Role",
+            input_file_tag="Input_File",
+            output_file_tag="Output_File",
+            asset_type_path_fn=lambda *_: Path("/never/called"),
+        )
+
+        # Asset_Role vocab lookup happened.
+        exe._ml_object.lookup_term.assert_called_once_with("Asset_Role", "Input")
+
+        # Two inserts happened: one for Image_Execution, one for Image_Asset_Type.
+        # We can verify the calls via the pathBuilder mock chain.
+        pb = exe._ml_object.pathBuilder.return_value
+        # pb.schemas["deriva-ml"].tables[...].insert was called twice.
+        table_path = pb.schemas.__getitem__.return_value.tables.__getitem__.return_value
+        assert table_path.insert.call_count == 2
+
+        # First call is the {Asset}_Execution insert; second is the
+        # {Asset}_Asset_Type insert with Input_File tag.
+        type_insert_call = table_path.insert.call_args_list[1]
+        rows = type_insert_call.args[0]
+        assert all(row["Asset_Type"] == "Input_File" for row in rows)
+        # on_conflict_skip=True is preserved.
+        assert type_insert_call.kwargs == {"on_conflict_skip": True}
+
+    def test_output_branch_reads_type_map_and_adds_output_file_tag(self, tmp_path):
+        """Output role → reads per-file type map, auto-adds ``Output_File`` tag."""
+        # Stage a JSONL file with the per-file type map.
+        type_file = tmp_path / "asset_type.jsonl"
+        type_file.write_text(json.dumps({"photo.jpg": ["Model_File"]}) + "\n")
+
+        exe = self._build_execution_mock()
+        asset = MagicMock()
+        asset.asset_rid = "ASSET-1"
+        asset.file_name = "photo.jpg"
+
+        def fake_asset_type_path_fn(working_dir, exec_rid, table):
+            return type_file
+
+        update_asset_execution_table(
+            exe,
+            {"deriva-ml/Image": [asset]},
+            asset_role="Output",
+            asset_role_vocab_term="Asset_Role",
+            input_file_tag="Input_File",
+            output_file_tag="Output_File",
+            asset_type_path_fn=fake_asset_type_path_fn,
+        )
+
+        # Asset_Role vocab lookup happened.
+        exe._ml_object.lookup_term.assert_called_once_with("Asset_Role", "Output")
+
+        # The asset's ``asset_types`` was mutated to include Output_File.
+        assert "Output_File" in asset.asset_types
+        assert "Model_File" in asset.asset_types
+
+        # The type insert was called with rows for BOTH tags.
+        pb = exe._ml_object.pathBuilder.return_value
+        table_path = pb.schemas.__getitem__.return_value.tables.__getitem__.return_value
+        type_insert_call = table_path.insert.call_args_list[1]
+        rows = type_insert_call.args[0]
+        tag_values = {row["Asset_Type"] for row in rows}
+        assert tag_values == {"Model_File", "Output_File"}
+
+    def test_output_branch_does_not_duplicate_existing_output_file_tag(self, tmp_path):
+        """When the type map already has ``Output_File``, it's not added twice."""
+        type_file = tmp_path / "asset_type.jsonl"
+        type_file.write_text(
+            json.dumps({"photo.jpg": ["Model_File", "Output_File"]}) + "\n"
+        )
+
+        exe = self._build_execution_mock()
+        asset = MagicMock()
+        asset.asset_rid = "ASSET-1"
+        asset.file_name = "photo.jpg"
+
+        update_asset_execution_table(
+            exe,
+            {"deriva-ml/Image": [asset]},
+            asset_role="Output",
+            asset_role_vocab_term="Asset_Role",
+            input_file_tag="Input_File",
+            output_file_tag="Output_File",
+            asset_type_path_fn=lambda *_: type_file,
+        )
+
+        # ``asset_types`` should still have exactly the two tags.
+        assert sorted(asset.asset_types) == ["Model_File", "Output_File"]
+
+    def test_uses_passed_in_vocab_term(self):
+        """The ``asset_role_vocab_term`` arg is threaded through to ``lookup_term``.
+
+        Pins the audit-friendly decoupling: the helper doesn't
+        import ``MLVocab``, so a future refactor of the enum
+        doesn't ripple through this module.
+        """
+        exe = self._build_execution_mock()
+        asset = MagicMock()
+        asset.asset_rid = "ASSET-1"
+
+        update_asset_execution_table(
+            exe,
+            {"deriva-ml/Image": [asset]},
+            asset_role="Input",
+            asset_role_vocab_term="My_Custom_Vocab",
+            input_file_tag="Input_File",
+            output_file_tag="Output_File",
+            asset_type_path_fn=lambda *_: Path("/never/called"),
+        )
+
+        exe._ml_object.lookup_term.assert_called_once_with("My_Custom_Vocab", "Input")
