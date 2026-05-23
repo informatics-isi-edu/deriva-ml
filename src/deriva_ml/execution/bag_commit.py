@@ -391,18 +391,31 @@ def _add_asset_rows_to_bag(
     #    that method; read once via ``_read_asset_type_map``.
     # 2. The directional ``Output_File`` tag — added by deriva-ml
     #    to every asset uploaded as an output of this execution.
-    #    This is the symmetric counterpart of the ``Input_File``
-    #    tag added by ``update_asset_execution_table`` for assets
-    #    consumed via ``download_asset``.
+    #    Symmetric with the ``Input_File`` tag added by
+    #    ``update_asset_execution_table`` for assets consumed via
+    #    ``download_asset``.
     #
-    # **Every asset associated with an execution carries either
-    # an Input_File or Output_File directional tag** — that's the
-    # public-API contract. Before this fix the bag-commit path
-    # silently omitted ``Output_File`` for assets the user
-    # uploaded via ``asset_file_path`` + ``upload_execution_outputs``;
-    # tags carried only what the user passed (e.g.,
-    # ``["Model_File"]``) when the catalog needed
-    # ``["Model_File", "Output_File"]``.
+    # **The directional-tag contract** (see the "How execution-
+    # asset roles work" section of the execution user guide and
+    # the docstring on
+    # ``asset_upload.update_asset_execution_table``):
+    #
+    #   Every asset associated with an execution carries either
+    #   an ``Input_File`` or ``Output_File`` directional Asset_Type
+    #   tag, AND its ``{Asset}_Execution`` row has the matching
+    #   ``Asset_Role`` ("Input" or "Output").
+    #
+    # The role is framework-supplied — callers don't pass
+    # ``Output_File`` in their ``asset_types=`` argument to
+    # ``asset_file_path``. The dedup below means an explicit
+    # pass-through is harmless.
+    #
+    # Pre-fix the bag-commit path silently omitted
+    # ``Output_File`` (catalog ended up with
+    # ``["Model_File"]`` instead of
+    # ``["Model_File", "Output_File"]``); this is the inline
+    # equivalent of ``update_asset_execution_table``'s Output
+    # branch.
     #
     # The loader's ``match_by_columns`` policy (configured in
     # :func:`load_execution_bag`) handles ``(asset_rid,

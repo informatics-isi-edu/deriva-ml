@@ -1413,13 +1413,30 @@ class Execution:
         what ``_initialize_execution`` uses internally so the
         platform-default download path is collision-free by construction.
 
+        **Directional tagging.** Assets downloaded via this method are
+        recorded as **inputs** of this execution (when
+        ``update_catalog=True``, the default). deriva-ml auto-adds the
+        ``Input_File`` Asset_Type tag and writes ``Asset_Role="Input"``
+        on the ``{Asset}_Execution`` row. The asset's pre-existing
+        content tags (e.g., ``Model_File`` if it was a prior
+        execution's output) are preserved — the directional tag is
+        additive, not a replacement. This is symmetric with the
+        ``Output_File`` tag added when assets are uploaded via
+        :meth:`asset_file_path` + :meth:`upload_execution_outputs`.
+        See the "How execution-asset roles work" section of the
+        execution user guide for the full contract.
+
         Args:
             asset_rid: RID of the asset.
             dest_dir: Destination directory for the asset. When ``Filename``
                 may collide across concurrent ``download_asset`` calls,
                 pass a unique directory per asset to avoid the WARNING and
                 the silent overwrite it guards against.
-            update_catalog: Whether to update the catalog execution information after downloading.
+            update_catalog: Whether to write the ``{Asset}_Execution``
+                row (``Asset_Role="Input"``) and the ``Input_File``
+                Asset_Type tag. Default ``True`` — the input-role
+                contract requires it. Pass ``False`` only for ad-hoc
+                downloads outside an execution-tracking context.
             use_cache: If True, check the cache directory for a previously downloaded copy
                 with a matching MD5 checksum before downloading. Cached copies are stored
                 in ``cache_dir/assets/{rid}_{md5}/`` and symlinked into the destination.
@@ -1462,6 +1479,16 @@ class Execution:
         Call this method **after** exiting the execution context manager, not
         inside it. The context manager sets execution status to ``Stopped``
         on exit; uploading after that preserves the correct status ordering.
+
+        **Directional tagging.** Every asset uploaded by this call
+        gets ``Asset_Role="Output"`` on its ``{Asset}_Execution`` row
+        and the ``Output_File`` Asset_Type tag (auto-added by
+        deriva-ml, in addition to any content tags the caller passed
+        via :meth:`asset_file_path(..., asset_types=...)`). This is
+        symmetric with the ``Input_File`` tag added by
+        :meth:`download_asset`. See the "How execution-asset roles
+        work" section of the execution user guide for the full
+        contract.
 
         Args:
             clean_folder: Whether to delete output folders after upload. If None (default),
@@ -1599,10 +1626,26 @@ class Execution:
         ``asset_types is None`` vs explicit-empty-list
         normalization.
 
+        **Directional tagging.** Files registered via this method are
+        uploaded as **outputs** of this execution. After
+        :meth:`upload_execution_outputs` runs, deriva-ml auto-adds
+        the ``Output_File`` Asset_Type tag to every uploaded asset
+        (alongside any content tags you passed in ``asset_types``).
+        You don't pass ``Output_File`` yourself — it's framework-
+        supplied, deduplicated if explicit, and symmetric with the
+        ``Input_File`` tag added by :meth:`download_asset`. The
+        ``{Asset}_Execution`` row gets ``Asset_Role="Output"``.
+        See the "How execution-asset roles work" section of the
+        execution user guide for the full contract.
+
         Args:
             asset_name: Name of the asset table. Must be a valid asset table.
             file_name: Name of file to be uploaded, or path to an existing file.
-            asset_types: Asset type terms from Asset_Type vocabulary. Defaults to asset_name.
+            asset_types: Content-classification tags from the Asset_Type
+                vocabulary (e.g., ``["Model_File"]``,
+                ``["Segmentation_Mask"]``). The directional
+                ``Output_File`` tag is added automatically — do not
+                pass it explicitly. Defaults to ``asset_name``.
             copy_file: Whether to copy the file rather than creating a symbolic link.
             rename_file: If provided, rename the file during staging.
             metadata: An AssetRecord instance or dict of metadata column values.

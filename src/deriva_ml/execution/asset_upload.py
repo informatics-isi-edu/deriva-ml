@@ -435,6 +435,13 @@ def update_asset_execution_table(
 ) -> None:
     """Link assets to an execution and auto-tag them by role.
 
+    Implements the **directional-tag contract** for assets
+    associated with an execution: every asset gets one of
+    ``Input_File``/``Output_File`` based on which side of the
+    execution it sits on. See the "How execution-asset roles
+    work" section of the execution user guide for the
+    public-API view.
+
     Writes two kinds of association rows for each asset:
 
     1. ``{Asset}_Execution`` — links the asset RID to the
@@ -442,45 +449,44 @@ def update_asset_execution_table(
        ``"Output"``). Consumers query it via
        ``execution.list_assets(asset_role="Input")``.
 
-    2. ``{Asset}_Asset_Type`` — auto-tags each asset's content
-       classification:
+    2. ``{Asset}_Asset_Type`` — adds the directional tag
+       alongside whatever content tags the asset already
+       carries:
 
        - For ``"Output"``: every user-supplied type from the
          ``asset_file_path`` calls **plus** ``Output_File``
          (added automatically if not already in the list).
          So a model file uploaded with ``ExecAssetType.model_file``
          ends up tagged ``["Model_File", "Output_File"]``.
-       - For ``"Input"``: just ``Input_File`` is added. The
+       - For ``"Input"``: ``Input_File`` is added. The
          asset's existing content types (from when it was
-         originally created) are preserved.
+         originally created) are preserved — we don't
+         overwrite them.
 
     Both inserts use ``on_conflict_skip=True`` so re-running is
     idempotent — an asset that already has the
     ``Input_File``/``Output_File`` tag from a prior
     execution-link is unchanged.
 
-    Pre-extraction this was an ``Execution`` method. The
-    audit (P1) recommended **dropping the Output branch as
-    "dead in production"** because the only production caller
-    in ``execution.py`` invokes the Input branch. **That
-    recommendation is rejected.** ``Asset_Role`` Input vs
-    Output is real public-API behaviour:
-    ``execution.list_assets(asset_role="Input"|"Output")``
-    queries the per-execution-link direction tag written by
-    this method. A prior pass eliminated this in error; the
-    audit's framing reflected that mistaken state. Do NOT
-    drop the Output branch without first migrating the
-    consumers that depend on the Output role assignment
-    (``test_asset_role_auto_tag.py`` and any catalog query
-    that filters by ``Asset_Role == "Output"``).
+    **Where each role gets written in production:**
 
-    The bag-commit Output flow in
-    :func:`bag_commit._add_asset_rows_to_bag` writes the same
-    rows for assets that go through the bag pipeline; this
-    branch handles assets that don't. The audit's
-    consolidation suggestion ("drop the branch, route
-    everything through bag-commit") is a future cleanup
-    project, not a current-PR change.
+    - **Inputs**: ``download_asset`` calls this helper with
+      ``asset_role="Input"``. Both rows (Execution +
+      directional Asset_Type) come from here.
+    - **Outputs**: the bag-commit upload path
+      (``bag_commit._add_asset_rows_to_bag``) writes the
+      equivalent rows inline as part of its bag-build sweep —
+      ``Asset_Role="Output"`` on the Execution row and
+      ``Output_File`` auto-added to each asset's Asset_Type
+      list. The Output branch HERE handles non-bag callers
+      and is the reference implementation that the bag-commit
+      inline writes mirror.
+
+    The 2026-05-22 audit suggested dropping the Output branch
+    as "dead in production." That suggestion was rejected:
+    ``Asset_Role`` Input/Output is real public-API behaviour,
+    and the Output branch here is the documented reference
+    for the symmetric contract.
 
     Args:
         execution: The bound :class:`Execution`. Reads

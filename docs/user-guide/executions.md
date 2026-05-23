@@ -234,6 +234,76 @@ for path in metric_files:
 - For high-throughput logging (thousands of writes per second inside a tight batch loop), file-append is the wrong shape — the fsync cost dominates. Either buffer in memory and flush once per epoch, or open an issue if you have a concrete use case that needs server-side queryable metrics.
 - Metrics written this way are **not** queryable from the catalog like features are — comparing metrics across runs requires downloading each bag and parsing the file. This is an intentional trade-off: the file-as-asset design keeps the API simple for lab-scale use (tens of runs per experiment), at the cost of not scaling to MLflow-style leaderboard queries.
 
+## How execution-asset roles work
+
+**Motivation.** Every asset linked to an execution carries an explicit
+**direction** — was it consumed as input, or produced as output? Two
+queries become trivial: "what did this execution read?" and "what did
+this execution produce?" The directional tag also lets the catalog
+show colour-coded provenance in Chaise and lets downstream lineage
+tools walk only the relevant edges.
+
+**The contract.** Every asset associated with an execution gets:
+
+1. A row in `{Asset}_Execution` with `Asset_Role` set to either
+   `"Input"` or `"Output"`.
+2. A row in `{Asset}_Asset_Type` carrying the directional tag —
+   `"Input_File"` for inputs, `"Output_File"` for outputs — in
+   addition to whatever content tags (e.g., `"Model_File"`,
+   `"Segmentation_Mask"`) the caller passed.
+
+**deriva-ml assigns the role; you don't.** The framework decides
+based on the call you made:
+
+- `exe.download_asset(rid, dest_dir)` → role `"Input"`, tag
+  `"Input_File"` added automatically.
+- `exe.asset_file_path("Model", "model.pt")` followed by
+  `exe.upload_execution_outputs()` → role `"Output"`, tag
+  `"Output_File"` added automatically.
+
+You never write `Asset_Role` yourself, and you don't need to pass
+`Input_File`/`Output_File` in `asset_types=` — those are reserved
+for the framework. User-supplied tags are content classifications
+(what kind of file is it?); directional tags are framework-supplied
+(which side of the execution did it sit on?).
+
+**Querying by role.** Once an execution finishes,
+`exe.list_assets(asset_role="Input")` and
+`exe.list_assets(asset_role="Output")` give you exactly the assets
+on each side. Catalog queries filtering by `Asset_Type == "Output_File"`
+give you every asset ever produced by any execution.
+
+```python
+with ml.create_execution(config) as exe:
+    # INPUT — role is "Input", auto-tagged "Input_File":
+    img = exe.download_asset(image_rid, exe.working_dir / "inputs")
+    assert "Input_File" in img.asset_types
+
+    # ... run model on img ...
+
+    # OUTPUT — role is "Output", auto-tagged "Output_File" after upload:
+    mp = exe.asset_file_path("Model", "best.pt",
+                             asset_types=["Model_File"])
+    torch.save(model.state_dict(), mp)
+
+exe.upload_execution_outputs()
+
+# After upload, the Model row carries asset_types = ["Model_File", "Output_File"].
+inputs = exe.list_assets(asset_role="Input")
+outputs = exe.list_assets(asset_role="Output")
+```
+
+**Notes:**
+
+- Passing `asset_types=["Output_File", ...]` explicitly is allowed (it's
+  the canonical string) and is **deduplicated** — you won't get two
+  `Output_File` rows. Likewise `asset_types=[]` (no content tags) is
+  honored as-is and still gets the directional tag.
+- The `Asset_Type` vocabulary terms `Input_File` and `Output_File` are
+  seeded by `create_ml_schema()` / `initialize_ml_schema()`. An old
+  catalog that predates this feature needs to be re-initialized once
+  before uploads with content types will succeed.
+
 ## How to upload outputs
 
 **Motivation.** Uploading is deliberately separate from running. Large file uploads can take minutes; keeping them outside the context manager means the execution timing reflects computation time, not upload latency. It also lets you inspect outputs before committing them to the catalog.
