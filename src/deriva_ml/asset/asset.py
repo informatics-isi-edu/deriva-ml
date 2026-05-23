@@ -325,12 +325,25 @@ class Asset:
             >>> print(f"Downloaded to: {local_path}")  # doctest: +SKIP
         """
 
-        # Use hatrac to download the file
+        # Use hatrac to download the file. ``DerivaML`` doesn't
+        # expose a ``hatrac`` attribute (the legacy assumption in
+        # this method), so construct a ``HatracStore`` on demand —
+        # same pattern as ``Execution.download_asset``. Audit P1 A3
+        # uncovered this latent bug: the pre-fix code did
+        # ``self._ml_instance.hatrac.get_obj(...)`` which always
+        # raised ``AttributeError`` against a real ``DerivaML``.
+        from deriva.core.hatrac_store import HatracStore
+
         dest_dir = Path(dest_dir)
         dest_dir.mkdir(parents=True, exist_ok=True)
 
         dest_path = dest_dir / self.filename
-        self._ml_instance.hatrac.get_obj(self.url, destfilename=str(dest_path))
+        hs = HatracStore(
+            "https",
+            self._ml_instance.host_name,
+            self._ml_instance.credential,
+        )
+        hs.get_obj(self.url, destfilename=str(dest_path))
 
         return dest_path
 
