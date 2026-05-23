@@ -91,7 +91,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -99,6 +99,7 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from deriva_ml import DerivaML
+    from deriva_ml.dataset.dataset import Dataset
     from deriva_ml.execution import Execution
 
 from deriva_ml.core.logging_config import get_logger
@@ -479,6 +480,400 @@ def _ensure_dataset_types(ml: DerivaML) -> None:
 # =============================================================================
 
 
+def _validate_split_inputs(
+    *,
+    stratify_by_column: str | None,
+    selection_fn: SelectionFunction | None,
+    include_tables: list[str] | None,
+) -> None:
+    """Validate the mutually-exclusive + required-companion arg constraints.
+
+    Three rules:
+
+    1. ``stratify_by_column`` and ``selection_fn`` are mutually
+       exclusive — both produce per-element partitioning decisions
+       so allowing both would let the caller silently choose
+       whichever the implementation checked first.
+    2. ``stratify_by_column`` requires ``include_tables`` (it
+       drives a denormalization that needs explicit table scope).
+    3. ``selection_fn`` requires ``include_tables`` for the same
+       reason.
+
+    Raises ``ValueError`` rather than a ``DerivaMLException`` to
+    match the existing surface: these are argument-shape errors
+    the caller should fix at the call site, not catalog-side
+    failures.
+    """
+    if stratify_by_column and selection_fn:
+        raise ValueError(
+            "stratify_by_column and selection_fn are mutually exclusive. Use one or the other."
+        )
+
+    if stratify_by_column and not include_tables:
+        raise ValueError(
+            "include_tables is required when using stratify_by_column. "
+            "Specify the tables needed for denormalization "
+            "(e.g., include_tables=['Image', 'Image_Classification'])."
+        )
+
+    if selection_fn and not include_tables:
+        raise ValueError(
+            "include_tables is required when using a custom selection_fn. "
+            "Specify the tables needed for denormalization."
+        )
+
+
+def _compute_partitions(
+    *,
+    source_ds: "Dataset",
+    source_dataset_rid: str,
+    element_table: str | None,
+    test_size: float | int,
+    train_size: float | int | None,
+    val_size: float | int | None,
+    shuffle: bool,
+    seed: int,
+    stratify_by_column: str | None,
+    stratify_missing: str,
+    include_tables: list[str] | None,
+    selection_fn: SelectionFunction | None,
+    row_per: str | None,
+    via: list[str] | None,
+    ignore_unrelated_anchors: bool,
+) -> tuple[
+    dict[str, list[str]],
+    dict[str, int],
+    str,
+    str,
+]:
+    """Resolve the source dataset members into per-partition RID lists.
+
+    Pure read path — no catalog writes. Suitable for dry-run mode
+    (the caller skips :func:`_create_split_hierarchy` and builds
+    the dry-run :class:`SplitResult` directly from the outputs of
+    this helper).
+
+    Steps:
+
+    1. Look up the source dataset and list its members.
+    2. Auto-detect the element table when ``element_table is
+       None`` (single-candidate-table check).
+    3. Validate that ``element_table`` has members.
+    4. Resolve absolute sizes via :func:`_resolve_sizes`.
+    5. Build partition RID lists — either via the
+       denormalization + selector path (stratified / custom) or
+       the random-shuffle path.
+    6. Compute the strategy description string.
+
+    Args:
+        source_ds: The looked-up source :class:`Dataset`.
+        source_dataset_rid: The source RID. Used in error
+            messages.
+        element_table: Caller-specified element table (or
+            ``None`` for auto-detect).
+        test_size, train_size, val_size, shuffle, seed,
+            stratify_by_column, stratify_missing, include_tables,
+            selection_fn, row_per, via,
+            ignore_unrelated_anchors: As passed to
+            :func:`split_dataset`.
+
+    Returns:
+        Four-tuple ``(partition_rids, partition_sizes,
+        strategy_desc, element_table)``:
+
+        - ``partition_rids`` — ``{name: [rid, ...]}`` for each
+          partition.
+        - ``partition_sizes`` — ``{name: int}`` — total RID count
+          per partition. Includes ``"Validation"`` only when
+          ``val_size`` is set.
+        - ``strategy_desc`` — human-readable strategy
+          (``"random"``, ``"stratified by ..."``, ``"custom
+          selection function"``).
+        - ``element_table`` — the resolved element table name
+          (may differ from the input when auto-detected).
+
+    Raises:
+        ValueError: If the source has no members, multiple
+            candidate tables when no ``element_table`` is given,
+            or the chosen ``element_table`` has no members.
+    """
+    logger.info("Listing dataset members...")
+    members = source_ds.list_dataset_members(recurse=True)
+
+    if element_table is None:
+        candidate_tables = [
+            table_name
+            for table_name, records in members.items()
+            if table_name != "Dataset" and len(records) > 0
+        ]
+        if not candidate_tables:
+            raise ValueError(
+                f"Source dataset {source_dataset_rid} has no members. Cannot split an empty dataset."
+            )
+        if len(candidate_tables) > 1:
+            raise ValueError(
+                f"Source dataset has members in multiple tables: {candidate_tables}. "
+                "Specify element_table to choose which one to split."
+            )
+        element_table = candidate_tables[0]
+
+    if element_table not in members or not members[element_table]:
+        raise ValueError(
+            f"Source dataset {source_dataset_rid} has no members in "
+            f"table '{element_table}'. Available tables with members: "
+            f"{[t for t, r in members.items() if r and t != 'Dataset']}"
+        )
+
+    member_records = members[element_table]
+    total = len(member_records)
+    logger.info(f"Found {total} members in table '{element_table}'")
+
+    partition_sizes = _resolve_sizes(total, test_size, train_size, val_size)
+    size_summary = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
+    logger.info(f"Split sizes: {size_summary} (total={total})")
+
+    use_denormalization = stratify_by_column is not None or selection_fn is not None
+
+    if use_denormalization:
+        # Default row_per to the element table when stratifying, so
+        # the natural "one row per element" cardinality lines up with
+        # how the partitions are built downstream (RID lookups happen
+        # via the {element_table}.RID column). Callers who want a
+        # different row_per (e.g., one row per feature value when the
+        # feature-assoc table is in include_tables) can pass it
+        # explicitly. See issue #174 for the motivating case.
+        effective_row_per = row_per if row_per is not None else element_table
+        logger.info(
+            f"Denormalizing dataset with tables: {include_tables} (row_per={effective_row_per}, via={via or []})"
+        )
+        df = source_ds.get_denormalized_as_dataframe(
+            include_tables,
+            row_per=effective_row_per,
+            via=via,
+            ignore_unrelated_anchors=ignore_unrelated_anchors,
+        )
+        logger.info(f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns")
+
+        if stratify_by_column:
+            logger.info(f"Using stratified split on column: {stratify_by_column}")
+            selector = stratified_split(stratify_by_column, missing=stratify_missing)
+        else:
+            logger.info("Using custom selection function")
+            selector = selection_fn
+
+        partition_indices = selector(df, partition_sizes, seed)
+
+        # Map indices back to RIDs (dot notation: Table.RID).
+        rid_column = f"{element_table}.RID"
+        if rid_column not in df.columns:
+            rid_column = "RID"
+            if rid_column not in df.columns:
+                raise ValueError(
+                    f"Cannot find RID column. Tried '{element_table}.RID' and 'RID'. "
+                    f"Available columns: {list(df.columns)}"
+                )
+
+        partition_rids = {
+            name: df.iloc[indices][rid_column].tolist()
+            for name, indices in partition_indices.items()
+        }
+    else:
+        all_rids = [record["RID"] for record in member_records]
+
+        if shuffle:
+            rng = np.random.default_rng(seed)
+            indices = np.arange(len(all_rids))
+            rng.shuffle(indices)
+            all_rids = [all_rids[i] for i in indices]
+
+        partition_rids = {}
+        offset = 0
+        for name, size in partition_sizes.items():
+            partition_rids[name] = all_rids[offset : offset + size]
+            offset += size
+
+    for name, rids in partition_rids.items():
+        logger.info(f"Selected {len(rids)} {name} RIDs")
+
+    # Strategy description.
+    if selection_fn:
+        strategy_desc = "custom selection function"
+    elif stratify_by_column:
+        strategy_desc = f"stratified by {stratify_by_column}"
+    else:
+        strategy_desc = "random"
+
+    return partition_rids, partition_sizes, strategy_desc, element_table
+
+
+def _create_split_hierarchy(
+    *,
+    ml: DerivaML,
+    execution: Execution,
+    source_dataset_rid: str,
+    partition_rids: dict[str, list[str]],
+    partition_sizes: dict[str, int],
+    strategy_desc: str,
+    element_table: str,
+    seed: int,
+    split_description: str,
+    training_types: list[str] | None,
+    testing_types: list[str] | None,
+    validation_types: list[str] | None,
+    val_size: float | int | None,
+    split_params: dict[str, Any],
+) -> SplitResult:
+    """Create the parent Split + child Training/Testing(/Validation) datasets.
+
+    Catalog-writing path — invoked only when ``dry_run=False``.
+    Pre-extraction this was the second half of
+    :func:`split_dataset` (~140 LOC).
+
+    Args:
+        ml: Connected :class:`DerivaML`.
+        execution: Live :class:`Execution` owning the split.
+        source_dataset_rid: Source dataset (recorded in the
+            auto-description).
+        partition_rids: Per-partition RID lists from
+            :func:`_compute_partitions`.
+        partition_sizes: Per-partition counts.
+        strategy_desc: Strategy string for the description.
+        element_table: Element table the partitions came from.
+        seed: Seed value (recorded in descriptions + result).
+        split_description: Caller's description (or empty, in
+            which case ``auto_description`` is used).
+        training_types, testing_types, validation_types: Extra
+            dataset types beyond the built-in
+            ``"Training"`` / ``"Testing"`` / ``"Validation"``.
+        val_size: Whether to create the Validation child. The
+            value itself is only checked for ``is None``.
+        split_params: Full parameter dict written as the
+            ``split_config.json`` artifact.
+
+    Returns:
+        :class:`SplitResult` with the newly-created RIDs and
+        their current versions.
+    """
+    partitions_desc = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
+    auto_description = (
+        f"Split of dataset {source_dataset_rid} ({strategy_desc}, {partitions_desc}, seed={seed})"
+    )
+
+    logger.info("Splitting inside caller's execution %s", execution.execution_rid)
+
+    train_types = ["Training"] + (training_types or [])
+    test_types = ["Testing"] + (testing_types or [])
+    val_types = ["Validation"] + (validation_types or []) if val_size is not None else []
+
+    # Save split parameters as config artifact. The caller's execution
+    # is responsible for uploading this on its own
+    # ``upload_execution_outputs``; we never call upload here.
+    params_file = Path(execution.working_dir) / "split_config.json"
+    params_file.write_text(json.dumps(split_params, indent=2))
+    logger.info(f"  Saved split parameters to {params_file}")
+
+    # Create parent Split dataset.
+    split_ds = execution.create_dataset(
+        description=split_description or auto_description,
+        dataset_types=["Split"],
+    )
+    logger.info(f"  Created Split dataset: {split_ds.dataset_rid}")
+
+    # Create Training dataset.
+    training_ds = execution.create_dataset(
+        description=(
+            f"Training subset ({partition_sizes['Training']} samples) of "
+            f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
+        ),
+        dataset_types=train_types,
+    )
+    logger.info(f"  Created Training dataset: {training_ds.dataset_rid}")
+
+    # Create Validation dataset (if requested).
+    validation_ds = None
+    if val_size is not None:
+        validation_ds = execution.create_dataset(
+            description=(
+                f"Validation subset ({partition_sizes['Validation']} samples) of "
+                f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
+            ),
+            dataset_types=val_types,
+        )
+        logger.info(f"  Created Validation dataset: {validation_ds.dataset_rid}")
+
+    # Create Testing dataset.
+    testing_ds = execution.create_dataset(
+        description=(
+            f"Testing subset ({partition_sizes['Testing']} samples) of "
+            f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
+        ),
+        dataset_types=test_types,
+    )
+    logger.info(f"  Created Testing dataset: {testing_ds.dataset_rid}")
+
+    # Link children to parent.
+    child_rids = [training_ds.dataset_rid, testing_ds.dataset_rid]
+    if validation_ds is not None:
+        child_rids.insert(1, validation_ds.dataset_rid)
+    split_ds.add_dataset_members(child_rids, validate=False)
+    logger.info("  Linked child datasets to Split dataset")
+
+    # Add members to each partition (batched).
+    batch_size = 500
+    for part_name, ds in [
+        ("Training", training_ds),
+        ("Validation", validation_ds),
+        ("Testing", testing_ds),
+    ]:
+        if ds is None:
+            continue
+        rids = partition_rids[part_name]
+        logger.info(f"  Adding {len(rids)} members to {part_name} dataset...")
+        for i in range(0, len(rids), batch_size):
+            batch = rids[i : i + batch_size]
+            ds.add_dataset_members({element_table: batch}, validate=False)
+            added = min(i + batch_size, len(rids))
+            if added % 2000 == 0 or added >= len(rids):
+                logger.info(f"    Added {added}/{len(rids)}")
+
+    # Build result.
+    split_ds_info = ml.lookup_dataset(split_ds.dataset_rid)
+    training_ds_info = ml.lookup_dataset(training_ds.dataset_rid)
+    testing_ds_info = ml.lookup_dataset(testing_ds.dataset_rid)
+
+    validation_info = None
+    if validation_ds is not None:
+        validation_ds_info = ml.lookup_dataset(validation_ds.dataset_rid)
+        validation_info = PartitionInfo(
+            rid=validation_ds.dataset_rid,
+            version=str(validation_ds_info.current_version),
+            count=partition_sizes["Validation"],
+        )
+
+    return SplitResult(
+        source=source_dataset_rid,
+        split=PartitionInfo(
+            rid=split_ds.dataset_rid,
+            version=str(split_ds_info.current_version),
+            count=0,
+        ),
+        training=PartitionInfo(
+            rid=training_ds.dataset_rid,
+            version=str(training_ds_info.current_version),
+            count=partition_sizes["Training"],
+        ),
+        testing=PartitionInfo(
+            rid=testing_ds.dataset_rid,
+            version=str(testing_ds_info.current_version),
+            count=partition_sizes["Testing"],
+        ),
+        validation=validation_info,
+        strategy=strategy_desc,
+        element_table=element_table,
+        seed=seed,
+    )
+
+
 def split_dataset(
     ml: DerivaML,
     source_dataset_rid: str,
@@ -753,142 +1148,45 @@ def split_dataset(
         ``DatasetBag.restructure_assets``:
             Class-folder layout for ``ImageFolder``-style consumers.
     """
-    # -------------------------------------------------------------------------
-    # Validate inputs
-    # -------------------------------------------------------------------------
-    if stratify_by_column and selection_fn:
-        raise ValueError("stratify_by_column and selection_fn are mutually exclusive. Use one or the other.")
+    # Post Ds-split extraction this function dispatches to three
+    # helpers (above):
+    #
+    # 1. ``_validate_split_inputs`` — argument-shape checks.
+    # 2. ``_compute_partitions`` — pure read path (members, sizes,
+    #    selection); used by both dry-run and live paths.
+    # 3. ``_create_split_hierarchy`` — catalog-writing path
+    #    (parent/child datasets, member assignment).
 
-    if stratify_by_column and not include_tables:
-        raise ValueError(
-            "include_tables is required when using stratify_by_column. "
-            "Specify the tables needed for denormalization "
-            "(e.g., include_tables=['Image', 'Image_Classification'])."
-        )
+    _validate_split_inputs(
+        stratify_by_column=stratify_by_column,
+        selection_fn=selection_fn,
+        include_tables=include_tables,
+    )
 
-    if selection_fn and not include_tables:
-        raise ValueError(
-            "include_tables is required when using a custom selection_fn. "
-            "Specify the tables needed for denormalization."
-        )
-
-    # -------------------------------------------------------------------------
-    # Look up source dataset and get members
-    # -------------------------------------------------------------------------
     logger.info(f"Looking up source dataset: {source_dataset_rid}")
     source_ds = ml.lookup_dataset(source_dataset_rid)
 
-    logger.info("Listing dataset members...")
-    members = source_ds.list_dataset_members(recurse=True)
+    partition_rids, partition_sizes, strategy_desc, element_table = _compute_partitions(
+        source_ds=source_ds,
+        source_dataset_rid=source_dataset_rid,
+        element_table=element_table,
+        test_size=test_size,
+        train_size=train_size,
+        val_size=val_size,
+        shuffle=shuffle,
+        seed=seed,
+        stratify_by_column=stratify_by_column,
+        stratify_missing=stratify_missing,
+        include_tables=include_tables,
+        selection_fn=selection_fn,
+        row_per=row_per,
+        via=via,
+        ignore_unrelated_anchors=ignore_unrelated_anchors,
+    )
 
-    # Auto-detect element table if not specified
-    if element_table is None:
-        candidate_tables = [
-            table_name for table_name, records in members.items() if table_name != "Dataset" and len(records) > 0
-        ]
-        if not candidate_tables:
-            raise ValueError(f"Source dataset {source_dataset_rid} has no members. Cannot split an empty dataset.")
-        if len(candidate_tables) > 1:
-            raise ValueError(
-                f"Source dataset has members in multiple tables: {candidate_tables}. "
-                "Specify element_table to choose which one to split."
-            )
-        element_table = candidate_tables[0]
-
-    if element_table not in members or not members[element_table]:
-        raise ValueError(
-            f"Source dataset {source_dataset_rid} has no members in "
-            f"table '{element_table}'. Available tables with members: "
-            f"{[t for t, r in members.items() if r and t != 'Dataset']}"
-        )
-
-    member_records = members[element_table]
-    total = len(member_records)
-    logger.info(f"Found {total} members in table '{element_table}'")
-
-    # -------------------------------------------------------------------------
-    # Compute absolute sizes
-    # -------------------------------------------------------------------------
-    partition_sizes = _resolve_sizes(total, test_size, train_size, val_size)
-    size_summary = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
-    logger.info(f"Split sizes: {size_summary} (total={total})")
-
-    # -------------------------------------------------------------------------
-    # Determine selection strategy and get partition RIDs
-    # -------------------------------------------------------------------------
-    use_denormalization = stratify_by_column is not None or selection_fn is not None
-
-    if use_denormalization:
-        # Default row_per to the element table when stratifying, so
-        # the natural "one row per element" cardinality lines up with
-        # how the partitions are built downstream (RID lookups happen
-        # via the {element_table}.RID column). Callers who want a
-        # different row_per (e.g., one row per feature value when the
-        # feature-assoc table is in include_tables) can pass it
-        # explicitly. See issue #174 for the motivating case.
-        effective_row_per = row_per if row_per is not None else element_table
-        logger.info(
-            f"Denormalizing dataset with tables: {include_tables} (row_per={effective_row_per}, via={via or []})"
-        )
-        df = source_ds.get_denormalized_as_dataframe(
-            include_tables,
-            row_per=effective_row_per,
-            via=via,
-            ignore_unrelated_anchors=ignore_unrelated_anchors,
-        )
-        logger.info(f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns")
-
-        if stratify_by_column:
-            logger.info(f"Using stratified split on column: {stratify_by_column}")
-            selector = stratified_split(stratify_by_column, missing=stratify_missing)
-        else:
-            logger.info("Using custom selection function")
-            selector = selection_fn
-
-        partition_indices = selector(df, partition_sizes, seed)
-
-        # Map indices back to RIDs (dot notation: Table.RID)
-        rid_column = f"{element_table}.RID"
-        if rid_column not in df.columns:
-            rid_column = "RID"
-            if rid_column not in df.columns:
-                raise ValueError(
-                    f"Cannot find RID column. Tried '{element_table}.RID' and 'RID'. "
-                    f"Available columns: {list(df.columns)}"
-                )
-
-        partition_rids = {name: df.iloc[indices][rid_column].tolist() for name, indices in partition_indices.items()}
-
-    else:
-        all_rids = [record["RID"] for record in member_records]
-
-        if shuffle:
-            rng = np.random.default_rng(seed)
-            indices = np.arange(len(all_rids))
-            rng.shuffle(indices)
-            all_rids = [all_rids[i] for i in indices]
-
-        partition_rids = {}
-        offset = 0
-        for name, size in partition_sizes.items():
-            partition_rids[name] = all_rids[offset : offset + size]
-            offset += size
-
-    for name, rids in partition_rids.items():
-        logger.info(f"Selected {len(rids)} {name} RIDs")
-
-    # -------------------------------------------------------------------------
-    # Compute strategy description
-    # -------------------------------------------------------------------------
-    strategy_desc = f"stratified by {stratify_by_column}" if stratify_by_column else "random"
-    if selection_fn:
-        strategy_desc = "custom selection function"
-
-    # -------------------------------------------------------------------------
-    # Dry run
-    # -------------------------------------------------------------------------
+    # Dry-run early return — no catalog writes.
     if dry_run:
-        result = SplitResult(
+        return SplitResult(
             source=source_dataset_rid,
             split=PartitionInfo(rid="(dry run)", version="(dry run)", count=0),
             training=PartitionInfo(
@@ -915,32 +1213,17 @@ def split_dataset(
             seed=seed,
             dry_run=True,
         )
-        return result
 
-    # -------------------------------------------------------------------------
     # Ensure dataset-type vocabulary terms exist (Training, Testing,
     # Validation, Split, Labeled, Unlabeled). Workflow-type vocabulary is
-    # the caller's concern -- they registered the workflow that owns
+    # the caller's concern — they registered the workflow that owns
     # ``execution`` and chose its type.
-    # -------------------------------------------------------------------------
     _ensure_dataset_types(ml)
-
-    # -------------------------------------------------------------------------
-    # Create dataset hierarchy inside the caller's execution
-    # -------------------------------------------------------------------------
-    partitions_desc = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
-    auto_description = f"Split of dataset {source_dataset_rid} ({strategy_desc}, {partitions_desc}, seed={seed})"
-
-    exe = execution
-    logger.info("Splitting inside caller's execution %s", exe.execution_rid)
 
     train_types = ["Training"] + (training_types or [])
     test_types = ["Testing"] + (testing_types or [])
     val_types = ["Validation"] + (validation_types or []) if val_size is not None else []
 
-    # Save split parameters as config artifact. The caller's execution
-    # is responsible for uploading this on its own ``upload_execution_outputs``;
-    # we never call upload here.
     split_params = {
         "source_dataset_rid": source_dataset_rid,
         "test_size": test_size,
@@ -961,111 +1244,22 @@ def split_dataset(
         "validation_types": val_types if val_types else None,
         "strategy": strategy_desc,
     }
-    params_file = Path(exe.working_dir) / "split_config.json"
-    params_file.write_text(json.dumps(split_params, indent=2))
-    logger.info(f"  Saved split parameters to {params_file}")
 
-    # Create parent Split dataset
-    split_ds = exe.create_dataset(
-        description=split_description or auto_description,
-        dataset_types=["Split"],
-    )
-    logger.info(f"  Created Split dataset: {split_ds.dataset_rid}")
-
-    # Create Training dataset
-    training_ds = exe.create_dataset(
-        description=(
-            f"Training subset ({partition_sizes['Training']} samples) of "
-            f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
-        ),
-        dataset_types=train_types,
-    )
-    logger.info(f"  Created Training dataset: {training_ds.dataset_rid}")
-
-    # Create Validation dataset (if requested)
-    validation_ds = None
-    if val_size is not None:
-        validation_ds = exe.create_dataset(
-            description=(
-                f"Validation subset ({partition_sizes['Validation']} samples) of "
-                f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
-            ),
-            dataset_types=val_types,
-        )
-        logger.info(f"  Created Validation dataset: {validation_ds.dataset_rid}")
-
-    # Create Testing dataset
-    testing_ds = exe.create_dataset(
-        description=(
-            f"Testing subset ({partition_sizes['Testing']} samples) of "
-            f"{source_dataset_rid} ({strategy_desc}, seed={seed})"
-        ),
-        dataset_types=test_types,
-    )
-    logger.info(f"  Created Testing dataset: {testing_ds.dataset_rid}")
-
-    # Link children to parent
-    child_rids = [training_ds.dataset_rid, testing_ds.dataset_rid]
-    if validation_ds is not None:
-        child_rids.insert(1, validation_ds.dataset_rid)
-    split_ds.add_dataset_members(child_rids, validate=False)
-    logger.info("  Linked child datasets to Split dataset")
-
-    # Add members to each partition
-    batch_size = 500
-    for part_name, ds in [
-        ("Training", training_ds),
-        ("Validation", validation_ds),
-        ("Testing", testing_ds),
-    ]:
-        if ds is None:
-            continue
-        rids = partition_rids[part_name]
-        logger.info(f"  Adding {len(rids)} members to {part_name} dataset...")
-        for i in range(0, len(rids), batch_size):
-            batch = rids[i : i + batch_size]
-            ds.add_dataset_members({element_table: batch}, validate=False)
-            added = min(i + batch_size, len(rids))
-            if added % 2000 == 0 or added >= len(rids):
-                logger.info(f"    Added {added}/{len(rids)}")
-
-    # -------------------------------------------------------------------------
-    # Build result
-    # -------------------------------------------------------------------------
-    split_ds_info = ml.lookup_dataset(split_ds.dataset_rid)
-    training_ds_info = ml.lookup_dataset(training_ds.dataset_rid)
-    testing_ds_info = ml.lookup_dataset(testing_ds.dataset_rid)
-
-    validation_info = None
-    if validation_ds is not None:
-        validation_ds_info = ml.lookup_dataset(validation_ds.dataset_rid)
-        validation_info = PartitionInfo(
-            rid=validation_ds.dataset_rid,
-            version=str(validation_ds_info.current_version),
-            count=partition_sizes["Validation"],
-        )
-
-    return SplitResult(
-        source=source_dataset_rid,
-        split=PartitionInfo(
-            rid=split_ds.dataset_rid,
-            version=str(split_ds_info.current_version),
-            count=0,
-        ),
-        training=PartitionInfo(
-            rid=training_ds.dataset_rid,
-            version=str(training_ds_info.current_version),
-            count=partition_sizes["Training"],
-        ),
-        testing=PartitionInfo(
-            rid=testing_ds.dataset_rid,
-            version=str(testing_ds_info.current_version),
-            count=partition_sizes["Testing"],
-        ),
-        validation=validation_info,
-        strategy=strategy_desc,
+    return _create_split_hierarchy(
+        ml=ml,
+        execution=execution,
+        source_dataset_rid=source_dataset_rid,
+        partition_rids=partition_rids,
+        partition_sizes=partition_sizes,
+        strategy_desc=strategy_desc,
         element_table=element_table,
         seed=seed,
+        split_description=split_description,
+        training_types=training_types,
+        testing_types=testing_types,
+        validation_types=validation_types,
+        val_size=val_size,
+        split_params=split_params,
     )
 
 
