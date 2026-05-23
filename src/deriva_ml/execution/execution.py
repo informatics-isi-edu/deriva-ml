@@ -36,7 +36,6 @@ import logging
 import os
 import shutil
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, List
@@ -78,7 +77,6 @@ from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.dataset.aux_classes import DatasetSpec, DatasetVersion
 from deriva_ml.dataset.dataset import Dataset
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.execution.environment import get_execution_environment
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
 from deriva_ml.execution.state_machine import transition
@@ -540,132 +538,68 @@ class Execution:
         return instance
 
     def _save_runtime_environment(self):
-        runtime_env_path = self.asset_file_path(
-            asset_name="Execution_Metadata",
-            file_name=f"environment_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            asset_types=ExecMetadataType.runtime_env.value,
-            description=_ENV_SNAPSHOT_DESCRIPTION,
+        # Delegates to ``asset_upload.save_runtime_environment``
+        # — extracted in the Ex-god first sweep so the helper
+        # has a single home alongside the other asset-staging
+        # helpers in ``execution/asset_upload.py``.
+        from deriva_ml.execution.asset_upload import save_runtime_environment
+
+        save_runtime_environment(
+            self,
+            runtime_env_asset_type=ExecMetadataType.runtime_env.value,
+            env_snapshot_description=_ENV_SNAPSHOT_DESCRIPTION,
         )
-        with Path(runtime_env_path).open("w") as fp:
-            json.dump(get_execution_environment(), fp)
 
     def _upload_hydra_config_assets(self):
         """Register Hydra static config YAMLs as Execution_Metadata assets.
 
-        Walks ``<hydra_run_dir>/hydra-config/`` — the subdirectory Hydra
-        designates for the resolved configuration snapshots
-        (``config.yaml``, ``hydra.yaml``, ``overrides.yaml``). These are
-        immutable per-run artifacts written once at hydra-launch and the
-        actual provenance for "what configuration did this run use".
-
-        Deliberately does NOT walk the parent ``<hydra_run_dir>`` itself.
-        Hydra installs a job-logging ``FileHandler`` at
-        ``<hydra_run_dir>/<job_name>.log`` (e.g., ``notebook.log``) that
-        keeps appending log lines for the entire process — including
-        every ``logger.info`` from this very upload pass. Registering a
-        live, growing file as an immutable asset breaks the asset
-        contract ("the bytes you registered are the bytes that get
-        uploaded") and produces a known race in deriva-py's uploader:
-        the file's MD5 changes between hash-time and a subsequent
-        idempotency pre-check, the pre-check by ``MD5+Filename`` misses
-        the row that was already inserted, and a duplicate-RID INSERT
-        fires (HTTP 409). The job log is the *runner's* asset, not the
-        kernel's — see ``deriva_ml/run_notebook.py`` for the runner-side
-        registration that closes the FileHandler before staging the log.
+        Delegates to ``asset_upload.upload_hydra_config_assets``;
+        see that helper for the design notes on why this only
+        walks ``<hydra_run_dir>/hydra-config/`` and not the
+        parent directory.
         """
-        hydra_runtime_output_dir = self._ml_object.hydra_runtime_output_dir
-        if not hydra_runtime_output_dir:
-            return
-        config_dir = hydra_runtime_output_dir / "hydra-config"
-        if not config_dir.exists():
-            return  # tolerate older Hydra layouts that don't separate config from log
-        timestamp = hydra_runtime_output_dir.parts[-1]
-        for hydra_asset in config_dir.iterdir():
-            if hydra_asset.is_dir():
-                continue
-            # Register file for upload (side effect); result intentionally unused.
-            # Use Hydra_Config type for Hydra YAML configuration files.
-            self.asset_file_path(
-                asset_name=MLAsset.execution_metadata,
-                file_name=hydra_asset,
-                rename_file=f"hydra-{timestamp}-{hydra_asset.name}",
-                asset_types=ExecMetadataType.hydra_config.value,
-                description=self._get_metadata_description(hydra_asset.name),
-            )
+        from deriva_ml.execution.asset_upload import upload_hydra_config_assets
+
+        upload_hydra_config_assets(
+            self,
+            hydra_config_asset_type=ExecMetadataType.hydra_config.value,
+            metadata_descriptions=_METADATA_DESCRIPTIONS,
+            env_snapshot_description=_ENV_SNAPSHOT_DESCRIPTION,
+            execution_metadata_asset_name=MLAsset.execution_metadata,
+        )
 
     @staticmethod
     def _get_metadata_description(file_name: str) -> str | None:
         """Resolve a description for an execution metadata file.
 
-        Handles both direct filenames (configuration.json, uv.lock) and
-        hydra-renamed files (hydra-{timestamp}-{original_name}).
-
-        Args:
-            file_name: The filename as it appears in the catalog.
-
-        Returns:
-            A human-readable description, or None if the file is unrecognized.
+        Thin delegate to
+        ``asset_upload.get_metadata_description``; the module-level
+        constants are passed through so the helper stays
+        decoupled from this class's imports.
         """
-        if file_name in _METADATA_DESCRIPTIONS:
-            return _METADATA_DESCRIPTIONS[file_name]
+        from deriva_ml.execution.asset_upload import get_metadata_description
 
-        # Hydra renamed files: "hydra-{timestamp}-{original_name}"
-        if file_name.startswith("hydra-"):
-            for original, desc in _METADATA_DESCRIPTIONS.items():
-                if file_name.endswith(f"-{original}"):
-                    return desc
-
-        if file_name.startswith("environment_snapshot_"):
-            return _ENV_SNAPSHOT_DESCRIPTION
-
-        return None
+        return get_metadata_description(
+            file_name,
+            metadata_descriptions=_METADATA_DESCRIPTIONS,
+            env_snapshot_description=_ENV_SNAPSHOT_DESCRIPTION,
+        )
 
     def _set_asset_descriptions(self, uploaded_assets: dict[str, list[AssetFilePath]]) -> None:
         """Set Description on asset records after upload.
 
-        Applies descriptions from two sources:
-        1. Hardcoded descriptions for known execution metadata files.
-        2. User-provided descriptions passed via the ``description`` parameter
-           of ``asset_file_path()``.
-
-        Args:
-            uploaded_assets: Dict mapping "{schema}/{table}" to uploaded AssetFilePaths.
+        Delegates to ``asset_upload.set_asset_descriptions``;
+        see that helper for the manifest-snapshot performance
+        note and the two-source description-resolution rule.
         """
-        manifest = self._get_manifest()
-        pb = self._ml_object.pathBuilder()
+        from deriva_ml.execution.asset_upload import set_asset_descriptions
 
-        # Snapshot the manifest's asset entries ONCE. ``manifest.assets``
-        # is a property that calls ``ManifestStore.list_assets`` (a SQL
-        # SELECT) on every access. Reading it inside the inner loop ran
-        # one full-table SELECT per uploaded file — for a 10K-asset
-        # upload, ~10K serialized SQL round-trips totaling ~19 minutes
-        # on a localhost SSD (measured against an instrumented build).
-        # One read, one dict, in-memory lookups.
-        manifest_assets = manifest.assets
-
-        # Group updates by schema/table for batch efficiency
-        table_updates: dict[str, list[dict[str, str]]] = {}
-
-        for table_key, assets in uploaded_assets.items():
-            for asset in assets:
-                # Determine description: check manifest first, then fall back to
-                # hardcoded metadata descriptions for Execution_Metadata files.
-                table_name = table_key.split("/")[1] if "/" in table_key else table_key
-                manifest_key = f"{table_name}/{asset.file_name}"
-                entry = manifest_assets.get(manifest_key)
-
-                description = None
-                if entry and entry.description:
-                    description = entry.description
-                elif table_name == "Execution_Metadata":
-                    description = self._get_metadata_description(asset.file_name)
-
-                if description and asset.asset_rid:
-                    table_updates.setdefault(table_key, []).append({"RID": asset.asset_rid, "Description": description})
-
-        for table_key, updates in table_updates.items():
-            schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
-            pb.schemas[schema].tables[table_name].update(updates)
+        set_asset_descriptions(
+            self,
+            uploaded_assets,
+            metadata_descriptions=_METADATA_DESCRIPTIONS,
+            env_snapshot_description=_ENV_SNAPSHOT_DESCRIPTION,
+        )
 
     def _initialize_execution(self, reload: RID | None = None) -> None:
         """Initialize the execution environment.
@@ -1737,47 +1671,21 @@ class Execution:
     def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
         """Clean up folder contents and optionally the folder itself.
 
-        Removes all files and subdirectories within the specified folder.
-        Uses retry logic for Windows compatibility where files may be temporarily locked.
-
-        Args:
-            folder_path: Path to the folder to clean.
-            remove_folder: If True (default), also remove the folder itself after
-                cleaning its contents. If False, only remove contents.
+        Thin delegate to ``asset_upload.clean_folder_contents``.
+        The helper doesn't need ``self`` at all — it's a pure
+        filesystem op that lived on ``Execution`` for legacy
+        reasons. Preserved here as an instance method so the
+        existing in-class call sites
+        (``upload_execution_outputs``, ``__exit__``,
+        ``execution_stop``) still read naturally.
         """
-        MAX_RETRIES = 3
-        RETRY_DELAY = 1  # seconds
+        from deriva_ml.execution.asset_upload import clean_folder_contents
 
-        def remove_with_retry(path: Path, is_dir: bool = False) -> bool:
-            for attempt in range(MAX_RETRIES):
-                try:
-                    if is_dir:
-                        shutil.rmtree(path)
-                    else:
-                        Path(path).unlink()
-                    return True
-                except (OSError, PermissionError) as e:
-                    if attempt == MAX_RETRIES - 1:
-                        logging.warning(f"Failed to remove {path}: {e}")
-                        return False
-                    time.sleep(RETRY_DELAY)
-            return False
-
-        try:
-            # First remove all contents
-            with os.scandir(folder_path) as entries:
-                for entry in entries:
-                    if entry.is_dir() and not entry.is_symlink():
-                        remove_with_retry(Path(entry.path), is_dir=True)
-                    else:
-                        remove_with_retry(Path(entry.path))
-
-            # Then remove the folder itself if requested
-            if remove_folder:
-                remove_with_retry(folder_path, is_dir=True)
-
-        except OSError as e:
-            logging.warning(f"Failed to clean folder {folder_path}: {e}")
+        clean_folder_contents(
+            folder_path,
+            remove_folder=remove_folder,
+            logger=self._logger,
+        )
 
     def _update_asset_execution_table(
         self,
