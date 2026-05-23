@@ -19,12 +19,13 @@ DerivaML is a Python library (requires Python ≥3.12) for creating and executin
 export PATH="/Users/carl/.local/bin:$PATH"
 ```
 
-**Dirty workflow check**: DerivaML checks for uncommitted git changes before running workflows. For tests, set:
-```bash
-export DERIVA_ML_ALLOW_DIRTY=true
-```
-
-**Test catalog**: Tests require a running Deriva catalog server. Set `DERIVA_HOST` to specify the server (defaults to `localhost`). Tests take 30-90 minutes due to real catalog operations.
+**Dirty workflow check & test catalog**: DerivaML refuses to run
+workflows with uncommitted changes; tests set
+`DERIVA_ML_ALLOW_DIRTY=true` to bypass. Tests also need a live
+Deriva catalog at `DERIVA_HOST` (defaults to `localhost`). See
+the workspace-level [`CLAUDE.md`](../CLAUDE.md) "Dirty-tree
+override for testing" for the rule rationale; full suite is
+30–90 minutes.
 
 **Running long test suites from Claude Code**: The full test suite exceeds Claude Code's default 2-minute Bash timeout. Use these strategies:
 1. **Run test subsets incrementally** rather than the full suite at once:
@@ -131,6 +132,16 @@ results = pb.schemas[schema_name].tables[table_name].entities().fetch()
 - `{Asset}_Execution` tables link assets to executions with Input/Output roles
 - File uploads use Hatrac object store
 
+**Asset_Role contract**: Every execution-linked asset carries an
+`Asset_Role` of `Input` or `Output` on its `{Asset}_Execution` row
+**and** a directional `Input_File` / `Output_File` Asset_Type tag.
+deriva-ml assigns both — never the caller. Input role goes on
+assets materialized at execution start; Output role goes on
+assets uploaded via `bag_commit`. Pinned by
+`tests/execution/test_asset_role_contract.py`; user-facing
+description in `docs/user-guide/executions.md` ("How
+execution-asset roles work").
+
 **Verb naming (`find_*` vs `list_*`)**: deriva-ml's public-API methods
 follow a predictable verb-then-noun convention. Knowing the rule
 means you don't have to guess which method to reach for:
@@ -209,7 +220,7 @@ literal.
 Tests require a running Deriva catalog. Set `DERIVA_HOST` environment variable to specify the test server (defaults to `localhost`).
 
 **Core test infrastructure** (`tests/catalog_manager.py`):
-- `CatalogManager`: Session-scoped owner of the test catalog. Tracks state (EMPTY/POPULATED/DATASETS) and provides `ensure_populated()`, `ensure_datasets()`, `reset()`, and `get_ml_instance()`.
+- `CatalogManager`: Session-scoped owner of the test catalog. Tracks state via `CatalogState` (EMPTY → POPULATED → WITH_FEATURES → WITH_DATASETS, monotonic) and provides `ensure_populated()`, `ensure_features()`, `ensure_datasets()`, `reset()`, and `get_ml_instance()`.
 
 **Key fixtures** (`tests/conftest.py`):
 - `catalog_manager`: Session-scoped `CatalogManager` instance (primary entry point)
