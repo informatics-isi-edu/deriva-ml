@@ -385,6 +385,54 @@ class Execution:
                 ]
             )[0]["RID"]
 
+        # Ex-init2 (audit): the catalog row exists at this point.
+        # Everything below — environment file writes, dataset
+        # materialization, asset downloads, SQLite registry insert —
+        # can fail and leave an orphaned catalog Execution row. Wrap
+        # the post-insert work in a try/except that rolls back the
+        # catalog row before re-raising. ``reload`` and ``dry_run``
+        # paths skip the rollback because they never inserted a row
+        # in the first place.
+        _catalog_row_owned_by_us = (
+            not reload and not self._dry_run and self.execution_rid != DRY_RUN_RID
+        )
+        try:
+            self._post_catalog_init_init(reload, schema_path)
+        except Exception:
+            if _catalog_row_owned_by_us:
+                # Best-effort orphan cleanup; never mask the
+                # original failure with a delete-side error.
+                try:
+                    schema_path.Execution.filter(
+                        schema_path.Execution.RID == self.execution_rid
+                    ).delete()
+                    logger.warning(
+                        "create_execution %s: post-insert work failed; "
+                        "rolled back orphaned catalog Execution row.",
+                        self.execution_rid,
+                    )
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "create_execution %s: post-insert work failed AND "
+                        "orphan-rollback also failed (%s). Manual cleanup "
+                        "required: ``deriva-ml`` Execution row at this RID "
+                        "has no workspace SQLite sibling.",
+                        self.execution_rid,
+                        cleanup_exc,
+                    )
+            raise
+
+    def _post_catalog_init_init(self, reload, schema_path) -> None:
+        """The post-catalog-insert section of __init__.
+
+        Extracted (audit Ex-init2) so the wrapping try/except in
+        ``__init__`` can roll back the orphaned catalog row on
+        any failure here. Includes the
+        ``DERIVA_ML_SAVE_EXECUTION_RID`` write, workspace setup,
+        ExecutionRecord construction, dataset+asset download
+        (via ``_initialize_execution``), and the SQLite registry
+        insert.
+        """
         if rid_path := os.environ.get("DERIVA_ML_SAVE_EXECUTION_RID", None):
             # Put execution_rid into the provided file path so we can find it later.
             # Also include hydra_runtime_output_dir so an outer runner harness
@@ -435,6 +483,12 @@ class Execution:
         # existing execution (reload is not None), in which case the registry
         # entry was written by the original run and should not be overwritten.
         # Writing twice would corrupt the start-time and initial-status fields.
+        #
+        # Pre Ex-init2 fix this site wrapped its own try/except that just
+        # logged + re-raised, leaving an orphaned catalog row. The outer
+        # try/except in ``__init__`` now owns orphan rollback for any
+        # post-catalog-insert failure (this one, dataset materialization,
+        # asset download, environment writes), so the inner wrapper is gone.
         if not self._dry_run and reload is None:
             store = self._ml_object.workspace.execution_state_store()
             now = datetime.now(timezone.utc)
@@ -445,41 +499,25 @@ class Execution:
             # from a resume_execution call is faithful.
             config_json = self.configuration.model_dump_json()
 
-            try:
-                store.insert_execution(
-                    rid=self.execution_rid,
-                    workflow_rid=self.workflow_rid,
-                    description=self.configuration.description,
-                    config_json=config_json,
-                    status=ExecutionStatus.Created,
-                    mode=self._ml_object._mode,
-                    working_dir_rel=f"execution/{self.execution_rid}",
-                    created_at=now,
-                    last_activity=now,
-                )
-                # Persist the just-measured download duration through
-                # update_execution. Done as a follow-up write rather
-                # than baked into insert_execution so the insert
-                # signature stays focused on identity / config fields.
-                store.update_execution(
-                    self.execution_rid,
-                    download_duration=self._download_duration_str,
-                )
-            except Exception as exc:
-                # The catalog row is already created at this point —
-                # don't leave a catalog Execution with no SQLite sibling.
-                # Log and re-raise; the user can recover via
-                # lookup_execution, but workspace-based resume is
-                # impaired until the row is re-registered manually.
-                logger.error(
-                    "create_execution %s: catalog POST succeeded but "
-                    "SQLite registry write FAILED (%s). Execution can "
-                    "be recovered via ml.lookup_execution(rid) + manual "
-                    "adoption.",
-                    self.execution_rid,
-                    exc,
-                )
-                raise
+            store.insert_execution(
+                rid=self.execution_rid,
+                workflow_rid=self.workflow_rid,
+                description=self.configuration.description,
+                config_json=config_json,
+                status=ExecutionStatus.Created,
+                mode=self._ml_object._mode,
+                working_dir_rel=f"execution/{self.execution_rid}",
+                created_at=now,
+                last_activity=now,
+            )
+            # Persist the just-measured download duration through
+            # update_execution. Done as a follow-up write rather
+            # than baked into insert_execution so the insert
+            # signature stays focused on identity / config fields.
+            store.update_execution(
+                self.execution_rid,
+                download_duration=self._download_duration_str,
+            )
 
     @classmethod
     def from_registry(cls, *, ml_object, execution_rid: str) -> "Execution":
@@ -667,37 +705,49 @@ class Execution:
             schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
             pb.schemas[schema].tables[table_name].update(updates)
 
-    def _initialize_execution(self, reload: RID | None = None) -> None:
-        """Initialize the execution environment.
+    def _materialize_input_datasets(self, reload: RID | None) -> None:
+        """Materialize each input dataset and link it to the execution.
 
-        Sets up the working directory, downloads required datasets and assets,
-        and saves initial configuration metadata. Each input asset is placed at
-        ``<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>``
-        so two assets that share an asset table and ``Filename`` do not collide
-        on disk. After initialization, ``self.asset_paths`` maps asset-table
-        name to the list of ``AssetFilePath`` objects produced; use
-        ``AssetFilePath.file_name`` as the canonical read path.
+        For every ``DatasetSpec`` in :attr:`configuration.datasets`:
+
+        1. Download the bag (via :meth:`download_dataset_bag`).
+        2. Append it to :attr:`_datasets_list` and track the RID
+           in :attr:`dataset_rids`.
+
+        When this is a live run (not ``reload`` or ``dry_run``)
+        and at least one dataset is present, insert the
+        ``Dataset_Execution`` association rows in one batch.
 
         Args:
-            reload: Optional RID of a previously initialized execution to reload.
-
-        Raises:
-            DerivaMLException: If initialization fails.
+            reload: ``None`` for a fresh execution; an existing
+                RID when resuming.
         """
-        # Materialize bdbag
         for dataset in self.configuration.datasets:
             self._logger.info(f"Materialize bag {dataset.rid}... ")
             self._datasets_list.append(self.download_dataset_bag(dataset))
             self.dataset_rids.append(dataset.rid)
 
-        # Update execution info
         schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not (reload or self._dry_run):
             schema_path.Dataset_Execution.insert(
                 [{"Dataset": d, "Execution": self.execution_rid} for d in self.dataset_rids]
             )
 
-        # Download assets....
+    def _download_input_assets(self, reload: RID | None) -> None:
+        """Resolve every input asset RID and download to its per-asset slot.
+
+        Each asset lands at
+        ``<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>``
+        so two assets with the same ``Filename`` from the same
+        table don't collide on disk (common for prediction CSVs
+        emitted by parallel multirun children).
+
+        Args:
+            reload: ``None`` for a fresh execution; an existing
+                RID when resuming. The ``update_catalog`` flag on
+                :meth:`download_asset` is suppressed when
+                resuming or dry-running.
+        """
         self._logger.info("Downloading assets ...")
         self.asset_paths = {}
         # Batch-resolve every asset RID up front (one query per
@@ -723,13 +773,6 @@ class Execution:
             else:
                 rid_info_table = rid_info.table
             asset_table = rid_info_table.name
-            # Key per-asset download directory by ``asset_rid`` so two
-            # assets from the same table that happen to share the same
-            # ``Filename`` (a common case for prediction CSVs emitted by
-            # parallel multirun children) land on disjoint paths. Keying
-            # only by ``asset_table`` caused the second download to
-            # silently overwrite the first while still producing two
-            # ``AssetFilePath`` entries that pointed at the same bytes.
             dest_dir = (
                 execution_root(self._ml_object.working_dir, self.execution_rid)
                 / "downloaded-assets"
@@ -747,39 +790,97 @@ class Execution:
                 )
             )
 
-        # Save configuration details and upload (skip in dry_run mode)
-        if not reload and not self._dry_run:
-            # Save DerivaML configuration with Deriva_Config type
-            cfile = self.asset_file_path(
+    def _register_init_metadata(self) -> None:
+        """Stage configuration / uv.lock / Hydra config / runtime env for upload.
+
+        Writes the in-memory configuration to
+        ``configuration.json``, attaches ``uv.lock`` when the
+        workflow's git root carries one, registers Hydra config
+        assets (when running under hydra-zen), and snapshots the
+        runtime environment (Python version, package list, etc.)
+        for provenance.
+
+        These artifacts are staged into the manifest only; the
+        actual upload is :meth:`_upload_init_assets`.
+
+        Skipped in ``dry_run`` and ``reload`` modes — the caller
+        of :meth:`_initialize_execution` guards on this.
+        """
+        # Save DerivaML configuration with Deriva_Config type.
+        cfile = self.asset_file_path(
+            asset_name=MLAsset.execution_metadata,
+            file_name="configuration.json",
+            asset_types=ExecMetadataType.deriva_config.value,
+            description=_METADATA_DESCRIPTIONS["configuration.json"],
+        )
+        with Path(cfile).open("w", encoding="utf-8") as config_file:
+            json.dump(self.configuration.model_dump(mode="json"), config_file)
+
+        # Only try to copy uv.lock if git_root is available (local workflow).
+        if self.configuration.workflow.git_root:
+            lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
+        else:
+            lock_file = None
+        if lock_file and lock_file.exists():
+            _ = self.asset_file_path(
                 asset_name=MLAsset.execution_metadata,
-                file_name="configuration.json",
-                asset_types=ExecMetadataType.deriva_config.value,
-                description=_METADATA_DESCRIPTIONS["configuration.json"],
+                file_name=lock_file,
+                asset_types=ExecMetadataType.execution_config.value,
+                description=_METADATA_DESCRIPTIONS["uv.lock"],
             )
 
-            with Path(cfile).open("w", encoding="utf-8") as config_file:
-                json.dump(self.configuration.model_dump(mode="json"), config_file)
-            # Only try to copy uv.lock if git_root is available (local workflow)
-            if self.configuration.workflow.git_root:
-                lock_file = Path(self.configuration.workflow.git_root) / "uv.lock"
-            else:
-                lock_file = None
-            if lock_file and lock_file.exists():
-                _ = self.asset_file_path(
-                    asset_name=MLAsset.execution_metadata,
-                    file_name=lock_file,
-                    asset_types=ExecMetadataType.execution_config.value,
-                    description=_METADATA_DESCRIPTIONS["uv.lock"],
-                )
+        self._upload_hydra_config_assets()
+        self._save_runtime_environment()
 
-            self._upload_hydra_config_assets()
+    def _upload_init_assets(self) -> None:
+        """Commit the staged init-time assets so they land in the catalog.
 
-            # save runtime env
-            self._save_runtime_environment()
+        Pairs with :meth:`_register_init_metadata`: that method
+        stages files, this one commits them. Splitting keeps the
+        catalog-write boundary visible. Same skip-in-dry-run/reload
+        guard at the caller.
+        """
+        uploaded = self._bag_commit_upload()
+        self._set_asset_descriptions(uploaded)
 
+    def _initialize_execution(self, reload: RID | None = None) -> None:
+        """Initialize the execution environment.
+
+        Sets up the working directory, downloads required datasets and assets,
+        and saves initial configuration metadata. Each input asset is placed at
+        ``<working_dir>/<exec_rid>/downloaded-assets/<asset_table>/<asset_rid>/<Filename>``
+        so two assets that share an asset table and ``Filename`` do not collide
+        on disk. After initialization, ``self.asset_paths`` maps asset-table
+        name to the list of ``AssetFilePath`` objects produced; use
+        ``AssetFilePath.file_name`` as the canonical read path.
+
+        Post Ex-init extraction this method is a thin dispatcher
+        over four private helpers:
+
+        1. :meth:`_materialize_input_datasets` — bag downloads +
+           ``Dataset_Execution`` insert.
+        2. :meth:`_download_input_assets` — per-asset RID resolution
+           and download.
+        3. :meth:`_register_init_metadata` — config JSON + uv.lock
+           + Hydra config + runtime env staging. Skipped in
+           ``dry_run`` and ``reload`` modes.
+        4. :meth:`_upload_init_assets` — commit the staged
+           init-time assets. Same skip-in-dry-run/reload guard.
+
+        Args:
+            reload: Optional RID of a previously initialized execution to reload.
+
+        Raises:
+            DerivaMLException: If initialization fails.
+        """
+        self._materialize_input_datasets(reload)
+        self._download_input_assets(reload)
+
+        if not reload and not self._dry_run:
+            self._register_init_metadata()
             # Now upload the files so we have the info in case the execution fails.
-            uploaded = self._bag_commit_upload()
-            self._set_asset_descriptions(uploaded)
+            self._upload_init_assets()
+
         # NOTE(E3): `start_time` is no longer an instance attribute —
         # the authoritative value is written to SQLite by __enter__ via
         # state_machine.transition. `_initialize_execution` predates the
