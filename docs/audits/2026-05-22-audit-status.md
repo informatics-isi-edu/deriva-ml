@@ -1,6 +1,6 @@
 # 2026-05-22 audit — status summary
 
-**Last updated:** 2026-05-22 (after PR #217)
+**Last updated:** 2026-05-23 (after PR #221)
 
 The eight engineer-audit docs and the writer-audit doc dated
 2026-05-22 catalogued **5 P0**, **78 P1**, **139 P2**, and
@@ -39,10 +39,11 @@ Tracked in three categories matching the PR series:
 | Ex-init2 | `Execution.__init__` orphan-row rollback on partial init failure | #213 |
 | Ex-god (first sweep) | 5 asset-staging helpers → `asset_upload.py` | #216 |
 | Ex-god (second sweep) | `bag_commit_upload` + `update_asset_execution_table` → `asset_upload.py` | #217 |
+| Ex-god (third sweep) | Public-API surface → `asset_upload.py` | #219 |
 
-`execution.py` shrank from **2,692 → 2,387 LOC** across the two
-Ex-god sweeps. Further Ex-god work (the truly state-machine-tangled
-methods: `upload_execution_outputs`, `download_asset`,
+`execution.py` shrank from **2,692 → ~2,100 LOC** across the
+three Ex-god sweeps. Further Ex-god work (the truly
+state-machine-tangled methods: `download_asset`,
 `asset_file_path`, `metrics_file`) is **deferred to next minor**
 — their extraction wants the state-machine and manifest-store
 types to stabilize further first.
@@ -94,6 +95,16 @@ open" but cross-referencing each against current `main` showed
 they were almost all closed. Future audit cycles should consider
 striking-through fixed items in-place to avoid this drift.
 
+## Post-audit work shipped in the same cycle
+
+Work surfaced after the 2026-05-22 audit cutoff but addressed
+during the same sprint:
+
+| ID | Subject | PR |
+|---|---|---|
+| Output_File directional tag | bag_commit auto-adds `Output_File` to executed assets; `Execution_Execution` excluded from `find_asset_execution_tables`; user-guide + docstring + role-contract tests | #220 |
+| Asset/Dataset description setters | Symmetric write-through `@property`/`@setter` mirroring Workflow + ExecutionRecord; `update_field_in_catalog` accepts optional `schema_name` for domain-schema asset tables | #221 (closes #70) |
+
 ## P2 / P3 status
 
 **139 P2 + 90 P3 = 229 items.** Many already closed; remaining
@@ -117,9 +128,11 @@ diminishing returns because so many are already closed.
 These were called out in the audits and consciously deferred:
 
 1. **Ex-god full split** — remaining methods on `Execution`
-   (`upload_execution_outputs`, `download_asset`,
-   `asset_file_path`, `metrics_file`). The state-machine and
-   manifest-store types should stabilize first.
+   (`download_asset`, `asset_file_path`, `metrics_file`).
+   `upload_execution_outputs` was extracted in PR #219; the
+   remaining methods are the state-machine- and
+   manifest-store-tangled ones, and their extraction wants
+   those types to stabilize further first.
 
 2. **`_update_asset_execution_table` Output-branch consolidation**
    (audit `execution.py:1864-1899` P1) — the audit recommended

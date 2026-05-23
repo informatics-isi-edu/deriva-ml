@@ -541,26 +541,39 @@ A hash value (md5 or sha256) is required for each entry.
 
 See `deriva_download.py` in deriva-py for the reference implementation.
 
-### CatalogGraph and Dataset Export
+### Dataset bag-builder traversal
 
-`CatalogGraph` (`src/deriva_ml/dataset/catalog_graph.py`) traverses FK paths from the Dataset
-table to discover all reachable tables. It builds:
-- **Export specs** (`generate_dataset_download_spec`): Query processor definitions for bag export
-- **Aggregate queries** (`_aggregate_queries`): Datapath objects for `estimate_bag_size`
-- **Table paths** (`_table_paths`): ERMrest paths for export
+`src/deriva_ml/dataset/bag_builder.py` drives dataset export and size
+estimation via `deriva.bag.catalog_builder.CatalogBagBuilder`, per ADR-0006.
+`CatalogBagBuilder` walks FK paths from the Dataset RID to discover all
+reachable tables; deriva-ml supplies a `_SnapshotAwareCatalogBagBuilder`
+subclass that pins to a catalog snapshot and applies the per-table
+traversal policy.
 
-`estimate_bag_size` uses RID-union semantics: it fetches RID lists from all FK paths to each
-table and computes `set.union()` for exact counts. This handles the case where the same table
-is reachable via multiple FK paths with overlapping or disjoint rows.
+`estimate_bag_size` uses RID-union semantics: it fetches RID lists from
+all FK paths to each table and computes `set.union()` for exact counts.
+This handles the case where the same table is reachable via multiple
+FK paths with overlapping or disjoint rows.
+
+The previous `CatalogGraph` (`src/deriva_ml/dataset/catalog_graph.py`)
+that owned this logic was retired in the 2026-05 bag-client cutover —
+see `docs/archive/2026-05-bag-cutover/dataset-bag-cutover-2026-05.md`
+for the design that drove the replacement.
 
 ### Dataset Download Flow
 
-`download_dataset_bag` → `_get_dataset_minid` → `_create_dataset_bag_client` (or MINID path):
+`download_dataset_bag` → `get_dataset_minid` → (free-function pipeline
+in `dataset/bag_download.py`):
 1. Creates a bag directory structure
 2. Processes query_processors from the export spec (env, json, csv, fetch)
 3. Writes remote file manifest for assets (passed to `make_bag(remote_file_manifest=...)`)
 4. Archives the bag as a zip
-5. `_materialize_dataset_bag` then calls `bdb.materialize()` to fetch remote assets
+5. `materialize_dataset_bag` then calls `bdb.materialize()` to fetch remote assets
+
+(`get_dataset_minid` and `materialize_dataset_bag` are the
+free-function successors to the Dataset-method versions
+`_get_dataset_minid` / `_materialize_dataset_bag`, extracted in the
+2026-05 audit cycle.)
 
 ### restructure_assets Return Type
 

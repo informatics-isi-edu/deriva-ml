@@ -1,3 +1,47 @@
+Unreleased (since v1.37.14)
+
+- **`feat(asset,dataset)`: write-through description setters** (#221, closes #70). `Asset.description` and `Dataset.description` now use a `@property` / `@setter` pair that persists assignments to the catalog row, mirroring the symmetric pattern already in place on `Workflow` and `ExecutionRecord`. `update_field_in_catalog` in `execution/_helpers.py` gained an optional `schema_name` parameter so the same helper now serves both ML-schema (Workflow / Execution / Dataset) and domain-schema (Asset) callers.
+- **`fix(execution)`: Output_File directional tag + Execution_Execution exclusion** (#220). `bag_commit._add_asset_rows_to_bag` now auto-adds the `Output_File` directional Asset_Type to every asset uploaded after an execution — restores the public-API contract that every execution-linked asset carries an Input or Output role. `find_asset_execution_tables` excludes `Execution_Execution` (which is an execution-to-execution association, not an asset). Adds a "How execution-asset roles work" section to `docs/user-guide/executions.md` and a 5-test `test_asset_role_contract.py` regression suite.
+- **`refactor(execution)`: public-API surface extracted to `asset_upload.py`** (#219, audit P1 Ex-god, third sweep). `upload_execution_outputs` and several sibling methods moved out of `execution.py` into the asset-upload module. Brings the `execution.py` running total to ~600 LOC removed across the three Ex-god sweeps.
+- **`docs(audits)`: 2026-05-22 audit status summary** (#218). New `docs/audits/2026-05-22-audit-status.md` running ledger — tracks which P0/P1/P2/P3 items from the 9 audit reports have shipped vs. remain open.
+- **`refactor(execution)`: bag_commit_upload + update_asset_execution_table extracted** (#217, audit P1 Ex-god, second sweep). Second pass on the execution god-class — moves `_bag_commit_upload` and `update_asset_execution_table` out of `Execution` into `asset_upload.py`.
+
+Version 1.37.14
+
+- **`chore(execution)`: P1 sweep (part 1) — 9 audit findings** (#203). Correctness + coverage fixes across `execution/` subsystem; details in `docs/audits/2026-05-22-engineer-audit-execution.md`.
+
+Version 1.37.13
+
+- **`chore(model)`: P1 sweep — 10 audit findings** (#202). Correctness + cleanup + coverage fixes across `model/` subsystem.
+
+Version 1.37.12
+
+- **`chore(asset)`: P1 sweep — 7 audit findings** (#201). Correctness + cleanup + coverage fixes across `asset/` subsystem.
+
+Version 1.37.11
+
+- **`chore(catalog)`: P1 sweep — 6 audit findings** (#200). Docs + correctness + coverage fixes across `catalog/` subsystem.
+
+Version 1.37.10
+
+- **`chore(dataset)`: P1 sweep — 2 correctness bugs + 1 cleanup** (#199). Fixes a typo in `_version_snapshot_catalog` and rebuilds the `add_dataset_members` cycle check on a real graph walk; deletes two retired `DatasetBag` tombstones.
+
+Version 1.37.9
+
+- **`chore(schema)`: P1 sweep — 7 audit findings** (#198). Threads the `schema` parameter through `generate_annotation`, sorts iteration, honours `use_hatrac`; backfills docstrings on 3 public functions; adds direct unit tests for `asset_annotation` and `generate_annotation`.
+
+Version 1.37.8
+
+- **`chore(feature)`: P1 sweep — 3 audit findings** (#197). FK-classification coverage and docstring fixes.
+
+Version 1.37.7
+
+- **`chore(core)`: P1 sweep — 15 audit findings** (#196). Sweep across `core/` covering exceptions, type hints, dead-code removal, and coverage.
+
+Version 1.37.6
+
+- **fix-pack 2: eight documentation P0s** (#195). Eight documentation-only P0s from the technical-writer audit — corrected examples, missing args, drifted references.
+
 Version 1.37.5
 
 - **Six correctness P0 fixes from the 2026-05-22 pre-release audit** (#193). (1) `Workflow._github_url` now treats any non-empty `git status --porcelain` output as dirty, not just staged-modified files — fixes silent provenance corruption for repos with unstaged, untracked, deleted, or renamed files. (2) `FileSpec.create_filespecs` now reports each file's actual length under a directory walk (was reporting the parent directory's stat size). (3) `DatasetBag.find_features(None)` no longer crashes with TypeError; now delegates to the deduped catalog walk. (4) `FeatureRecord.select_majority_vote(column=None)` auto-detect works on the single-term-feature happy path (was crashing with `TypeError: 'set' object is not subscriptable`). (5) `AssetSpecConfig` now mirrors `AssetSpec` field-for-field — the hydra-zen surface had been silently missing `asset_role`. (6) Adds integration coverage for `localize_assets` (350-LoC public function, previously had zero end-to-end tests).
