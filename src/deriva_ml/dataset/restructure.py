@@ -99,10 +99,17 @@ def _default_dir_name_from_target(
             f"target_transform to derive a single directory name. "
             f"Provide target_transform=lambda rec: ... that returns a str."
         )
-    # Single FeatureRecord — find the first term/value column that has a value
+    # Single FeatureRecord — find the first term/value column that has a value.
+    # Skip the catalog's system columns (canonical
+    # ``DerivaSystemColumns``) plus the feature-table-specific
+    # ``Feature_Name`` and ``Execution`` columns. Pulling the
+    # system columns from the canonical constant means new ones
+    # (e.g. a future ``RVT``) propagate without a code change
+    # here — audit Ds-restr P2.
+    from deriva_ml.core.constants import DerivaSystemColumns
+
     record_data = target.model_dump()
-    # Skip well-known metadata columns to find the label column
-    _skip_cols = {"RID", "RCT", "RMT", "RCB", "RMB", "Feature_Name", "Execution"}
+    _skip_cols = {*DerivaSystemColumns, "Feature_Name", "Execution"}
     for col, val in record_data.items():
         if col in _skip_cols:
             continue
@@ -216,9 +223,12 @@ def _get_reachable_assets(bag, asset_table: str) -> list[dict[str, Any]]:
     sql_query = bag._dataset_table_view(asset_table)
 
     with Session(bag.engine) as session:
+        # ``.mappings().all()`` returns row mappings as
+        # public-API ``RowMapping`` objects — same shape as
+        # ``dict(row._mapping)`` but without reaching into a
+        # SQLAlchemy private attribute. Audit Ds-restr P3.
         result = session.execute(sql_query)
-        # Convert rows to dictionaries
-        rows = [dict(row._mapping) for row in result]
+        rows = [dict(m) for m in result.mappings().all()]
 
     return rows
 
@@ -245,6 +255,327 @@ def _detect_asset_table(bag) -> str | None:
         except (KeyError, AttributeError):
             continue
     return None
+
+
+def _validate_targets(targets: "list[str] | dict[str, FeatureSelector] | None") -> None:
+    """Reject the removed dotted ``"Feature.column"`` syntax with a migration hint.
+
+    Pre-Ds-restr this guard was inline in ``restructure_assets``;
+    pulling it out keeps the main function focused on
+    orchestration. The migration message is identical.
+
+    Args:
+        targets: As passed to :func:`restructure_assets`.
+
+    Raises:
+        DerivaMLValidationError: If any target string contains
+            a ``.`` separator.
+    """
+    if targets is None:
+        return
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    target_names = list(targets) if isinstance(targets, dict) else targets
+    for t in target_names:
+        if "." in t:
+            raise DerivaMLValidationError(
+                f"Dotted target syntax {t!r} is no longer supported. "
+                f"Replace with: targets=[{t.split('.')[0]!r}], "
+                f"target_transform=lambda rec: rec.{t.split('.')[1]}"
+            )
+
+
+def _classify_targets(
+    bag: "DatasetBag",
+    asset_table: str,
+    targets: "list[str] | dict[str, FeatureSelector] | None",
+) -> tuple["list[str] | dict[str, Any] | None", list[str]]:
+    """Split ``targets`` into a feature-only spec and a column-name list.
+
+    ``_resolve_targets`` only works with features (via
+    ``bag.feature_values``). Direct column names on the asset
+    table are handled separately. This helper probes each target
+    against ``bag.lookup_feature``; success → feature, failure →
+    column.
+
+    Args:
+        bag: The dataset bag to probe.
+        asset_table: The asset table whose features (and columns)
+            we're resolving against.
+        targets: As passed to :func:`restructure_assets`.
+
+    Returns:
+        Two-tuple ``(feature_targets_spec, column_targets)``:
+
+        - ``feature_targets_spec`` — a list of feature names
+          (when the caller passed a list) or a dict subset of
+          the caller's input (when the caller passed a dict).
+          ``None`` when no targets resolve as features.
+        - ``column_targets`` — names that don't resolve as
+          features; the caller treats these as direct columns
+          on the asset table.
+
+        Returns ``(None, [])`` when ``targets`` itself is ``None``.
+    """
+    if targets is None:
+        return None, []
+
+    target_names_list = list(targets) if isinstance(targets, dict) else list(targets)
+
+    feature_names: list[str] = []
+    column_targets: list[str] = []
+    for t_name in target_names_list:
+        try:
+            bag.lookup_feature(asset_table, t_name)
+            feature_names.append(t_name)
+        except Exception:
+            # Not a recognized feature on asset_table — treat as column.
+            column_targets.append(t_name)
+
+    feature_targets_spec: "list[str] | dict[str, Any] | None" = None
+    if feature_names:
+        if isinstance(targets, dict):
+            feature_targets_spec = {k: v for k, v in targets.items() if k in feature_names}
+        else:
+            feature_targets_spec = feature_names
+    return feature_targets_spec, column_targets
+
+
+def _resolve_source_path(
+    asset: dict[str, Any],
+    asset_table: str,
+    bag: "DatasetBag",
+) -> Path | None:
+    """Locate the on-disk source file for an asset record.
+
+    Tries the asset record's ``Filename`` field first; if that
+    doesn't exist on disk (the value may be a bare basename
+    stored in the SQLite cache pre-materialization), falls back
+    to the canonical BDBag layout
+    ``{bag.path}/data/asset/{RID}/{table}/{filename}``.
+
+    Args:
+        asset: Asset record dict (must have ``Filename``).
+        asset_table: Asset table name (used for the bag-layout
+            fallback path).
+        bag: The bag the asset lives in. Uses the public
+            ``bag.path`` property — pre-Ds-restr this reached
+            through ``bag._catalog._database_model.bag_path``
+            (audit P2).
+
+    Returns:
+        Path to the source file, or ``None`` if neither location
+        exists.
+    """
+    filename = asset.get("Filename")
+    if not filename:
+        return None
+    source_path = Path(filename)
+    if source_path.exists():
+        return source_path
+
+    # Fall back to the canonical BDBag asset layout.
+    # ``bag.path`` is the public API; pre-extraction this site
+    # reached through two private attributes
+    # (``bag._catalog._database_model.bag_path``) wrapped in a
+    # try/except AttributeError. The public property exists
+    # whenever the bag was constructed in the usual way; tests
+    # that build bags with truncated mocks can still hit
+    # ``AttributeError``, so keep the guard.
+    try:
+        bag_root = bag.path
+    except AttributeError:
+        return None
+    candidate = bag_root / "data" / "asset" / asset.get("RID", "") / asset_table / Path(filename).name
+    return candidate if candidate.exists() else None
+
+
+def _resolve_grouping_path(
+    *,
+    asset: dict[str, Any],
+    target_names_list: list[str],
+    column_targets: list[str],
+    feature_targets_spec: "list[str] | dict[str, Any] | None",
+    feature_target_map: dict[str, Any],
+    column_value_map: dict[str, dict[str, str]],
+    target_transform: Callable[..., str] | None,
+    missing: Literal["error", "skip", "unknown"],
+) -> tuple[list[str], bool]:
+    """Build the per-asset grouping path components.
+
+    Each ``targets`` entry contributes one directory level.
+    Resolution order:
+
+    - Column target → ``column_value_map[col][rid]`` (or
+      ``"Unknown"`` / skip / raise per ``missing``).
+    - Feature target → ``feature_target_map[rid]`` (single
+      ``FeatureRecord`` for single-target, ``dict`` for
+      multi-target). Default-derived from
+      ``_default_dir_name_from_target`` unless
+      ``target_transform`` is supplied.
+
+    Pre-Ds-restr this logic was inline in
+    :func:`restructure_assets` (~80 LOC); the extraction is
+    audit's first suggestion.
+
+    Args:
+        asset: The asset record (carries ``RID``).
+        target_names_list: Original ``targets`` keys in order.
+        column_targets: Names that resolve as direct columns
+            (not features). From :func:`_classify_targets`.
+        feature_targets_spec: As returned by
+            :func:`_classify_targets`. Used to detect the
+            "asset is absent from the feature map entirely"
+            condition.
+        feature_target_map: Output of ``_resolve_targets`` —
+            ``{rid: FeatureRecord | dict | None}``.
+        column_value_map: ``{col: {rid: str_value}}`` for
+            column targets.
+        target_transform: As passed to
+            :func:`restructure_assets`.
+        missing: ``"error" | "skip" | "unknown"`` policy.
+
+    Returns:
+        Two-tuple ``(group_path, skip_asset)``. ``group_path`` is
+        the list of directory components (in order); the caller
+        appends to the type-derived prefix. ``skip_asset=True``
+        means the caller should omit this asset entirely
+        (``missing="skip"`` triggered).
+
+    Raises:
+        DerivaMLException: If ``missing="error"`` and a target
+            value is absent.
+        DerivaMLValidationError: If ``target_transform`` returns
+            a non-``str``.
+    """
+    from deriva_ml.core.exceptions import DerivaMLValidationError
+
+    asset_rid = asset.get("RID")
+    feature_raw = feature_target_map.get(asset_rid)
+    group_path: list[str] = []
+
+    # If the RID is absent from the feature_target_map entirely AND
+    # there are feature targets, apply the missing policy at the
+    # group level.
+    if feature_targets_spec and asset_rid not in feature_target_map:
+        if missing == "skip":
+            return [], True
+        if missing == "error":
+            raise DerivaMLException(
+                f"Asset {asset_rid!r} has no value for target feature(s). "
+                f"Pass missing='skip' to drop unlabeled assets, or "
+                f"missing='unknown' to place them in Unknown/."
+            )
+        # missing="unknown": column targets get their values,
+        # feature targets get "Unknown".
+        for t_name in target_names_list:
+            if t_name in column_targets:
+                col_val = column_value_map.get(t_name, {}).get(asset_rid)
+                group_path.append(str(col_val) if col_val is not None else "Unknown")
+            else:
+                group_path.append("Unknown")
+        return group_path, False
+
+    # Normal path: resolve each target in order.
+    for t_name in target_names_list:
+        if t_name in column_targets:
+            col_val = column_value_map.get(t_name, {}).get(asset_rid)
+            if col_val is not None:
+                if target_transform is not None:
+                    dir_name = target_transform(col_val)
+                    if not isinstance(dir_name, str):
+                        raise DerivaMLValidationError(
+                            f"restructure_assets target_transform must return str "
+                            f"(for directory naming); got {type(dir_name).__name__}"
+                        )
+                else:
+                    dir_name = col_val
+            else:
+                if missing == "error":
+                    raise DerivaMLException(
+                        f"Asset {asset_rid!r} has no value for column target {t_name!r}. "
+                        f"Pass missing='skip' to drop unlabeled assets, or "
+                        f"missing='unknown' to place them in Unknown/."
+                    )
+                if missing == "skip":
+                    return [], True
+                dir_name = "Unknown"
+            group_path.append(dir_name)
+        else:
+            # Feature-based target — look up from feature_target_map.
+            # feature_raw is either FeatureRecord (single) or
+            # dict[str, FeatureRecord] (multi-feature).
+            if feature_raw is None:
+                per_feature_val = None
+            elif isinstance(feature_raw, dict):
+                per_feature_val = feature_raw.get(t_name)
+            else:
+                # Single feature target — feature_raw IS the FeatureRecord.
+                per_feature_val = feature_raw
+
+            if per_feature_val is None:
+                dir_name = "Unknown"
+            elif target_transform is not None:
+                dir_name = target_transform(per_feature_val)
+                if not isinstance(dir_name, str):
+                    raise DerivaMLValidationError(
+                        f"restructure_assets target_transform must return str "
+                        f"(for directory naming); got {type(dir_name).__name__}"
+                    )
+            else:
+                dir_name = _default_dir_name_from_target(per_feature_val, [t_name])
+            group_path.append(dir_name)
+
+    return group_path, False
+
+
+def _place_asset(
+    source_path: Path,
+    target_path: Path,
+    *,
+    file_transformer: Callable[[Path, Path], Path] | None,
+    use_symlinks: bool,
+) -> Path:
+    """Write the asset to ``target_path``, returning the actual written path.
+
+    Three modes, in priority order:
+
+    1. ``file_transformer`` provided → call it with
+       ``(source, target)`` and return its result. The
+       transformer owns the write (may change extension / format).
+       ``use_symlinks`` is ignored.
+    2. ``use_symlinks=True`` → ``target_path.symlink_to`` with a
+       ``shutil.copy2`` fallback when the OS refuses symlinks.
+    3. Otherwise → ``shutil.copy2``.
+
+    The caller is responsible for clearing any existing file at
+    ``target_path`` before invoking this helper.
+
+    Args:
+        source_path: On-disk source file (resolved by
+            :func:`_resolve_source_path`).
+        target_path: Suggested destination
+            (``output_dir/.../filename``).
+        file_transformer: Optional callable; see mode 1.
+        use_symlinks: When ``True``, prefer symlinks (mode 2);
+            ignored when ``file_transformer`` is given.
+
+    Returns:
+        Actual path written. For modes 2 and 3 this is
+        ``target_path``; for mode 1 it's whatever the
+        transformer returned.
+    """
+    if file_transformer is not None:
+        return file_transformer(source_path, target_path)
+    if use_symlinks:
+        try:
+            target_path.symlink_to(source_path.resolve())
+        except OSError as e:
+            logger.warning(f"Symlink failed, falling back to copy: {e}")
+            shutil.copy2(source_path, target_path)
+        return target_path
+    shutil.copy2(source_path, target_path)
+    return target_path
 
 
 def restructure_assets(
@@ -475,28 +806,28 @@ def restructure_assets(
             paths are alternatives, not a pipeline — pick one per the
             User Guide "How to feed a bag to a training framework".
     """
-    from deriva_ml.core.exceptions import DerivaMLValidationError
+    # Post Ds-restr extraction, this function orchestrates four
+    # helpers (above):
+    #
+    # 1. ``_validate_targets`` — reject the removed dotted syntax.
+    # 2. ``_classify_targets`` — split into feature vs column.
+    # 3. ``_resolve_grouping_path`` — per-asset directory resolution.
+    # 4. ``_place_asset`` — write the file (symlink / copy / transform).
+    #
+    # ``_resolve_source_path`` handles the on-disk lookup with the
+    # public ``bag.path`` API (pre-Ds-restr this reached through
+    # ``bag._catalog._database_model.bag_path``).
+
     from deriva_ml.dataset.target_resolution import _resolve_targets
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Validate targets: dotted "Feature.column" syntax is removed
-    if targets is not None:
-        target_names = list(targets) if isinstance(targets, dict) else targets
-        for t in target_names:
-            if "." in t:
-                raise DerivaMLValidationError(
-                    f"Dotted target syntax {t!r} is no longer supported. "
-                    f"Replace with: targets=[{t.split('.')[0]!r}], "
-                    f"target_transform=lambda rec: rec.{t.split('.')[1]}"
-                )
+    _validate_targets(targets)
 
-    # Default type-to-directory mapping
     if type_to_dir_map is None:
         type_to_dir_map = {"Training": "training", "Testing": "testing", "Unknown": "unknown"}
 
-    # Auto-detect asset table if not provided
     if asset_table is None:
         asset_table = _detect_asset_table(bag)
         if asset_table is None:
@@ -506,7 +837,7 @@ def restructure_assets(
             )
         logger.info(f"Auto-detected asset table: {asset_table}")
 
-    # Step 1: Build dataset type path map with directory name mapping
+    # Step 1: Build dataset type path map with directory name mapping.
     def map_type_to_dir(types: list[str]) -> str | None:
         """Map dataset types to directory name using type_to_dir_map.
 
@@ -517,7 +848,6 @@ def restructure_assets(
         still be traversed and their own types will determine the path.
         """
         if not types:
-            # No types defined - treat as Testing for prediction scenarios
             return type_to_dir_map.get("Testing", "testing")
         if type_selector:
             selected_type = type_selector(types)
@@ -525,222 +855,93 @@ def restructure_assets(
             selected_type = types[0]
         if selected_type in type_to_dir_map:
             return type_to_dir_map[selected_type]
-        # Type not explicitly mapped — treat as transparent container
         return None
 
     type_path_map = _build_dataset_type_path_map(bag, map_type_to_dir)
 
-    # Step 2: Get asset-to-dataset mapping
+    # Step 2: Asset → dataset mapping.
     asset_dataset_map = _get_asset_dataset_mapping(bag, asset_table)
 
-    # Step 3: Separate feature-based targets from column-based targets.
-    # _resolve_targets only works with features (via bag.feature_values).
-    # Direct column names on the asset table must be handled separately.
+    # Step 3: Classify targets, then resolve features.
+    feature_targets_spec, column_targets = _classify_targets(bag, asset_table, targets)
+    target_names_list = list(targets) if isinstance(targets, dict) else (list(targets) if targets else [])
+
     feature_target_map: dict[str, Any] = {}
-    column_targets: list[str] = []
-    feature_targets_spec: "list[str] | dict[str, Any] | None" = None
+    if feature_targets_spec:
+        # ``enforce_vocabulary`` is enforced inside ``_resolve_targets``
+        # so the validation happens at the same boundary as resolution.
+        feature_target_map = _resolve_targets(
+            bag,
+            asset_table,
+            targets=feature_targets_spec,
+            missing=missing,
+            enforce_vocabulary=enforce_vocabulary,
+        )
 
-    if targets is not None:
-        target_names_list = list(targets) if isinstance(targets, dict) else list(targets)
-
-        # Classify each target as feature or column by probing lookup_feature.
-        feature_names: list[str] = []
-        for t_name in target_names_list:
-            try:
-                bag.lookup_feature(asset_table, t_name)
-                feature_names.append(t_name)
-            except Exception:
-                # Not a recognized feature on asset_table — treat as column
-                column_targets.append(t_name)
-
-        # Build the feature-only targets spec to pass to _resolve_targets
-        if feature_names:
-            if isinstance(targets, dict):
-                feature_targets_spec = {k: v for k, v in targets.items() if k in feature_names}
-            else:
-                feature_targets_spec = feature_names
-
-        # Call _resolve_targets only for feature-based targets.
-        # ``enforce_vocabulary`` is enforced inside _resolve_targets so the
-        # validation happens once at the same boundary as the resolution.
-        if feature_targets_spec:
-            feature_target_map = _resolve_targets(
-                bag,
-                asset_table,
-                targets=feature_targets_spec,
-                missing=missing,
-                enforce_vocabulary=enforce_vocabulary,
-            )
-
-    # Step 4: For column-based targets, load a simple {rid: value_str} map
-    # by scanning all asset records once.
-    column_value_map: dict[str, dict[str, str]] = {col: {} for col in column_targets}
-
-    # Step 6: Get all assets reachable through FK paths
+    # Step 4: Fetch reachable assets through FK paths.
     assets = _get_reachable_assets(bag, asset_table)
 
     manifest: dict[Path, Path] = {}
-
     if not assets:
         logger.warning(f"No assets found in table '{asset_table}'")
         return manifest
 
-    # Populate column_value_map from the asset records
+    # Step 5: Build the per-column lookup map by walking assets once.
+    column_value_map: dict[str, dict[str, str]] = {col: {} for col in column_targets}
     for asset in assets:
         for col in column_targets:
             val = asset.get(col)
             if val is not None:
                 column_value_map[col][asset["RID"]] = str(val)
 
-    # Step 7: Process each asset
+    # Step 6: Process each asset.
     for asset in assets:
         asset_rid = asset.get("RID")
 
-        # Get source file path
-        filename = asset.get("Filename")
-        if not filename:
-            logger.warning(f"Asset {asset_rid} has no Filename")
+        source_path = _resolve_source_path(asset, asset_table, bag)
+        if source_path is None:
+            filename = asset.get("Filename")
+            if not filename:
+                logger.warning(f"Asset {asset_rid} has no Filename")
+            else:
+                logger.warning(f"Asset file not found: {filename}")
             continue
 
-        source_path = Path(filename)
-        if not source_path.exists():
-            # Filename may be a bare basename stored in the SQLite cache
-            # before image materialization.  Fall back to the canonical
-            # BDBag asset layout: data/asset/{RID}/{table}/{filename}.
-            try:
-                bag_root = Path(bag._catalog._database_model.bag_path)
-                source_path = bag_root / "data" / "asset" / asset.get("RID", "") / asset_table / Path(filename).name
-            except AttributeError:
-                pass  # catalog doesn't have _database_model (e.g. in tests)
+        type_path = type_path_map.get(asset_dataset_map.get(asset_rid), ["unknown"])
 
-        if not source_path.exists():
-            logger.warning(f"Asset file not found: {filename}")
-            continue
-
-        # Get dataset type path
-        dataset_rid = asset_dataset_map.get(asset_rid)
-        type_path = type_path_map.get(dataset_rid, ["unknown"])
-
-        # Resolve grouping path components from targets.
-        # Each target name contributes one directory level. Target names are
-        # processed in order (column targets get column lookup; feature targets
-        # get resolution from feature_target_map built by _resolve_targets above).
-        group_path: list[str] = []
-        skip_asset = False
-
-        if targets is not None:
-            target_names_list = list(targets) if isinstance(targets, dict) else list(targets)
-            # For single-feature target, feature_target_map[rid] is FeatureRecord|None.
-            # For multi-feature target, feature_target_map[rid] is dict[str, FeatureRecord].
-            # We unpack accordingly when passing to target_transform or _default_dir_name_from_target.
-            feature_raw = feature_target_map.get(asset_rid)
-
-            # If the RID is absent from the feature_target_map entirely AND there are
-            # feature targets, apply the missing policy at the group level.
-            if feature_targets_spec and asset_rid not in feature_target_map:
-                if missing == "skip":
-                    skip_asset = True
-                elif missing == "error":
-                    raise DerivaMLException(
-                        f"Asset {asset_rid!r} has no value for target feature(s). "
-                        f"Pass missing='skip' to drop unlabeled assets, or "
-                        f"missing='unknown' to place them in Unknown/."
-                    )
-                else:
-                    # missing="unknown": place in Unknown dir
-                    # Build partial path from column targets, then add Unknown for features
-                    for t_name in target_names_list:
-                        if t_name in column_targets:
-                            col_val = column_value_map.get(t_name, {}).get(asset_rid)
-                            group_path.append(str(col_val) if col_val is not None else "Unknown")
-                        else:
-                            group_path.append("Unknown")
-            elif not skip_asset:
-                # Normal path: resolve each target in order
-                for t_name in target_names_list:
-                    if t_name in column_targets:
-                        # Column-based target
-                        col_val = column_value_map.get(t_name, {}).get(asset_rid)
-                        if col_val is not None:
-                            if target_transform is not None:
-                                dir_name = target_transform(col_val)
-                                if not isinstance(dir_name, str):
-                                    raise DerivaMLValidationError(
-                                        f"restructure_assets target_transform must return str "
-                                        f"(for directory naming); got {type(dir_name).__name__}"
-                                    )
-                            else:
-                                dir_name = col_val
-                        else:
-                            # Missing column value
-                            if missing == "error":
-                                raise DerivaMLException(
-                                    f"Asset {asset_rid!r} has no value for column target {t_name!r}. "
-                                    f"Pass missing='skip' to drop unlabeled assets, or "
-                                    f"missing='unknown' to place them in Unknown/."
-                                )
-                            elif missing == "skip":
-                                skip_asset = True
-                                break
-                            else:
-                                dir_name = "Unknown"
-                        group_path.append(dir_name)
-                    else:
-                        # Feature-based target: look up from feature_target_map
-                        # feature_raw is either FeatureRecord (single) or
-                        # dict[str, FeatureRecord] (multi-feature). Extract for this feature.
-                        if feature_raw is None:
-                            per_feature_val = None
-                        elif isinstance(feature_raw, dict):
-                            per_feature_val = feature_raw.get(t_name)
-                        else:
-                            # Single feature target — feature_raw IS the FeatureRecord
-                            per_feature_val = feature_raw
-
-                        if per_feature_val is None:
-                            dir_name = "Unknown"
-                        elif target_transform is not None:
-                            dir_name = target_transform(per_feature_val)
-                            if not isinstance(dir_name, str):
-                                raise DerivaMLValidationError(
-                                    f"restructure_assets target_transform must return str "
-                                    f"(for directory naming); got {type(dir_name).__name__}"
-                                )
-                        else:
-                            dir_name = _default_dir_name_from_target(per_feature_val, [t_name])
-                        group_path.append(dir_name)
-
+        # Resolve per-asset grouping path. ``targets is None`` is
+        # the no-grouping path — the helper short-circuits via
+        # an empty ``target_names_list``.
+        if targets is None:
+            group_path, skip_asset = [], False
+        else:
+            group_path, skip_asset = _resolve_grouping_path(
+                asset=asset,
+                target_names_list=target_names_list,
+                column_targets=column_targets,
+                feature_targets_spec=feature_targets_spec,
+                feature_target_map=feature_target_map,
+                column_value_map=column_value_map,
+                target_transform=target_transform,
+                missing=missing,
+            )
         if skip_asset:
             continue
 
-        # Build target directory
         target_dir = output_dir.joinpath(*type_path, *group_path)
         target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Suggested destination preserves the original filename
         target_path = target_dir / source_path.name
 
-        # Handle existing files at the suggested destination
+        # Clear any existing file at the suggested destination.
         if target_path.exists() or target_path.is_symlink():
             target_path.unlink()
 
-        if file_transformer is not None:
-            # Transformer is responsible for writing the output file.
-            # It receives the suggested dest and returns the actual path written,
-            # which may differ in name or extension (e.g. DICOM -> PNG).
-            actual_path = file_transformer(source_path, target_path)
-        elif use_symlinks:
-            try:
-                target_path.symlink_to(source_path.resolve())
-            except OSError as e:
-                # Fall back to copy on platforms that don't support symlinks
-                logger.warning(f"Symlink failed, falling back to copy: {e}")
-                shutil.copy2(source_path, target_path)
-            actual_path = target_path
-        else:
-            shutil.copy2(source_path, target_path)
-            actual_path = target_path
-
+        actual_path = _place_asset(
+            source_path,
+            target_path,
+            file_transformer=file_transformer,
+            use_symlinks=use_symlinks,
+        )
         manifest[source_path] = actual_path
 
     return manifest
