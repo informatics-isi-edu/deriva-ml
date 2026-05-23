@@ -326,6 +326,69 @@ class TestAssetMetadata:
 
 
 # =============================================================================
+# TestAssetDescriptionSetter - write-through description (issue #70)
+# =============================================================================
+
+
+class TestAssetDescriptionSetter:
+    """Pin the write-through description setter on Asset.
+
+    Pre-issue-#70, ``asset.description = "new"`` only updated the
+    in-memory attribute; the catalog row was unchanged. The
+    setter now writes both, mirroring the pattern already in
+    place on :class:`Workflow` and :class:`ExecutionRecord`.
+    """
+
+    def test_description_assignment_writes_to_catalog(self, basic_execution):
+        """``asset.description = "new"`` persists to the catalog row."""
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "desc_write.txt", "x")
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        asset = ml.lookup_asset(asset_rid)
+        new_desc = "Updated via setter — issue #70"
+
+        # Write-through assignment.
+        asset.description = new_desc
+
+        # In-memory side updated.
+        assert asset.description == new_desc
+
+        # Catalog round-trip: a fresh lookup sees the new value.
+        refreshed = ml.lookup_asset(asset_rid)
+        assert refreshed.description == new_desc
+
+    def test_description_read_returns_initial_value(self, basic_execution):
+        """The getter returns whatever was passed at construction (no catalog read).
+
+        For a freshly uploaded asset with no description set, the
+        catalog ``Description`` column is NULL, so the getter
+        returns None. Once written via the setter, the getter
+        returns the written value.
+        """
+        ml = basic_execution._ml_object
+
+        with basic_execution.execute() as execution:
+            create_test_asset(execution, "desc_read.txt", "x")
+        uploaded = basic_execution.upload_execution_outputs()
+        asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
+
+        asset = ml.lookup_asset(asset_rid)
+        # No description was ever written to this asset's row — the
+        # getter mirrors what ``lookup_asset`` populated (None or "").
+        initial = asset.description
+        assert initial is None or isinstance(initial, str)
+
+        # After a write, the getter reflects the written value
+        # without re-reading the catalog.
+        asset.description = "set via setter"
+        assert asset.description == "set via setter"
+
+
+# =============================================================================
 # TestAssetDownload - bare-bytes download primitive (audit P1 A3)
 # =============================================================================
 

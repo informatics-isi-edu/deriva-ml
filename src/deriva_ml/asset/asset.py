@@ -35,11 +35,12 @@ from deriva_ml.core.exceptions import NoAssociationException
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution_record import ExecutionRecord
-    from deriva_ml.feature import Feature, FeatureRecord
+    from deriva_ml.feature import Feature
     from deriva_ml.interfaces import DerivaMLCatalog
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+
 from deriva_ml.core.logging_config import get_logger
 
 _ermrest_model = importlib.import_module("deriva.core.ermrest_model")
@@ -89,7 +90,7 @@ class Asset:
         url: str = "",
         length: int = 0,
         md5: str = "",
-        description: str = "",
+        description: str | None = "",
         asset_types: list[str] | None = None,
         execution_rid: RID | None = None,
     ):
@@ -122,7 +123,11 @@ class Asset:
         self.url = url
         self.length = length
         self.md5 = md5
-        self.description = description
+        # ``description`` is exposed via a @property/@setter (below)
+        # for write-through to the catalog. Store the underlying
+        # value in ``_description`` so the setter has somewhere
+        # to write without invoking itself.
+        self._description = description
         self._asset_types = asset_types or []
         self._execution_rid = execution_rid
         # Lazy cache for ``_asset_type_path``. ``self.asset_table``
@@ -136,6 +141,82 @@ class Asset:
         return (
             f"<deriva_ml.Asset at {hex(id(self))}: rid='{self.asset_rid}', "
             f"table='{self.asset_table}', file='{self.filename}', types={self._asset_types}>"
+        )
+
+    @property
+    def description(self) -> str | None:
+        """The asset's human-readable description.
+
+        Read returns the cached in-memory value. Write performs a
+        **write-through** update: assigning
+        ``asset.description = "new"`` updates both the in-memory
+        attribute and the ``Description`` column on the asset's
+        catalog row.
+
+        This is the symmetric counterpart of
+        :attr:`Workflow.description` and
+        :attr:`ExecutionRecord.description` — every typed-entity
+        class with a catalog-backed description now writes
+        through on assignment. Issue #70.
+
+        Returns:
+            The description string, or ``None`` when the
+            catalog ``Description`` column is NULL.
+
+        Example:
+            >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
+            >>> asset.description = "Refined OCT scan, July 2026"  # doctest: +SKIP
+            >>> # Catalog ``Asset.Description`` is now updated;
+            >>> # ``asset.description`` reads "Refined OCT scan, July 2026".
+        """
+        return self._description
+
+    @description.setter
+    def description(self, value: str | None) -> None:
+        """Update the asset description in the catalog and in memory.
+
+        Args:
+            value: The new description text.
+
+        Raises:
+            DerivaMLException: If the asset is bound to a
+                read-only catalog snapshot or the catalog
+                connection is missing.
+        """
+        if self._ml_instance is not None:
+            self._update_description_in_catalog(value)
+        self._description = value
+
+    def _update_description_in_catalog(self, new_description: str | None) -> None:
+        """Write the description to the asset's catalog row.
+
+        Pulls the schema name from
+        ``model.name_to_table(self.asset_table).schema.name`` so
+        the helper picks up asset tables in any domain schema —
+        Asset tables aren't always in the ML schema (unlike
+        Workflow, Execution, Dataset which are).
+
+        Raises:
+            DerivaMLException: If the catalog is unwritable.
+        """
+        from deriva_ml.execution._helpers import (
+            check_writable_catalog,
+            update_field_in_catalog,
+        )
+
+        check_writable_catalog(
+            rid=self.asset_rid,
+            ml_instance=self._ml_instance,
+            entity_label="Asset",
+            operation="update description",
+        )
+        asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
+        update_field_in_catalog(
+            rid=self.asset_rid,
+            ml_instance=self._ml_instance,
+            table_name=self.asset_table,
+            updates={"Description": new_description},
+            schema_name=asset_table_obj.schema.name,
         )
 
     def _asset_type_path(self) -> tuple[Any, str]:
