@@ -63,8 +63,17 @@ class TestFindAssetExecutionTablesCaching:
             del model._asset_execution_tables_cache
         return model
 
-    def test_finds_execution_association_tables_excludes_dataset(self):
-        """``*_Execution`` tables yielded; ``Dataset_Execution`` excluded."""
+    def test_finds_execution_association_tables_excludes_non_asset_tables(self):
+        """``*_Execution`` tables yielded; ``Dataset_Execution`` and
+        ``Execution_Execution`` excluded.
+
+        Both excluded tables end in ``_Execution`` but neither is an
+        asset-to-execution association table — sweeping them into the
+        ``list_assets(asset_role=...)`` walk would either return zero
+        matches (Dataset_Execution; harmless) or crash with
+        ``AttributeError`` on the missing ``Asset_Role`` column
+        (Execution_Execution; correctness-critical).
+        """
         model = self._build_fake_model(
             domain_schemas=["my_domain"],
             ml_schema="deriva-ml",
@@ -74,8 +83,9 @@ class TestFindAssetExecutionTablesCaching:
                     "Execution",
                     "Execution_Asset",
                     "Execution_Asset_Execution",
+                    "Execution_Execution",  # nested-execution; must be excluded
                     "Dataset",
-                    "Dataset_Execution",  # must be excluded
+                    "Dataset_Execution",  # dataset linkage; must be excluded
                 ],
             },
         )
@@ -85,6 +95,9 @@ class TestFindAssetExecutionTablesCaching:
         assert "Execution_Asset_Execution" in names
         # Dataset_Execution is the dataset linkage, not an asset linkage.
         assert "Dataset_Execution" not in names
+        # Execution_Execution is the nested-execution hierarchy table
+        # — no Asset_Role column. Including it crashes list_assets.
+        assert "Execution_Execution" not in names
         # Pure data tables (no _Execution suffix) excluded too.
         assert "Image" not in names
         assert "Execution" not in names
