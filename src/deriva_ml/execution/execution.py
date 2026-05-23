@@ -1553,120 +1553,13 @@ class Execution:
     ) -> dict[str, list[AssetFilePath]]:
         """Upload pending execution outputs via the bag pipeline.
 
-        Builds a transient bag from the execution's pending
-        manifest entries and staged feature records, then loads
-        it into the destination catalog. The bag's asset bytes
-        are hardlinked from flat storage (zero disk copies); rows
-        are inserted by :class:`BagCatalogLoader` in FK-safe
-        order; bytes get PUT to Hatrac.
-
-        After a successful load, marks every pending manifest
-        entry as ``uploaded`` (matches the legacy contract that
-        the manifest reflects the destination's state after a
-        commit). The transient bag dir is left in place at
-        ``working_dir/upload/{execution_rid}/`` so post-mortem
-        inspection is possible if needed; users may delete the
-        ``upload/{rid}/`` directory by hand once they no longer
-        need it. The caller's ``clean_folder`` flag controls
-        cleanup of the separate ``execution_root`` only (see
-        :meth:`upload_execution_outputs`).
-
-        Returns:
-            ``{"{schema}/{table}": [AssetFilePath, ...]}`` for the
-            asset rows that landed at the destination.
+        Thin delegate to ``asset_upload.bag_commit_upload``;
+        see that helper for the bag-build → bag-load → manifest-mark
+        flow.
         """
-        from deriva_ml.execution.bag_commit import (
-            build_execution_bag,
-            load_execution_bag,
-            report_to_asset_map,
-        )
+        from deriva_ml.execution.asset_upload import bag_commit_upload
 
-        # Issue #178: per-execution upload staging lives under a
-        # dedicated ``upload/`` parent — not at the cache root, where
-        # it used to sit beside ``cache/`` and ``schema-cache.json``
-        # and was easy to mistake for cache state. The cache root now
-        # contains only caches; per-execution scratch is here.
-        bag_dir = Path(self._working_dir) / "upload" / self.execution_rid
-        if bag_dir.exists():
-            # An earlier (failed) attempt may have left a partial
-            # bag on disk. Wipe it so the build starts clean —
-            # bdbag's update path expects scaffolding it controls.
-            shutil.rmtree(bag_dir)
-
-        self._logger.info("Building commit bag at %s", bag_dir)
-        # ``build_execution_bag`` leases pending RIDs as its first
-        # step. Capture the post-lease ``pending`` snapshot *after*
-        # the build so ``entry.rid`` reflects the leased value (the
-        # destination catalog now knows about these RIDs).
-        bag_dir = build_execution_bag(
-            self,
-            bag_dir,
-            progress_callback=progress_callback,
-        )
-        manifest = self._get_manifest()
-        pending = manifest.pending_assets()
-
-        self._logger.info("Loading commit bag into destination catalog")
-        try:
-            report = load_execution_bag(
-                self,
-                bag_dir,
-                progress_callback=progress_callback,
-            )
-        except Exception as e:
-            error = format_exception(e)
-            self._logger.error("BagCatalogLoader failed: %s", error)
-            # Mark every pending feature record as failed with the
-            # loader's error so the user can retry from a known
-            # state. Bag commit is atomic at load time, so all
-            # pending records share the same failure mode (the
-            # bag's load transaction either committed or didn't).
-            # Preserving the loader error message in each record's
-            # ``error`` column is the right observability shape.
-            try:
-                pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
-                if pending_features:
-                    self._manifest_store.mark_feature_records_failed(
-                        [(r.stage_id, f"bag-load failed: {error}") for r in pending_features]
-                    )
-            except Exception as mark_err:  # noqa: BLE001 — never mask the original failure
-                self._logger.warning(
-                    "Could not mark pending features as failed: %s",
-                    mark_err,
-                )
-            raise DerivaMLException(f"Failed to upload execution outputs via bag pipeline: {error}")
-
-        # Mark every leased manifest entry as uploaded — its RID
-        # was set during the bag build step's lease. Batch the
-        # SQLite update; one transaction beats N for a typical
-        # execution.
-        manifest_updates = [(key, entry.rid) for key, entry in pending.items()]
-        manifest.mark_uploaded_batch(manifest_updates)
-
-        # Mark staged feature records as uploaded too. The bag
-        # carried them; if the load succeeded, they're at the
-        # destination.
-        pending_features = self._manifest_store.list_pending_feature_records(self.execution_rid)
-        if pending_features:
-            self._manifest_store.mark_feature_records_uploaded([r.stage_id for r in pending_features])
-
-        manifest = self._get_manifest()  # re-read with post-mark statuses
-        # Restrict the return to assets that went through *this*
-        # commit call — additive uploads (kernel commits, then
-        # runner registers more) need the call-scoped subset, not
-        # the full manifest history.
-        asset_map = report_to_asset_map(
-            execution=self,
-            report=report,
-            manifest=manifest,
-            keys=list(pending.keys()),
-        )
-        self._logger.info(
-            "Commit bag loaded: %d rows inserted, %d asset upload(s) attempted",
-            report.total_rows_inserted,
-            sum(s.assets_attempted for s in report.table_stats.values()),
-        )
-        return asset_map
+        return bag_commit_upload(self, progress_callback=progress_callback)
 
     def _clean_folder_contents(self, folder_path: Path, remove_folder: bool = True):
         """Clean up folder contents and optionally the folder itself.
@@ -1694,133 +1587,27 @@ class Execution:
     ) -> None:
         """Link assets to this execution and auto-tag them by role.
 
-        Writes two kinds of association rows for each asset:
-
-        1. ``{Asset}_Execution`` — links the asset RID to this
-           execution with the given ``Asset_Role`` (``"Input"`` or
-           ``"Output"``). This is the per-execution-link direction
-           tag; consumers query it via
-           ``execution.list_assets(asset_role="Input")``.
-
-        2. ``{Asset}_Asset_Type`` — auto-tags each asset's content
-           classification:
-
-           - For ``Output``: every user-supplied type from the
-             ``asset_file_path`` calls **plus** ``Output_File``
-             (added automatically if not already in the list).
-             So a model file uploaded with
-             ``ExecAssetType.model_file`` ends up tagged
-             ``["Model_File", "Output_File"]``.
-           - For ``Input``: just ``Input_File`` is added. The
-             asset's existing content types (from when it was
-             originally created) are preserved; we don't overwrite
-             them. So a model file consumed as input ends up
-             tagged ``["Model_File", "Input_File"]``.
-
-           Both inserts use ``on_conflict_skip=True`` so re-running
-           is idempotent — an asset that already has the
-           ``Input_File``/``Output_File`` tag from a prior
-           execution-link is unchanged.
-
-        Args:
-            uploaded_assets: ``{schema/table_name: [AssetFilePath, ...]}``.
-                Each ``AssetFilePath`` carries the asset RID and
-                (for outputs) the user-supplied content types.
-            asset_role: ``"Input"`` or ``"Output"`` from the
-                ``Asset_Role`` vocabulary.
+        Thin delegate to ``asset_upload.update_asset_execution_table``;
+        see that helper for the per-branch (Input/Output) logic.
+        Audit ledger: only the Input branch is exercised in
+        production — the Output flow now lives in
+        :func:`bag_commit._add_asset_rows_to_bag`. The Output
+        branch stays for now because the asset-role-auto-tag
+        tests pin it; dropping it requires rewriting those
+        tests against the bag-commit path. Tracked as a
+        follow-up.
         """
-        # Make sure the asset role is in the controlled vocabulary table.
-        if self._dry_run:
-            # Don't do any updates of we are doing a dry run.
-            return
-        self._ml_object.lookup_term(MLVocab.asset_role, asset_role)
+        from deriva_ml.execution.asset_upload import update_asset_execution_table
 
-        # Direction-tag for the {Asset}_Asset_Type write below. The
-        # direction is multi-valued alongside content types — a file
-        # uploaded as ExecAssetType.model_file ends up tagged with
-        # both Model_File AND Output_File. The directional tag makes
-        # "give me every asset that's ever served as input" queryable
-        # through Asset_Type alone, regardless of which execution
-        # it was input to.
-        direction_tag = ExecAssetType.input_file.value if asset_role == "Input" else ExecAssetType.output_file.value
-
-        pb = self._ml_object.pathBuilder()
-        for asset_table, asset_list in uploaded_assets.items():
-            asset_table_name = asset_table.split("/")[1]  # Peel off the schema from the asset table
-            asset_exe, asset_fk, execution_fk = self._model.find_association(asset_table_name, "Execution")
-            asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
-
-            asset_exe_path.insert(
-                [
-                    {
-                        asset_fk: asset_path.asset_rid,
-                        execution_fk: self.execution_rid,
-                        "Asset_Role": asset_role,
-                    }
-                    for asset_path in asset_list
-                ],
-                on_conflict_skip=True,
-            )
-
-            # Resolve the {Asset}_Asset_Type association once per
-            # asset_table loop iteration — we need it for both the
-            # Output (user-supplied + Output_File) and Input
-            # (Input_File only) branches below.
-            asset_asset_type, _, _ = self._model.find_association(asset_table_name, "Asset_Type")
-            type_path = pb.schemas[asset_asset_type.schema.name].tables[asset_asset_type.name]
-
-            if asset_role == "Input":
-                # Input branch: auto-tag each downloaded asset with
-                # Input_File. We don't touch the asset's existing
-                # content types — the asset was created by someone
-                # else (likely a prior execution's output); whatever
-                # types it carries should stay. ``on_conflict_skip``
-                # makes re-downloads idempotent.
-                type_path.insert(
-                    [
-                        {asset_table_name: asset_path.asset_rid, "Asset_Type": direction_tag}
-                        for asset_path in asset_list
-                    ],
-                    on_conflict_skip=True,
-                )
-                continue
-
-            # Output branch: read the user-supplied per-file type
-            # map produced during asset_file_path() calls, then
-            # auto-add Output_File to every asset's type list (if
-            # not already present). The user can still explicitly
-            # pass ExecAssetType.output_file; we just don't require
-            # it anymore.
-            asset_type_map = {}
-            with Path(
-                asset_type_path(
-                    self._working_dir,
-                    self.execution_rid,
-                    self._model.name_to_table(asset_table_name),
-                )
-            ).open("r") as asset_type_file:
-                for line in asset_type_file:
-                    asset_type_map.update(json.loads(line.strip()))
-
-            # Ensure the directional Output_File tag is in every
-            # asset's type list. Use a list (preserving order) +
-            # membership check rather than a set, so user-specified
-            # tag ordering is preserved for any downstream consumer
-            # that cares.
-            for asset_path in asset_list:
-                types = asset_type_map[asset_path.file_name]
-                if direction_tag not in types:
-                    types.append(direction_tag)
-                asset_path.asset_types = types
-
-            type_path.insert(
-                [
-                    {asset_table_name: asset.asset_rid, "Asset_Type": t}
-                    for asset in asset_list
-                    for t in asset_type_map[asset.file_name]
-                ],
-                on_conflict_skip=True,
-            )
+        update_asset_execution_table(
+            self,
+            uploaded_assets,
+            asset_role=asset_role,
+            asset_role_vocab_term=MLVocab.asset_role,
+            input_file_tag=ExecAssetType.input_file.value,
+            output_file_tag=ExecAssetType.output_file.value,
+            asset_type_path_fn=asset_type_path,
+        )
 
     @validate_call(config=VALIDATION_CONFIG)
     def asset_file_path(
