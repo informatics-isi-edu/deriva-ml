@@ -396,8 +396,13 @@ def test_report_to_asset_map_filters_metadata_to_declared_cols(tmp_path):
 
 
 def test_add_asset_rows_reserves_one_batch_when_no_types(tmp_path, monkeypatch):
-    """Two pending assets, no asset-types → one ``lease_agg.reserve`` call
-    (Execution association), no inline POST.
+    """Two pending assets, no user-supplied asset-types → two reservations:
+    one for Execution association rows, one for the auto-added
+    ``Output_File`` directional tag.
+
+    The Output_File auto-add is the "deriva-ml assigns Input/Output
+    to every execution asset" rule — every asset gets a directional
+    tag even when the user supplies no content types.
 
     Post Ex-batch, ``_add_asset_rows_to_bag`` doesn't POST to
     ERMrest_RID_Lease at all — it reserves tokens against the
@@ -408,7 +413,8 @@ def test_add_asset_rows_reserves_one_batch_when_no_types(tmp_path, monkeypatch):
     2. The Execution-association rows land in ``deferred_emits``
        carrying placeholder tokens (the driver resolves them
        after flush).
-    3. The on-disk asset rows still go straight to ``bb.add_rows``
+    3. Every entry gets one ``Output_File`` Asset_Type row.
+    4. The on-disk asset rows still go straight to ``bb.add_rows``
        (no RID rewrite needed — their RIDs come from the
        manifest, not from the lease).
     """
@@ -485,10 +491,13 @@ def test_add_asset_rows_reserves_one_batch_when_no_types(tmp_path, monkeypatch):
 
     assert final_staged == 2
 
-    # Two tokens reserved on the aggregator (one per entry's
-    # Execution-association row). No Asset_Type pairs ⇒ no
-    # second reservation.
-    assert len(lease_agg._tokens) == 2  # noqa: SLF001 — pinning internal state by design
+    # Four tokens reserved on the aggregator:
+    # - 2 for Execution-association rows (one per entry)
+    # - 2 for Output_File Asset_Type rows (auto-added one per entry,
+    #   even though the user supplied no content types). This pins
+    #   the "every execution asset gets Input_File or Output_File"
+    #   rule for the no-user-types case.
+    assert len(lease_agg._tokens) == 4  # noqa: SLF001 — pinning internal state by design
 
     # Asset rows still emitted directly to ``bb.add_rows`` (they
     # use the manifest's RID, not a leased one).
@@ -504,11 +513,22 @@ def test_add_asset_rows_reserves_one_batch_when_no_types(tmp_path, monkeypatch):
     assert "Image_Execution" in deferred_tables
     exec_rows = next(rows for t, rows in deferred_emits if t == "Image_Execution")
     assert len(exec_rows) == 2
-    # RID slot holds the reserved tokens (UUID4-ish strings), not
-    # a leased catalog RID.
-    assert set(row["RID"] for row in exec_rows) == set(lease_agg._tokens)
+    # RID slot holds reserved tokens (UUID4-ish strings), not
+    # leased catalog RIDs. The set of exec-row tokens is a SUBSET
+    # of all reserved tokens (the aggregator also holds tokens
+    # for the auto-added Output_File rows).
+    assert set(row["RID"] for row in exec_rows).issubset(set(lease_agg._tokens))
     # ``Asset_Role`` is still pinned to "Output".
     assert all(row["Asset_Role"] == "Output" for row in exec_rows)
+
+    # Two Output_File Asset_Type rows landed (one per entry) even
+    # though the user supplied no content types. This is the
+    # deriva-ml-assigns-Input/Output directional-tag rule.
+    assert "Image_Asset_Type" in deferred_tables
+    type_rows = next(rows for t, rows in deferred_emits if t == "Image_Asset_Type")
+    assert len(type_rows) == 2
+    assert all(row["Asset_Type"] == "Output_File" for row in type_rows)
+    assert {row["Image"] for row in type_rows} == {"ASSET-A", "ASSET-B"}
 
     # Asset hardlinks still happen directly.
     assert len(bb.add_asset_calls) == 2
@@ -584,19 +604,105 @@ def test_add_asset_rows_with_types_reserves_both_associations(tmp_path, monkeypa
         deferred_emits=deferred_emits,
     )
 
-    # 1 token for the exec association + 2 tokens for the two
-    # (asset, type) pairs = 3 tokens total. All accumulated on
-    # one aggregator — the driver will flush them in ONE POST,
+    # 1 token for the exec association + 3 tokens for the three
+    # (asset, type) pairs — TypeX, TypeY, AND the auto-added
+    # Output_File directional tag — totalling 4. All accumulated
+    # on one aggregator — the driver will flush them in ONE POST,
     # which is the whole point of Ex-batch.
-    assert len(lease_agg._tokens) == 3  # noqa: SLF001
+    assert len(lease_agg._tokens) == 4  # noqa: SLF001
 
     # Both deferred emits land — Image_Execution and Image_Asset_Type.
     deferred_tables = [t for t, _ in deferred_emits]
     assert "Image_Execution" in deferred_tables
     assert "Image_Asset_Type" in deferred_tables
     type_rows = next(rows for t, rows in deferred_emits if t == "Image_Asset_Type")
-    assert len(type_rows) == 2
-    assert sorted(r["Asset_Type"] for r in type_rows) == ["TypeX", "TypeY"]
+    # Three tags: TypeX, TypeY, and the auto-added Output_File
+    # directional tag (the canonical "deriva-ml assigns
+    # Input/Output to every execution asset" rule).
+    assert len(type_rows) == 3
+    assert sorted(r["Asset_Type"] for r in type_rows) == ["Output_File", "TypeX", "TypeY"]
+
+
+def test_add_asset_rows_does_not_duplicate_explicit_output_file_tag(tmp_path, monkeypatch):
+    """User-supplied ``Output_File`` is honored without duplication.
+
+    When the caller explicitly passes
+    ``ExecAssetType.output_file.value`` (e.g., a pre-Phase-3
+    workflow that still types its outputs manually), the
+    auto-add machinery must NOT emit a second ``Output_File``
+    Asset_Type row.
+
+    Mirrors the dedup contract in
+    ``asset_upload.update_asset_execution_table`` Output branch
+    (see lines 584-593 of ``asset_upload.py``). This pin guards
+    against a future regression where the bag-commit path
+    diverges from the canonical Output-tag handling.
+    """
+    from deriva_ml.execution import bag_commit
+    from deriva_ml.execution.rid_lease import LeaseAggregator
+
+    image = _FakeTable(name="Image", schema=_FakeSchema(name="deriva-ml"))
+    image_execution = _FakeTable(name="Image_Execution", schema=_FakeSchema(name="deriva-ml"))
+    image_asset_type = _FakeTable(name="Image_Asset_Type", schema=_FakeSchema(name="deriva-ml"))
+    model = _FakeModel(
+        tables={"Image": image},
+        metadata_cols={"Image": set()},
+        associations={
+            ("Image", "Execution"): (image_execution, "Image", "Execution"),
+            ("Image", "Asset_Type"): (image_asset_type, "Image", "Asset_Type"),
+        },
+    )
+    execution = _FakeExecution(
+        _model=model,
+        _working_dir=tmp_path,
+        execution_rid="EXE-A",
+        _ml_object=_FakeMLObject(),
+    )
+
+    flat_dir = tmp_path / "EXE-A" / "asset" / "Image"
+    flat_dir.mkdir(parents=True)
+    (flat_dir / "a.jpg").write_bytes(b"alpha")
+
+    entries = [
+        ("a.jpg", AssetEntry(asset_table="Image", schema="deriva-ml", rid="ASSET-A", status="pending")),
+    ]
+
+    # Caller explicitly tags this asset as Model_File + Output_File.
+    monkeypatch.setattr(
+        bag_commit,
+        "_read_asset_type_map",
+        lambda execution, asset_table: {"a.jpg": ["Model_File", "Output_File"]},
+    )
+    monkeypatch.setattr(
+        bag_commit,
+        "flat_asset_dir",
+        lambda working_dir, execution_rid, table_name: working_dir / execution_rid / "asset" / table_name,
+    )
+
+    bb = _MockBagBuilder()
+    lease_agg = LeaseAggregator()
+    deferred_emits: list = []
+    bag_commit._add_asset_rows_to_bag(
+        bb=bb,
+        execution=execution,  # type: ignore[arg-type]
+        asset_table_name="Image",
+        entries=entries,
+        progress_callback=None,
+        staged_so_far=0,
+        total_assets=1,
+        lease_agg=lease_agg,
+        deferred_emits=deferred_emits,
+    )
+
+    # Output_File appears exactly once in the type rows.
+    type_rows = next(rows for t, rows in deferred_emits if t == "Image_Asset_Type")
+    output_file_rows = [r for r in type_rows if r["Asset_Type"] == "Output_File"]
+    assert len(output_file_rows) == 1, (
+        f"Output_File must appear exactly once; got {len(output_file_rows)} rows. "
+        f"Full tag set: {sorted(r['Asset_Type'] for r in type_rows)}"
+    )
+    # Model_File is preserved too.
+    assert sorted(r["Asset_Type"] for r in type_rows) == ["Model_File", "Output_File"]
 
 
 def test_add_asset_rows_skips_missing_files(tmp_path, monkeypatch):

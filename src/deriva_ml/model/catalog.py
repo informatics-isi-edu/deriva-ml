@@ -550,14 +550,25 @@ class DerivaModel:
         """Return the ``*_Execution`` association tables across all schemas.
 
         Walks every domain + ML schema once, finds tables whose
-        name ends with ``_Execution`` (excluding
-        ``Dataset_Execution``, which is the dataset linkage and
-        not an asset association), and caches the result on the
-        instance. Subsequent calls re-use the cache so callers
+        name ends with ``_Execution``, and caches the result on
+        the instance. Subsequent calls re-use the cache so callers
         that walk these tables repeatedly (e.g.
         :func:`~deriva_ml.execution._helpers.list_assets`) pay
         the schema-iteration cost exactly once per
         :class:`DerivaModel` lifetime.
+
+        Two ``*_Execution`` tables are **excluded** because they're
+        not asset-to-execution association tables despite the
+        suffix:
+
+        - ``Dataset_Execution`` — dataset linkage; consumed by
+          :func:`~deriva_ml.execution._helpers.list_input_datasets`.
+        - ``Execution_Execution`` — nested-execution hierarchy
+          (parent/child); has no ``Asset_Role`` column. Hitting
+          it during the ``list_assets(asset_role=...)`` walk
+          produces an ``AttributeError`` ("no such column
+          ``Asset_Role``") rather than just returning zero
+          matches, so the exclusion is correctness-critical.
 
         The cache is invalidated whenever the underlying model
         object identity changes (e.g. after a catalog
@@ -591,7 +602,12 @@ class DerivaModel:
             for table in schema_obj.tables.values():
                 if not table.name.endswith("_Execution"):
                     continue
-                if table.name == "Dataset_Execution":
+                # ``Dataset_Execution`` is the dataset linkage; not an
+                # asset association. ``Execution_Execution`` is the
+                # nested-execution parent/child table; has no
+                # ``Asset_Role`` column so it'd crash any
+                # ``list_assets(asset_role=...)`` walk.
+                if table.name in ("Dataset_Execution", "Execution_Execution"):
                     continue
                 result.append((schema_name, table.name))
 

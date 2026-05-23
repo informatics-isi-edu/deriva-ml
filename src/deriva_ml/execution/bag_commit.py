@@ -384,21 +384,70 @@ def _add_asset_rows_to_bag(
     if assoc_rows:
         deferred_emits.append((exec_assoc.name, assoc_rows))
 
-    # {Asset}_Asset_Type association rows. Asset types live in a
-    # per-execution JSONL file populated by ``asset_file_path``;
-    # read it once and emit one row per (asset, type) pair. The
-    # loader's ``match_by_columns`` policy (configured in
+    # {Asset}_Asset_Type association rows. Two sources of tags:
+    #
+    # 1. User-supplied content types from each ``asset_file_path``
+    #    call. Live in a per-execution JSONL file populated by
+    #    that method; read once via ``_read_asset_type_map``.
+    # 2. The directional ``Output_File`` tag — added by deriva-ml
+    #    to every asset uploaded as an output of this execution.
+    #    Symmetric with the ``Input_File`` tag added by
+    #    ``update_asset_execution_table`` for assets consumed via
+    #    ``download_asset``.
+    #
+    # **The directional-tag contract** (see the "How execution-
+    # asset roles work" section of the execution user guide and
+    # the docstring on
+    # ``asset_upload.update_asset_execution_table``):
+    #
+    #   Every asset associated with an execution carries either
+    #   an ``Input_File`` or ``Output_File`` directional Asset_Type
+    #   tag, AND its ``{Asset}_Execution`` row has the matching
+    #   ``Asset_Role`` ("Input" or "Output").
+    #
+    # The role is framework-supplied — callers don't pass
+    # ``Output_File`` in their ``asset_types=`` argument to
+    # ``asset_file_path``. The dedup below means an explicit
+    # pass-through is harmless.
+    #
+    # Pre-fix the bag-commit path silently omitted
+    # ``Output_File`` (catalog ended up with
+    # ``["Model_File"]`` instead of
+    # ``["Model_File", "Output_File"]``); this is the inline
+    # equivalent of ``update_asset_execution_table``'s Output
+    # branch.
+    #
+    # The loader's ``match_by_columns`` policy (configured in
     # :func:`load_execution_bag`) handles ``(asset_rid,
-    # Asset_Type)`` dedup at load time — no pre-flight needed
-    # here.
+    # Asset_Type)`` dedup at load time — no pre-flight needed.
     type_assoc, _, _ = model.find_association(asset_table_name, "Asset_Type")
     type_map = _read_asset_type_map(execution, asset_table)
 
+    # Lazy import to avoid a top-level circular with
+    # ``core.definitions``. ``ExecAssetType.output_file.value`` is
+    # the canonical string ("Output_File") that the loader will
+    # write into ``Asset_Type``.
+    from deriva_ml.core.definitions import ExecAssetType
+
+    output_file_tag = ExecAssetType.output_file.value
+
     # Compute every (entry, asset_type) pair first so we can lease
-    # the right number of RIDs in one batch.
+    # the right number of RIDs in one batch. Auto-add Output_File
+    # to each entry's tag list (deduped so a caller who explicitly
+    # passed ``ExecAssetType.output_file`` doesn't produce a
+    # duplicate row).
     type_pairs: list[tuple[Any, str]] = []
     for _filename, entry in entries:
-        for asset_type in type_map.get(_filename, []):
+        # Build the per-entry tag list — user-supplied + directional.
+        # Preserve order so a downstream consumer that cares about
+        # user-tag ordering sees Output_File appended last when it
+        # wasn't explicit. The deduplication mirrors
+        # ``update_asset_execution_table``'s Output branch behaviour
+        # (see ``asset_upload.update_asset_execution_table``).
+        tags = list(type_map.get(_filename, []))
+        if output_file_tag not in tags:
+            tags.append(output_file_tag)
+        for asset_type in tags:
             type_pairs.append((entry, asset_type))
 
     if type_pairs:
