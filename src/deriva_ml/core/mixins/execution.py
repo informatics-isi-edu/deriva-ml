@@ -144,7 +144,7 @@ class ExecutionMixin:
                 >>> with ml.create_execution(config) as execution:
                 ...     # Run analysis
                 ...     pass
-                >>> execution.upload_execution_outputs()
+                >>> execution.commit_output_assets()
 
             Kwargs form (equivalent)::
 
@@ -447,7 +447,7 @@ class ExecutionMixin:
             >>> exe = ml.resume_execution("5-ABC")
             >>> exe.status
             <ExecutionStatus.Stopped>
-            >>> exe.upload_outputs()
+            >>> exe.commit_output_assets()
         """
         from deriva_ml.execution.execution import Execution
 
@@ -738,67 +738,56 @@ class ExecutionMixin:
             if exec_record["RID"] in exec_rids_with_config:
                 yield Experiment(self, exec_record["RID"])  # type: ignore[arg-type]
 
-    def upload_pending(
+    def commit_pending_executions(
         self,
         *,
         execution_rids: "list[RID] | None" = None,
-        retry_failed: bool = False,
+        clean_folder: bool = False,
     ) -> "UploadReport":
-        """Blocking upload of pending state for selected executions.
+        """Batch-commit pending output assets for one or more executions.
 
-        Flushes all pending rows (catalog inserts, asset uploads) for the
-        named executions to the live catalog. Blocks until complete.
+        ADR-0009's batch upload entry point. For each requested
+        execution, resumes it from the workspace registry and calls
+        :meth:`Execution.commit_output_assets`, which brackets the
+        bag-commit with the full lifecycle (``Pending_Upload →
+        Uploaded`` transition, ``Upload_Duration`` recording, asset
+        description writes, optional working-folder cleanup).
+
+        Failure isolation is per-execution: an exception while
+        committing execution A does not skip execution B; both
+        outcomes appear in the returned :class:`UploadReport`. The
+        blocking call returns even when one or more executions
+        failed; callers check ``report.total_failed`` and
+        ``report.errors`` for diagnosis.
+
+        This is the engine behind the ``deriva-ml-upload`` CLI.
         Online mode only.
 
-        Implementation: drives
-        :meth:`Execution._bag_commit_upload` per execution. Each call
-        builds an execution-scoped bag (via
-        :func:`~deriva_ml.execution.bag_commit.build_execution_bag`) and
-        hands it to
-        :class:`~deriva.bag.catalog_loader.BagCatalogLoader` for FK-safe
-        row insertion plus asset upload via
-        :meth:`DerivaUpload._hatracUpload`. The bag pipeline replaced
-        the legacy SQLite-queued row-drain engine in Phase 2 Steps
-        11+12 + WI2 (see ``docs/design/bag-client-cutover-2026-05.md``).
-
-        Failure isolation is per-execution: a load failure on execution
-        A does not skip execution B; both outcomes appear in the
-        returned :class:`UploadReport`. The blocking call returns even
-        when one or more executions failed; callers check
-        ``report.total_failed`` and ``report.errors`` for diagnosis.
-
-        Non-blocking variant retired in WI2 — for survive-process
-        uploads run ``deriva-ml upload`` as a subprocess instead of
-        invoking from inside Python.
-
         Args:
-            execution_rids: List of RIDs, or None to drain every
+            execution_rids: List of RIDs, or ``None`` to drain every
                 execution that has pending work in the workspace
-                registry.
-            retry_failed: Currently no-op under the bag pipeline. The
-                legacy engine retried per-row failures from a SQLite
-                ``status='failed'`` queue; the bag pipeline retries by
-                re-running the whole bag-commit (idempotent under
-                ``BagCatalogLoader``'s ``match_by_columns`` dedup), so
-                the per-row distinction doesn't apply. Kept on the
-                signature for API stability — callers may continue to
-                pass ``retry_failed=True`` and will simply re-run the
-                bag-commit, which already handles partial-success
-                cases by virtue of FK-safe ordering + match-by-columns
-                row dedup on the destination.
+                registry. An empty list is treated as "drain nothing"
+                and returns an empty report.
+            clean_folder: Forwarded to
+                :meth:`Execution.commit_output_assets`. When ``True``,
+                each execution's working folder is removed after a
+                successful commit. Default ``False`` preserves on-disk
+                state for inspection.
 
         Returns:
-            UploadReport with totals + per-table counts + error lines.
+            UploadReport aggregating per-execution outcomes. Successful
+            executions contribute their per-(schema, table) counts to
+            ``per_table`` and their asset-row count to
+            ``total_uploaded``. Failed executions contribute one entry
+            to ``total_failed`` and one human-readable line to
+            ``errors`` prefixed by ``"execution {rid}: "``.
 
         Example:
-            >>> report = ml.upload_pending()  # doctest: +SKIP
+            >>> report = ml.commit_pending_executions()  # doctest: +SKIP
             >>> print(f"{report.total_uploaded} uploaded, "
             ...       f"{report.total_failed} failed")
         """
-        from deriva_ml.core.exceptions import DerivaMLException
         from deriva_ml.execution.upload_report import UploadReport
-
-        del retry_failed  # See docstring — no-op under bag pipeline.
 
         # Enumerate executions to drain. Caller-supplied list wins; an
         # empty caller-supplied list is treated as "drain nothing." A
@@ -818,33 +807,22 @@ class ExecutionMixin:
         for rid in rids:
             try:
                 execution = self.resume_execution(rid)  # type: ignore[attr-defined]
-            except Exception as e:
-                # Couldn't resume the execution at all (workspace
-                # missing, registry corruption, etc.). Record and move
-                # on — sibling executions may still drain cleanly.
+                exec_report = execution.commit_output_assets(clean_folder=clean_folder)
+            except Exception as e:  # noqa: BLE001 — surface every failure into the report
+                # Failure isolation: continue past this execution so
+                # sibling executions still get a chance to drain.
                 total_failed += 1
-                errors.append(f"execution {rid}: resume failed: {e}")
+                errors.append(f"execution {rid}: {e}")
                 continue
-            try:
-                execution._bag_commit_upload()
-            except DerivaMLException as e:
-                total_failed += 1
-                errors.append(f"execution {rid}: bag-commit failed: {e}")
-                continue
-            except Exception as e:  # noqa: BLE001 — surface unexpected failures into the report
-                total_failed += 1
-                errors.append(f"execution {rid}: bag-commit raised: {e!r}")
-                continue
-            # Bag-commit succeeded. The execution's manifest was
-            # marked uploaded inside ``_bag_commit_upload``; we don't
-            # have direct visibility into per-row counts here because
-            # ``_bag_commit_upload`` doesn't return the loader's
-            # ``LoadReport``. The conservative aggregation is "this
-            # execution drained; count it as one successful drain."
-            # Per-table breakdown is left empty for successful drains
-            # until ``_bag_commit_upload`` exposes the underlying
-            # ``LoadReport`` to callers.
-            total_uploaded += 1
+
+            # Aggregate the per-execution UploadReport into the batch
+            # totals. The per-table dict gets summed across executions
+            # so the caller sees one rolled-up view per asset table.
+            total_uploaded += exec_report.total_uploaded
+            for fqn, counts in exec_report.per_table.items():
+                bucket = per_table.setdefault(fqn, {"uploaded": 0, "failed": 0})
+                bucket["uploaded"] += counts.get("uploaded", 0)
+                bucket["failed"] += counts.get("failed", 0)
 
         return UploadReport(
             execution_rids=rids,

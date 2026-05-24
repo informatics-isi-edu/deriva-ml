@@ -11,9 +11,11 @@ This is a VALUE OBJECT, not a live catalog record:
 - Immutable (``ConfigDict(frozen=True)``) — the snapshot captures a
   moment in time; mutating it would be meaningless.
 - Reads do not contact the catalog; works in offline mode.
-- Behavior methods (``pending_summary``, ``upload_outputs``,
-  ``update_status``) take ``ml: DerivaML`` as a kwarg because the
-  snapshot itself doesn't carry a server connection.
+- Behavior methods (``pending_summary``, ``update_status``) take
+  ``ml: DerivaML`` as a kwarg because the snapshot itself doesn't
+  carry a server connection. To commit a snapshot's pending outputs,
+  resume the execution and call its ``commit_output_assets`` method:
+  ``ml.resume_execution(snap.rid).commit_output_assets()``.
 
 For a live, catalog-bound record whose property setters write
 through to the catalog, see
@@ -39,7 +41,6 @@ logger = get_logger(__name__)
 if TYPE_CHECKING:
     from deriva_ml.core.base import DerivaML  # noqa: F401
     from deriva_ml.execution.pending_summary import PendingSummary
-    from deriva_ml.execution.upload_report import UploadReport
 
 
 __all__ = ["ExecutionSnapshot"]
@@ -178,22 +179,6 @@ class ExecutionSnapshot(BaseModel):
             rows=[PendingRowCount(**r) for r in data["rows"]],
             assets=[PendingAssetCount(**a) for a in data["assets"]],
             diagnostics=data["diagnostics"],
-        )
-
-    def upload_outputs(
-        self,
-        *,
-        ml: "DerivaML",
-        retry_failed: bool = False,
-    ) -> "UploadReport":
-        """Sugar for ``ml.upload_pending(execution_rids=[self.rid], ...)``.
-
-        Snapshots are frozen Pydantic models — the caller provides the
-        DerivaML instance that owns the workspace.
-        """
-        return ml.upload_pending(
-            execution_rids=[self.rid],
-            retry_failed=retry_failed,
         )
 
     def update_status(
