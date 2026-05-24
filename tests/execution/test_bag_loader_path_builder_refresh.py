@@ -99,6 +99,5 @@ def test_ermrest_catalog_exposes_schema_read_entry_points() -> None:
         "(notably execution/bag_commit.py)."
     )
     assert hasattr(ErmrestCatalog, "getPathBuilder"), (
-        "deriva-py's ErmrestCatalog is expected to expose "
-        "`getPathBuilder` as the datapath wrapper entry point."
+        "deriva-py's ErmrestCatalog is expected to expose `getPathBuilder` as the datapath wrapper entry point."
     )

@@ -387,9 +387,7 @@ class Execution:
         # catalog row before re-raising. ``reload`` and ``dry_run``
         # paths skip the rollback because they never inserted a row
         # in the first place.
-        _catalog_row_owned_by_us = (
-            not reload and not self._dry_run and self.execution_rid != DRY_RUN_RID
-        )
+        _catalog_row_owned_by_us = not reload and not self._dry_run and self.execution_rid != DRY_RUN_RID
         try:
             self._post_catalog_init_init(reload, schema_path)
         except Exception:
@@ -397,12 +395,9 @@ class Execution:
                 # Best-effort orphan cleanup; never mask the
                 # original failure with a delete-side error.
                 try:
-                    schema_path.Execution.filter(
-                        schema_path.Execution.RID == self.execution_rid
-                    ).delete()
+                    schema_path.Execution.filter(schema_path.Execution.RID == self.execution_rid).delete()
                     logger.warning(
-                        "create_execution %s: post-insert work failed; "
-                        "rolled back orphaned catalog Execution row.",
+                        "create_execution %s: post-insert work failed; rolled back orphaned catalog Execution row.",
                         self.execution_rid,
                     )
                 except Exception as cleanup_exc:
@@ -2343,4 +2338,3 @@ class Execution:
             assets=[PendingAssetCount(**a) for a in data["assets"]],
             diagnostics=data["diagnostics"],
         )
-

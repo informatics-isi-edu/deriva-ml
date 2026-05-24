@@ -269,13 +269,7 @@ def _fake_asset_type_path(
     ``working_dir/deriva-ml/execution/<rid>/asset-type/<schema>/<table>.jsonl``.
     """
     return (
-        working_dir
-        / "deriva-ml"
-        / "execution"
-        / execution_rid
-        / "asset-type"
-        / ml_schema
-        / f"{asset_table_name}.jsonl"
+        working_dir / "deriva-ml" / "execution" / execution_rid / "asset-type" / ml_schema / f"{asset_table_name}.jsonl"
     )
 
 
@@ -364,9 +358,7 @@ class TestOutputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, pb = _build_execution_fixture(tmp_path)
-        asset = _make_asset_file_path(
-            file_name="model.pt", asset_rid="2-AAA", asset_table="Execution_Asset"
-        )
+        asset = _make_asset_file_path(file_name="model.pt", asset_rid="2-AAA", asset_table="Execution_Asset")
         _write_asset_type_jsonl(
             tmp_path,
             "1-EXEC",
@@ -399,9 +391,7 @@ class TestOutputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, pb = _build_execution_fixture(tmp_path)
-        asset = _make_asset_file_path(
-            file_name="out.csv", asset_rid="2-BBB", asset_table="Execution_Asset"
-        )
+        asset = _make_asset_file_path(file_name="out.csv", asset_rid="2-BBB", asset_table="Execution_Asset")
         _write_asset_type_jsonl(
             tmp_path,
             "1-EXEC",
@@ -418,9 +408,7 @@ class TestOutputAutoTag:
 
         # The Output_File tag appears in the insert rows exactly once.
         type_inserts = _inserts_for(pb, "Execution_Asset_Asset_Type")
-        output_file_rows = [
-            r for inst in type_inserts for r in inst.rows if r["Asset_Type"] == "Output_File"
-        ]
+        output_file_rows = [r for inst in type_inserts for r in inst.rows if r["Asset_Type"] == "Output_File"]
         assert len(output_file_rows) == 1, (
             "Output_File should be present exactly once, even when the "
             "user explicitly supplied it. Got rows: %s" % output_file_rows
@@ -437,9 +425,7 @@ class TestOutputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, _ = _build_execution_fixture(tmp_path)
-        asset = _make_asset_file_path(
-            file_name="model.pt", asset_rid="2-CCC", asset_table="Execution_Asset"
-        )
+        asset = _make_asset_file_path(file_name="model.pt", asset_rid="2-CCC", asset_table="Execution_Asset")
         _write_asset_type_jsonl(
             tmp_path,
             "1-EXEC",
@@ -462,9 +448,7 @@ class TestOutputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, pb = _build_execution_fixture(tmp_path)
-        asset = _make_asset_file_path(
-            file_name="x.csv", asset_rid="2-DDD", asset_table="Execution_Asset"
-        )
+        asset = _make_asset_file_path(file_name="x.csv", asset_rid="2-DDD", asset_table="Execution_Asset")
         _write_asset_type_jsonl(
             tmp_path,
             "1-EXEC",
@@ -508,9 +492,7 @@ class TestInputAutoTag:
         # No JSONL file needed for the Input branch — the input path
         # doesn't read user-supplied types because the asset already
         # exists in the catalog with whatever types it has.
-        asset = _make_asset_file_path(
-            file_name="input.csv", asset_rid="3-AAA", asset_table="Image"
-        )
+        asset = _make_asset_file_path(file_name="input.csv", asset_rid="3-AAA", asset_table="Image")
 
         Execution._update_asset_execution_table(
             execution,
@@ -538,9 +520,7 @@ class TestInputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, pb = _build_execution_fixture(tmp_path)
-        asset = _make_asset_file_path(
-            file_name="img.png", asset_rid="3-BBB", asset_table="Image"
-        )
+        asset = _make_asset_file_path(file_name="img.png", asset_rid="3-BBB", asset_table="Image")
 
         Execution._update_asset_execution_table(
             execution,
@@ -551,8 +531,7 @@ class TestInputAutoTag:
         type_inserts = _inserts_for(pb, "Image_Asset_Type")
         assert type_inserts
         assert all(inst.on_conflict_skip for inst in type_inserts), (
-            "Input-branch Asset_Type insert must use on_conflict_skip=True "
-            "so re-downloads are idempotent."
+            "Input-branch Asset_Type insert must use on_conflict_skip=True so re-downloads are idempotent."
         )
 
     def test_input_branch_links_all_tables(self, tmp_path) -> None:
@@ -567,12 +546,8 @@ class TestInputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, pb = _build_execution_fixture(tmp_path)
-        image_asset = _make_asset_file_path(
-            file_name="img.png", asset_rid="3-CCC", asset_table="Image"
-        )
-        model_asset = _make_asset_file_path(
-            file_name="model.pt", asset_rid="3-DDD", asset_table="Model"
-        )
+        image_asset = _make_asset_file_path(file_name="img.png", asset_rid="3-CCC", asset_table="Image")
+        model_asset = _make_asset_file_path(file_name="model.pt", asset_rid="3-DDD", asset_table="Model")
 
         Execution._update_asset_execution_table(
             execution,
@@ -598,9 +573,7 @@ class TestInputAutoTag:
         from deriva_ml.execution.execution import Execution
 
         execution, pb = _build_execution_fixture(tmp_path)
-        asset = _make_asset_file_path(
-            file_name="x.png", asset_rid="3-EEE", asset_table="Image"
-        )
+        asset = _make_asset_file_path(file_name="x.png", asset_rid="3-EEE", asset_table="Image")
 
         Execution._update_asset_execution_table(
             execution,
@@ -684,9 +657,7 @@ def test_dry_run_writes_nothing(tmp_path) -> None:
     from deriva_ml.execution.execution import Execution
 
     execution, pb = _build_execution_fixture(tmp_path, dry_run=True)
-    asset = _make_asset_file_path(
-        file_name="x.csv", asset_rid="5-AAA", asset_table="Execution_Asset"
-    )
+    asset = _make_asset_file_path(file_name="x.csv", asset_rid="5-AAA", asset_table="Execution_Asset")
 
     Execution._update_asset_execution_table(
         execution,
@@ -694,6 +665,4 @@ def test_dry_run_writes_nothing(tmp_path) -> None:
         asset_role="Output",
     )
 
-    assert pb.inserts == [], (
-        "dry_run=True must skip every catalog insert. Recorded inserts: %s" % pb.inserts
-    )
+    assert pb.inserts == [], "dry_run=True must skip every catalog insert. Recorded inserts: %s" % pb.inserts

@@ -296,9 +296,7 @@ def create_asset_table(
     # "no Hatrac upload template" — the URL column is a plain
     # string. The Hatrac template is wired up only when the
     # caller asks for it via ``use_hatrac=True``.
-    hatrac_template = (
-        "/hatrac/metadata/{{MD5}}.{{Filename}}" if use_hatrac else None
-    )
+    hatrac_template = "/hatrac/metadata/{{MD5}}.{{Filename}}" if use_hatrac else None
     asset_table = schema.create_table(
         AssetTableDef(
             schema_name=schema.name,

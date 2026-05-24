@@ -165,7 +165,9 @@ class TestRunModelWithMocks:
         mock_execution = MagicMock()
         mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
         mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
+        mock_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
         mock_ml_instance.create_execution.return_value = mock_execution
 
         mock_model_config = Mock()
@@ -247,7 +249,9 @@ class TestRunModelWithMocks:
         mock_child_execution.execution_rid = "child-rid"
         mock_child_execution.execute.return_value.__enter__ = Mock(return_value=mock_child_execution)
         mock_child_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_child_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
+        mock_child_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
 
         # First call creates parent, second call creates child
         mock_ml_instance.create_execution.side_effect = [
@@ -291,7 +295,9 @@ class TestRunModelWithMocks:
         mock_execution = MagicMock()
         mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
         mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
+        mock_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
         mock_ml_instance.create_execution.return_value = mock_execution
 
         mock_model_config = Mock()
@@ -360,7 +366,9 @@ class TestRunModelUploadCallContract:
         mock_execution = MagicMock(spec=Execution)
         mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
         mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
+        mock_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
         mock_ml_instance.create_execution.return_value = mock_execution
 
         mock_model_config = Mock()
@@ -478,7 +486,9 @@ class TestCompleteParentExecutionDryRun:
         """
         parent = MagicMock()
         parent.execution_rid = "1-ABCD"
-        parent.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
+        parent.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
 
         _multirun_state.parent_execution = parent
         _multirun_state.parent_execution_rid = "1-ABCD"

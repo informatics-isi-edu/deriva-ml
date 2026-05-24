@@ -181,9 +181,7 @@ def test_batch_isolates_per_execution_failures(test_ml, monkeypatch):
 
     monkeypatch.setattr(Execution, "commit_output_assets", _fake_commit)
 
-    report = test_ml.commit_pending_executions(
-        execution_rids=[exe_ok.execution_rid, exe_fail.execution_rid]
-    )
+    report = test_ml.commit_pending_executions(execution_rids=[exe_ok.execution_rid, exe_fail.execution_rid])
 
     assert report.total_failed == 1
     assert report.total_uploaded >= 0

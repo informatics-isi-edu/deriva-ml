@@ -254,9 +254,7 @@ class Asset:
             return self._asset_type_path_cache
 
         asset_table_obj = self._ml_instance.model.name_to_table(self.asset_table)
-        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(
-            asset_table_obj, "Asset_Type"
-        )
+        type_assoc_table, asset_fk, _ = self._ml_instance.model.find_association(asset_table_obj, "Asset_Type")
 
         pb = self._ml_instance.pathBuilder()
         type_path = pb.schemas[type_assoc_table.schema.name].tables[type_assoc_table.name]

@@ -505,9 +505,7 @@ def _validate_split_inputs(
     failures.
     """
     if stratify_by_column and selection_fn:
-        raise ValueError(
-            "stratify_by_column and selection_fn are mutually exclusive. Use one or the other."
-        )
+        raise ValueError("stratify_by_column and selection_fn are mutually exclusive. Use one or the other.")
 
     if stratify_by_column and not include_tables:
         raise ValueError(
@@ -602,14 +600,10 @@ def _compute_partitions(
 
     if element_table is None:
         candidate_tables = [
-            table_name
-            for table_name, records in members.items()
-            if table_name != "Dataset" and len(records) > 0
+            table_name for table_name, records in members.items() if table_name != "Dataset" and len(records) > 0
         ]
         if not candidate_tables:
-            raise ValueError(
-                f"Source dataset {source_dataset_rid} has no members. Cannot split an empty dataset."
-            )
+            raise ValueError(f"Source dataset {source_dataset_rid} has no members. Cannot split an empty dataset.")
         if len(candidate_tables) > 1:
             raise ValueError(
                 f"Source dataset has members in multiple tables: {candidate_tables}. "
@@ -673,10 +667,7 @@ def _compute_partitions(
                     f"Available columns: {list(df.columns)}"
                 )
 
-        partition_rids = {
-            name: df.iloc[indices][rid_column].tolist()
-            for name, indices in partition_indices.items()
-        }
+        partition_rids = {name: df.iloc[indices][rid_column].tolist() for name, indices in partition_indices.items()}
     else:
         all_rids = [record["RID"] for record in member_records]
 
@@ -755,9 +746,7 @@ def _create_split_hierarchy(
         their current versions.
     """
     partitions_desc = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
-    auto_description = (
-        f"Split of dataset {source_dataset_rid} ({strategy_desc}, {partitions_desc}, seed={seed})"
-    )
+    auto_description = f"Split of dataset {source_dataset_rid} ({strategy_desc}, {partitions_desc}, seed={seed})"
 
     logger.info("Splitting inside caller's execution %s", execution.execution_rid)
 

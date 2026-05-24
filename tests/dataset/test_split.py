@@ -695,9 +695,7 @@ class TestSplitDataset:
             workflow_type="Dataset_Split",
             description="Splitting workflow for tests",
         )
-        with ml.create_execution(
-            ExecutionConfiguration(workflow=workflow, description="Test split")
-        ) as exe:
+        with ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Test split")) as exe:
             result = split_dataset(ml, source_rid, exe, **kwargs)
         exe.commit_output_assets(clean_folder=True)
         return result
@@ -1140,9 +1138,7 @@ class TestSplitDataset:
         ml = test_ml
         source_rid = self._setup_splittable_dataset(ml)
 
-        result = self._split_in_execution(
-            ml, source_rid, test_size=4, seed=42, dry_run=True
-        )
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42, dry_run=True)
         assert result.strategy == "random"
         assert result.element_table == "SplitTestItem"
         assert result.seed == 42

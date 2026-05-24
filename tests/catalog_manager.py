@@ -393,9 +393,7 @@ class CatalogManager:
             # pattern as ``ensure_populated``.
             pb = self.catalog.getPathBuilder()
             try:
-                feature_names = list(
-                    pb.schemas["deriva-ml"].tables["Feature_Name"].path.entities().fetch()
-                )
+                feature_names = list(pb.schemas["deriva-ml"].tables["Feature_Name"].path.entities().fetch())
                 if len(feature_names) > 0:
                     return ml
                 self._logger.info("State is WITH_FEATURES but Feature_Name is empty — recreating features")
@@ -431,9 +429,7 @@ class CatalogManager:
             # ``ensure_populated``.
             pb = self.catalog.getPathBuilder()
             try:
-                datasets = list(
-                    pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch()
-                )
+                datasets = list(pb.schemas["deriva-ml"].tables["Dataset"].path.entities().fetch())
                 if len(datasets) > 0:
                     return ml, self._dataset_description
                 self._logger.info("State is WITH_DATASETS but Dataset table is empty — recreating datasets")

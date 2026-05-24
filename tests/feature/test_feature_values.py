@@ -459,8 +459,7 @@ class TestFeatureValuesSymmetry:
             bag_rids = set(rids)
             assert bag_rids, "Bag returned empty execution list after non-empty check above"
             assert bag_rids.issubset(feature_container.expected_workflow_executions), (
-                f"Bag has executions not in catalog's set: "
-                f"{bag_rids - feature_container.expected_workflow_executions}"
+                f"Bag has executions not in catalog's set: {bag_rids - feature_container.expected_workflow_executions}"
             )
         else:
             rids = feature_container.container.list_workflow_executions(feature_container.workflow)

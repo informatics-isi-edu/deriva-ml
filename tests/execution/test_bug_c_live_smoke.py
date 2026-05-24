@@ -6,6 +6,7 @@ Gated on DERIVA_HOST. Three tests:
 2. Upload refused when required metadata missing — validator raises.
 3. Upload succeeds with SQL NULL when nullable metadata missing.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,6 +25,7 @@ requires_catalog = pytest.mark.skipif(
 
 def _make_workflow(test_ml, name: str):
     from deriva_ml import MLVocab as vc
+
     test_ml.add_term(
         vc.workflow_type,
         "Test Workflow",
@@ -69,9 +71,7 @@ def test_upload_asset_with_full_metadata_end_to_end(test_ml, tmp_path):
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas["deriva-ml"].tables["Execution_Asset"]
     rows = list(
-        asset_path.filter(asset_path.MD5 == expected_md5)
-        .filter(asset_path.Filename == "smoke.bin")
-        .entities().fetch()
+        asset_path.filter(asset_path.MD5 == expected_md5).filter(asset_path.Filename == "smoke.bin").entities().fetch()
     )
     assert len(rows) == 1
     assert "/hatrac/" in rows[0]["URL"]
@@ -100,6 +100,7 @@ def _find_asset_table_with_nullable_metadata(test_ml) -> tuple[str, str, dict, s
     an existing row from the referenced table is used (or a new one inserted). Returns
     None if no suitable table or the caller can't satisfy FK constraints."""
     from datetime import date, datetime, timezone
+
     model = test_ml.model.model
     pb = test_ml.pathBuilder()
     for schema_name, schema in model.schemas.items():
@@ -121,9 +122,7 @@ def _find_asset_table_with_nullable_metadata(test_ml) -> tuple[str, str, dict, s
                     if len(fk.column_map) == 1:
                         from_col, to_col = next(iter(fk.column_map.items()))
                         ref_table = to_col.table
-                        fk_by_col[from_col.name] = (
-                            ref_table.schema.name, ref_table.name, to_col.name
-                        )
+                        fk_by_col[from_col.name] = (ref_table.schema.name, ref_table.name, to_col.name)
             except Exception:
                 pass
 
@@ -189,8 +188,7 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
     found = _find_asset_table_with_required_metadata(test_ml)
     if not found:
         pytest.skip(
-            "Test catalog has no asset table with NOT-NULL metadata; "
-            "Bug C required-column path cannot be exercised."
+            "Test catalog has no asset table with NOT-NULL metadata; Bug C required-column path cannot be exercised."
         )
     schema_name, table_name, required_cols = found
 
@@ -212,11 +210,7 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
     # col is an FK (see _find_asset_table_with_required_metadata's
     # schema scan — first match wins regardless of FK-ness).
     table_obj = test_ml.model.name_to_table(table_name)
-    fk_col_names = {
-        next(iter(fk.column_map.keys())).name
-        for fk in table_obj.foreign_keys
-        if len(fk.column_map) == 1
-    }
+    fk_col_names = {next(iter(fk.column_map.keys())).name for fk in table_obj.foreign_keys if len(fk.column_map) == 1}
     non_fk_required = [c for c in required_cols if c not in fk_col_names]
     if not non_fk_required:
         pytest.skip(
@@ -245,8 +239,7 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
     found = _find_asset_table_with_nullable_metadata(test_ml)
     if not found:
         pytest.skip(
-            "No asset table with nullable metadata found in test fixture; "
-            "Bug C sentinel path cannot be exercised."
+            "No asset table with nullable metadata found in test fixture; Bug C sentinel path cannot be exercised."
         )
     schema_name, table_name, required_md, nullable_col_name = found
 
@@ -275,12 +268,8 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
     # (Python None after fetch), not the string "__NULL__" and not "None".
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas[schema_name].tables[table_name]
-    rows = list(
-        asset_path.filter(asset_path.MD5 == expected_md5)
-        .entities().fetch()
-    )
+    rows = list(asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch())
     assert len(rows) == 1
     assert rows[0][nullable_col_name] is None, (
-        f"expected SQL NULL for {nullable_col_name}, "
-        f"got {rows[0][nullable_col_name]!r}"
+        f"expected SQL NULL for {nullable_col_name}, got {rows[0][nullable_col_name]!r}"
     )
