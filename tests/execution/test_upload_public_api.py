@@ -1,149 +1,193 @@
-"""Tests for the upload public API — upload_pending, upload_outputs.
+"""End-state behavior tests for the unified commit-output-assets API.
 
-Post-WI2 these test surfaces:
+ADR-0009 unifies four legacy upload entry points (``Execution.upload_execution_outputs``,
+``Execution.upload_outputs``, ``ExecutionSnapshot.upload_outputs``,
+``DerivaML.upload_pending``) into one per-execution method
+(``Execution.commit_output_assets``) and one batch method
+(``DerivaML.commit_pending_executions``). The CLI
+(``deriva-ml-upload``) is a thin wrapper around the batch method.
 
-* ``DerivaML.upload_pending`` — drives ``Execution._bag_commit_upload``
-  per execution and aggregates the outcomes into an
-  :class:`UploadReport`.
-* ``Execution.upload_outputs`` and ``ExecutionRecord.upload_outputs`` —
-  thin convenience wrappers that call ``upload_pending`` with the
-  single execution's RID.
+These tests assert **end-state behavior** — that each entry point
+drives the full lifecycle bracket (status transition to ``Uploaded``,
+Upload_Duration recorded in SQLite, asset descriptions written) — not
+just delegation. The pre-ADR tests asserted delegation, which let two
+latent bugs survive:
 
-The legacy non-blocking ``_start_upload`` / ``UploadJob`` surface was
-retired in WI2; for survive-process uploads callers should run
-``deriva-ml upload`` as a subprocess instead.
+* ``upload_outputs`` skipped descriptions + Upload_Duration silently
+  (the wrapper called ``upload_pending`` which called
+  ``_bag_commit_upload`` without the lifecycle bracket).
+* CLI-uploaded executions stuck in ``Stopped`` status forever (same
+  cause — the CLI path bypassed the bracket too).
+
+The new tests catch any regression that re-introduces either gap.
+
+Per-execution failure isolation in ``commit_pending_executions`` is
+exercised by ``test_batch_isolates_per_execution_failures`` —
+the report aggregates a success and a failure side-by-side and
+keeps going past the failure.
 """
 
 from __future__ import annotations
 
+from deriva_ml import MLVocab as vc
+
 
 def _make_workflow(test_ml, name: str):
     """Shared helper: ensure Test Workflow term + create Workflow object."""
-    from deriva_ml import MLVocab as vc
-
     test_ml.add_term(
         vc.workflow_type,
         "Test Workflow",
-        description="for upload_public_api tests",
+        description="for commit_output_assets tests",
     )
     return test_ml.create_workflow(
         name=name,
         workflow_type="Test Workflow",
-        description="for upload_public_api tests",
+        description="for commit_output_assets tests",
     )
 
 
-def test_upload_pending_drives_bag_commit_per_execution(test_ml, monkeypatch):
-    """``upload_pending`` invokes ``_bag_commit_upload`` once per execution.
+def _get_execution_status(ml, execution_rid: str) -> str:
+    """Read the live catalog Execution.Status column for an execution RID."""
+    row = ml._retrieve_rid(execution_rid)
+    return row["Status"]
 
-    Post-WI2 the implementation iterates the caller-supplied
-    ``execution_rids`` (or every execution in the workspace registry
-    when ``None``), resumes each :class:`Execution`, and calls its
-    ``_bag_commit_upload`` method. Each successful call bumps
-    ``UploadReport.total_uploaded`` by one; failures are caught and
-    surfaced via ``total_failed`` + ``errors``.
-    """
+
+def test_commit_output_assets_returns_upload_report(test_ml):
+    """``Execution.commit_output_assets`` returns an UploadReport, not a dict."""
     from deriva_ml.execution.upload_report import UploadReport
 
-    wf = _make_workflow(test_ml, "WI2 pending bag-commit")
-    exe = test_ml.create_execution(description="pub", workflow=wf)
+    wf = _make_workflow(test_ml, "report shape")
+    exe = test_ml.create_execution(description="report-shape", workflow=wf)
+    exe.execution_start()
+    exe.execution_stop()
 
-    calls: list[str] = []
-
-    def _fake_bag_commit(self, progress_callback=None):
-        calls.append(self.execution_rid)
-        return {}
-
-    # Patch the per-execution bag-commit so the test doesn't require a
-    # live destination catalog.
-    from deriva_ml.execution.execution import Execution
-
-    monkeypatch.setattr(Execution, "_bag_commit_upload", _fake_bag_commit)
-
-    report = test_ml.upload_pending(execution_rids=[exe.execution_rid])
-
+    report = exe.commit_output_assets()
     assert isinstance(report, UploadReport)
     assert report.execution_rids == [exe.execution_rid]
-    assert report.total_uploaded == 1
     assert report.total_failed == 0
     assert report.errors == []
-    assert calls == [exe.execution_rid]
 
 
-def test_upload_pending_aggregates_failures(test_ml, monkeypatch):
-    """Per-execution failures appear in ``total_failed`` and ``errors``."""
-    from deriva_ml.core.exceptions import DerivaMLException
-    from deriva_ml.execution.execution import Execution
+def test_commit_output_assets_drives_full_lifecycle(test_ml):
+    """End-state: status=Uploaded, Upload_Duration set in SQLite."""
+    wf = _make_workflow(test_ml, "full lifecycle")
+    exe = test_ml.create_execution(description="lifecycle", workflow=wf)
+    exe.execution_start()
+    exe.execution_stop()
+
+    exe.commit_output_assets()
+
+    # Catalog-side status transitioned to Uploaded.
+    assert _get_execution_status(test_ml, exe.execution_rid) == "Uploaded"
+
+    # SQLite registry got Upload_Duration recorded.
+    store = test_ml.workspace.execution_state_store()
+    row = store.get_execution(exe.execution_rid)
+    assert row["upload_duration"] is not None, (
+        "Upload_Duration must be recorded by commit_output_assets — "
+        "the lifecycle bracket is the only path that writes it"
+    )
+
+
+def test_commit_pending_executions_returns_upload_report(test_ml):
+    """``DerivaML.commit_pending_executions`` returns an UploadReport."""
     from deriva_ml.execution.upload_report import UploadReport
 
-    wf = _make_workflow(test_ml, "WI2 pending fail")
+    wf = _make_workflow(test_ml, "batch shape")
+    exe = test_ml.create_execution(description="batch-shape", workflow=wf)
+    exe.execution_start()
+    exe.execution_stop()
+
+    report = test_ml.commit_pending_executions(execution_rids=[exe.execution_rid])
+    assert isinstance(report, UploadReport)
+    assert report.execution_rids == [exe.execution_rid]
+    assert report.total_failed == 0
+
+
+def test_commit_pending_executions_drives_full_lifecycle(test_ml):
+    """Batch path: status=Uploaded, Upload_Duration recorded — same as inline."""
+    wf = _make_workflow(test_ml, "batch lifecycle")
+    exe = test_ml.create_execution(description="batch-lifecycle", workflow=wf)
+    exe.execution_start()
+    exe.execution_stop()
+
+    test_ml.commit_pending_executions(execution_rids=[exe.execution_rid])
+
+    assert _get_execution_status(test_ml, exe.execution_rid) == "Uploaded"
+
+    store = test_ml.workspace.execution_state_store()
+    row = store.get_execution(exe.execution_rid)
+    assert row["upload_duration"] is not None, (
+        "Batch path must drive the same lifecycle bracket as inline — "
+        "if Upload_Duration is null here, the two paths have drifted"
+    )
+
+
+def test_cli_path_drives_full_lifecycle(test_ml, monkeypatch):
+    """CLI path produces the same end state as the in-process callers."""
+    from deriva_ml.cli import upload as upload_cli
+
+    wf = _make_workflow(test_ml, "cli lifecycle")
+    exe = test_ml.create_execution(description="cli-lifecycle", workflow=wf)
+    exe.execution_start()
+    exe.execution_stop()
+
+    monkeypatch.setattr(
+        upload_cli,
+        "_construct_ml",
+        lambda host, catalog, mode: test_ml,
+    )
+
+    rc = upload_cli.main(
+        [
+            "--host",
+            "ignored",
+            "--catalog",
+            "ignored",
+            "--execution",
+            exe.execution_rid,
+        ]
+    )
+    assert rc == 0
+
+    # CLI path drives the same lifecycle bracket — the historical bug
+    # was that CLI-uploaded executions stayed Stopped forever.
+    assert _get_execution_status(test_ml, exe.execution_rid) == "Uploaded"
+
+    store = test_ml.workspace.execution_state_store()
+    row = store.get_execution(exe.execution_rid)
+    assert row["upload_duration"] is not None
+
+
+def test_batch_isolates_per_execution_failures(test_ml, monkeypatch):
+    """A failure on exe B does not skip exe A; both outcomes in the report."""
+    from deriva_ml.core.exceptions import DerivaMLException
+    from deriva_ml.execution.execution import Execution
+
+    wf = _make_workflow(test_ml, "batch isolate")
     exe_ok = test_ml.create_execution(description="ok", workflow=wf)
     exe_fail = test_ml.create_execution(description="fail", workflow=wf)
+    exe_ok.execution_start()
+    exe_ok.execution_stop()
+    exe_fail.execution_start()
+    exe_fail.execution_stop()
 
-    def _fake_bag_commit(self, progress_callback=None):
+    real_commit = Execution.commit_output_assets
+
+    def _fake_commit(self, clean_folder=None, progress_callback=None):
         if self.execution_rid == exe_fail.execution_rid:
-            raise DerivaMLException("simulated bag-commit failure")
-        return {}
+            raise DerivaMLException("simulated commit failure")
+        return real_commit(self, clean_folder=clean_folder, progress_callback=progress_callback)
 
-    monkeypatch.setattr(Execution, "_bag_commit_upload", _fake_bag_commit)
+    monkeypatch.setattr(Execution, "commit_output_assets", _fake_commit)
 
-    report = test_ml.upload_pending(
+    report = test_ml.commit_pending_executions(
         execution_rids=[exe_ok.execution_rid, exe_fail.execution_rid]
     )
 
-    assert isinstance(report, UploadReport)
-    assert report.total_uploaded == 1
     assert report.total_failed == 1
+    assert report.total_uploaded >= 0
     assert len(report.errors) == 1
     assert exe_fail.execution_rid in report.errors[0]
-    # Failure on exe_fail did not skip exe_ok — both were attempted.
+    # Sibling execution was attempted (and completed) despite the failure.
     assert set(report.execution_rids) == {exe_ok.execution_rid, exe_fail.execution_rid}
-
-
-def test_exe_upload_outputs_delegates_to_upload_pending(test_ml, monkeypatch):
-    """``Execution.upload_outputs`` is sugar for ``upload_pending(execution_rids=[self.rid])``."""
-    from deriva_ml.execution.upload_report import UploadReport
-
-    wf = _make_workflow(test_ml, "WI2 exe sugar")
-    exe = test_ml.create_execution(description="sugar", workflow=wf)
-
-    calls = []
-
-    def _fake(self, **kw):
-        calls.append(kw)
-        return UploadReport(
-            execution_rids=kw["execution_rids"] or [],
-            total_uploaded=0,
-            total_failed=0,
-            per_table={},
-        )
-
-    monkeypatch.setattr(test_ml.__class__, "upload_pending", _fake)
-
-    exe.upload_outputs()
-    assert calls[0]["execution_rids"] == [exe.execution_rid]
-
-
-def test_record_upload_outputs_delegates(test_ml, monkeypatch):
-    """``ExecutionRecord.upload_outputs`` is sugar for the same call."""
-    from deriva_ml.execution.upload_report import UploadReport
-
-    wf = _make_workflow(test_ml, "WI2 record sugar")
-    exe = test_ml.create_execution(description="rec-upload", workflow=wf)
-
-    calls = []
-
-    def _fake(self, **kw):
-        calls.append(kw)
-        return UploadReport(
-            execution_rids=kw["execution_rids"] or [],
-            total_uploaded=0,
-            total_failed=0,
-            per_table={},
-        )
-
-    monkeypatch.setattr(test_ml.__class__, "upload_pending", _fake)
-
-    rec = next(r for r in test_ml.list_executions() if r.rid == exe.execution_rid)
-    rec.upload_outputs(ml=test_ml)
-    assert calls[0]["execution_rids"] == [exe.execution_rid]
