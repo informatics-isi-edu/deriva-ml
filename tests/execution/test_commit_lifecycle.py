@@ -55,11 +55,15 @@ def commit_workflow(test_ml):
     )
 
 
-def _make_pending_execution(test_ml, commit_workflow, label: str) -> Execution:
+def _make_pending_execution(test_ml, commit_workflow, label: str) -> tuple[Execution, str]:
     """Build an execution in status=Stopped with one staged output asset.
 
     Mirrors the "kernel finished its run, manifest has pending work"
     state that every commit entry point is supposed to drain.
+
+    Returns:
+        Tuple of (execution, expected_asset_filename) so the assertion
+        bundle can look up the right asset rid via lookup_asset afterwards.
     """
     cfg = ExecutionConfiguration(
         description=f"commit-lifecycle {label}",
@@ -79,7 +83,7 @@ def _make_pending_execution(test_ml, commit_workflow, label: str) -> Execution:
     return exe
 
 
-def _assert_full_lifecycle(test_ml, execution_rid: str) -> None:
+def _assert_full_lifecycle(test_ml, execution: Execution) -> None:
     """Assertion bundle shared by all three commit-path tests.
 
     Checks the end state every commit entry point is contracted to
@@ -87,6 +91,8 @@ def _assert_full_lifecycle(test_ml, execution_rid: str) -> None:
     refactor that breaks one (e.g., a new batch shortcut that skips
     descriptions) fails here on each path that drifts.
     """
+    execution_rid = execution.execution_rid
+
     # 1. Catalog status = Uploaded.
     catalog_row = test_ml._retrieve_rid(execution_rid)
     assert catalog_row["Status"] == "Uploaded", (
@@ -106,40 +112,40 @@ def _assert_full_lifecycle(test_ml, execution_rid: str) -> None:
         "absent value means the state-machine PUT did not carry the measurement"
     )
 
-    # 3. Output assets present at the catalog with descriptions.
-    pb = test_ml.pathBuilder().schemas[test_ml.ml_schema]
-    asset_exec = pb.Execution_Asset_Execution
-    asset = pb.Execution_Asset
-    assoc_path = asset_exec.path
-    assoc_path.filter(asset_exec.Execution == execution_rid)
-    assoc_path.link(asset)
-    asset_rows = list(assoc_path.entities().fetch())
-    assert asset_rows, "commit must surface Execution_Asset rows for this execution"
-    for row in asset_rows:
+    # 3. Output assets present at the catalog with descriptions and the
+    #    Output_File directional tag (PR #220 contract). Use the public
+    #    higher-level helpers (``uploaded_assets`` + ``lookup_asset``)
+    #    so the assertion is decoupled from association-table layout.
+    uploaded = execution.uploaded_assets
+    asset_paths = uploaded.get("deriva-ml/Execution_Asset", [])
+    assert asset_paths, "commit must surface Execution_Asset rows for this execution"
+
+    for asset_path in asset_paths:
+        asset = test_ml.lookup_asset(asset_path.asset_rid)
+        tags = set(asset.asset_types)
+
         # Description written by ``_set_asset_descriptions`` — the
         # second latent bug ADR-0009 fixes (upload_outputs silently
         # skipped this).
-        assert row.get("Description"), (
-            "asset description must be written by the lifecycle bracket — "
-            "absent value means the commit path skipped _set_asset_descriptions"
+        assert asset.description, (
+            f"asset description must be written by the lifecycle bracket — "
+            f"absent value on asset {asset_path.asset_rid} means the commit path "
+            f"skipped _set_asset_descriptions"
         )
 
-    # 4. Asset_Role="Output" on every {Asset}_Execution row + Output_File tag.
-    for row in asset_rows:
-        assert row.get("Asset_Role") == "Output", (
-            f"every committed asset must carry Asset_Role=Output on its "
-            f"{{Asset}}_Execution row; saw {row.get('Asset_Role')!r} for {row['RID']}"
-        )
-
-    # 5. Output_File directional tag on every committed asset (PR #220 contract).
-    asset_type_assoc = pb.Execution_Asset_Type
-    for asset_row in asset_rows:
-        type_path = asset_type_assoc.path
-        type_path.filter(asset_type_assoc.Execution_Asset == asset_row["Execution_Asset"])
-        types = {t["Asset_Type"] for t in type_path.attributes(asset_type_assoc.Asset_Type).fetch()}
-        assert "Output_File" in types, (
+        # Output_File directional tag on every committed asset.
+        assert "Output_File" in tags, (
             f"every committed asset must carry the Output_File directional tag "
-            f"(PR #220 contract); asset {asset_row['Execution_Asset']} has tags {types}"
+            f"(PR #220 contract); asset {asset_path.asset_rid} has tags {sorted(tags)}"
+        )
+
+        # 4. Asset_Role="Output" on the {Asset}_Execution row, queried via
+        #    the documented ``list_executions(asset_role=...)`` API.
+        output_executions = asset.list_executions(asset_role="Output")
+        assert any(e.execution_rid == execution_rid for e in output_executions), (
+            f"asset {asset_path.asset_rid} must have an Output-role link to "
+            f"execution {execution_rid}; saw "
+            f"{[e.execution_rid for e in output_executions]!r}"
         )
 
 
@@ -154,7 +160,7 @@ def test_inline_commit_produces_full_lifecycle(test_ml, commit_workflow):
 
     exe.commit_output_assets()
 
-    _assert_full_lifecycle(test_ml, exe.execution_rid)
+    _assert_full_lifecycle(test_ml, exe)
 
 
 def test_resumed_commit_produces_full_lifecycle(test_ml, commit_workflow):
@@ -172,7 +178,7 @@ def test_resumed_commit_produces_full_lifecycle(test_ml, commit_workflow):
     resumed = test_ml.resume_execution(rid)
     resumed.commit_output_assets()
 
-    _assert_full_lifecycle(test_ml, rid)
+    _assert_full_lifecycle(test_ml, resumed)
 
 
 def test_batch_commit_produces_full_lifecycle(test_ml, commit_workflow):
@@ -189,4 +195,7 @@ def test_batch_commit_produces_full_lifecycle(test_ml, commit_workflow):
     assert report.total_failed == 0
     assert rid in report.execution_rids
 
-    _assert_full_lifecycle(test_ml, rid)
+    # Re-resume the execution so the assertion bundle reads the
+    # current manifest view (the report carries counts, not paths).
+    resumed = test_ml.resume_execution(rid)
+    _assert_full_lifecycle(test_ml, resumed)
