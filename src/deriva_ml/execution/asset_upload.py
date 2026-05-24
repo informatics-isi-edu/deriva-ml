@@ -26,7 +26,7 @@ association rows).
 ``asset_file_path`` (manifest registration + flat staging
 + asset_type JSONL), ``metrics_file`` (thin sugar over
 ``asset_file_path``), ``download_asset`` (hatrac fetch +
-cache + execution-link), and ``upload_execution_outputs``
+cache + execution-link), and ``commit_output_assets``
 (state-machine bracketed bag-commit driver). These are
 public-API methods on :class:`Execution`; the body moves
 here but the class still exposes thin delegate methods so
@@ -76,8 +76,8 @@ __all__ = [
     "metrics_file",
     "save_runtime_environment",
     "set_asset_descriptions",
+    "commit_output_assets",
     "update_asset_execution_table",
-    "upload_execution_outputs",
     "upload_hydra_config_assets",
 ]
 
@@ -631,7 +631,7 @@ def bag_commit_upload(
     ``upload/{rid}/`` directory by hand once they no longer
     need it. The caller's ``clean_folder`` flag controls
     cleanup of the separate ``execution_root`` only (see
-    :meth:`Execution.upload_execution_outputs`).
+    :meth:`Execution.commit_output_assets`).
 
     Pre-extraction this was the ``_bag_commit_upload`` method
     on ``Execution``. The helper now takes ``execution`` as
@@ -1128,7 +1128,7 @@ def download_asset(
     return asset_path
 
 
-def upload_execution_outputs(
+def commit_output_assets(
     execution: "Execution",
     *,
     clean_folder: bool | None = None,
