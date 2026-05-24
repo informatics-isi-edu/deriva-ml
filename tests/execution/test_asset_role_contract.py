@@ -15,7 +15,7 @@ inner helpers in isolation. This file exercises the **full
 public API** against a live catalog:
 
 - ``download_asset`` → role "Input" + ``Input_File`` tag.
-- ``asset_file_path`` + ``upload_execution_outputs`` → role
+- ``asset_file_path`` + ``commit_output_assets`` → role
   "Output" + ``Output_File`` tag.
 
 The motivation is a regression that lived undetected for many
@@ -66,7 +66,7 @@ def _asset_type_set(asset) -> set[str]:
 
 
 class TestOutputAssetRoleContract:
-    """Assets uploaded via ``asset_file_path`` + ``upload_execution_outputs``
+    """Assets uploaded via ``asset_file_path`` + ``commit_output_assets``
     must carry ``Asset_Role="Output"`` + ``Output_File`` tag.
     """
 
@@ -95,7 +95,8 @@ class TestOutputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("output content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Look up the resulting catalog state and assert BOTH halves
@@ -153,7 +154,8 @@ class TestOutputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("notags")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -185,7 +187,8 @@ class TestOutputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("explicit")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -234,7 +237,8 @@ class TestInputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("cross-execution test")
 
-        uploaded = creator.upload_execution_outputs()
+        uploaded_report = creator.commit_output_assets()
+        uploaded = creator.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Sanity: creator's upload tagged it as an Output.
@@ -312,7 +316,8 @@ class TestRoleSymmetry:
             )
             with asset_path.open("w") as fp:
                 fp.write("shared")
-        uploaded = creator.upload_execution_outputs()
+        uploaded_report = creator.commit_output_assets()
+        uploaded = creator.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Creator: listing by Output role should include this asset.

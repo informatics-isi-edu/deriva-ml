@@ -78,7 +78,7 @@ def test_upload_asset_uses_pre_leased_rid(test_ml, tmp_path):
             "Execution_Asset", src, asset_types="Execution_Asset"
         )
 
-    report = exe.upload_outputs()
+    report = exe.commit_output_assets()
     assert report.total_failed == 0, f"failures: {report.errors}"
     assert report.total_uploaded == 1
 
@@ -131,7 +131,7 @@ def test_soft_mode_second_upload_adopts_existing_rid(test_ml, tmp_path):
         exe1.asset_file_path(
             "Execution_Asset", src, asset_types="Execution_Asset"
         )
-    report1 = exe1.upload_outputs()
+    report1 = exe1.commit_output_assets()
     assert report1.total_failed == 0, report1.errors
 
     # Capture the row's first-upload RID for the dedup comparison.
@@ -155,7 +155,7 @@ def test_soft_mode_second_upload_adopts_existing_rid(test_ml, tmp_path):
             rename_file="bug-e2-shared.bin",  # keep the same Filename for dedup
             asset_types="Execution_Asset",
         )
-    report2 = exe2.upload_outputs()
+    report2 = exe2.commit_output_assets()
     assert report2.total_failed == 0, (
         f"Soft-mode upload should succeed but failed: {report2.errors}"
     )

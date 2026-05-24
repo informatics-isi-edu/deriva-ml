@@ -11,7 +11,7 @@ bag-based commit_execution:
   resolved on demand at upload time
 - #232 — ``SchemaBuilder.make_table_name`` hyphen normalisation
 
-The shape mirrors what ``Execution.upload_execution_outputs``
+The shape mirrors what ``Execution.commit_output_assets``
 will do once rewritten: build a bag containing one Image row +
 its bytes hardlinked from local flat storage, load it via
 ``BagCatalogLoader`` with ``PRESERVE`` policy + commit-mode

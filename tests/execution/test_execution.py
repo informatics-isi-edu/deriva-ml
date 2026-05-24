@@ -434,12 +434,12 @@ class TestExecutionLifecycle:
         # uploaded depending on how the current upload pipeline is wired
         # relative to this task). We don't assert a specific terminal
         # state here — later tasks (E5/G-series) will refine.
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         # After upload, Upload_Duration is populated.
         catalog_row = ml._retrieve_rid(execution.execution_rid)
         assert catalog_row["Upload_Duration"] is not None, (
-            "catalog Upload_Duration must be populated by upload_execution_outputs timing (PR 2 upload phase)"
+            "catalog Upload_Duration must be populated by commit_output_assets timing (PR 2 upload phase)"
         )
 
     def test_execution_manual_start_stop(self, basic_execution):
@@ -453,7 +453,7 @@ class TestExecutionLifecycle:
 
             execution_start()           → Created  → Running
             execution_stop()            → Running  → Stopped
-            upload_execution_outputs()  → Stopped  → Pending_Upload → Uploaded
+            commit_output_assets()  → Stopped  → Pending_Upload → Uploaded
 
         Regression guard: prior to the fix in commit
         "fix(execution): execution_start/stop transition status",
@@ -472,25 +472,25 @@ class TestExecutionLifecycle:
         execution.execution_stop()
         assert get_execution_status(ml, execution.execution_rid) == "Stopped"
 
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
         assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
 
     def test_notebook_lifecycle_auto_stops_running(self, workflow_terms, test_workflow):
-        """upload_execution_outputs() auto-stops a still-Running execution.
+        """commit_output_assets() auto-stops a still-Running execution.
 
         Regression test for the notebook code path. ``run_notebook()``
         returns ``(ml, execution, config)`` to the user with the execution
         in status ``Running`` (it calls ``execution_start()`` internally).
         The user's notebook cells run, doing work, and the last cell calls
-        ``execution.upload_execution_outputs()`` directly — no
+        ``execution.commit_output_assets()`` directly — no
         ``execution_stop()`` call between them, since notebooks have no
         natural ``__exit__`` hook for the kernel-managed cell flow.
 
-        Before this fix, ``upload_execution_outputs()`` only handled
+        Before this fix, ``commit_output_assets()`` only handled
         Stopped → Pending_Upload, and a Running-status execution either
         crashed inside the upload (state machine rejected its terminal
         transitions) or the exception handler tried Created/Running →
-        Failed which is illegal from Created. Now ``upload_execution_outputs()``
+        Failed which is illegal from Created. Now ``commit_output_assets()``
         auto-calls ``execution_stop()`` if the execution is still Running.
 
         Tested flow (mirrors ``run_notebook`` + last-cell ``upload``):
@@ -498,7 +498,7 @@ class TestExecutionLifecycle:
             create_execution         status=Created
             execution_start()        status=Running
             (user work in cells)
-            upload_execution_outputs status=Uploaded   # auto-stops first
+            commit_output_assets status=Uploaded   # auto-stops first
         """
         ml = workflow_terms
 
@@ -519,66 +519,64 @@ class TestExecutionLifecycle:
 
         # Final cell: upload directly. Must succeed without a separate
         # execution_stop() call because notebooks have no __exit__ hook.
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
         assert get_execution_status(ml, execution.execution_rid) == "Uploaded"
 
     def test_additive_upload_after_uploaded(self, basic_execution):
-        """A second ``upload_execution_outputs()`` call ships newly-staged assets.
+        """A second ``commit_output_assets()`` call ships newly-staged assets.
 
         Models the runner-harness pattern: a notebook kernel finishes its
-        cells and runs ``upload_execution_outputs()`` (kernel-side, status
+        cells and runs ``commit_output_assets()`` (kernel-side, status
         moves to Uploaded). The runner then knows about additional assets
         only it could safely produce — typically Hydra's job log, which
         has a write-race when registered kernel-side because Hydra's
         FileHandler keeps appending to the file during the kernel's own
         upload pass. The runner registers those additional assets against
-        the same execution and calls ``upload_execution_outputs()`` again.
+        the same execution and calls ``commit_output_assets()`` again.
 
         The state machine's documented Uploaded → Pending_Upload edge
-        permits this; ``upload_execution_outputs()`` auto-takes the
+        permits this; ``commit_output_assets()`` auto-takes the
         transition when there are pending manifest entries, and is a
         no-op when there aren't.
 
         Tested flow (mirrors ``run_notebook`` outer harness):
 
-            kernel:   create_execution → ... → upload_execution_outputs()
+            kernel:   create_execution → ... → commit_output_assets()
                       status: Uploaded
             runner:   register more assets via asset_file_path()
-                      upload_execution_outputs()
+                      commit_output_assets()
                       status: Uploaded (cycled through Pending_Upload)
         """
         # Phase 1: kernel-style upload. with-block handles
-        # Created → Running → Stopped; upload_execution_outputs finalizes
+        # Created → Running → Stopped; commit_output_assets finalizes
         # the lifecycle to Uploaded.
         with basic_execution.execute() as execution:
             create_test_asset(execution, "kernel_output.txt", "kernel content")
-        first_uploaded = basic_execution.upload_execution_outputs()
+        first_report = basic_execution.commit_output_assets()
         assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
-        assert "deriva-ml/Execution_Asset" in first_uploaded
-        assert len(first_uploaded["deriva-ml/Execution_Asset"]) == 1
+        assert first_report.per_table["deriva-ml/Execution_Asset"]["uploaded"] == 1
 
         # Phase 2: runner-style additive upload. Stage another asset
         # against the same execution, call upload again. The state
         # machine takes Uploaded → Pending_Upload → Uploaded.
         create_test_asset(basic_execution, "runner_output.txt", "runner content")
-        second_uploaded = basic_execution.upload_execution_outputs()
+        second_report = basic_execution.commit_output_assets()
         assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
         # Only the runner's newly-staged asset uploads on the second
         # call (the kernel's asset is already settled in the catalog).
-        assert "deriva-ml/Execution_Asset" in second_uploaded
-        assert len(second_uploaded["deriva-ml/Execution_Asset"]) == 1
+        assert second_report.per_table["deriva-ml/Execution_Asset"]["uploaded"] == 1
 
         # Phase 3: a third call with nothing pending is a no-op — must
-        # not cycle the state machine, must not raise. Returns the full
-        # manifest view of all assets uploaded by this execution
-        # (kernel's + runner's), not the last call's per-call subset
-        # (see audit §A.8 / Phase 3 #14 — the in-memory cache was
-        # retired; the manifest is the source of truth).
-        third_uploaded = basic_execution.upload_execution_outputs()
+        # not cycle the state machine, must not raise. The per-call
+        # report reflects the no-op view (the free-function path
+        # short-circuits and returns the manifest's uploaded view);
+        # the cumulative manifest reflects both prior uploads.
+        third_report = basic_execution.commit_output_assets()
         assert get_execution_status(basic_execution._ml_object, basic_execution.execution_rid) == "Uploaded"
-        assert "deriva-ml/Execution_Asset" in third_uploaded
         # Both prior uploads (kernel + runner) surface in the manifest view.
-        assert len(third_uploaded["deriva-ml/Execution_Asset"]) == 2
+        cumulative = basic_execution.uploaded_assets
+        assert len(cumulative["deriva-ml/Execution_Asset"]) == 2
+        assert third_report.per_table["deriva-ml/Execution_Asset"]["uploaded"] == 2
 
     def test_multirun_parent_lifecycle(self, workflow_terms, test_workflow):
         """Multirun parent execution flows through the full state-machine cycle.
@@ -615,11 +613,11 @@ class TestExecutionLifecycle:
         # ... children would run here in production. Skip for the unit test.
 
         # Runner's atexit handler calls execution_stop() then
-        # upload_execution_outputs(). Both must succeed.
+        # commit_output_assets(). Both must succeed.
         parent.execution_stop()
         assert get_execution_status(ml, parent.execution_rid) == "Stopped"
 
-        parent.upload_execution_outputs()
+        parent.commit_output_assets()
         assert get_execution_status(ml, parent.execution_rid) == "Uploaded"
 
     def test_execution_status_updates(self, basic_execution):
@@ -652,7 +650,7 @@ class TestExecutionLifecycle:
         with execution.execute():
             pass
 
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         metadata_files = get_execution_metadata_files(ml, execution.execution_rid)
         assert "configuration.json" in metadata_files
@@ -690,7 +688,8 @@ class TestExecutionAssets:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "model1.txt", "Model 1 content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         assert "deriva-ml/Execution_Asset" in uploaded
         assert len(uploaded["deriva-ml/Execution_Asset"]) == 1
 
@@ -701,7 +700,8 @@ class TestExecutionAssets:
             create_test_asset(execution, "model2.txt", "Model 2")
             create_test_asset(execution, "model3.txt", "Model 3")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         assert len(uploaded["deriva-ml/Execution_Asset"]) == 3
 
     def test_asset_download(self, basic_execution):
@@ -712,7 +712,8 @@ class TestExecutionAssets:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "downloadable.txt", "Download me")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Now download it in a new execution
@@ -742,7 +743,8 @@ class TestExecutionAssets:
             with asset_path.open("w") as f:
                 f.write("typed content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Download and check types
@@ -778,7 +780,8 @@ class TestExecutionAssets:
             create_test_asset(execution, "file2.txt", "Content 2")
 
         # Upload with progress callback
-        uploaded = basic_execution.upload_execution_outputs(progress_callback=progress_callback)
+        uploaded_report = basic_execution.commit_output_assets(progress_callback=progress_callback)
+        uploaded = basic_execution.uploaded_assets
 
         # Verify callback was invoked
         assert len(progress_updates) > 0, "Progress callback should have been invoked"
@@ -800,7 +803,8 @@ class TestExecutionAssets:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "traced_asset.txt", "Traceable content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Test list_asset_executions - should return ExecutionRecord objects
@@ -1008,7 +1012,8 @@ class TestAssetCaching:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "weights.bin", "large model weights")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # First download with use_cache=True (cache miss — downloads and caches)
@@ -1061,7 +1066,8 @@ class TestAssetCaching:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "ephemeral.txt", "not cached")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         config = ExecutionConfiguration(
@@ -1092,7 +1098,8 @@ class TestAssetCaching:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "config_cached.txt", "cached via config")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Create execution with AssetSpec(cache=True) in the config
@@ -1124,7 +1131,8 @@ class TestAssetCaching:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "plain_rid.txt", "not cached")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Create execution with plain RID string (no caching)
@@ -1156,7 +1164,8 @@ class TestAssetCaching:
             create_test_asset(execution, "cached.txt", "I am cached")
             create_test_asset(execution, "uncached.txt", "I am not cached")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         cached_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
         uncached_rid = uploaded["deriva-ml/Execution_Asset"][1].asset_rid
 
@@ -1224,7 +1233,8 @@ class TestAssetCaching:
             )
             with asset_path.open("w") as f:
                 f.write("producer-a-bytes")
-        uploaded_a = upload_a.upload_execution_outputs()
+        uploaded_a_report = upload_a.commit_output_assets()
+        uploaded_a = upload_a.uploaded_assets
         rid_a = uploaded_a["deriva-ml/Execution_Asset"][0].asset_rid
 
         upload_b = ml.create_execution(
@@ -1241,7 +1251,8 @@ class TestAssetCaching:
             )
             with asset_path.open("w") as f:
                 f.write("producer-b-bytes")
-        uploaded_b = upload_b.upload_execution_outputs()
+        uploaded_b_report = upload_b.commit_output_assets()
+        uploaded_b = upload_b.uploaded_assets
         rid_b = uploaded_b["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Sanity: two distinct RIDs sharing the same catalog Filename is
@@ -1426,10 +1437,10 @@ class TestExecutionFeatures:
             ]
             exe.add_features(features)
 
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         # Verify features were uploaded. Phase 2 lifecycle:
-        # upload_execution_outputs advances Stopped → Pending_Upload → Uploaded.
+        # commit_output_assets advances Stopped → Pending_Upload → Uploaded.
         status = get_execution_status(ml, execution.execution_rid)
         assert status == "Uploaded"
 
@@ -1462,7 +1473,7 @@ class TestExecutionDryRun:
             create_test_asset(exe, "dry_run.txt", "Should not upload")
 
         # In dry run, upload should not create catalog entries
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         # Execution count should be the same (dry run uses fake RID)
         executions_after = len(list(pb.Execution.entities().fetch()))
@@ -1558,10 +1569,11 @@ class TestExecutionIntegration:
             assert new_dataset is not None
 
         # Upload and verify completion
-        uploaded = execution.upload_execution_outputs()
+        uploaded_report = execution.commit_output_assets()
+        uploaded = execution.uploaded_assets
         assert "deriva-ml/Execution_Asset" in uploaded
 
-        # Phase 2 lifecycle: upload_execution_outputs → Uploaded (legacy Completed).
+        # Phase 2 lifecycle: commit_output_assets → Uploaded (legacy Completed).
         status = get_execution_status(ml, execution.execution_rid)
         assert status == "Uploaded"
 

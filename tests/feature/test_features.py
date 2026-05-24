@@ -374,7 +374,7 @@ class TestFeatures:
             print(SubjectHealthFeature.feature_columns())
             exe.add_features([SubjectHealthFeature(Subject=subject_rids[0], SubjectHealth="Sick", Scale=23)])
 
-        feature_execution.upload_execution_outputs()
+        feature_execution.commit_output_assets()
         # Filter to records from THIS execution — the demo catalog populates
         # Health feature values for every Subject during ensure_features, so the
         # unfiltered count will be (# demo subjects) + 1.
@@ -434,7 +434,7 @@ class TestFeatures:
             exe.add_features(feature_records)
 
         # Upload outputs (assets + feature values)
-        asset_execution.upload_execution_outputs()
+        asset_execution.commit_output_assets()
 
         # Verify the feature values were created — filter to THIS execution,
         # since the demo catalog also populates BoundingBox feature values

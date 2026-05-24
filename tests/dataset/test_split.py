@@ -699,7 +699,7 @@ class TestSplitDataset:
             ExecutionConfiguration(workflow=workflow, description="Test split")
         ) as exe:
             result = split_dataset(ml, source_rid, exe, **kwargs)
-        exe.upload_execution_outputs(clean_folder=True)
+        exe.commit_output_assets(clean_folder=True)
         return result
 
     def test_basic_random_split(self, test_ml):

@@ -3,7 +3,7 @@
 The audit at
 ``docs/design/deriva-ml-audit-2026-05-phase3-execution.md`` §C.1
 flagged that the bag-commit pipeline (the production upload path)
-is only tested end-to-end through ``Execution.upload_execution_outputs``.
+is only tested end-to-end through ``Execution.commit_output_assets``.
 When something breaks, the failure surface is the full pipeline,
 not the individual function — bug locality is poor.
 

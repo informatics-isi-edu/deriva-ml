@@ -2,7 +2,7 @@
 ``Execution._update_asset_execution_table``.
 
 When an execution consumes an existing asset (download_asset) or
-produces a new asset (upload_execution_outputs), the system writes
+produces a new asset (commit_output_assets), the system writes
 two kinds of association rows:
 
 1. ``{Asset}_Execution`` — the per-execution-link direction tag

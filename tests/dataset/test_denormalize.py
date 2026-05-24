@@ -1651,8 +1651,8 @@ class TestNewFKPatterns:
                     [QualityFeature(Image=rid, ImageQuality=label) for rid in image_member_rids]
                 )
             # Flush staged feature records to ermrest; add_features only
-            # stages to a SQLite buffer; upload_execution_outputs writes.
-            annot_n.upload_execution_outputs()
+            # stages to a SQLite buffer; commit_output_assets writes.
+            annot_n.commit_output_assets()
             extra_execution_rids.append(annot_n.execution_rid)
 
         total_features_per_image = 1 + EXTRA_ANNOTATORS

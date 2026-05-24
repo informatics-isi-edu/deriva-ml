@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from deriva_ml.core.constants import DRY_RUN_RID
+from deriva_ml.execution.upload_report import UploadReport
 from deriva_ml.core.exceptions import DerivaMLStateInconsistency
 from deriva_ml.execution.runner import (
     _complete_parent_execution,
@@ -164,7 +165,7 @@ class TestRunModelWithMocks:
         mock_execution = MagicMock()
         mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
         mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_execution.upload_execution_outputs.return_value = {}
+        mock_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
         mock_ml_instance.create_execution.return_value = mock_execution
 
         mock_model_config = Mock()
@@ -246,7 +247,7 @@ class TestRunModelWithMocks:
         mock_child_execution.execution_rid = "child-rid"
         mock_child_execution.execute.return_value.__enter__ = Mock(return_value=mock_child_execution)
         mock_child_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_child_execution.upload_execution_outputs.return_value = {}
+        mock_child_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
 
         # First call creates parent, second call creates child
         mock_ml_instance.create_execution.side_effect = [
@@ -290,7 +291,7 @@ class TestRunModelWithMocks:
         mock_execution = MagicMock()
         mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
         mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_execution.upload_execution_outputs.return_value = {}
+        mock_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
         mock_ml_instance.create_execution.return_value = mock_execution
 
         mock_model_config = Mock()
@@ -314,10 +315,10 @@ class TestRunModelWithMocks:
 
 
 class TestRunModelUploadCallContract:
-    """Regression tests for runner.run_model's call to upload_execution_outputs.
+    """Regression tests for runner.run_model's call to commit_output_assets.
 
     Surfaced 2026-05-19: ``runner.run_model`` was calling
-    ``execution.upload_execution_outputs(timeout=..., chunk_size=...)`` but
+    ``execution.commit_output_assets(timeout=..., chunk_size=...)`` but
     the method's signature only accepts ``clean_folder`` and
     ``progress_callback``. The ``@validate_call`` decorator on the method
     made the mismatch fatal at runtime. Every other runner test in this
@@ -337,8 +338,8 @@ class TestRunModelUploadCallContract:
         reset_multirun_state()
 
     @patch("deriva_ml.execution.runner._is_multirun")
-    def test_run_model_call_matches_upload_execution_outputs_signature(self, mock_is_multirun):
-        """run_model must only pass kwargs that upload_execution_outputs accepts.
+    def test_run_model_call_matches_commit_output_assets_signature(self, mock_is_multirun):
+        """run_model must only pass kwargs that commit_output_assets accepts.
 
         Before the 2026-05-19 fix, run_model passed timeout= and chunk_size=
         kwargs that the upload method's signature did not accept. The fix
@@ -359,7 +360,7 @@ class TestRunModelUploadCallContract:
         mock_execution = MagicMock(spec=Execution)
         mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
         mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
-        mock_execution.upload_execution_outputs.return_value = {}
+        mock_execution.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
         mock_ml_instance.create_execution.return_value = mock_execution
 
         mock_model_config = Mock()
@@ -367,7 +368,7 @@ class TestRunModelUploadCallContract:
         mock_workflow = MagicMock()
 
         # Call should complete without raising. Pre-fix, this raised
-        # because the upload_execution_outputs MagicMock(spec=...) rejected
+        # because the commit_output_assets MagicMock(spec=...) rejected
         # the timeout=/chunk_size= kwargs the runner passed.
         run_model(
             deriva_ml=mock_config,
@@ -384,16 +385,16 @@ class TestRunModelUploadCallContract:
         # real method's signature.
         import inspect
 
-        real_sig = inspect.signature(Execution.upload_execution_outputs)
+        real_sig = inspect.signature(Execution.commit_output_assets)
         real_params = set(real_sig.parameters.keys())
 
-        call_args = mock_execution.upload_execution_outputs.call_args
+        call_args = mock_execution.commit_output_assets.call_args
         passed_kwargs = set(call_args.kwargs.keys()) if call_args else set()
 
         unsupported = passed_kwargs - real_params
         assert not unsupported, (
             f"run_model passed kwargs not accepted by "
-            f"Execution.upload_execution_outputs: {unsupported}. "
+            f"Execution.commit_output_assets: {unsupported}. "
             f"Real method accepts: {real_params - {'self'}}."
         )
 
@@ -414,7 +415,7 @@ class TestCompleteParentExecutionDryRun:
 
     These tests pin the fix: the handler must short-circuit on the
     ``DRY_RUN_RID`` placeholder, log a clear INFO message, and never touch
-    ``execution_stop`` / ``upload_execution_outputs`` on the placeholder.
+    ``execution_stop`` / ``commit_output_assets`` on the placeholder.
     """
 
     @pytest.fixture(autouse=True)
@@ -433,14 +434,14 @@ class TestCompleteParentExecutionDryRun:
         before any registry-touching method runs.
         """
         # Build a parent execution that mimics a dry-run placeholder:
-        # execution_stop / upload_execution_outputs would (under the bug)
+        # execution_stop / commit_output_assets would (under the bug)
         # raise DerivaMLStateInconsistency because no SQLite row exists.
         parent = MagicMock()
         parent.execution_rid = DRY_RUN_RID
         parent.execution_stop.side_effect = DerivaMLStateInconsistency(
             f"Execution {DRY_RUN_RID} no longer in workspace registry."
         )
-        parent.upload_execution_outputs.side_effect = DerivaMLStateInconsistency(
+        parent.commit_output_assets.side_effect = DerivaMLStateInconsistency(
             f"Execution {DRY_RUN_RID} no longer in workspace registry."
         )
 
@@ -467,7 +468,7 @@ class TestCompleteParentExecutionDryRun:
 
         # The registry-touching methods were not invoked on the placeholder.
         parent.execution_stop.assert_not_called()
-        parent.upload_execution_outputs.assert_not_called()
+        parent.commit_output_assets.assert_not_called()
 
     def test_real_parent_still_completed_normally(self, caplog):
         """Non-placeholder parents still go through the full stop/upload path.
@@ -477,7 +478,7 @@ class TestCompleteParentExecutionDryRun:
         """
         parent = MagicMock()
         parent.execution_rid = "1-ABCD"
-        parent.upload_execution_outputs.return_value = {}
+        parent.commit_output_assets.return_value = UploadReport(execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[])
 
         _multirun_state.parent_execution = parent
         _multirun_state.parent_execution_rid = "1-ABCD"
@@ -487,6 +488,6 @@ class TestCompleteParentExecutionDryRun:
             _complete_parent_execution()
 
         parent.execution_stop.assert_called_once()
-        parent.upload_execution_outputs.assert_called_once()
+        parent.commit_output_assets.assert_called_once()
         info_messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
         assert any("Completed parent execution: 1-ABCD" in m for m in info_messages)

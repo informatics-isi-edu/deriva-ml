@@ -46,7 +46,7 @@ def test_hard_crash_recovery_running_to_pending_upload():
 
         exe = ml.resume_execution(rid)
         exe.update_status(ExecutionStatus.Pending_Upload)
-        exe.upload_execution_outputs()
+        exe.commit_output_assets()
 
     Marking the execution ``Failed`` first — which used to be the only
     legal path forward — would pollute the audit trail with a spurious

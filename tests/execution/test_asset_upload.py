@@ -25,7 +25,7 @@ Coverage layers:
    JSONL writeback, empty-list-types preservation, metadata
    normalization.
 8. ``metrics_file`` — thin sugar over ``asset_file_path``.
-9. ``upload_execution_outputs`` — state-machine bracketing
+9. ``commit_output_assets`` — state-machine bracketing
    for dry-run, Running auto-stop, Uploaded short-circuit,
    Stopped → Pending_Upload → Uploaded happy path,
    Pending_Upload → Failed on exception.
@@ -49,7 +49,7 @@ from deriva_ml.execution.asset_upload import (
     save_runtime_environment,
     set_asset_descriptions,
     update_asset_execution_table,
-    upload_execution_outputs,
+    commit_output_assets,
     upload_hydra_config_assets,
 )
 
@@ -867,7 +867,7 @@ class TestMetricsFile:
 
 
 # ---------------------------------------------------------------------------
-# upload_execution_outputs — state-machine bracketing
+# commit_output_assets — state-machine bracketing
 # ---------------------------------------------------------------------------
 
 
@@ -916,7 +916,7 @@ class TestUploadExecutionOutputs:
         s = self._statuses()
         exe = self._build_execution(status=s["Stopped"], dry_run=True)
 
-        result = upload_execution_outputs(
+        result = commit_output_assets(
             exe,
             pending_upload_status=s["Pending_Upload"],
             uploaded_status=s["Uploaded"],
@@ -936,7 +936,7 @@ class TestUploadExecutionOutputs:
         exe = self._build_execution(status=s["Uploaded"], pending={})
         exe.uploaded_assets = {"schema/Image": []}
 
-        result = upload_execution_outputs(
+        result = commit_output_assets(
             exe,
             pending_upload_status=s["Pending_Upload"],
             uploaded_status=s["Uploaded"],
@@ -972,7 +972,7 @@ class TestUploadExecutionOutputs:
 
         exe.update_status.side_effect = _update_fn
 
-        upload_execution_outputs(
+        commit_output_assets(
             exe,
             pending_upload_status=s["Pending_Upload"],
             uploaded_status=s["Uploaded"],
@@ -1003,7 +1003,7 @@ class TestUploadExecutionOutputs:
         exe.update_status.side_effect = _update_fn
 
         with pytest.raises(RuntimeError, match="bag-load failed"):
-            upload_execution_outputs(
+            commit_output_assets(
                 exe,
                 pending_upload_status=s["Pending_Upload"],
                 uploaded_status=s["Uploaded"],
@@ -1029,7 +1029,7 @@ class TestUploadExecutionOutputs:
 
         exe.update_status.side_effect = _update_fn
 
-        upload_execution_outputs(
+        commit_output_assets(
             exe,
             clean_folder=True,
             pending_upload_status=s["Pending_Upload"],

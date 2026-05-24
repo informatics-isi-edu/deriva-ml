@@ -61,7 +61,7 @@ def test_upload_asset_with_full_metadata_end_to_end(test_ml, tmp_path):
             asset_types="Execution_Asset",
         )
 
-    report = exe.upload_outputs()
+    report = exe.commit_output_assets()
     assert report.total_failed == 0, f"failures: {report.errors}"
     assert report.total_uploaded == 1
 
@@ -226,7 +226,7 @@ def test_upload_with_missing_required_metadata_raises_validation(test_ml, tmp_pa
         )
 
     with pytest.raises(DerivaMLValidationError) as ei:
-        exe.upload_outputs()
+        exe.commit_output_assets()
     msg = str(ei.value)
     for c in non_fk_required:
         assert c in msg, f"expected column {c} in error message"
@@ -267,7 +267,7 @@ def test_upload_with_missing_nullable_metadata_succeeds_with_null(test_ml, tmp_p
             metadata=required_md,
         )
 
-    report = exe.upload_outputs()
+    report = exe.commit_output_assets()
     assert report.total_failed == 0, f"failures: {report.errors}"
     assert report.total_uploaded == 1
 
