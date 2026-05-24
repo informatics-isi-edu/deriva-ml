@@ -247,7 +247,7 @@ with ml.create_execution(config) as exe:
     bag = exe.datasets[0]
     # run your model with bag.path ...
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 Using the same `DatasetSpec` version ensures the new execution reads the same rows as the original. Using the same `workflow` object links the new execution to the same workflow record, so both appear together when you query `ml.find_executions(workflow=past_exec.workflow)`.
@@ -311,6 +311,6 @@ data-flow-vs-orchestration distinction (recorded in ADR-0001).
 
 ## See also
 
-- [Running an experiment](executions.md) — execution context manager, `upload_execution_outputs()`, and `asset_file_path()`
+- [Running an experiment](executions.md) — execution context manager, `commit_output_assets()`, and `asset_file_path()`
 - [Working with datasets](datasets.md) — dataset versioning, `set_version()`, and `estimate_bag_size()`
 - [Integrating with hydra-zen](hydra-zen.md) — `config_choices`, `deriva-ml-run`, multirun sweeps, `bump-version`, and `--allow-dirty`

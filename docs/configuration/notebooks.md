@@ -61,7 +61,7 @@ for table, paths in execution.asset_paths.items():
         print(f"Asset: {path}")
 
 # At the end of the notebook
-execution.upload_execution_outputs()
+execution.commit_output_assets()
 ```
 
 ### What `run_notebook()` Does Internally
@@ -111,7 +111,7 @@ for cleaning up when finished:
   weights) should be registered with `execution.asset_file_path()` so they are
   tracked as execution assets.
 
-- **Call `execution.upload_execution_outputs()` at the end.** This uploads all
+- **Call `execution.commit_output_assets()` at the end.** This uploads all
   registered output files to the catalog. If you skip this call, your outputs
   will not be recorded.
 
@@ -153,7 +153,7 @@ what `run_notebook()` provides inside the notebook itself:
 6. **Uploads notebook outputs as execution assets.** Both the executed `.ipynb`
    and the `.md` conversion are uploaded to the catalog as execution assets with
    type `notebook_output`. This happens on top of any outputs the notebook
-   itself uploaded via `execution.upload_execution_outputs()`.
+   itself uploaded via `execution.commit_output_assets()`.
 
 ### Basic Usage
 

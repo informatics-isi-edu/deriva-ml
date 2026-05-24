@@ -175,10 +175,10 @@ with ml.create_execution(cfg) as exe:
     print(f"Staged {count} records")
 
 # Records are flushed to the catalog after the context manager exits
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
-`exe.add_features()` stages records in the execution's local SQLite state. They are flushed to ERMrest in a single batch after asset upload, when the execution completes. If the process crashes before upload, call `ml.resume_execution(execution.execution_rid)` and re-run `upload_execution_outputs()`.
+`exe.add_features()` stages records in the execution's local SQLite state. They are flushed to ERMrest in a single batch after asset upload, when the execution completes. If the process crashes before upload, call `ml.resume_execution(execution.execution_rid)` and re-run `commit_output_assets()`.
 
 **Notes**
 
@@ -654,6 +654,6 @@ See the "How to restructure assets for ML frameworks" section above for the full
 
 - [Working with datasets](datasets.md) — Chapter 2: creating datasets, downloading bags, `estimate_bag_size`, version pinning.
 - [Defining and using features](features.md) — Chapter 3: creating features, `feature_values()` selectors, multi-annotator patterns.
-- [Running an experiment](executions.md) — Chapter 4: `ExecutionConfiguration`, `exe.add_features()`, `upload_execution_outputs()`.
+- [Running an experiment](executions.md) — Chapter 4: `ExecutionConfiguration`, `exe.add_features()`, `commit_output_assets()`.
 - [Chapter 7 — Reproducibility](reproducibility.md): `DatasetSpec` version pinning, catalog snapshots.
 - API reference: [`DatasetBag`](../api-reference/dataset_bag.md)

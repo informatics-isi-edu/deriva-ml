@@ -282,13 +282,13 @@ except DerivaMLMaterializeLimitExceeded as e:
 
 ### Crash recovery
 
-Before, after a hard process crash (OOM, SIGKILL) in the middle of an execution, you had to manually mark the execution `Failed` so `upload_execution_outputs` could proceed:
+Before, after a hard process crash (OOM, SIGKILL) in the middle of an execution, you had to manually mark the execution `Failed` so `commit_output_assets` could proceed:
 
 ```python
 # Before — workaround that polluted the audit trail
 exe = ml.resume_execution(rid)
 exe.update_status(ExecutionStatus.Failed, "Resumed after crash")  # spurious Failed marker
-exe.upload_execution_outputs()  # Failed → Pending_Upload → Uploaded
+exe.commit_output_assets()  # Failed → Pending_Upload → Uploaded
 ```
 
 Now `Running → Pending_Upload` is a legal state transition; the crash-recovery path is explicit and does not lie about the execution's outcome:
@@ -297,7 +297,7 @@ Now `Running → Pending_Upload` is a legal state transition; the crash-recovery
 # After — clean path
 exe = ml.resume_execution(rid)
 exe.update_status(ExecutionStatus.Pending_Upload)  # honest: "advance the state machine, please upload"
-exe.upload_execution_outputs()  # Pending_Upload → Uploaded
+exe.commit_output_assets()  # Pending_Upload → Uploaded
 ```
 
 See [Chapter 4 — Running an experiment](executions.md#how-to-handle-a-crash-resume) for the full crash-recovery flow.
