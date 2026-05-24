@@ -134,33 +134,17 @@ These were called out in the audits and consciously deferred:
    manifest-store-tangled ones, and their extraction wants
    those types to stabilize further first.
 
-2. **`_update_asset_execution_table` Output-branch consolidation**
-   (audit `execution.py:1864-1899` P1) — the audit recommended
-   dropping the Output branch as "dead in production." **This
-   recommendation is rejected.** Both Input and Output role
-   assignments are real public-API behaviour:
-   `Asset_Role="Input"` / `Asset_Role="Output"` are the
-   per-execution-link direction tags consumers query via
-   `execution.list_assets(asset_role=...)`. A prior pass
-   eliminated this in error; the audit's framing reflected
-   that mistaken state, not the current one.
-
-   The audit's observation that the production caller in
-   `execution.py` only invokes the Input branch is correct
-   but misleading — the Output assignment now happens in
-   `bag_commit._add_asset_rows_to_bag` (different code path,
-   same semantic). The Output branch in
-   `update_asset_execution_table` is exercised by the
-   699-LOC `test_asset_role_auto_tag.py` test suite and
-   serves as the documented reference implementation for
-   role assignment.
-
-   What's actually deferred: **consolidating the two role-
-   assignment sites** (bag-commit's inline writes vs.
-   `update_asset_execution_table`'s explicit method) into a
-   single source of truth, with the test suite updated to
-   exercise the consolidated path. That's the next-minor
-   work, not "drop the branch."
+2. **Upload-method unification** — shipped in v2.0.0 (PR TBD) per
+   ADR-0009. The four upload entry points (`Execution.upload_execution_outputs`,
+   `Execution.upload_outputs`, `ExecutionSnapshot.upload_outputs`,
+   `DerivaML.upload_pending`) collapsed into one per-execution
+   method (`commit_output_assets`) and one batch method
+   (`commit_pending_executions`). The unification also closed
+   the audit's `_update_asset_execution_table` Output-branch
+   consolidation item that was previously listed here — the
+   single commit path now routes every caller through the same
+   lifecycle bracket, so the bag-commit vs. update-table split
+   is moot. See `docs/adr/0009-unified-commit-output-assets.md`.
 
 3. **Test files in wrong directory** (audit `model/` M-40, M-41)
    — `tests/model/test_data_sources.py` and

@@ -1,3 +1,24 @@
+Version 2.0.0
+
+**Breaking change: unified upload API.** The four ways to upload execution outputs (`Execution.upload_execution_outputs`, `Execution.upload_outputs`, `ExecutionSnapshot.upload_outputs`, `DerivaML.upload_pending`) collapse into one per-execution method and one batch method. See ADR-0009 for the rationale and the two latent bugs fixed.
+
+Migration table:
+
+| Old                                                       | New                                                                              |
+|-----------------------------------------------------------|----------------------------------------------------------------------------------|
+| `exe.upload_execution_outputs(clean_folder=, progress_callback=)` | `exe.commit_output_assets(clean_folder=, progress_callback=)` (returns UploadReport now, not dict) |
+| `exe.upload_outputs(retry_failed=)`                       | `exe.commit_output_assets()` (retry_failed was a no-op; removed)                 |
+| `snap.upload_outputs(ml=, retry_failed=)`                 | `ml.resume_execution(snap.rid).commit_output_assets()`                           |
+| `ml.upload_pending(execution_rids=, retry_failed=)`       | `ml.commit_pending_executions(execution_rids=, clean_folder=False)`              |
+| `deriva-ml-upload --retry-failed`                         | (removed; flag was a no-op)                                                      |
+| `deriva-ml-upload` (default: no folder cleanup)           | `deriva-ml-upload --clean` (explicit opt-in to clean working folder)             |
+
+**Bugs fixed by the unification:**
+- CLI-uploaded executions now correctly transition to `Uploaded` status (were stuck `Stopped`).
+- `exe.upload_outputs()` callers now get asset descriptions written and Upload_Duration recorded (were silently skipped).
+
+Both bugs were present in v1.37.x but only reachable via the legacy methods that v2.0.0 removes.
+
 Unreleased (since v1.37.14)
 
 - **`feat(asset,dataset)`: write-through description setters** (#221, closes #70). `Asset.description` and `Dataset.description` now use a `@property` / `@setter` pair that persists assignments to the catalog row, mirroring the symmetric pattern already in place on `Workflow` and `ExecutionRecord`. `update_field_in_catalog` in `execution/_helpers.py` gained an optional `schema_name` parameter so the same helper now serves both ML-schema (Workflow / Execution / Dataset) and domain-schema (Asset) callers.
