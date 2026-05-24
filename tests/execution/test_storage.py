@@ -217,7 +217,7 @@ class TestCleanExecutionDirConfig:
         assert ml.clean_execution_dir is True
 
     def test_upload_uses_config_setting(self, test_ml, storage_workflow):
-        """Test that upload_execution_outputs uses the config setting."""
+        """Test that commit_output_assets uses the config setting."""
         from deriva_ml.execution import ExecutionConfiguration
 
         ml = test_ml
@@ -234,7 +234,7 @@ class TestCleanExecutionDirConfig:
         with execution.execute():
             pass
 
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         # Directory should be removed (or at least emptied)
         # Note: The directory itself is now removed with remove_folder=True
@@ -259,7 +259,7 @@ class TestCleanExecutionDirConfig:
             pass
 
         # Override to keep files
-        execution.upload_execution_outputs(clean_folder=False)
+        execution.commit_output_assets(clean_folder=False)
 
         # File should still exist
         assert test_file.exists(), "File was removed despite clean_folder=False"

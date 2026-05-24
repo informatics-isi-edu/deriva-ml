@@ -147,10 +147,10 @@ with ml.create_execution(config) as exe:
 
     exe.add_features(records)           # staged, not yet in the catalog
 
-exe.upload_execution_outputs()          # flush staged features to the catalog
+exe.commit_output_assets()          # flush staged features to the catalog
 ```
 
-`exe.add_features` stages records to a local SQLite table with status `Pending`. They are not visible in the catalog until `upload_execution_outputs()` runs. The flush happens after asset upload, so feature rows that reference assets are guaranteed to find those asset rows already present.
+`exe.add_features` stages records to a local SQLite table with status `Pending`. They are not visible in the catalog until `commit_output_assets()` runs. The flush happens after asset upload, so feature rows that reference assets are guaranteed to find those asset rows already present.
 
 ### Asset-based feature values
 
@@ -177,7 +177,7 @@ with ml.create_execution(config) as exe:
 
     exe.add_features(records)
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 **Notes**
@@ -362,7 +362,7 @@ with ml.create_execution(config) as exe:
         ))
     exe.add_features(records)
 
-exe.upload_execution_outputs()       # assets uploaded first, then feature rows
+exe.commit_output_assets()       # assets uploaded first, then feature rows
 ```
 
 ### Reading asset features
@@ -412,7 +412,7 @@ pending = [RecordClass(Image=r["RID"], QualityScore_Type="Good") for r in rows]
 # Online: stage and upload
 with ml.create_execution(online_config) as exe:
     exe.add_features(pending)
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 !!! note
@@ -492,7 +492,7 @@ The retired APIs raise immediately with a specific message naming the replacemen
     Despite being iterator-shaped, `feature_values` fetches every row for the feature from the catalog in one call before yielding the first record. For features with very large value tables, apply a selector to reduce the output, or filter in your caller. This behavior is documented in the method's docstring and is by design — stream-safe is a future enhancement.
 
 !!! warning "exe.add_features stages to SQLite, not to the catalog"
-    Records passed to `exe.add_features` are not visible in the catalog until `upload_execution_outputs()` completes. If you query `feature_values` on the live catalog before calling `upload_execution_outputs()`, the records from the current execution will not appear. This is intentional: partial execution output should not be visible to other readers.
+    Records passed to `exe.add_features` are not visible in the catalog until `commit_output_assets()` completes. If you query `feature_values` on the live catalog before calling `commit_output_assets()`, the records from the current execution will not appear. This is intentional: partial execution output should not be visible to other readers.
 
 !!! warning "Workflow deduplication affects select_by_workflow"
     Workflows are deduplicated by checksum. If you run the same script multiple times, `create_workflow` returns the same workflow RID each time. `FeatureRecord.select_by_workflow("My_Workflow", container=ml)` will therefore match feature values from all runs of that script. If you need to distinguish runs, use `select_by_execution` with a specific execution RID, or create a new workflow for each run by changing the script or passing an explicit `checksum`.
@@ -501,5 +501,5 @@ The retired APIs raise immediately with a specific message naming the replacemen
 
 - **API reference:** `DerivaML.create_feature`, `DerivaML.feature_values`, `DerivaML.find_features`, `DerivaML.lookup_feature` in the Library Documentation.
 - **[Chapter 2 (Datasets)](datasets.md):** how dataset versioning interacts with feature values via catalog snapshots.
-- **[Chapter 4 (Executions)](executions.md):** `create_execution`, `upload_execution_outputs`, `resume_execution`, and the full execution lifecycle.
+- **[Chapter 4 (Executions)](executions.md):** `create_execution`, `commit_output_assets`, `resume_execution`, and the full execution lifecycle.
 - **[Chapter 5 (Working offline)](offline.md):** `restructure_assets` with `value_selector` for feature-based file organization in offline ML workflows.

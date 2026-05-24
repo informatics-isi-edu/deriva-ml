@@ -21,10 +21,10 @@ Typical usage example:
     ...     path = execution.asset_file_path("Model", "model.pt")  # doctest: +SKIP
     ...     # Write model to path...
     ...
-    >>> # IMPORTANT: Upload AFTER the context manager exits
-    >>> execution.upload_execution_outputs()  # doctest: +SKIP
+    >>> # IMPORTANT: Commit AFTER the context manager exits
+    >>> execution.commit_output_assets()  # doctest: +SKIP
 
-The context manager handles start/stop timing automatically. The upload_execution_outputs()
+The context manager handles start/stop timing automatically. The commit_output_assets()
 call must happen AFTER exiting the context manager to ensure proper status tracking.
 """
 
@@ -42,7 +42,6 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, List
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
     from deriva_ml.execution.pending_summary import PendingSummary
-    from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.local_db.manifest_store import ManifestStore
 from pydantic import validate_call
 
@@ -77,6 +76,7 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
 from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.execution.upload_report import UploadReport
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView
@@ -255,8 +255,8 @@ class Execution:
             ...     output_path = execution.asset_file_path("Model", "model.pt")  # doctest: +SKIP
             ...     # Write results to output_path
             ...
-            >>> # IMPORTANT: Call upload AFTER exiting the context manager
-            >>> execution.upload_execution_outputs()  # doctest: +SKIP
+            >>> # IMPORTANT: Call commit AFTER exiting the context manager
+            >>> execution.commit_output_assets()  # doctest: +SKIP
     """
 
     @validate_call(config=VALIDATION_CONFIG)
@@ -387,9 +387,7 @@ class Execution:
         # catalog row before re-raising. ``reload`` and ``dry_run``
         # paths skip the rollback because they never inserted a row
         # in the first place.
-        _catalog_row_owned_by_us = (
-            not reload and not self._dry_run and self.execution_rid != DRY_RUN_RID
-        )
+        _catalog_row_owned_by_us = not reload and not self._dry_run and self.execution_rid != DRY_RUN_RID
         try:
             self._post_catalog_init_init(reload, schema_path)
         except Exception:
@@ -397,12 +395,9 @@ class Execution:
                 # Best-effort orphan cleanup; never mask the
                 # original failure with a delete-side error.
                 try:
-                    schema_path.Execution.filter(
-                        schema_path.Execution.RID == self.execution_rid
-                    ).delete()
+                    schema_path.Execution.filter(schema_path.Execution.RID == self.execution_rid).delete()
                     logger.warning(
-                        "create_execution %s: post-insert work failed; "
-                        "rolled back orphaned catalog Execution row.",
+                        "create_execution %s: post-insert work failed; rolled back orphaned catalog Execution row.",
                         self.execution_rid,
                     )
                 except Exception as cleanup_exc:
@@ -959,7 +954,7 @@ class Execution:
         Reads the manifest on every access — no in-memory cache. The
         returned dict carries every entry whose status is
         ``uploaded`` across the manifest's lifetime, regardless of
-        which ``upload_execution_outputs()`` call produced it. Each
+        which ``commit_output_assets()`` call produced it. Each
         value is a list of :class:`AssetFilePath` objects giving the
         leased ``asset_rid`` and ``file_name`` for the entry.
 
@@ -975,15 +970,15 @@ class Execution:
             return value. The manifest is now the source of truth;
             the property returns the full manifest's uploaded
             entries. Callers that need the per-call subset should
-            use the return value of ``upload_execution_outputs()``
+            use the return value of ``commit_output_assets()``
             directly.
 
         Example:
             >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
             ...     pass  # doctest: +SKIP
-            >>> uploaded = exe.upload_execution_outputs()  # doctest: +SKIP
-            >>> # After upload, the property reflects the manifest:
-            >>> exe.uploaded_assets == uploaded or len(exe.uploaded_assets) >= len(uploaded)  # doctest: +SKIP
+            >>> report = exe.commit_output_assets()  # doctest: +SKIP
+            >>> # After commit, the property reflects the manifest:
+            >>> sum(len(v) for v in exe.uploaded_assets.values()) >= report.total_uploaded  # doctest: +SKIP
             True
         """
         if self._dry_run:
@@ -1422,7 +1417,7 @@ class Execution:
         execution's output) are preserved — the directional tag is
         additive, not a replacement. This is symmetric with the
         ``Output_File`` tag added when assets are uploaded via
-        :meth:`asset_file_path` + :meth:`upload_execution_outputs`.
+        :meth:`asset_file_path` + :meth:`commit_output_assets`.
         See the "How execution-asset roles work" section of the
         execution user guide for the full contract.
 
@@ -1465,22 +1460,41 @@ class Execution:
         )
 
     @validate_call(config=VALIDATION_CONFIG)
-    def upload_execution_outputs(
+    def commit_output_assets(
         self,
         clean_folder: bool | None = None,
         progress_callback: Callable[[UploadProgress], None] | None = None,
-    ) -> dict[str, list[AssetFilePath]]:
-        """Upload all registered output assets to Hatrac and record provenance.
+    ) -> UploadReport:
+        """Commit this execution's output assets to the catalog.
 
-        Reads the asset manifest, uploads each file to the catalog's Hatrac
-        object store, and inserts ``{Asset}_Execution`` association records
-        linking each uploaded asset to this execution with the ``Output`` role.
+        Single per-execution upload entry point (ADR-0009). Reads the
+        asset manifest, uploads each file to the catalog's Hatrac
+        object store, and inserts ``{Asset}_Execution`` association
+        records linking each uploaded asset to this execution with the
+        ``Output`` role. Brackets the work with the
+        ``Pending_Upload → Uploaded`` (success) or
+        ``Pending_Upload → Failed`` (exception) state-machine
+        transition, records ``Upload_Duration`` in the SQLite registry,
+        writes asset descriptions to the catalog, and optionally cleans
+        the execution working folder.
 
-        Call this method **after** exiting the execution context manager, not
-        inside it. The context manager sets execution status to ``Stopped``
-        on exit; uploading after that preserves the correct status ordering.
+        Call this method **after** exiting the execution context
+        manager, not inside it. The context manager sets execution
+        status to ``Stopped`` on exit; this method transitions
+        ``Stopped → Pending_Upload → Uploaded`` (or ``Failed``).
 
-        **Directional tagging.** Every asset uploaded by this call
+        Idempotent: re-running after a successful upload (status
+        ``Uploaded``, no pending assets) is a no-op that returns an
+        empty report. Re-running after a partial failure resumes from
+        the last known-good state — ``BagCatalogLoader``'s
+        ``match_by_columns`` dedup makes row inserts idempotent at the
+        catalog.
+
+        The method raises on failure. Failure isolation is the batch
+        caller's job (:meth:`DerivaML.commit_pending_executions`), not
+        the per-execution call's.
+
+        **Directional tagging.** Every asset committed by this call
         gets ``Asset_Role="Output"`` on its ``{Asset}_Execution`` row
         and the ``Output_File`` Asset_Type tag (auto-added by
         deriva-ml, in addition to any content tags the caller passed
@@ -1491,32 +1505,40 @@ class Execution:
         contract.
 
         Args:
-            clean_folder: Whether to delete output folders after upload. If None (default),
-                uses the DerivaML instance's clean_execution_dir setting. Pass True/False
-                to override for this specific execution.
-            progress_callback: Optional callback function to receive upload progress updates.
-                Called with UploadProgress objects containing file name, bytes uploaded,
-                total bytes, percent complete, phase, and status message.
+            clean_folder: Whether to delete output folders after
+                upload. If None (default), uses the DerivaML instance's
+                ``clean_execution_dir`` setting. Pass True/False to
+                override for this specific execution.
+            progress_callback: Optional callback function to receive
+                upload progress updates. Called with UploadProgress
+                objects containing file name, bytes uploaded, total
+                bytes, percent complete, phase, and status message.
 
         Returns:
-            Dict mapping asset table name to list of uploaded ``AssetFilePath`` objects, e.g.
-            ``{"Image": [...], "Model": [...]}``. Returns ``{}`` for dry-run executions.
+            UploadReport with ``execution_rids=[self.execution_rid]``
+            and per-(schema, table) upload counts. ``total_uploaded``
+            is the sum of asset rows committed across all asset tables
+            this execution touched. For dry-run executions, returns an
+            empty report.
 
         Raises:
-            DerivaMLUploadError: If any file upload fails. Partial uploads are
-                recorded in the manifest so the upload can be resumed.
-            DerivaMLReadOnlyError: If the catalog connection is read-only.
+            DerivaMLUploadError: If any file upload fails. Partial
+                uploads are recorded in the manifest so the upload can
+                be resumed.
+            DerivaMLReadOnlyError: If the catalog connection is
+                read-only.
 
         Example:
             >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
             ...     path = exe.asset_file_path("Model", "model.pt")  # doctest: +SKIP
-            >>> uploaded = exe.upload_execution_outputs()  # doctest: +SKIP
+            >>> report = exe.commit_output_assets()  # doctest: +SKIP
+            >>> print(report.total_uploaded, "assets committed")  # doctest: +SKIP
         """
         from deriva_ml.execution.asset_upload import (
-            upload_execution_outputs as _upload_execution_outputs,
+            commit_output_assets as _commit_output_assets,
         )
 
-        return _upload_execution_outputs(
+        result = _commit_output_assets(
             self,
             clean_folder=clean_folder,
             progress_callback=progress_callback,
@@ -1526,6 +1548,19 @@ class Execution:
             running_status=ExecutionStatus.Running,
             stopped_status=ExecutionStatus.Stopped,
             format_duration_fn=_format_duration,
+        )
+
+        # Build UploadReport from the free function's per-table dict.
+        # Each value is a list of AssetFilePath; the count is the
+        # number of asset rows committed for that table.
+        total_uploaded = sum(len(v) for v in result.values())
+        per_table = {fqn: {"uploaded": len(v), "failed": 0} for fqn, v in result.items()}
+        return UploadReport(
+            execution_rids=[self.execution_rid],
+            total_uploaded=total_uploaded,
+            total_failed=0,
+            per_table=per_table,
+            errors=[],
         )
 
     def _bag_commit_upload(
@@ -1551,7 +1586,7 @@ class Execution:
         filesystem op that lived on ``Execution`` for legacy
         reasons. Preserved here as an instance method so the
         existing in-class call sites
-        (``upload_execution_outputs``, ``__exit__``,
+        (``commit_output_assets``, ``__exit__``,
         ``execution_stop``) still read naturally.
         """
         from deriva_ml.execution.asset_upload import clean_folder_contents
@@ -1628,7 +1663,7 @@ class Execution:
 
         **Directional tagging.** Files registered via this method are
         uploaded as **outputs** of this execution. After
-        :meth:`upload_execution_outputs` runs, deriva-ml auto-adds
+        :meth:`commit_output_assets` runs, deriva-ml auto-adds
         the ``Output_File`` Asset_Type tag to every uploaded asset
         (alongside any content tags you passed in ``asset_types``).
         You don't pass ``Output_File`` yourself — it's framework-
@@ -1684,7 +1719,7 @@ class Execution:
         catalog's ``Execution_Metadata.Type`` column honestly describes
         the file's purpose. The file registers with the execution's asset
         manifest on first call and uploads as part of
-        ``upload_execution_outputs()``.
+        ``commit_output_assets()``.
 
         The file itself is plain text; callers decide the format. The
         default filename ``metrics.jsonl`` suggests one JSON record per
@@ -1708,7 +1743,7 @@ class Execution:
                             f,
                         )
                         f.write("\\n")
-            exe.upload_execution_outputs()
+            exe.commit_output_assets()
 
         Args:
             filename: Name of the metrics file inside the execution's
@@ -1745,7 +1780,7 @@ class Execution:
             ...     with exe.metrics_file().open("a") as f:  # doctest: +SKIP
             ...         json.dump({"epoch": 0, "val_loss": 0.23}, f)  # doctest: +SKIP
             ...         f.write("\\n")  # doctest: +SKIP
-            >>> exe.upload_execution_outputs()  # doctest: +SKIP
+            >>> exe.commit_output_assets()  # doctest: +SKIP
         """
         from deriva_ml.execution.asset_upload import metrics_file as _metrics_file
 
@@ -2174,7 +2209,7 @@ class Execution:
         # the time __exit__ fires. The canonical pattern for the
         # context manager is "exit at Running → Stopped"; but it is
         # legal (and fixture code in demo_catalog.py does this) to
-        # call upload_execution_outputs() inside the with block, which
+        # call commit_output_assets() inside the with block, which
         # advances Running → Stopped → Pending_Upload → Uploaded
         # before __exit__ is invoked. Forcing a Stopped/Failed
         # transition from a terminal state would crash the caller's
@@ -2223,7 +2258,7 @@ class Execution:
         counts = store.count_pending_by_kind(execution_rid=self.execution_rid)
         if counts["pending_rows"] or counts["pending_files"]:
             logger.info(
-                "[Execution %s] exited with pending: %d rows, %d files. Call exe.upload_outputs() to flush.",
+                "[Execution %s] exited with pending: %d rows, %d files. Call exe.commit_output_assets() to flush.",
                 self.execution_rid,
                 counts["pending_rows"],
                 counts["pending_files"],
@@ -2302,33 +2337,4 @@ class Execution:
             rows=[PendingRowCount(**r) for r in data["rows"]],
             assets=[PendingAssetCount(**a) for a in data["assets"]],
             diagnostics=data["diagnostics"],
-        )
-
-    def upload_outputs(
-        self,
-        *,
-        retry_failed: bool = False,
-    ) -> "UploadReport":
-        """Upload this execution's pending rows and asset files.
-
-        Convenience wrapper around ``ml.upload_pending`` scoped to this
-        execution. See ``upload_pending`` for full details on retry
-        semantics and the returned report structure.
-
-        Args:
-            retry_failed: If True, retry rows and assets that previously
-                failed upload. Default is False.
-
-        Returns:
-            UploadReport summarising rows inserted, assets uploaded, and
-            any per-item failures.
-
-        Example:
-            >>> with exe.execute() as e:  # doctest: +SKIP
-            ...     pass  # do work
-            >>> report = exe.upload_outputs()  # doctest: +SKIP
-        """
-        return self._ml_object.upload_pending(
-            execution_rids=[self.execution_rid],
-            retry_failed=retry_failed,
         )

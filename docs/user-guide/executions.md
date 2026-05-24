@@ -6,7 +6,7 @@ This chapter covers the full lifecycle of a DerivaML execution: configuring inpu
 
 An **Execution** is DerivaML's unit of provenance. It links a specific run of your code (a **Workflow**) to exactly the inputs it consumed and the outputs it produced, with a start time, stop time, and status record. Everything produced inside an execution — feature records, model files, metrics — can be traced back to the exact code version and dataset version that generated it.
 
-Executions are not self-contained scripts. They are catalog records that wrap your existing training or analysis code. The pattern is always: create an `ExecutionConfiguration`, open the context manager, do your work, then call `upload_execution_outputs()`. The catalog sees a clean audit trail; your code stays readable.
+Executions are not self-contained scripts. They are catalog records that wrap your existing training or analysis code. The pattern is always: create an `ExecutionConfiguration`, open the context manager, do your work, then call `commit_output_assets()`. The catalog sees a clean audit trail; your code stays readable.
 
 ## How to describe an execution with ExecutionConfiguration
 
@@ -78,12 +78,12 @@ with ml.create_execution(config) as exe:
     torch.save(model.state_dict(), model_path)
 
 # IMPORTANT: upload is OUTSIDE the context manager.
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 **Explanation.** `ml.create_execution(config)` inserts an Execution record in the catalog with status `Created`, then `__enter__` transitions it to `Running`. On a clean exit, `__exit__` transitions to `Stopped` and records the stop time. On an exception, `__exit__` transitions to `Failed` and stores the error message — then re-raises so your code sees the exception.
 
-`upload_execution_outputs()` is a separate call after the context manager exits. It transitions the execution from `Stopped` to `Pending_Upload`, uploads all registered files to Hatrac, INSERTs staged feature records into ERMrest, then transitions to `Uploaded`.
+`commit_output_assets()` is a separate call after the context manager exits. It transitions the execution from `Stopped` to `Pending_Upload`, uploads all registered files to Hatrac, INSERTs staged feature records into ERMrest, then transitions to `Uploaded`.
 
 **Notes:**
 
@@ -129,7 +129,7 @@ with ml.create_execution(config) as exe:
     # yourself before assigning.
     path.metadata = {**path.metadata, "Acquisition_Time": "14:30:00"}
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 **Explanation.** `asset_file_path(asset_name, file_name, ...)` has three modes depending on whether `file_name` names an existing file:
@@ -166,14 +166,14 @@ with ml.create_execution(config) as exe:
     # Records are NOT yet in ERMrest at this point.
 
 # Records appear in ERMrest only after this call:
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
-**Explanation.** `add_features(features)` writes the list to the `execution_state__feature_records` SQLite table with status `Pending`. All records in a single call must belong to one feature definition; mixing features raises `DerivaMLValidationError`. `upload_execution_outputs()` then assembles a bag containing both the uploaded asset bytes and the staged feature rows, substituting uploaded-asset RIDs into any asset-column fields before the bag is loaded into the catalog by `BagCatalogLoader`.
+**Explanation.** `add_features(features)` writes the list to the `execution_state__feature_records` SQLite table with status `Pending`. All records in a single call must belong to one feature definition; mixing features raises `DerivaMLValidationError`. `commit_output_assets()` then assembles a bag containing both the uploaded asset bytes and the staged feature rows, substituting uploaded-asset RIDs into any asset-column fields before the bag is loaded into the catalog by `BagCatalogLoader`.
 
 **Notes:**
 
-- Staged rows survive process death. If the process crashes after `add_features()` but before `upload_execution_outputs()`, the rows are still in SQLite and will be flushed on the next `upload_execution_outputs()` call after resuming.
+- Staged rows survive process death. If the process crashes after `add_features()` but before `commit_output_assets()`, the rows are still in SQLite and will be flushed on the next `commit_output_assets()` call after resuming.
 - Call `add_features()` as many times as needed; rows accumulate in SQLite and are flushed in one batch.
 - `exe.add_features()` is the only way to write feature values. The top-level `ml.add_features()` method has been retired; any code using it should be updated.
 
@@ -199,10 +199,10 @@ with ml.create_execution(config) as exe:
             )
             f.write("\n")
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
-**Explanation.** `exe.metrics_file()` returns an `AssetFilePath` pointing at a file in the execution's staging directory, registers it with the asset manifest on first call, and stamps its asset type as `Metrics_File` so the catalog's `Execution_Metadata.Type` column honestly describes the purpose of the file. Repeat calls to `exe.metrics_file()` within the same execution return the same path, so appending across an epoch loop is safe. `upload_execution_outputs()` uploads the file to Hatrac and inserts a row into `Execution_Metadata` linked to the execution, just like any other asset.
+**Explanation.** `exe.metrics_file()` returns an `AssetFilePath` pointing at a file in the execution's staging directory, registers it with the asset manifest on first call, and stamps its asset type as `Metrics_File` so the catalog's `Execution_Metadata.Type` column honestly describes the purpose of the file. Repeat calls to `exe.metrics_file()` within the same execution return the same path, so appending across an epoch loop is safe. `commit_output_assets()` uploads the file to Hatrac and inserts a row into `Execution_Metadata` linked to the execution, just like any other asset.
 
 The default filename is `metrics.jsonl` — one JSON record per line is the shape that lets downstream readers stream through the file without loading it whole. You can pass a different filename if you want to distinguish multiple streams (for example, `"train_metrics.jsonl"` and `"eval_metrics.jsonl"`); each distinct filename becomes its own `Execution_Metadata` asset on upload.
 
@@ -258,7 +258,7 @@ based on the call you made:
 - `exe.download_asset(rid, dest_dir)` → role `"Input"`, tag
   `"Input_File"` added automatically.
 - `exe.asset_file_path("Model", "model.pt")` followed by
-  `exe.upload_execution_outputs()` → role `"Output"`, tag
+  `exe.commit_output_assets()` → role `"Output"`, tag
   `"Output_File"` added automatically.
 
 You never write `Asset_Role` yourself, and you don't need to pass
@@ -286,7 +286,7 @@ with ml.create_execution(config) as exe:
                              asset_types=["Model_File"])
     torch.save(model.state_dict(), mp)
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 
 # After upload, the Model row carries asset_types = ["Model_File", "Output_File"].
 inputs = exe.list_assets(asset_role="Input")
@@ -317,25 +317,52 @@ with ml.create_execution(config) as exe:
 # Context exits here: status → Stopped. Upload is NOT triggered.
 
 # Upload explicitly:
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 # Status: Stopped → Pending_Upload → Uploaded
 ```
 
 **Upload ordering.** Asset files are uploaded first by `BagCatalogLoader`, then feature rows are inserted. This ordering is required because feature records that reference asset files need the uploaded-asset RIDs before the INSERT; the bag-build step pre-leases asset RIDs and rewrites feature rows to reference those RIDs so the loader can insert in a single FK-safe pass.
 
-**Tuning for large files / slow connections.** Bag-commit (the post-cutover upload path) inherits the catalog session's HTTP timeout and Hatrac chunk size; tune those on the `DerivaML` instance rather than at the call site. There is no upload-level retry — the bag is uploaded in a single attempt and a failure raises ``DerivaMLUploadError``. Resumability comes from the manifest: a re-run of ``upload_execution_outputs()`` picks up only the entries marked ``pending``.
+**Tuning for large files / slow connections.** Bag-commit (the post-cutover upload path) inherits the catalog session's HTTP timeout and Hatrac chunk size; tune those on the `DerivaML` instance rather than at the call site. There is no upload-level retry — the bag is uploaded in a single attempt and a failure raises ``DerivaMLUploadError``. Resumability comes from the manifest: a re-run of ``commit_output_assets()`` picks up only the entries marked ``pending``.
 
 **Notes:**
 
-- `__exit__` does NOT trigger upload. You must call `upload_execution_outputs()` explicitly.
+- `__exit__` does NOT trigger upload. You must call `commit_output_assets()` explicitly.
 - A `progress_callback` parameter accepts a callable `(UploadProgress) -> None` for custom progress reporting.
-- The return value is `dict[str, list[AssetFilePath]]` — the uploaded file manifest, keyed by asset table name.
+- The return value is an `UploadReport` — `execution_rids`, `total_uploaded`, `total_failed`, `per_table` per-(schema, table) counts, and per-execution `errors`. For per-asset path data (RIDs, filenames) read `exe.uploaded_assets` after the commit returns.
 
 !!! warning "Upload is not automatic"
     Exiting the `with` block transitions the execution to `Stopped` but does **not** upload
-    anything. If you omit `exe.upload_execution_outputs()`, the execution record stays in
+    anything. If you omit `exe.commit_output_assets()`, the execution record stays in
     `Stopped` state indefinitely and no outputs appear in the catalog. Always call it
     explicitly after the context manager exits.
+
+### One method, three callers
+
+`commit_output_assets()` is the single entry point for committing an execution's outputs (ADR-0009). Whether you call it inline after a `with` block, after `resume_execution`, or via `deriva-ml-upload`, the end state is identical: the execution transitions to `Uploaded`, asset descriptions are written, `Upload_Duration` is recorded, and the working folder is optionally cleaned. Per-execution failure isolation is the job of the batch caller (`ml.commit_pending_executions` / the CLI), not the per-execution method.
+
+```python
+# 1. Inline — most common, right after the with block exits.
+with ml.create_execution(cfg) as exe:
+    ...
+exe.commit_output_assets()
+
+# 2. Resumed — e.g. recovery after a process restart.
+exe = ml.resume_execution(rid)
+exe.commit_output_assets()
+
+# 3. Batch — drains every pending execution on the workspace.
+report = ml.commit_pending_executions()           # all pending
+report = ml.commit_pending_executions(            # explicit subset
+    execution_rids=["EXE-A", "EXE-B"],
+    clean_folder=True,                            # remove working dirs after
+)
+
+# 4. CLI — thin wrapper around (3) for out-of-process operator-driven uploads.
+#    deriva-ml-upload --host h --catalog c --execution EXE-A --clean
+```
+
+See [ADR-0009](../adr/0009-unified-commit-output-assets.md) for the rationale and the two latent bugs the unification fixes.
 
 ## Execution status lifecycle
 
@@ -348,10 +375,10 @@ stateDiagram-v2
     Running --> Stopped : __exit__ (clean)
     Running --> Failed : __exit__ (exception)
     Running --> Pending_Upload : hard-crash recovery
-    Stopped --> Pending_Upload : upload_execution_outputs()
+    Stopped --> Pending_Upload : commit_output_assets()
     Pending_Upload --> Uploaded : upload complete
     Pending_Upload --> Failed : upload error
-    Failed --> Pending_Upload : upload_execution_outputs() (retry)
+    Failed --> Pending_Upload : commit_output_assets() (retry)
     Uploaded --> Pending_Upload : additive upload
     Created --> Aborted
     Running --> Aborted
@@ -369,17 +396,17 @@ stateDiagram-v2
 | `Running` | `__enter__` (or `execution_start()`) | Work in progress; start time recorded. |
 | `Stopped` | `__exit__` (or `execution_stop()`) | Work finished cleanly; stop time recorded. |
 | `Failed` | `__exit__` (exception) or upload error | Error message stored in catalog. |
-| `Pending_Upload` | `upload_execution_outputs()` starts | Upload in progress. |
-| `Uploaded` | `upload_execution_outputs()` completes | All outputs uploaded. Re-entrant — can cycle to `Pending_Upload` for an additive upload. |
+| `Pending_Upload` | `commit_output_assets()` starts | Upload in progress. |
+| `Uploaded` | `commit_output_assets()` completes | All outputs uploaded. Re-entrant — can cycle to `Pending_Upload` for an additive upload. |
 | `Aborted` | explicit abort | Abandoned before completion; terminal. |
 
 **Non-happy-path transitions:**
 
-- **`Running → Pending_Upload`** — hard-crash recovery. The process was killed mid-run, so `__exit__` never fired and never moved status to `Stopped`. Resume the execution, call `update_status(ExecutionStatus.Pending_Upload)`, then `upload_execution_outputs()`. The audit trail stays honest: "Failed" means the run failed, not "the process died before it could mark itself finished."
+- **`Running → Pending_Upload`** — hard-crash recovery. The process was killed mid-run, so `__exit__` never fired and never moved status to `Stopped`. Resume the execution, call `update_status(ExecutionStatus.Pending_Upload)`, then `commit_output_assets()`. The audit trail stays honest: "Failed" means the run failed, not "the process died before it could mark itself finished."
 
-- **`Failed → Pending_Upload`** — retry from upload failure. If `upload_execution_outputs()` raised after the execution already reached `Failed` (e.g., a transient network error), staging is intact; call `upload_execution_outputs()` again to retry.
+- **`Failed → Pending_Upload`** — retry from upload failure. If `commit_output_assets()` raised after the execution already reached `Failed` (e.g., a transient network error), staging is intact; call `commit_output_assets()` again to retry.
 
-- **`Uploaded → Pending_Upload`** — additive upload. The execution finished and its initial asset batch successfully uploaded, but a second lifecycle owner needs to ship more assets against the same execution. The classic case is a runner harness wrapping a kernel: the kernel uploads its own outputs (status reaches `Uploaded`), the runner then registers assets only it can produce safely (e.g., the Hydra job log it owns) and calls `upload_execution_outputs()` again. `upload_execution_outputs()` automatically takes this transition when there are pending manifest entries; if there are none, the call is a no-op and status stays `Uploaded`. Asset rows linked to an execution have no temporal constraint vs. its status — an execution's upload is a batch operation, not a wall.
+- **`Uploaded → Pending_Upload`** — additive upload. The execution finished and its initial asset batch successfully uploaded, but a second lifecycle owner needs to ship more assets against the same execution. The classic case is a runner harness wrapping a kernel: the kernel uploads its own outputs (status reaches `Uploaded`), the runner then registers assets only it can produce safely (e.g., the Hydra job log it owns) and calls `commit_output_assets()` again. `commit_output_assets()` automatically takes this transition when there are pending manifest entries; if there are none, the call is a no-op and status stays `Uploaded`. Asset rows linked to an execution have no temporal constraint vs. its status — an execution's upload is a batch operation, not a wall.
 
 **Disallowed transitions worth knowing:**
 
@@ -409,7 +436,7 @@ with ml.create_execution(config) as exe:
     model_path = exe.asset_file_path("Model", "model_final.pt")
     torch.save(model.state_dict(), model_path)
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 `update_status(status, message)` writes `status` to `Execution.Status` and `message` to `Execution.Status_Detail` in the catalog, making progress visible immediately. When you want to update the progress message without changing state, pass the current status (typically `Running`) as the first argument; only the message changes.
@@ -430,14 +457,14 @@ with ml.create_execution(config) as exe:
 exe = ml.resume_execution(rid)
 
 # Upload flushes the still-pending rows from SQLite.
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
-**Explanation.** `ml.resume_execution(rid)` rebuilds an `Execution` object bound to the existing catalog record and its local SQLite state. When `upload_execution_outputs()` runs, it discovers the pending feature rows and asset manifest entries and processes them as if the run had just completed.
+**Explanation.** `ml.resume_execution(rid)` rebuilds an `Execution` object bound to the existing catalog record and its local SQLite state. When `commit_output_assets()` runs, it discovers the pending feature rows and asset manifest entries and processes them as if the run had just completed.
 
 **Two distinct crash scenarios:**
 
-**Scenario A — exception inside the `with` block.** If your code raises and `__exit__` runs, the execution transitions to `Failed`. On restart, `ml.resume_execution(rid)` returns an execution already in `Failed` state. `upload_execution_outputs()` accepts `Failed` as a starting point (`Failed → Pending_Upload` is a legal transition) and flushes any staged outputs.
+**Scenario A — exception inside the `with` block.** If your code raises and `__exit__` runs, the execution transitions to `Failed`. On restart, `ml.resume_execution(rid)` returns an execution already in `Failed` state. `commit_output_assets()` accepts `Failed` as a starting point (`Failed → Pending_Upload` is a legal transition) and flushes any staged outputs.
 
 **Scenario B — hard process crash (SIGKILL, OOM, power failure) inside the `with` block.** `__exit__` never runs, so the execution stays in `Running` in both SQLite and the catalog. On restart, `ml.resume_execution(rid)` runs just-in-time reconciliation: since both sides agree on `Running`, reconciliation is a no-op and the execution is returned still in `Running` state. Advance it to `Pending_Upload` and then call the upload helper:
 
@@ -446,10 +473,10 @@ exe = ml.resume_execution(rid)
 # Execution is in Running state — advance directly to Pending_Upload
 # to signal "the owning process died; please upload what I staged."
 exe.update_status(ExecutionStatus.Pending_Upload)
-exe.upload_execution_outputs()   # Pending_Upload → Uploaded
+exe.commit_output_assets()   # Pending_Upload → Uploaded
 ```
 
-`Running → Pending_Upload` is an intentional recovery edge in the state graph: it documents "this run never got to mark itself finished" without lying about the run's outcome (the audit trail stays free of a spurious `Failed` marker). `upload_execution_outputs()` then flushes any staged feature rows and asset manifest entries that survived in SQLite, completing the upload without re-running the model.
+`Running → Pending_Upload` is an intentional recovery edge in the state graph: it documents "this run never got to mark itself finished" without lying about the run's outcome (the audit trail stays free of a spurious `Failed` marker). `commit_output_assets()` then flushes any staged feature rows and asset manifest entries that survived in SQLite, completing the upload without re-running the model.
 
 **Notes:**
 
@@ -459,7 +486,7 @@ exe.upload_execution_outputs()   # Pending_Upload → Uploaded
 
 ## CLI reference
 
-`deriva-ml-run` and `deriva-ml-run-notebook` run model functions and Jupyter notebooks with Hydra-zen configuration and automatic execution tracking. Both tools create an `ExecutionConfiguration` from the config store, call `ml.create_execution()`, and call `upload_execution_outputs()` after the model function returns. You do not call these steps manually when using the CLI.
+`deriva-ml-run` and `deriva-ml-run-notebook` run model functions and Jupyter notebooks with Hydra-zen configuration and automatic execution tracking. Both tools create an `ExecutionConfiguration` from the config store, call `ml.create_execution()`, and call `commit_output_assets()` after the model function returns. You do not call these steps manually when using the CLI.
 
 ### deriva-ml-run
 
@@ -540,7 +567,7 @@ The CLI tools handle Jupyter kernel detection, `nbstripout`-based checksum compu
 
     **`__exit__` does not upload.** Exiting the `with` block records the stop time and
     transitions to `Stopped`. It does not upload anything. Always call
-    `exe.upload_execution_outputs()` explicitly after the context manager exits. Omitting
+    `exe.commit_output_assets()` explicitly after the context manager exits. Omitting
     it leaves the execution in `Stopped` and no outputs appear in the catalog.
 
     **Writing files directly to `working_dir`.** Only files registered through

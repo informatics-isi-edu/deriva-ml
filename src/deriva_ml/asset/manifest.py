@@ -232,7 +232,7 @@ def _validate_pending_asset_metadata_iter(
         noun = "column" if len(cols) == 1 else "columns"
         lines.append(f"  - {key}: missing {noun} {', '.join(cols)}")
     lines.append(
-        "Supply these values before calling upload_outputs(), either via "
+        "Supply these values before calling commit_output_assets(), either via "
         "the ``metadata=`` arg to asset_file_path(...) or by assigning "
         "to the returned AssetFilePath's ``metadata`` property."
     )

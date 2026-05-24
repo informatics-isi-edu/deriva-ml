@@ -24,10 +24,11 @@ The pipeline:
    in FK-safe order, PUTs the asset bytes to the destination
    Hatrac, and returns a report.
 
-3. The caller in ``Execution.upload_execution_outputs``
-   marshals the report into the legacy return shape
-   (``dict[str, list[AssetFilePath]]``) so existing callers
-   don't see the swap.
+3. The caller in ``Execution.commit_output_assets``
+   marshals the report into an :class:`UploadReport`
+   (per-(schema, table) counts + execution RID) so existing
+   callers don't see the underlying ``BagCatalogLoader``
+   shape.
 
 The bag is discarded after a successful load. The destination
 catalog is the durable artifact.
@@ -732,7 +733,7 @@ def report_to_asset_map(
 ) -> dict[str, list[AssetFilePath]]:
     """Translate a :class:`LoadReport` back to the legacy return shape.
 
-    Existing callers of ``upload_execution_outputs`` expect a
+    Existing callers of ``commit_output_assets`` expect a
     ``dict[str, list[AssetFilePath]]`` keyed by
     ``"{schema}/{table}"`` containing **only the assets uploaded
     on this call**. Additive uploads (kernel completes, then

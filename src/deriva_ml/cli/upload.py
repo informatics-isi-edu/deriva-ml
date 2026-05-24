@@ -1,8 +1,8 @@
 """Command-line interface for deriva-ml upload.
 
-Wraps DerivaML.upload_pending so operator-driven uploads can be
-scheduled, backgrounded, or run on a different host from the
-compute. Typical invocations:
+Wraps ``DerivaML.commit_pending_executions`` so operator-driven
+uploads can be scheduled, backgrounded, or run on a different host
+from the compute. Typical invocations:
 
     deriva-ml-upload --host example.org --catalog 42
 
@@ -11,7 +11,9 @@ compute. Typical invocations:
 
     nohup deriva-ml-upload --host example.org --catalog 42 &
 
-Per spec §2.11.4. Drives the same engine as ml.upload_pending.
+Per spec §2.11.4 + ADR-0009. Drives the same engine as
+``ml.commit_pending_executions`` — same lifecycle bracket per
+execution, same per-execution failure isolation.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import argparse
 import logging
 import sys
 from typing import TYPE_CHECKING
+
 from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -58,9 +61,13 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--retry-failed",
+        "--clean",
         action="store_true",
-        help="Include rows currently in status='failed'.",
+        help=(
+            "Remove each execution's working folder after a successful "
+            "commit. Default is to leave the on-disk state in place for "
+            "inspection."
+        ),
     )
     p.add_argument(
         "--working-dir",
@@ -108,12 +115,12 @@ def main(argv: "list[str] | None" = None) -> int:
 
     ml = _construct_ml(args.host, args.catalog, args.mode)
     try:
-        report = ml.upload_pending(
+        report = ml.commit_pending_executions(
             execution_rids=args.execution_rids,
-            retry_failed=args.retry_failed,
+            clean_folder=args.clean,
         )
     except Exception as exc:
-        logger.error("upload_pending failed: %s", exc)
+        logger.error("commit_pending_executions failed: %s", exc)
         return 2
 
     print(

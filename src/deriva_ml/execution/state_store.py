@@ -124,7 +124,7 @@ class ExecutionStateStore:
         #                       _catalog_body_for_execution.
         #   download_duration — init/download phase (_initialize_execution).
         #                       Mirrored to catalog Execution.Download_Duration.
-        #   upload_duration   — upload phase (upload_execution_outputs).
+        #   upload_duration   — upload phase (commit_output_assets).
         #                       Mirrored to catalog Execution.Upload_Duration.
         self.executions = Table(
             EXECUTIONS_TABLE,

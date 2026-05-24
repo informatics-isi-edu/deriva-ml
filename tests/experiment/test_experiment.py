@@ -68,7 +68,7 @@ def completed_execution(basic_execution):
         with asset_path.open("w") as fp:
             fp.write("Test output content")
 
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
     return execution
 
 
@@ -140,7 +140,7 @@ def execution_with_hydra_config(workflow_terms, test_workflow, tmp_path):
         with hydra_path.open("w") as f:
             yaml.dump(hydra_content, f)
 
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
     return execution
 
 
@@ -211,7 +211,7 @@ class TestExperimentBasic:
 
         experiment = ml.lookup_experiment(execution_rid)
 
-        # Phase 2 lifecycle: after upload_execution_outputs the status is "Uploaded"
+        # Phase 2 lifecycle: after commit_output_assets the status is "Uploaded"
         # (legacy "Completed" no longer exists in ExecutionStatus).
         assert experiment.status == "Uploaded"
 
@@ -458,7 +458,7 @@ class TestExperimentFinder:
 
         ml = execution_with_hydra_config._ml_object
 
-        # Find uploaded experiments (Phase 2 lifecycle: upload_execution_outputs → Uploaded)
+        # Find uploaded experiments (Phase 2 lifecycle: commit_output_assets → Uploaded)
         uploaded = list(ml.find_experiments(status=ExecutionStatus.Uploaded))
 
         # The execution_with_hydra_config should be uploaded and found
@@ -608,7 +608,7 @@ class TestExperimentWithDatasets:
         execution = ml.create_execution(config)
         with execution.execute():
             pass
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         # Now test the experiment
         experiment = ml.lookup_experiment(execution.execution_rid)
@@ -646,7 +646,7 @@ class TestExperimentWithDatasets:
         execution = ml.create_execution(config)
         with execution.execute():
             pass
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
         experiment = ml.lookup_experiment(execution.execution_rid)
         summary = experiment.summary()

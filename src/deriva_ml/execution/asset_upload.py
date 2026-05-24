@@ -26,7 +26,7 @@ association rows).
 ``asset_file_path`` (manifest registration + flat staging
 + asset_type JSONL), ``metrics_file`` (thin sugar over
 ``asset_file_path``), ``download_asset`` (hatrac fetch +
-cache + execution-link), and ``upload_execution_outputs``
+cache + execution-link), and ``commit_output_assets``
 (state-machine bracketed bag-commit driver). These are
 public-API methods on :class:`Execution`; the body moves
 here but the class still exposes thin delegate methods so
@@ -76,8 +76,8 @@ __all__ = [
     "metrics_file",
     "save_runtime_environment",
     "set_asset_descriptions",
+    "commit_output_assets",
     "update_asset_execution_table",
-    "upload_execution_outputs",
     "upload_hydra_config_assets",
 ]
 
@@ -231,14 +231,10 @@ def set_asset_descriptions(
                 )
 
             if description and asset.asset_rid:
-                table_updates.setdefault(table_key, []).append(
-                    {"RID": asset.asset_rid, "Description": description}
-                )
+                table_updates.setdefault(table_key, []).append({"RID": asset.asset_rid, "Description": description})
 
     for table_key, updates in table_updates.items():
-        schema, table_name = (
-            table_key.split("/", 1) if "/" in table_key else ("", table_key)
-        )
+        schema, table_name = table_key.split("/", 1) if "/" in table_key else ("", table_key)
         pb.schemas[schema].tables[table_name].update(updates)
 
 
@@ -353,9 +349,7 @@ def upload_hydra_config_assets(
         )
 
 
-def clean_folder_contents(
-    folder_path: Path, remove_folder: bool = True, *, logger: Any = None
-) -> None:
+def clean_folder_contents(folder_path: Path, remove_folder: bool = True, *, logger: Any = None) -> None:
     """Clean up a folder's contents and optionally the folder itself.
 
     Removes all files and subdirectories within ``folder_path``.
@@ -526,9 +520,7 @@ def update_asset_execution_table(
     for asset_table, asset_list in uploaded_assets.items():
         # Peel off the schema from the asset table.
         asset_table_name = asset_table.split("/")[1]
-        asset_exe, asset_fk, execution_fk = execution._model.find_association(
-            asset_table_name, "Execution"
-        )
+        asset_exe, asset_fk, execution_fk = execution._model.find_association(asset_table_name, "Execution")
         asset_exe_path = pb.schemas[asset_exe.schema.name].tables[asset_exe.name]
 
         asset_exe_path.insert(
@@ -547,12 +539,8 @@ def update_asset_execution_table(
         # asset_table loop iteration — we need it for both the
         # Output (user-supplied + Output_File) and Input
         # (Input_File only) branches below.
-        asset_asset_type, _, _ = execution._model.find_association(
-            asset_table_name, "Asset_Type"
-        )
-        type_path = pb.schemas[asset_asset_type.schema.name].tables[
-            asset_asset_type.name
-        ]
+        asset_asset_type, _, _ = execution._model.find_association(asset_table_name, "Asset_Type")
+        type_path = pb.schemas[asset_asset_type.schema.name].tables[asset_asset_type.name]
 
         if asset_role == "Input":
             # Input branch: auto-tag each downloaded asset with
@@ -562,10 +550,7 @@ def update_asset_execution_table(
             # types it carries should stay. ``on_conflict_skip``
             # makes re-downloads idempotent.
             type_path.insert(
-                [
-                    {asset_table_name: asset_path.asset_rid, "Asset_Type": direction_tag}
-                    for asset_path in asset_list
-                ],
+                [{asset_table_name: asset_path.asset_rid, "Asset_Type": direction_tag} for asset_path in asset_list],
                 on_conflict_skip=True,
             )
             continue
@@ -631,7 +616,7 @@ def bag_commit_upload(
     ``upload/{rid}/`` directory by hand once they no longer
     need it. The caller's ``clean_folder`` flag controls
     cleanup of the separate ``execution_root`` only (see
-    :meth:`Execution.upload_execution_outputs`).
+    :meth:`Execution.commit_output_assets`).
 
     Pre-extraction this was the ``_bag_commit_upload`` method
     on ``Execution``. The helper now takes ``execution`` as
@@ -697,9 +682,7 @@ def bag_commit_upload(
         # loader's error so the user can retry from a known
         # state.
         try:
-            pending_features = execution._manifest_store.list_pending_feature_records(
-                execution.execution_rid
-            )
+            pending_features = execution._manifest_store.list_pending_feature_records(execution.execution_rid)
             if pending_features:
                 execution._manifest_store.mark_feature_records_failed(
                     [(r.stage_id, f"bag-load failed: {error}") for r in pending_features]
@@ -709,9 +692,7 @@ def bag_commit_upload(
                 "Could not mark pending features as failed: %s",
                 mark_err,
             )
-        raise DerivaMLException(
-            f"Failed to upload execution outputs via bag pipeline: {error}"
-        )
+        raise DerivaMLException(f"Failed to upload execution outputs via bag pipeline: {error}")
 
     # Mark every leased manifest entry as uploaded — its RID
     # was set during the bag build step's lease. Batch the
@@ -723,13 +704,9 @@ def bag_commit_upload(
     # Mark staged feature records as uploaded too. The bag
     # carried them; if the load succeeded, they're at the
     # destination.
-    pending_features = execution._manifest_store.list_pending_feature_records(
-        execution.execution_rid
-    )
+    pending_features = execution._manifest_store.list_pending_feature_records(execution.execution_rid)
     if pending_features:
-        execution._manifest_store.mark_feature_records_uploaded(
-            [r.stage_id for r in pending_features]
-        )
+        execution._manifest_store.mark_feature_records_uploaded([r.stage_id for r in pending_features])
 
     manifest = execution._get_manifest()  # re-read with post-mark statuses
     # Restrict the return to assets that went through *this*
@@ -863,9 +840,7 @@ def asset_file_path(
     metadata_dict: dict[str, Any] = {}
     if metadata is not None:
         if hasattr(metadata, "model_dump"):
-            metadata_dict = {
-                k: v for k, v in metadata.model_dump().items() if v is not None
-            }
+            metadata_dict = {k: v for k, v in metadata.model_dump().items() if v is not None}
         else:
             metadata_dict = dict(metadata)
     # Merge any legacy_kwargs that aren't standard parameters.
@@ -879,14 +854,10 @@ def asset_file_path(
     if not file_name.is_absolute():
         file_name = file_name.resolve()
 
-    target_name = (
-        Path(rename_file) if file_name.exists() and rename_file else file_name
-    )
+    target_name = Path(rename_file) if file_name.exists() and rename_file else file_name
 
     # Store file in flat per-table directory.
-    flat_dir = flat_asset_dir_fn(
-        execution._working_dir, execution.execution_rid, asset_name
-    )
+    flat_dir = flat_asset_dir_fn(execution._working_dir, execution.execution_rid, asset_name)
     flat_path = flat_dir / target_name.name
 
     if file_name.exists():
@@ -913,9 +884,7 @@ def asset_file_path(
     )
 
     # Also write legacy asset-type JSONL for backward compatibility with upload.
-    with Path(
-        asset_type_path_fn(execution._working_dir, execution.execution_rid, asset_table)
-    ).open("a") as f:
+    with Path(asset_type_path_fn(execution._working_dir, execution.execution_rid, asset_table)).open("a") as f:
         f.write(json.dumps({target_name.name: asset_types}) + "\n")
 
     result = AssetFilePath(
@@ -1029,20 +998,12 @@ def download_asset(
 
     from deriva_ml.asset.aux_classes import AssetFilePath
 
-    asset_table = (
-        _asset_table
-        if _asset_table is not None
-        else execution._ml_object.resolve_rid(asset_rid).table
-    )
+    asset_table = _asset_table if _asset_table is not None else execution._ml_object.resolve_rid(asset_rid).table
     if not execution._model.is_asset(asset_table):
         raise DerivaMLException(f"RID {asset_rid}  is not for an asset table.")
 
     asset_record = execution._ml_object._retrieve_rid(asset_rid)
-    asset_metadata = {
-        k: v
-        for k, v in asset_record.items()
-        if k in execution._model.asset_metadata(asset_table)
-    }
+    asset_metadata = {k: v for k, v in asset_record.items() if k in execution._model.asset_metadata(asset_table)}
     asset_url = asset_record["URL"]
     asset_filename = dest_dir / asset_record["Filename"]
     expected_md5 = asset_record.get("MD5")
@@ -1063,9 +1024,7 @@ def download_asset(
                 # ``expected_md5`` as the "about to be written" md5
                 # in the overwrite check.
                 check_overwrite_safe_fn(asset_filename, expected_md5, asset_rid)
-                execution._logger.info(
-                    f"Using cached asset {asset_rid} (MD5: {md5})"
-                )
+                execution._logger.info(f"Using cached asset {asset_rid} (MD5: {md5})")
                 if asset_filename.exists() or asset_filename.is_symlink():
                     asset_filename.unlink()
                 asset_filename.symlink_to(cached_file)
@@ -1073,9 +1032,7 @@ def download_asset(
 
     if not cache_hit:
         check_overwrite_safe_fn(asset_filename, expected_md5, asset_rid)
-        hs = HatracStore(
-            "https", execution._ml_object.host_name, execution._ml_object.credential
-        )
+        hs = HatracStore("https", execution._ml_object.host_name, execution._ml_object.credential)
         hs.get_obj(path=asset_url, destfilename=asset_filename.as_posix())
 
         # Store in cache for future use.
@@ -1093,17 +1050,11 @@ def download_asset(
                 asset_filename.symlink_to(cached_file)
                 execution._logger.info(f"Cached asset {asset_rid} (MD5: {md5})")
 
-    asset_type_table, _col_l, _col_r = execution._model.find_association(
-        asset_table, asset_type_vocab_term
-    )
-    type_path = execution._ml_object.pathBuilder().schemas[
-        asset_type_table.schema.name
-    ].tables[asset_type_table.name]
+    asset_type_table, _col_l, _col_r = execution._model.find_association(asset_table, asset_type_vocab_term)
+    type_path = execution._ml_object.pathBuilder().schemas[asset_type_table.schema.name].tables[asset_type_table.name]
     asset_types = [
         asset_type[asset_type_vocab_term]
-        for asset_type in type_path.filter(
-            type_path.columns[asset_table.name] == asset_rid
-        )
+        for asset_type in type_path.filter(type_path.columns[asset_table.name] == asset_rid)
         .attributes(type_path.Asset_Type)
         .fetch()
     ]
@@ -1128,7 +1079,7 @@ def download_asset(
     return asset_path
 
 
-def upload_execution_outputs(
+def commit_output_assets(
     execution: "Execution",
     *,
     clean_folder: bool | None = None,

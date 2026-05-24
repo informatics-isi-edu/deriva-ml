@@ -76,7 +76,8 @@ class TestAssetLookup:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "lookup_test.txt", "Lookup test content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Look up the asset
@@ -111,7 +112,7 @@ class TestAssetLookup:
             create_test_asset(execution, "find_test_1.txt", "Content 1")
             create_test_asset(execution, "find_test_2.txt", "Content 2")
 
-        basic_execution.upload_execution_outputs()
+        basic_execution.commit_output_assets()
 
         # Find all assets in Execution_Asset table
         assets = list(ml.find_assets(asset_table="Execution_Asset"))
@@ -128,7 +129,7 @@ class TestAssetLookup:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "typed_asset.txt", "Typed content")
 
-        basic_execution.upload_execution_outputs()
+        basic_execution.commit_output_assets()
 
         # Find assets with the Model_File type
         assets = list(ml.find_assets(asset_type="Model_File"))
@@ -152,7 +153,8 @@ class TestAssetTypes:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "types_test.txt", "Types content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -170,7 +172,8 @@ class TestAssetTypes:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "add_type_test.txt", "Content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -193,7 +196,8 @@ class TestAssetTypes:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "remove_type_test.txt", "Content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -224,7 +228,8 @@ class TestAssetExecutions:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "exec_test.txt", "Content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -243,7 +248,8 @@ class TestAssetExecutions:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "input_test.txt", "Content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Create a new execution that uses this asset as input
@@ -272,7 +278,8 @@ class TestAssetExecutions:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "execution_rid_test.txt", "Content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -296,7 +303,8 @@ class TestAssetMetadata:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "metadata_test.txt", "Metadata content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -314,7 +322,8 @@ class TestAssetMetadata:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "chaise_test.txt", "Chaise content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -345,7 +354,8 @@ class TestAssetDescriptionSetter:
 
         with basic_execution.execute() as execution:
             create_test_asset(execution, "desc_write.txt", "x")
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -373,7 +383,8 @@ class TestAssetDescriptionSetter:
 
         with basic_execution.execute() as execution:
             create_test_asset(execution, "desc_read.txt", "x")
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -409,7 +420,8 @@ class TestAssetDownload:
 
         with basic_execution.execute() as execution:
             create_test_asset(execution, "download_test.txt", "Download content")
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -428,7 +440,8 @@ class TestAssetDownload:
 
         with basic_execution.execute() as execution:
             create_test_asset(execution, "mkdir_test.txt", "mkdir content")
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -450,7 +463,8 @@ class TestAssetDownload:
 
         with basic_execution.execute() as execution:
             create_test_asset(execution, "str_dest.txt", "str dest content")
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -476,7 +490,8 @@ class TestAssetRepr:
         with basic_execution.execute() as execution:
             create_test_asset(execution, "repr_test.txt", "Repr content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)

@@ -650,7 +650,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             # Use the default working directory (not tmpdirname) so that we share
             # the same asset staging area as the notebook subprocess. The notebook
             # registers output files via asset_file_path() into the default working
-            # dir; if we used a different working_dir here, upload_execution_outputs()
+            # dir; if we used a different working_dir here, commit_output_assets()
             # would only see the .ipynb/.md files we register below, missing any
             # assets the notebook itself created (e.g., training_curves.png).
             ml_instance = DerivaML(hostname=hostname, catalog_id=catalog_id)
@@ -739,11 +739,11 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                         ),
                     )
 
-            # Upload all registered assets to the catalog. If the kernel
-            # already called upload_execution_outputs() from its last
+            # Commit all registered assets to the catalog. If the kernel
+            # already called commit_output_assets() from its last
             # cell, status is Uploaded; this call cycles through
             # Pending_Upload to ship the runner-owned assets only.
-            execution.upload_execution_outputs()
+            execution.commit_output_assets()
 
             # Print execution URL (without snapshot ID for readability)
             print(f"https://{hostname}/id/{catalog_id}/{execution_rid}")

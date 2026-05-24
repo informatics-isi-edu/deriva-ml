@@ -11,7 +11,7 @@ bag-based commit_execution:
   resolved on demand at upload time
 - #232 — ``SchemaBuilder.make_table_name`` hyphen normalisation
 
-The shape mirrors what ``Execution.upload_execution_outputs``
+The shape mirrors what ``Execution.commit_output_assets``
 will do once rewritten: build a bag containing one Image row +
 its bytes hardlinked from local flat storage, load it via
 ``BagCatalogLoader`` with ``PRESERVE`` policy + commit-mode
@@ -121,13 +121,9 @@ def test_bag_commit_poc_image_round_trip(
         bb.finalize(make_bdbag=True)
 
     # Bag's asset entry is a hardlink to the source — same inode.
-    bag_image = (
-        bag_dir / "data" / "asset" / "Image" / image_rid / src.name
-    )
+    bag_image = bag_dir / "data" / "asset" / "Image" / image_rid / src.name
     assert bag_image.exists()
-    assert bag_image.stat().st_ino == src.stat().st_ino, (
-        "POC requires hardlink mode (#227) so we know we're testing it"
-    )
+    assert bag_image.stat().st_ino == src.stat().st_ino, "POC requires hardlink mode (#227) so we know we're testing it"
 
     # Load the bag into the live catalog.
     policy = FKTraversalPolicy(
@@ -153,17 +149,10 @@ def test_bag_commit_poc_image_round_trip(
     image_stats = report.table_stats.get(f"{ml.default_schema}.Image")
     assert image_stats is not None, list(report.table_stats)
     assert image_stats.rows_inserted >= 1
-    assert image_stats.assets_attempted >= 1, (
-        f"expected ≥1 asset upload attempt, got "
-        f"{image_stats.assets_attempted}"
-    )
+    assert image_stats.assets_attempted >= 1, f"expected ≥1 asset upload attempt, got {image_stats.assets_attempted}"
 
     # Image row landed at the destination with the right values.
-    landed = list(
-        domain.Image.path.filter(domain.Image.RID == image_rid)
-        .entities()
-        .fetch()
-    )
+    landed = list(domain.Image.path.filter(domain.Image.RID == image_rid).entities().fetch())
     assert len(landed) == 1
     row = landed[0]
     assert row["RID"] == image_rid
@@ -181,6 +170,4 @@ def test_bag_commit_poc_image_round_trip(
 
     md5_b64 = base64.b64encode(bytes.fromhex(md5)).decode()
     hs = HatracStore("https", ml.host_name, ml.credential)
-    assert hs.content_equals(hatrac_url, md5=md5_b64), (
-        f"hatrac at {hatrac_url} should have content matching MD5={md5}"
-    )
+    assert hs.content_equals(hatrac_url, md5=md5_b64), f"hatrac at {hatrac_url} should have content matching MD5={md5}"

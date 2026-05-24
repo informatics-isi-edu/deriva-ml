@@ -2,7 +2,7 @@
 
 See ``docs/bugs/2026-05-16-bag-loader-stale-path-builder.md`` for
 the full bug report. Symptom in production:
-``upload_execution_outputs`` raised ``KeyError`` on a destination
+``commit_output_assets`` raised ``KeyError`` on a destination
 table that exists in the catalog but isn't in the cached
 path-builder, because ``ErmrestCatalog.getPathBuilder()`` memoized
 per-catalog-instance and didn't see schema mutations made earlier
@@ -70,7 +70,7 @@ def test_ermrest_catalog_has_schema_invalidation_hook() -> None:
         "mutations through the binding auto-purge the catalog's "
         "schema + path-builder caches. Without this (or an "
         "equivalent replacement), the fresh-catalog upload flow "
-        "(create_ml_catalog → create_asset → upload_execution_outputs) "
+        "(create_ml_catalog → create_asset → commit_output_assets) "
         "will regress to KeyError on the newly-created table. "
         "See docs/bugs/2026-05-16-bag-loader-stale-path-builder.md "
         "and deriva-ml commit 0f14de7e for the full story."
@@ -99,6 +99,5 @@ def test_ermrest_catalog_exposes_schema_read_entry_points() -> None:
         "(notably execution/bag_commit.py)."
     )
     assert hasattr(ErmrestCatalog, "getPathBuilder"), (
-        "deriva-py's ErmrestCatalog is expected to expose "
-        "`getPathBuilder` as the datapath wrapper entry point."
+        "deriva-py's ErmrestCatalog is expected to expose `getPathBuilder` as the datapath wrapper entry point."
     )

@@ -217,7 +217,7 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
                 #     columns share the <Phase>_Duration pattern.
                 #   Download_Duration — init / dataset+asset download
                 #     time (_initialize_execution).
-                #   Upload_Duration   — upload_execution_outputs time
+                #   Upload_Duration   — commit_output_assets time
                 #     (bag commit + Hatrac PUTs).
                 ColumnDef("Execution_Duration", BuiltinType.text),
                 ColumnDef("Download_Duration", BuiltinType.text),
@@ -296,9 +296,7 @@ def create_asset_table(
     # "no Hatrac upload template" — the URL column is a plain
     # string. The Hatrac template is wired up only when the
     # caller asks for it via ``use_hatrac=True``.
-    hatrac_template = (
-        "/hatrac/metadata/{{MD5}}.{{Filename}}" if use_hatrac else None
-    )
+    hatrac_template = "/hatrac/metadata/{{MD5}}.{{Filename}}" if use_hatrac else None
     asset_table = schema.create_table(
         AssetTableDef(
             schema_name=schema.name,

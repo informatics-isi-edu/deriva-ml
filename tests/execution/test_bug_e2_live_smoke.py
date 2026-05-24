@@ -15,6 +15,7 @@ RID. This is exercised by the unit-level test in
 the deriva-py unit tests (mismatch-with-annotation → raise); an
 end-to-end integration check is deferred as future hardening.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -33,6 +34,7 @@ requires_catalog = pytest.mark.skipif(
 
 def _make_workflow(test_ml, name: str):
     from deriva_ml import MLVocab as vc
+
     test_ml.add_term(
         vc.workflow_type,
         "Test Workflow",
@@ -48,8 +50,10 @@ def _make_workflow(test_ml, name: str):
 def _lease_one_rid(test_ml) -> tuple[str, str]:
     """POST a single lease to ERMrest_RID_Lease; return (token, rid)."""
     from deriva_ml.execution.rid_lease import (
-        generate_lease_token, post_lease_batch,
+        generate_lease_token,
+        post_lease_batch,
     )
+
     token = generate_lease_token()
     result = post_lease_batch(catalog=test_ml.catalog, tokens=[token])
     return token, result[token]
@@ -74,11 +78,9 @@ def test_upload_asset_uses_pre_leased_rid(test_ml, tmp_path):
     exe = test_ml.create_execution(description="bug-e2-happy", workflow=wf)
 
     with exe.execute():
-        exe.asset_file_path(
-            "Execution_Asset", src, asset_types="Execution_Asset"
-        )
+        exe.asset_file_path("Execution_Asset", src, asset_types="Execution_Asset")
 
-    report = exe.upload_outputs()
+    report = exe.commit_output_assets()
     assert report.total_failed == 0, f"failures: {report.errors}"
     assert report.total_uploaded == 1
 
@@ -87,23 +89,15 @@ def test_upload_asset_uses_pre_leased_rid(test_ml, tmp_path):
     # records the leased RID before insert).
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas["deriva-ml"].tables["Execution_Asset"]
-    rows = list(
-        asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch()
-    )
+    rows = list(asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch())
     assert len(rows) == 1, (
-        f"Execution_Asset row with MD5={expected_md5} not found — "
-        f"bag-commit upload may have skipped the row insert."
+        f"Execution_Asset row with MD5={expected_md5} not found — bag-commit upload may have skipped the row insert."
     )
     # Sanity: the row's RID was leased (validates against the lease table).
-    leased_check = test_ml.catalog.getPathBuilder().schemas["public"].tables[
-        "ERMrest_RID_Lease"
-    ]
-    lease_rows = list(
-        leased_check.filter(leased_check.RID == rows[0]["RID"]).entities().fetch()
-    )
+    leased_check = test_ml.catalog.getPathBuilder().schemas["public"].tables["ERMrest_RID_Lease"]
+    lease_rows = list(leased_check.filter(leased_check.RID == rows[0]["RID"]).entities().fetch())
     assert len(lease_rows) == 1, (
-        f"row's RID {rows[0]['RID']} not in lease table — "
-        f"Bug E.2 regression: row's RID wasn't minted from a lease."
+        f"row's RID {rows[0]['RID']} not in lease table — Bug E.2 regression: row's RID wasn't minted from a lease."
     )
 
 
@@ -128,18 +122,14 @@ def test_soft_mode_second_upload_adopts_existing_rid(test_ml, tmp_path):
     # Execution 1 — first to upload.
     exe1 = test_ml.create_execution(description="bug-e2-soft-1", workflow=wf)
     with exe1.execute():
-        exe1.asset_file_path(
-            "Execution_Asset", src, asset_types="Execution_Asset"
-        )
-    report1 = exe1.upload_outputs()
+        exe1.asset_file_path("Execution_Asset", src, asset_types="Execution_Asset")
+    report1 = exe1.commit_output_assets()
     assert report1.total_failed == 0, report1.errors
 
     # Capture the row's first-upload RID for the dedup comparison.
     pb = test_ml.pathBuilder()
     asset_path = pb.schemas["deriva-ml"].tables["Execution_Asset"]
-    first_rows = list(
-        asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch()
-    )
+    first_rows = list(asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch())
     assert len(first_rows) == 1
     first_rid = first_rows[0]["RID"]
 
@@ -151,22 +141,17 @@ def test_soft_mode_second_upload_adopts_existing_rid(test_ml, tmp_path):
     exe2 = test_ml.create_execution(description="bug-e2-soft-2", workflow=wf)
     with exe2.execute():
         exe2.asset_file_path(
-            "Execution_Asset", src2,
+            "Execution_Asset",
+            src2,
             rename_file="bug-e2-shared.bin",  # keep the same Filename for dedup
             asset_types="Execution_Asset",
         )
-    report2 = exe2.upload_outputs()
-    assert report2.total_failed == 0, (
-        f"Soft-mode upload should succeed but failed: {report2.errors}"
-    )
+    report2 = exe2.commit_output_assets()
+    assert report2.total_failed == 0, f"Soft-mode upload should succeed but failed: {report2.errors}"
 
     # Only ONE catalog row with this MD5 (not two) — dedup worked.
-    rows = list(
-        asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch()
-    )
-    assert len(rows) == 1, (
-        f"expected single row for shared artifact, got {len(rows)}"
-    )
+    rows = list(asset_path.filter(asset_path.MD5 == expected_md5).entities().fetch())
+    assert len(rows) == 1, f"expected single row for shared artifact, got {len(rows)}"
     # The row's RID equals the FIRST upload (dedup preserved the
     # existing row, soft mode).
     assert rows[0]["RID"] == first_rid

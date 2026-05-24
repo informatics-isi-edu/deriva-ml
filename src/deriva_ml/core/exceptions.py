@@ -143,7 +143,7 @@ class DerivaMLSchemaError(DerivaMLConfigurationError):
 class DerivaMLSchemaRefreshBlocked(DerivaMLConfigurationError):
     """Raised when ``refresh_schema()`` is called with staged work in the workspace.
 
-    The caller should drain the workspace first (``ml.upload_pending()``)
+    The caller should drain the workspace first (``ml.commit_pending_executions()``)
     or call ``refresh_schema(force=True)`` to discard local state.
     Draining is the safer choice — a forced refresh may leave rows
     whose metadata references columns or types no longer in the new

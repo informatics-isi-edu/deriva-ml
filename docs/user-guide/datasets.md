@@ -42,7 +42,7 @@ with ml.create_execution(config) as exe:
         description="Images for model evaluation",
     )
 
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 `exe.create_dataset()` accepts `dataset_types` (a string or list of strings from the `Dataset_Type` vocabulary) and a `description`. It returns a `Dataset` object bound to the live catalog connection.
@@ -302,7 +302,7 @@ config = ExecutionConfiguration(workflow=workflow)
 with ml.create_execution(config) as exe:
     # ... split_dataset calls go here, reusing `exe` ...
     pass
-exe.upload_execution_outputs(clean_folder=True)
+exe.commit_output_assets(clean_folder=True)
 ```
 
 ### Simple random split

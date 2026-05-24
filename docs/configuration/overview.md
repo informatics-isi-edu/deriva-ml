@@ -353,7 +353,7 @@ def main(cfg):
             bag = exe.download_dataset_bag(ds)
             # Process data...
 
-    exe.upload_execution_outputs()
+    exe.commit_output_assets()
 
 if __name__ == "__main__":
     store.add_to_hydra_store()
@@ -522,7 +522,7 @@ def run_model(
         model_config(ml_instance=ml_instance, execution=exe)
 
     # Upload outputs after execution completes
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
 ```
 
 ### Main Script

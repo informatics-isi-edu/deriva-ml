@@ -59,7 +59,7 @@ def test_ml_with_feature(populated_catalog):
     with execution.execute() as exe:
         for rid in image_rids:
             exe.add_features([LabelFeature(Image=rid, Label="positive")])
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
 
     yield FeatureFixture(ml=ml, feature_name=feature_name, image_rids=image_rids)
 
@@ -95,7 +95,7 @@ def test_ml_with_feature_multi(populated_catalog):
         with execution.execute() as exe:
             for rid in image_rids:
                 exe.add_features([ScoreFeature(Image=rid, Score=label)])
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
         if i == 0:
             time.sleep(0.1)
 
@@ -226,7 +226,7 @@ def catalog_with_feature_and_dataset(populated_catalog):
     with execution.execute() as exe:
         for rid in all_image_rids:
             exe.add_features([LabelFeature(Image=rid, Label="positive")])
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
 
     # Create a second execution to build the dataset
     dataset_execution = ml.create_execution(
@@ -459,8 +459,7 @@ class TestFeatureValuesSymmetry:
             bag_rids = set(rids)
             assert bag_rids, "Bag returned empty execution list after non-empty check above"
             assert bag_rids.issubset(feature_container.expected_workflow_executions), (
-                f"Bag has executions not in catalog's set: "
-                f"{bag_rids - feature_container.expected_workflow_executions}"
+                f"Bag has executions not in catalog's set: {bag_rids - feature_container.expected_workflow_executions}"
             )
         else:
             rids = feature_container.container.list_workflow_executions(feature_container.workflow)
@@ -521,7 +520,7 @@ def test_offline_construct_records_online_stage(
             f"add_features should return the number of staged records; got {count}, expected {len(target_rids)}"
         )
     # __exit__ does NOT auto-upload (Task 7 review) — explicit call required
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
 
     # ------------------------------------------------------------------ #
     # VERIFY: records from this execution appear in the live catalog       #

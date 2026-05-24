@@ -21,7 +21,7 @@ cfg = ExecutionConfiguration(
 with ml.create_execution(cfg) as exe:
     bag = exe.download_dataset_bag(exe.datasets[0])
     # ... process data ...
-exe.upload_execution_outputs()
+exe.commit_output_assets()
 ```
 
 **hydra-zen — for reproducible project runs.** When you want to sweep hyperparameters, select dataset collections from the CLI, or let `deriva-ml-run` wire everything together automatically, use hydra-zen config classes registered in a `configs/` module:
@@ -128,5 +128,5 @@ Rather than setting this up from scratch, use the [deriva-ml-model-template](htt
 - [Config groups](../configuration/groups.md) — organizing datasets, assets, and model variants into named groups
 - [Experiments and multi-run](../configuration/experiments.md) — composing experiments and launching sweeps
 - [Notebook-driven configs](../configuration/notebooks.md) — using `deriva-ml-run-notebook` with the same config infrastructure
-- [Chapter 4: Executions](executions.md) — the `create_execution` context manager and `upload_execution_outputs()`
+- [Chapter 4: Executions](executions.md) — the `create_execution` context manager and `commit_output_assets()`
 - [deriva-ml-model-template](https://github.com/informatics-isi-edu/deriva-ml-model-template) — starter repository for new hydra-zen projects

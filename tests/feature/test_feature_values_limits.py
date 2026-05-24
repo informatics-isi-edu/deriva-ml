@@ -53,7 +53,7 @@ def catalog_with_feature_values(populated_catalog):
         # ``add_features`` only stages records to SQLite; the flush to
         # ermrest happens during upload. Without this call the feature
         # rows never land at the catalog and the tests see 0 records.
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
     return ml
 

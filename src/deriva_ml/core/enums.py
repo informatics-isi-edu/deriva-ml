@@ -152,7 +152,7 @@ class ExecMetadataType(StrEnum):
             record per evaluation point — per epoch, per eval step, etc.).
             Written during execution via ``Execution.metrics_file()`` and
             uploaded as an ``Execution_Metadata`` asset on
-            ``upload_execution_outputs()``. Readback: parse the file from
+            ``commit_output_assets()``. Readback: parse the file from
             the downloaded bag.
     """
 

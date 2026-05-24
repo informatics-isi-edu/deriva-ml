@@ -251,14 +251,16 @@ class TestDownloadAssetOverwriteIntegration:
         exec_a = ml.create_execution(config_a)
         with exec_a.execute() as execution:
             _create_test_asset(execution, "collide.txt", "first asset")
-        uploaded_a = exec_a.upload_execution_outputs()
+        uploaded_a_report = exec_a.commit_output_assets()
+        uploaded_a = exec_a.uploaded_assets
         rid_a = uploaded_a["deriva-ml/Execution_Asset"][0].asset_rid
 
         config_b = ExecutionConfiguration(description="Issue 181 Asset B", workflow=test_workflow)
         exec_b = ml.create_execution(config_b)
         with exec_b.execute() as execution:
             _create_test_asset(execution, "collide.txt", "second asset bytes are different")
-        uploaded_b = exec_b.upload_execution_outputs()
+        uploaded_b_report = exec_b.commit_output_assets()
+        uploaded_b = exec_b.uploaded_assets
         rid_b = uploaded_b["deriva-ml/Execution_Asset"][0].asset_rid
 
         assert rid_a != rid_b
@@ -299,7 +301,8 @@ class TestDownloadAssetOverwriteIntegration:
         with basic_execution.execute() as execution:
             _create_test_asset(execution, "idempotent.txt", "stable bytes")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         download_config = ExecutionConfiguration(

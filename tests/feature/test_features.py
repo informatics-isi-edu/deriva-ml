@@ -164,47 +164,32 @@ class TestFeatures:
         # int2 ``Scale`` metadata column (see demo_catalog.py's
         # ``create_feature("Subject", "Health", terms=...,
         # metadata=[ColumnDefinition("Scale", ...)])`` call).
-        health = next(
-            f for f in ml_instance.model.find_features("Subject")
-            if f.feature_name == "Health"
-        )
+        health = next(f for f in ml_instance.model.find_features("Subject") if f.feature_name == "Health")
         term_names = {c.name for c in health.term_columns}
         value_names = {c.name for c in health.value_columns}
         asset_names = {c.name for c in health.asset_columns}
         assert term_names == {"SubjectHealth"}, (
-            f"Subject.Health.term_columns: expected {{'SubjectHealth'}}, "
-            f"got {term_names}."
+            f"Subject.Health.term_columns: expected {{'SubjectHealth'}}, got {term_names}."
         )
-        assert value_names == {"Scale"}, (
-            f"Subject.Health.value_columns: expected {{'Scale'}}, "
-            f"got {value_names}."
-        )
+        assert value_names == {"Scale"}, f"Subject.Health.value_columns: expected {{'Scale'}}, got {value_names}."
         assert asset_names == set()
 
         # --- Image.BoundingBox: one asset column (the box-mask file),
         # zero terms, zero plain values.
-        bbox = next(
-            f for f in ml_instance.model.find_features("Image")
-            if f.feature_name == "BoundingBox"
-        )
+        bbox = next(f for f in ml_instance.model.find_features("Image") if f.feature_name == "BoundingBox")
         asset_names = {c.name for c in bbox.asset_columns}
         assert len(asset_names) == 1, (
-            f"Image.BoundingBox.asset_columns: expected exactly one column; "
-            f"got {asset_names}."
+            f"Image.BoundingBox.asset_columns: expected exactly one column; got {asset_names}."
         )
         assert {c.name for c in bbox.term_columns} == set()
         assert {c.name for c in bbox.value_columns} == set()
 
         # --- Image.Quality: one term column (the ImageQuality vocab FK),
         # zero asset/value.
-        quality = next(
-            f for f in ml_instance.model.find_features("Image")
-            if f.feature_name == "Quality"
-        )
+        quality = next(f for f in ml_instance.model.find_features("Image") if f.feature_name == "Quality")
         term_names = {c.name for c in quality.term_columns}
         assert term_names == {"ImageQuality"}, (
-            f"Image.Quality.term_columns: expected {{'ImageQuality'}}, "
-            f"got {term_names}."
+            f"Image.Quality.term_columns: expected {{'ImageQuality'}}, got {term_names}."
         )
         assert {c.name for c in quality.asset_columns} == set()
         assert {c.name for c in quality.value_columns} == set()
@@ -374,7 +359,7 @@ class TestFeatures:
             print(SubjectHealthFeature.feature_columns())
             exe.add_features([SubjectHealthFeature(Subject=subject_rids[0], SubjectHealth="Sick", Scale=23)])
 
-        feature_execution.upload_execution_outputs()
+        feature_execution.commit_output_assets()
         # Filter to records from THIS execution — the demo catalog populates
         # Health feature values for every Subject during ensure_features, so the
         # unfiltered count will be (# demo subjects) + 1.
@@ -434,7 +419,7 @@ class TestFeatures:
             exe.add_features(feature_records)
 
         # Upload outputs (assets + feature values)
-        asset_execution.upload_execution_outputs()
+        asset_execution.commit_output_assets()
 
         # Verify the feature values were created — filter to THIS execution,
         # since the demo catalog also populates BoundingBox feature values
@@ -551,12 +536,8 @@ class TestFeatures:
         catalog_features = list(ml_instance.find_features())
 
         # (1) Same set as the live catalog.
-        bag_keys = {
-            (f.feature_table.schema.name, f.feature_table.name) for f in bag_features
-        }
-        catalog_keys = {
-            (f.feature_table.schema.name, f.feature_table.name) for f in catalog_features
-        }
+        bag_keys = {(f.feature_table.schema.name, f.feature_table.name) for f in bag_features}
+        catalog_keys = {(f.feature_table.schema.name, f.feature_table.name) for f in catalog_features}
         assert bag_keys == catalog_keys, (
             f"bag.find_features() and ml.find_features() should agree on "
             f"the feature set. bag only: {bag_keys - catalog_keys}; "
@@ -564,9 +545,7 @@ class TestFeatures:
         )
 
         # (2) No duplicates -- the regression we're guarding against.
-        bag_qnames = [
-            f"{f.feature_table.schema.name}.{f.feature_table.name}" for f in bag_features
-        ]
+        bag_qnames = [f"{f.feature_table.schema.name}.{f.feature_table.name}" for f in bag_features]
         assert len(bag_qnames) == len(set(bag_qnames)), (
             f"bag.find_features() emitted duplicates: {bag_qnames}. "
             f"The bag's no-arg branch must delegate to the model's "
@@ -579,8 +558,7 @@ class TestFeatures:
             for f in bag.find_features(tname):
                 per_table_keys.add((f.feature_table.schema.name, f.feature_table.name))
         assert per_table_keys.issubset(bag_keys), (
-            f"bag.find_features() missed features that per-table calls "
-            f"surfaced: {per_table_keys - bag_keys}."
+            f"bag.find_features() missed features that per-table calls surfaced: {per_table_keys - bag_keys}."
         )
 
     def test_delete_feature_success(self, test_ml):

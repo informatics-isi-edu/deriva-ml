@@ -354,7 +354,7 @@ def test_exe_add_features_stages_to_sqlite(populated_catalog, image_feature) -> 
     ``Execution.__exit__`` does NOT auto-upload staged features or assets.  It
     only transitions the execution state (running → stopped/failed) and emits a
     warning log if there are pending rows.  The caller is responsible for
-    calling ``exe.upload_execution_outputs()`` AFTER the ``with`` block exits.
+    calling ``exe.commit_output_assets()`` AFTER the ``with`` block exits.
     This design keeps the context manager lightweight and allows callers to
     decide whether/when to flush (e.g. after additional post-processing).
 
@@ -384,7 +384,7 @@ def test_exe_add_features_stages_to_sqlite(populated_catalog, image_feature) -> 
         assert all(r.get("Execution") != exe.execution_rid for r in rows)
     # __exit__ transitions state to stopped but does NOT flush — rows are still pending.
     # Explicit upload call is required to flush staged features to ermrest.
-    exe.upload_execution_outputs()
+    exe.commit_output_assets()
     pb = ml.pathBuilder()
     rows = list(pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch())
     ours = [r for r in rows if r.get("Execution") == exe.execution_rid]
@@ -485,7 +485,7 @@ def test_flush_happens_after_assets(populated_catalog, asset_feature) -> None:
     """Feature flush order: assets first, then features (Task 11).
 
     Stage a feature record whose asset column holds a local file path. Call
-    ``upload_execution_outputs()`` and verify that the ermrest feature row
+    ``commit_output_assets()`` and verify that the ermrest feature row
     contains the uploaded asset RID (not the local filename). Because
     the rewrite only succeeds if the asset has already been uploaded
     when the bag-commit feature path runs, a correct RID in the row
@@ -515,7 +515,7 @@ def test_flush_happens_after_assets(populated_catalog, asset_feature) -> None:
         assert all(r.get("Execution") != exe.execution_rid for r in rows_before)
 
     # Upload: assets upload first, then features are flushed with RID rewriting.
-    exe.upload_execution_outputs()
+    exe.commit_output_assets()
 
     pb = ml.pathBuilder()
     rows = list(pb.schemas[asset_feature.schema].tables[asset_feature.feature_table_name].entities().fetch())
@@ -563,7 +563,7 @@ def test_flush_rewrites_asset_column_filenames_to_rids(populated_catalog, asset_
         staged = json.loads(pending[0].record_json)
         assert "rewrite_test.bin" in staged["Patch"], f"Expected filename in staged JSON, got: {staged['Patch']!r}"
 
-    exe.upload_execution_outputs()
+    exe.commit_output_assets()
 
     pb = ml.pathBuilder()
     rows = list(pb.schemas[asset_feature.schema].tables[asset_feature.feature_table_name].entities().fetch())
@@ -630,7 +630,7 @@ def test_bag_load_failure_marks_pending_features_failed(populated_catalog, image
         side_effect=injected,
     ):
         with pytest.raises(DerivaMLException) as exc_info:
-            exe.upload_execution_outputs()
+            exe.commit_output_assets()
 
     # Both feature groups should be marked failed in SQLite with
     # the injected error message preserved. The bag's failure mode
@@ -657,11 +657,11 @@ def test_crash_before_flush_resumes_without_duplicates(populated_catalog, image_
 
     Simulates a crash-before-flush scenario:
     1. Stage feature records inside the context manager.
-    2. Exit the context manager WITHOUT calling upload_execution_outputs().
+    2. Exit the context manager WITHOUT calling commit_output_assets().
     3. Verify rows are still Pending in SQLite and absent from ermrest.
-    4. Call upload_execution_outputs() to resume.
+    4. Call commit_output_assets() to resume.
     5. Verify exactly ONE row per record in ermrest (no duplicates).
-    6. Call upload_execution_outputs() again — must not duplicate.
+    6. Call commit_output_assets() again — must not duplicate.
     """
     ml = populated_catalog
     cfg = ExecutionConfiguration(description="crash-resume test", workflow=image_feature.workflow)
@@ -687,7 +687,7 @@ def test_crash_before_flush_resumes_without_duplicates(populated_catalog, image_
     )
 
     # Resume flush: call upload on the same object (holds the SQLite reference)
-    exe.upload_execution_outputs()
+    exe.commit_output_assets()
 
     pb = ml.pathBuilder()
     rows_after = list(pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch())
@@ -695,7 +695,7 @@ def test_crash_before_flush_resumes_without_duplicates(populated_catalog, image_
     assert len(ours) == 1, f"Expected exactly 1 row after resume flush; got {len(ours)}"
 
     # Second upload must not duplicate — on_conflict_skip prevents duplicates.
-    exe.upload_execution_outputs()
+    exe.commit_output_assets()
 
     pb = ml.pathBuilder()
     rows_final = list(pb.schemas[image_feature.schema].tables[image_feature.feature_table_name].entities().fetch())

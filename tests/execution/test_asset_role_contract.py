@@ -15,7 +15,7 @@ inner helpers in isolation. This file exercises the **full
 public API** against a live catalog:
 
 - ``download_asset`` → role "Input" + ``Input_File`` tag.
-- ``asset_file_path`` + ``upload_execution_outputs`` → role
+- ``asset_file_path`` + ``commit_output_assets`` → role
   "Output" + ``Output_File`` tag.
 
 The motivation is a regression that lived undetected for many
@@ -66,13 +66,11 @@ def _asset_type_set(asset) -> set[str]:
 
 
 class TestOutputAssetRoleContract:
-    """Assets uploaded via ``asset_file_path`` + ``upload_execution_outputs``
+    """Assets uploaded via ``asset_file_path`` + ``commit_output_assets``
     must carry ``Asset_Role="Output"`` + ``Output_File`` tag.
     """
 
-    def test_uploaded_output_carries_output_role_and_output_file_tag(
-        self, basic_execution
-    ):
+    def test_uploaded_output_carries_output_role_and_output_file_tag(self, basic_execution):
         """End-to-end: upload one asset; verify both Output side of the contract.
 
         This is the regression test for the
@@ -95,7 +93,8 @@ class TestOutputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("output content")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Look up the resulting catalog state and assert BOTH halves
@@ -105,8 +104,7 @@ class TestOutputAssetRoleContract:
 
         # 1. The user-supplied content tag is preserved.
         assert ExecAssetType.model_file.value in tags, (
-            f"Content tag {ExecAssetType.model_file.value!r} missing from "
-            f"uploaded asset's tags: {sorted(tags)}"
+            f"Content tag {ExecAssetType.model_file.value!r} missing from uploaded asset's tags: {sorted(tags)}"
         )
 
         # 2. The directional Output_File tag is auto-added.
@@ -130,9 +128,7 @@ class TestOutputAssetRoleContract:
         assert ExecAssetType.input_file.value not in tags
         assert asset.list_executions(asset_role="Input") == []
 
-    def test_upload_without_content_tag_still_gets_output_file(
-        self, basic_execution
-    ):
+    def test_upload_without_content_tag_still_gets_output_file(self, basic_execution):
         """An upload that passes ``asset_types=[]`` still gets ``Output_File``.
 
         Pins the "every execution asset gets a directional tag"
@@ -153,7 +149,8 @@ class TestOutputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("notags")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -185,7 +182,8 @@ class TestOutputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("explicit")
 
-        uploaded = basic_execution.upload_execution_outputs()
+        uploaded_report = basic_execution.commit_output_assets()
+        uploaded = basic_execution.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         asset = ml.lookup_asset(asset_rid)
@@ -194,8 +192,7 @@ class TestOutputAssetRoleContract:
         # Output_File appears exactly once — no duplicate row.
         output_file_count = sum(1 for t in tags if t == ExecAssetType.output_file.value)
         assert output_file_count == 1, (
-            f"Output_File appeared {output_file_count} times in {tags}; "
-            f"explicit-pass-through should be deduplicated."
+            f"Output_File appeared {output_file_count} times in {tags}; explicit-pass-through should be deduplicated."
         )
         # Other content tags preserved.
         assert ExecAssetType.model_file.value in tags
@@ -206,9 +203,7 @@ class TestInputAssetRoleContract:
     ``Asset_Role="Input"`` + ``Input_File`` tag.
     """
 
-    def test_downloaded_input_carries_input_role_and_input_file_tag(
-        self, workflow_terms, test_workflow, tmp_path
-    ):
+    def test_downloaded_input_carries_input_role_and_input_file_tag(self, workflow_terms, test_workflow, tmp_path):
         """End-to-end: create-then-download to verify the Input contract.
 
         Setup: a first execution uploads an asset (which by the
@@ -234,7 +229,8 @@ class TestInputAssetRoleContract:
             with asset_path.open("w") as fp:
                 fp.write("cross-execution test")
 
-        uploaded = creator.upload_execution_outputs()
+        uploaded_report = creator.commit_output_assets()
+        uploaded = creator.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Sanity: creator's upload tagged it as an Output.
@@ -256,15 +252,12 @@ class TestInputAssetRoleContract:
         tags = _asset_type_set(asset_after_consume)
 
         # 1. Input_File tag added.
-        assert ExecAssetType.input_file.value in tags, (
-            f"Input_File missing from consumed asset's tags: {sorted(tags)}"
-        )
+        assert ExecAssetType.input_file.value in tags, f"Input_File missing from consumed asset's tags: {sorted(tags)}"
 
         # 2. Prior Output_File tag preserved (Input doesn't overwrite
         # content tags — they're additive).
         assert ExecAssetType.output_file.value in tags, (
-            f"Output_File should be preserved across consumer download; "
-            f"got: {sorted(tags)}"
+            f"Output_File should be preserved across consumer download; got: {sorted(tags)}"
         )
 
         # 3. The asset is now linked to BOTH executions with their
@@ -282,9 +275,7 @@ class TestRoleSymmetry:
     documented in ``docs/user-guide/executions.md``.
     """
 
-    def test_list_assets_by_role_returns_correct_partitions(
-        self, workflow_terms, test_workflow
-    ):
+    def test_list_assets_by_role_returns_correct_partitions(self, workflow_terms, test_workflow):
         """``exe.list_assets(asset_role=...)`` returns the right partition
         of the execution's assets.
 
@@ -312,15 +303,14 @@ class TestRoleSymmetry:
             )
             with asset_path.open("w") as fp:
                 fp.write("shared")
-        uploaded = creator.upload_execution_outputs()
+        uploaded_report = creator.commit_output_assets()
+        uploaded = creator.uploaded_assets
         asset_rid = uploaded["deriva-ml/Execution_Asset"][0].asset_rid
 
         # Creator: listing by Output role should include this asset.
         creator_outputs = creator.list_assets(asset_role="Output")
         output_rids = {a.asset_rid for a in creator_outputs}
-        assert asset_rid in output_rids, (
-            f"Output listing missing asset {asset_rid}; got {output_rids}"
-        )
+        assert asset_rid in output_rids, f"Output listing missing asset {asset_rid}; got {output_rids}"
         creator_inputs = creator.list_assets(asset_role="Input")
         input_rids = {a.asset_rid for a in creator_inputs}
         assert asset_rid not in input_rids
@@ -334,10 +324,7 @@ class TestRoleSymmetry:
         consumer = ml.create_execution(consumer_config)
         consumer_inputs = consumer.list_assets(asset_role="Input")
         c_input_rids = {a.asset_rid for a in consumer_inputs}
-        assert asset_rid in c_input_rids, (
-            f"Consumer's Input listing missing asset {asset_rid}; "
-            f"got {c_input_rids}"
-        )
+        assert asset_rid in c_input_rids, f"Consumer's Input listing missing asset {asset_rid}; got {c_input_rids}"
         consumer_outputs = consumer.list_assets(asset_role="Output")
         c_output_rids = {a.asset_rid for a in consumer_outputs}
         assert asset_rid not in c_output_rids

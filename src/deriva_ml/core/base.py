@@ -568,7 +568,7 @@ class DerivaML(
         if count > 0 and not force:
             raise DerivaMLSchemaRefreshBlocked(
                 f"refresh_schema requires a drained workspace; "
-                f"{count} pending rows. Run ml.upload_pending() first, "
+                f"{count} pending rows. Run ml.commit_pending_executions() first, "
                 f"or call refresh_schema(force=True) to discard local "
                 f"state (staged rows may become inconsistent with the "
                 f"new schema)."

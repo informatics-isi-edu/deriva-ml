@@ -25,7 +25,7 @@ Coverage layers:
    JSONL writeback, empty-list-types preservation, metadata
    normalization.
 8. ``metrics_file`` — thin sugar over ``asset_file_path``.
-9. ``upload_execution_outputs`` — state-machine bracketing
+9. ``commit_output_assets`` — state-machine bracketing
    for dry-run, Running auto-stop, Uploaded short-circuit,
    Stopped → Pending_Upload → Uploaded happy path,
    Pending_Upload → Failed on exception.
@@ -49,7 +49,7 @@ from deriva_ml.execution.asset_upload import (
     save_runtime_environment,
     set_asset_descriptions,
     update_asset_execution_table,
-    upload_execution_outputs,
+    commit_output_assets,
     upload_hydra_config_assets,
 )
 
@@ -147,9 +147,7 @@ class TestSetAssetDescriptions:
         """When the manifest carries a description, it's used (not the canonical map)."""
         manifest_entry = MagicMock()
         manifest_entry.description = "User-supplied description"
-        exe = self._build_execution_mock(
-            {"Image/photo.jpg": manifest_entry}
-        )
+        exe = self._build_execution_mock({"Image/photo.jpg": manifest_entry})
         uploaded = self._build_uploaded("schema/Image", "photo.jpg", "RID-1")
 
         set_asset_descriptions(
@@ -161,18 +159,14 @@ class TestSetAssetDescriptions:
 
         # The pathBuilder update was called with the manifest description.
         table_path = self._table_path(exe)
-        table_path.update.assert_called_once_with(
-            [{"RID": "RID-1", "Description": "User-supplied description"}]
-        )
+        table_path.update.assert_called_once_with([{"RID": "RID-1", "Description": "User-supplied description"}])
 
     def test_metadata_fallback_for_execution_metadata(self):
         """When the manifest has no description, ``Execution_Metadata``
         files get the canonical description.
         """
         exe = self._build_execution_mock({})  # no manifest entries
-        uploaded = self._build_uploaded(
-            "deriva-ml/Execution_Metadata", "uv.lock", "RID-2"
-        )
+        uploaded = self._build_uploaded("deriva-ml/Execution_Metadata", "uv.lock", "RID-2")
 
         set_asset_descriptions(
             exe,
@@ -182,9 +176,7 @@ class TestSetAssetDescriptions:
         )
 
         table_path = self._table_path(exe)
-        table_path.update.assert_called_once_with(
-            [{"RID": "RID-2", "Description": "Dependency lockfile"}]
-        )
+        table_path.update.assert_called_once_with([{"RID": "RID-2", "Description": "Dependency lockfile"}])
 
     def test_no_description_skipped(self):
         """Assets without a description (and not Execution_Metadata) get no update."""
@@ -206,9 +198,7 @@ class TestSetAssetDescriptions:
         """Assets without an ``asset_rid`` get no update (can't address them)."""
         manifest_entry = MagicMock()
         manifest_entry.description = "Some description"
-        exe = self._build_execution_mock(
-            {"Image/photo.jpg": manifest_entry}
-        )
+        exe = self._build_execution_mock({"Image/photo.jpg": manifest_entry})
         # asset_rid is None.
         asset = MagicMock()
         asset.file_name = "photo.jpg"
@@ -472,6 +462,7 @@ class TestUpdateAssetExecutionTable:
         type_assoc_table.name = "Image_Asset_Type"
 
         if with_associations:
+
             def fake_find_assoc(table_name, partner):
                 if partner == "Execution":
                     return (assoc_table, "Image", "Execution")
@@ -585,9 +576,7 @@ class TestUpdateAssetExecutionTable:
     def test_output_branch_does_not_duplicate_existing_output_file_tag(self, tmp_path):
         """When the type map already has ``Output_File``, it's not added twice."""
         type_file = tmp_path / "asset_type.jsonl"
-        type_file.write_text(
-            json.dumps({"photo.jpg": ["Model_File", "Output_File"]}) + "\n"
-        )
+        type_file.write_text(json.dumps({"photo.jpg": ["Model_File", "Output_File"]}) + "\n")
 
         exe = self._build_execution_mock()
         asset = MagicMock()
@@ -666,6 +655,7 @@ class TestAssetFilePath:
 
     def _flat_dir_fn(self, tmp_path: Path):
         """Build a ``flat_asset_dir`` stand-in that mkdirs and returns a path."""
+
         def _fn(working_dir, exec_rid, asset_name):
             p = Path(working_dir) / "flat" / exec_rid / asset_name
             p.mkdir(parents=True, exist_ok=True)
@@ -675,6 +665,7 @@ class TestAssetFilePath:
 
     def _type_path_fn(self, tmp_path: Path):
         """Build an ``asset_type_path`` stand-in that returns a writable JSONL path."""
+
         def _fn(working_dir, exec_rid, asset_table):
             p = Path(working_dir) / "type-jsonl" / exec_rid
             p.mkdir(parents=True, exist_ok=True)
@@ -867,7 +858,7 @@ class TestMetricsFile:
 
 
 # ---------------------------------------------------------------------------
-# upload_execution_outputs — state-machine bracketing
+# commit_output_assets — state-machine bracketing
 # ---------------------------------------------------------------------------
 
 
@@ -896,6 +887,7 @@ class TestUploadExecutionOutputs:
 
     def _statuses(self):
         """Use sentinel enum-like objects so ``is`` comparisons work."""
+
         class _StatusSentinel:
             def __init__(self, name):
                 self.name = name
@@ -916,7 +908,7 @@ class TestUploadExecutionOutputs:
         s = self._statuses()
         exe = self._build_execution(status=s["Stopped"], dry_run=True)
 
-        result = upload_execution_outputs(
+        result = commit_output_assets(
             exe,
             pending_upload_status=s["Pending_Upload"],
             uploaded_status=s["Uploaded"],
@@ -936,7 +928,7 @@ class TestUploadExecutionOutputs:
         exe = self._build_execution(status=s["Uploaded"], pending={})
         exe.uploaded_assets = {"schema/Image": []}
 
-        result = upload_execution_outputs(
+        result = commit_output_assets(
             exe,
             pending_upload_status=s["Pending_Upload"],
             uploaded_status=s["Uploaded"],
@@ -972,7 +964,7 @@ class TestUploadExecutionOutputs:
 
         exe.update_status.side_effect = _update_fn
 
-        upload_execution_outputs(
+        commit_output_assets(
             exe,
             pending_upload_status=s["Pending_Upload"],
             uploaded_status=s["Uploaded"],
@@ -1003,7 +995,7 @@ class TestUploadExecutionOutputs:
         exe.update_status.side_effect = _update_fn
 
         with pytest.raises(RuntimeError, match="bag-load failed"):
-            upload_execution_outputs(
+            commit_output_assets(
                 exe,
                 pending_upload_status=s["Pending_Upload"],
                 uploaded_status=s["Uploaded"],
@@ -1029,7 +1021,7 @@ class TestUploadExecutionOutputs:
 
         exe.update_status.side_effect = _update_fn
 
-        upload_execution_outputs(
+        commit_output_assets(
             exe,
             clean_folder=True,
             pending_upload_status=s["Pending_Upload"],
