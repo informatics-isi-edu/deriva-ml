@@ -19,7 +19,7 @@ Migration table:
 
 Both bugs were present in v1.37.x but only reachable via the legacy methods that v2.0.0 removes.
 
-Unreleased (since v1.37.14)
+**Also in this release** (post-v1.37.14, folded into v2.0):
 
 - **`feat(asset,dataset)`: write-through description setters** (#221, closes #70). `Asset.description` and `Dataset.description` now use a `@property` / `@setter` pair that persists assignments to the catalog row, mirroring the symmetric pattern already in place on `Workflow` and `ExecutionRecord`. `update_field_in_catalog` in `execution/_helpers.py` gained an optional `schema_name` parameter so the same helper now serves both ML-schema (Workflow / Execution / Dataset) and domain-schema (Asset) callers.
 - **`fix(execution)`: Output_File directional tag + Execution_Execution exclusion** (#220). `bag_commit._add_asset_rows_to_bag` now auto-adds the `Output_File` directional Asset_Type to every asset uploaded after an execution — restores the public-API contract that every execution-linked asset carries an Input or Output role. `find_asset_execution_tables` excludes `Execution_Execution` (which is an execution-to-execution association, not an asset). Adds a "How execution-asset roles work" section to `docs/user-guide/executions.md` and a 5-test `test_asset_role_contract.py` regression suite.
