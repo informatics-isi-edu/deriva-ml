@@ -26,8 +26,8 @@ from deriva_ml.core.exceptions import (
     DerivaMLException,
     DerivaMLStateInconsistency,
 )
-from deriva_ml.execution.state_store import ExecutionStatus
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.execution.state_store import ExecutionStatus
 
 if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog  # noqa: F401  (string-annotation only)

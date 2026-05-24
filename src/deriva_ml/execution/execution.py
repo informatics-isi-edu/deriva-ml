@@ -46,7 +46,6 @@ if TYPE_CHECKING:
 from pydantic import validate_call
 
 from deriva_ml.asset.aux_classes import AssetFilePath
-from deriva_ml.execution.upload_report import UploadReport
 from deriva_ml.asset.manifest import AssetManifest
 from deriva_ml.core.base import DerivaML
 from deriva_ml.core.connection_mode import ConnectionMode
@@ -77,6 +76,7 @@ from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_record import ExecutionRecord
 from deriva_ml.execution.state_machine import transition
 from deriva_ml.execution.state_store import ExecutionStatus
+from deriva_ml.execution.upload_report import UploadReport
 from deriva_ml.execution.workflow import Workflow
 from deriva_ml.feature import FeatureRecord
 from deriva_ml.model.deriva_ml_bag_view import DerivaMLBagView

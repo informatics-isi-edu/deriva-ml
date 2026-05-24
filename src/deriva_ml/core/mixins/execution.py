@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable
 from deriva_ml.core.connection_mode import ConnectionMode
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException, NoAssociationException
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.execution_snapshot import ExecutionSnapshot
@@ -22,7 +23,6 @@ from deriva_ml.execution.state_machine import (
     reconcile_with_catalog,
 )
 from deriva_ml.execution.state_store import ExecutionStatus
-from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

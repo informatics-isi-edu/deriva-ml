@@ -35,9 +35,9 @@ from pydantic import BaseModel, PrivateAttr
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.execution.state_store import ExecutionStatus
-from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.execution.state_store import ExecutionStatus
 
 logger = get_logger(__name__)
 if TYPE_CHECKING:

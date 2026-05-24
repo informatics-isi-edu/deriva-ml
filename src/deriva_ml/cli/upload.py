@@ -22,6 +22,7 @@ import argparse
 import logging
 import sys
 from typing import TYPE_CHECKING
+
 from deriva_ml.core.logging_config import get_logger
 
 if TYPE_CHECKING:
