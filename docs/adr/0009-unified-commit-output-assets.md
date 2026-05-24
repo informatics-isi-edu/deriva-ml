@@ -129,11 +129,14 @@ around this method.
 | `DerivaML.upload_pending(...)` | `DerivaML.commit_pending_executions(...)` |
 | `retry_failed=` kwarg (everywhere) | Removed — was already a documented no-op under the bag pipeline |
 
-**No deprecation shims.** The breaking change ships as **v2.0.0**
-with a migration table in the release notes. Internal callers
-(10 source files) migrate in the same PR. External Python
-consumers (`deriva-mcp`, `deriva-ml-model-template`) migrate in
-coordinated companion PRs.
+**No deprecation shims.** The breaking change ships as **v1.39.0**
+— a minor bump that carries an API-incompatible change. Major-
+version (`v2.0.0`) is intentionally deferred until the unified
+surface has more bake time; landing the rename at v1.39 keeps the
+v2.0 marker free for a future release we are more confident in.
+Internal callers (10 source files) migrate in the same PR.
+External Python consumers (`deriva-mcp`,
+`deriva-ml-model-template`) migrate in coordinated companion PRs.
 
 ### Why no shims
 
@@ -192,7 +195,7 @@ session.
 **Negative:**
 
 - Breaking change. Every external Python caller of the four
-  removed methods must migrate at v2.0.0 upgrade. No shim.
+  removed methods must migrate at v1.39.0 upgrade. No shim.
 - Internal-caller migration is in the same PR as the rename —
   the PR is larger than a minimum-viable behavior fix would have
   been.
@@ -250,18 +253,31 @@ otherwise commit a half-done execution.
 
 ### Deprecation shims for one minor cycle
 
-Standard semver hygiene — ship v2.0.0 with shims that warn,
-remove in v3.0.0.
+Standard semver hygiene — ship with shims that warn, remove a
+minor cycle later.
 
 Rejected by the user: shims extend the period during which both
 names are in use. The blast radius is small enough that a single
 coordinated PR session resolves all known external consumers.
 Shims would have kept the broken methods reachable in any pinned
-v2.x environment.
+v1.39+ environment.
+
+### Ship as v2.0.0
+
+Initial intent — semver-honest. A breaking API change is what
+v2.0 numerals signal.
+
+Rejected by the user **after** the initial v2.0.0 tag was pushed:
+v2.0 should mark a release we are confident enough in to stand
+behind for years; the unified surface needs bake time before it
+earns that marker. The v2.0.0 tag was deleted from origin and
+this commit was re-tagged as v1.39.0. The release notes call out
+that v1.39.0 carries an API-incompatible change despite the minor
+version number; consumers must read them before upgrading.
 
 ## References
 
-- Release notes for v2.0.0 — migration table.
+- Release notes for v1.39.0 — migration table.
 - `tests/execution/test_commit_lifecycle.py` — the contract test.
 - `docs/user-guide/executions.md` §"Committing output assets" —
   user-facing documentation of the unified surface.
