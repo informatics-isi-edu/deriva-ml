@@ -83,13 +83,13 @@ class InvalidTransitionError(DerivaMLException):
 #     SIGKILL'd mid-run, so __exit__ never fired and never moved
 #     status to Stopped. The user calls
 #     ``exe.update_status(ExecutionStatus.Pending_Upload)`` to advance
-#     past the crashed Running state, then ``upload_execution_outputs()``.
+#     past the crashed Running state, then ``commit_output_assets()``.
 #     Keeps the audit trail honest — "Failed" means the run failed,
 #     not "the process died before it could mark itself finished".
 #
 #   failed → pending_upload — retry from upload failure. The first
 #     upload attempt raised; staging is intact; user re-runs
-#     ``upload_execution_outputs()``.
+#     ``commit_output_assets()``.
 #
 #   uploaded → pending_upload — additive upload. The execution
 #     completed and its first asset batch successfully uploaded, but
@@ -100,7 +100,7 @@ class InvalidTransitionError(DerivaMLException):
 #     The semantics: an execution's upload is **a batch operation,
 #     not a wall**. Asset rows linked to an execution have no temporal
 #     constraint vs. its status — the catalog already supports this.
-#     ``upload_execution_outputs()`` auto-takes this transition when
+#     ``commit_output_assets()`` auto-takes this transition when
 #     called on an already-Uploaded execution that has new pending
 #     manifest entries; if there are no pending entries it is a no-op.
 
@@ -125,7 +125,7 @@ ALLOWED_TRANSITIONS: frozenset[tuple[ExecutionStatus, ExecutionStatus]] = frozen
         # finishes its notebook and uploads its outputs (Uploaded). The
         # runner harness then registers its own assets (e.g., the Hydra
         # job log it is solely responsible for, since the kernel's view
-        # of that file is racy) and calls ``upload_execution_outputs()``
+        # of that file is racy) and calls ``commit_output_assets()``
         # again. Status cycles Uploaded → Pending_Upload → Uploaded.
         (ExecutionStatus.Uploaded, ExecutionStatus.Pending_Upload),
         # Abort is legal from any pre-terminal state. 'uploaded' is

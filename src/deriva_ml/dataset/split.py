@@ -47,7 +47,7 @@ Example:
 
         with ml.create_execution(config) as exe:
             result = split_dataset(ml, "28D0", exe, test_size=0.2, seed=42)
-        exe.upload_execution_outputs(clean_folder=True)
+        exe.commit_output_assets(clean_folder=True)
 
     Three-way train/val/test split (same execution, reuse ``exe``)::
 
@@ -767,7 +767,7 @@ def _create_split_hierarchy(
 
     # Save split parameters as config artifact. The caller's execution
     # is responsible for uploading this on its own
-    # ``upload_execution_outputs``; we never call upload here.
+    # ``commit_output_assets``; we never call upload here.
     params_file = Path(execution.working_dir) / "split_config.json"
     params_file.write_text(json.dumps(split_params, indent=2))
     logger.info(f"  Saved split parameters to {params_file}")
@@ -929,7 +929,7 @@ def split_dataset(
             identify the code making the splitting decision, and
             deriva-ml never invents a workflow on the caller's behalf.
             The caller is responsible for committing the execution
-            (``exe.upload_execution_outputs()`` / context-manager exit).
+            (``exe.commit_output_assets()`` / context-manager exit).
             ``split_dataset`` will write a ``split_config.json``
             artifact into ``exe.working_dir`` that the caller's upload
             will pick up.
@@ -1543,7 +1543,7 @@ def main() -> int:
                     ignore_unrelated_anchors=args.ignore_unrelated_anchors,
                     dry_run=False,
                 )
-            exe.upload_execution_outputs(clean_folder=True)
+            exe.commit_output_assets(clean_folder=True)
 
         # Print summary
         if args.dry_run:

@@ -1,7 +1,8 @@
-"""``UploadReport`` — the public return type of :meth:`DerivaML.upload_pending`.
+"""``UploadReport`` — the public return type of the commit-output-assets surface.
 
-:meth:`upload_pending` drives ``Execution._bag_commit_upload`` per
-execution; the report aggregates those per-execution outcomes.
+Returned by :meth:`Execution.commit_output_assets` (per-execution)
+and :meth:`DerivaML.commit_pending_executions` (batch). Both go
+through the same lifecycle bracket and yield the same report shape.
 
 The shape is intentionally narrow:
 
@@ -21,20 +22,23 @@ from dataclasses import dataclass, field
 
 @dataclass
 class UploadReport:
-    """Result of a :meth:`DerivaML.upload_pending` call.
+    """Result of a commit-output-assets call.
+
+    Returned by both :meth:`Execution.commit_output_assets` (with a
+    single-element ``execution_rids``) and
+    :meth:`DerivaML.commit_pending_executions` (with one entry per
+    drained execution).
 
     Attributes:
         execution_rids: Executions the call attempted to drain.
-        total_uploaded: Sum of rows that landed at the destination
-            across all drained executions. Equal to the sum of
-            :attr:`deriva.bag.catalog_loader.LoadReport.total_rows_inserted`
-            for each successful bag-commit.
-        total_failed: Number of executions whose bag-commit raised.
-            Per-row failures inside a successful bag-commit count as
-            ``uploaded`` from the report's perspective — the load
-            either committed or didn't.
+        total_uploaded: Sum of asset rows that landed at the
+            destination across all drained executions.
+        total_failed: Number of executions whose commit raised.
+            Per-row failures inside a successful commit count as
+            ``uploaded`` from the report's perspective — the commit
+            either succeeded or didn't.
         per_table: Per-(schema, table) roll-up across executions.
-            ``{"schema:table": {"uploaded": N, "failed": M}}``.
+            ``{"schema/table": {"uploaded": N, "failed": M}}``.
         errors: One error line per failed execution. Empty when all
             executions drained successfully.
     """

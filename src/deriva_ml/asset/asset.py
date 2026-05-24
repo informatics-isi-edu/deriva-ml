@@ -97,7 +97,7 @@ class Asset:
         """Initialize an Asset object from an existing asset in the catalog.
 
         This constructor wraps an existing asset record. To create a new asset
-        in the catalog, use Execution.asset_file_path() and upload_execution_outputs().
+        in the catalog, use Execution.asset_file_path() and commit_output_assets().
 
         Args:
             catalog: The DerivaMLCatalog instance containing this asset.

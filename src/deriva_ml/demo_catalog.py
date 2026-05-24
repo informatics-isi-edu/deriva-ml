@@ -76,7 +76,7 @@ def populate_demo_catalog(execution: Execution) -> None:
         with image_file.open("w") as f:
             f.write(f"Hello there {random()}\n")
 
-    execution.upload_execution_outputs()
+    execution.commit_output_assets()
 
     # Create Report rows linked to Observations.
     report_records = []
@@ -628,7 +628,7 @@ def create_demo_catalog(
                         create_demo_features(exe)
                     if create_datasets:
                         create_demo_datasets(exe)
-                execution.upload_execution_outputs()
+                execution.commit_output_assets()
 
     except Exception as e:
         # on failure, delete catalog and re-raise exception

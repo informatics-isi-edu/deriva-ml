@@ -483,7 +483,7 @@ def run_notebook(
                 print(f"Downloaded: {path.file_name}")
 
         # At the end of notebook
-        execution.upload_execution_outputs()
+        execution.commit_output_assets()
 
     Example with overrides:
         ml, execution, config = run_notebook(
@@ -570,7 +570,7 @@ def run_notebook(
     # ``with`` context manager around the cells (the kernel runs cells
     # one at a time and ``run_notebook`` returns to the user), so we
     # take the imperative ``execution_start()`` path here. Pairs with
-    # ``upload_execution_outputs()`` at the end of the notebook, which
+    # ``commit_output_assets()`` at the end of the notebook, which
     # auto-stops the execution if it is still Running.
     execution.execution_start()
 

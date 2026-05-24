@@ -258,8 +258,8 @@ def _complete_parent_execution() -> None:
         # Stop the parent execution timing
         parent.execution_stop()
 
-        # Upload any outputs and clean up
-        parent.upload_execution_outputs()
+        # Commit any outputs and clean up
+        parent.commit_output_assets()
 
         logging.info(
             f"Completed parent execution: {_multirun_state.parent_execution_rid} "
@@ -619,7 +619,7 @@ def run_model(
     #
     # NOTE(2026-05-19): previously this call passed timeout=... and
     # chunk_size=... kwargs. Both were unsupported by
-    # Execution.upload_execution_outputs's signature (which only accepts
+    # Execution.commit_output_assets's signature (which only accepts
     # clean_folder and progress_callback) and the @validate_call decorator
     # made the mismatch fatal at runtime. The kwargs have been removed from
     # this call AND from run_model's signature because:
@@ -637,15 +637,13 @@ def run_model(
     # Once deriva-py grows the matching support, re-introduce both
     # parameters here AND in run_model's signature.
     if not dry_run:
-        uploaded_assets = execution.upload_execution_outputs()
+        report = execution.commit_output_assets()
 
-        # Print summary of uploaded assets
-        total_files = sum(len(files) for files in uploaded_assets.values())
-        if total_files > 0:
-            print(f"\nUploaded {total_files} asset(s) to catalog:")
-            for asset_type, files in uploaded_assets.items():
-                for f in files:
-                    print(f"  - {asset_type}: {f}")
+        # Print summary of committed assets
+        if report.total_uploaded > 0:
+            print(f"\nCommitted {report.total_uploaded} asset(s) to catalog:")
+            for fqn, counts in report.per_table.items():
+                print(f"  - {fqn}: {counts['uploaded']}")
 
 
 def create_model_config(

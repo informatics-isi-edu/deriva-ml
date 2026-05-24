@@ -173,7 +173,7 @@ class UploadCallback(Protocol):
         >>> def my_callback(progress: UploadProgress) -> None:  # doctest: +SKIP
         ...     print(f"Uploading {progress.file_name}: {progress.percent_complete:.1f}%")
         ...
-        >>> execution.upload_execution_outputs(progress_callback=my_callback)  # doctest: +SKIP
+        >>> execution.commit_output_assets(progress_callback=my_callback)  # doctest: +SKIP
     """
 
     def __call__(self, progress: UploadProgress) -> None:

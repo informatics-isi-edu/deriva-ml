@@ -217,7 +217,7 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
                 #     columns share the <Phase>_Duration pattern.
                 #   Download_Duration — init / dataset+asset download
                 #     time (_initialize_execution).
-                #   Upload_Duration   — upload_execution_outputs time
+                #   Upload_Duration   — commit_output_assets time
                 #     (bag commit + Hatrac PUTs).
                 ColumnDef("Execution_Duration", BuiltinType.text),
                 ColumnDef("Download_Duration", BuiltinType.text),
