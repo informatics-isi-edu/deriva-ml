@@ -350,7 +350,6 @@ def _denormalize_impl(
             table_to_schema=table_to_schema,
             join_tables=join_tables,
             dataset_rid_list=dataset_rid_list,
-            model=model,
         )
 
     # Step 4: Build SQL for each element path.
@@ -396,36 +395,20 @@ def _populate_from_catalog(
     table_to_schema: dict[str, str],
     join_tables: dict,
     dataset_rid_list: list[str],
-    model: DerivaModel,
 ) -> None:
     """Fetch rows from a live catalog into the engine's local tables.
 
-    Two ordering concerns run in parallel:
+    Data-dependency order: each table's fetch needs RID values that come
+    from rows we've already loaded (e.g., to fetch ``Image`` we read
+    ``Dataset_Image.Image`` from the local DB). The join-path walk gives
+    us this naturally — we walk each path's tables in join order and
+    fetch each table once.
 
-    1. **Data-dependency order** — each table's fetch needs RID values
-       that come from rows we've already loaded (e.g., to fetch
-       ``Image`` we read ``Dataset_Image.Image`` from the local DB).
-       This is what the join-path walk gives us naturally.
-    2. **FK-dependency order** — each ``INSERT`` must come after the
-       row it references, because the local SQLite engine has
-       ``foreign_keys=ON`` (set by ``create_wal_engine``). A naive
-       join-path walk inserts ``Dataset_Image`` before ``Image``, and
-       SQLite refuses with ``IntegrityError: FOREIGN KEY constraint
-       failed``.
-
-    Both orderings agree on the parent-before-child arrows, but a
-    single join path can visit a referencing table before its referent
-    (the path ``Dataset → Dataset_Image → Image`` references both
-    backwards-FKs and forwards-FKs).  The fix:
-
-    - Step 1: fetch every table's RIDs in *join-path* order so each
-      table can read FK values from already-loaded prior tables.
-    - Step 2: actually insert each table's rows in *FK-dependency*
-      order — referents before referencers — so SQLite is happy.
-
-    We accomplish both with a single rewrite: walk the join paths once
-    to determine *which RIDs to fetch for each table*, then issue the
-    fetches in FK-safe order.
+    FK enforcement is disabled for the duration of the load via
+    :func:`_foreign_keys_off`, so a join path that visits a referencing
+    table before its referent (e.g. ``Dataset → Dataset_Image → Image``,
+    which inserts ``Dataset_Image`` before ``Image``) does not raise on
+    SQLite. The constraint is re-enabled on exit.
 
     Args:
         paged_client: The client used for all catalog HTTP calls.
@@ -441,15 +424,7 @@ def _populate_from_catalog(
             with "Dataset".
         dataset_rid_list: RIDs to scope the denormalization to (the root
             dataset plus any children from recursive traversal).
-        model: The DerivaModel — used to read FK metadata for the FK-safe
-            insertion order over the tables we're about to populate.
     """
-    # ``model`` is part of the signature for future FK-aware insert
-    # ordering (see :func:`_foreign_keys_off` docstring). It's not
-    # consumed in the body today; mark it referenced to keep lint
-    # quiet without losing the API surface.
-    _ = model
-
     fetcher = PagedFetcher(client=paged_client, engine=engine)
 
     # FK enforcement is off for the whole load — see
@@ -574,7 +549,22 @@ def _collect_fk_values(
     Returns ``(values, column_name)`` where ``column_name`` is the name of the
     filter column on *target_table_name*, or ``(empty, None)`` if no workable
     condition is found.
+
+    **Single-column FK assumption (RB-08).** This routine currently
+    handles only **single-column** foreign keys. When the planner emits
+    a join condition for a **composite** FK (multiple ``(fk_col, pk_col)``
+    pairs all targeting *target_table_name*), the legacy implementation
+    silently returned the first pair's values, producing an under-scoped
+    fetch. The implementation now raises ``NotImplementedError`` when
+    more than one workable condition is found, so the limitation
+    surfaces loudly the day a schema introduces a composite FK rather
+    than producing wrong join results.
+
+    DerivaML schemas in active use today (CSA, CFDE, GPCR) all use
+    single-column RID-based FKs, so this guard is latent and only fires
+    against a future schema that breaks the assumption.
     """
+    workable: list[tuple[list[Any], str]] = []
     for fk_col, pk_col in conditions:
         # Each pair has one column that belongs to target_table_name (the
         # "far side" for this join) and one that belongs to an already-loaded
@@ -615,8 +605,21 @@ def _collect_fk_values(
             values = [row[0] for row in conn.execute(stmt).fetchall() if row[0] is not None]
 
         if values:
-            return values, filter_col_on_target
+            workable.append((values, filter_col_on_target))
 
+    if len(workable) > 1:
+        # RB-08: surface composite FKs loudly so a future schema breaking
+        # the single-column assumption produces an actionable error
+        # rather than a silently under-scoped fetch.
+        filter_cols = sorted({fc for _, fc in workable})
+        raise NotImplementedError(
+            f"_collect_fk_values: composite FK on {target_table_name!r} is "
+            f"not yet supported; got {len(workable)} workable conditions on "
+            f"filter columns {filter_cols}. Single-column FKs only — see "
+            f"function docstring for context."
+        )
+    if workable:
+        return workable[0]
     return [], None
 
 

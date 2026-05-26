@@ -506,21 +506,22 @@ class TestFetchByRids:
         """A.4 in the test matrix: insert behavior when an incoming row
         has no ``RID`` column.
 
-        Pin the behavior: INSERT-OR-IGNORE relies on RID being the
-        conflict-target column. A row without RID violates the table's
-        NOT-NULL primary-key constraint and the engine raises. This is
-        the right behavior — rows from ermrest always carry RID, so a
-        missing RID is a programming error worth surfacing.
+        Post-SC-05: the explicit guard at the top of ``_insert_rows``
+        raises a clear ``ValueError`` naming the offending row, so the
+        dialect-coupled ``IntegrityError`` from SQLite's NOT NULL
+        constraint never fires. Rows from ermrest always carry RID, so
+        a missing RID is a programming error worth surfacing — the
+        explicit message makes the failure actionable instead of a
+        deep-engine traceback.
         """
-        from sqlalchemy.exc import IntegrityError
-
         engine = create_engine(f"sqlite:///{tmp_path / 'wd.sqlite'}", future=True)
         target = _make_target_table(engine)
         client = FakePagedClient(rows_by_table={"Image": []})
         fetcher = PagedFetcher(client=client, engine=engine)
 
-        # Calling _insert_rows directly with a bad row should raise.
-        with pytest.raises(IntegrityError):
+        # Calling _insert_rows directly with a bad row should raise
+        # ValueError (SC-05 explicit guard), not IntegrityError.
+        with pytest.raises(ValueError, match="missing RID"):
             fetcher._insert_rows(target, [{"Filename": "x", "Subject": "y"}])
 
     def test_predicate_against_pre_populated_engine(self, engine):
