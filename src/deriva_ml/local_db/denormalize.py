@@ -492,32 +492,34 @@ def _populate_from_catalog_inner(
     )
 
     # --- Step 2: Walk each join path, fetching each table in turn ----------
-    # We process tables in the order they appear along each path. Already-
-    # walked tables are skipped via the ``processed`` set so we don't issue
-    # redundant fetches. PagedFetcher itself is stateless about prior fetches
-    # (see paged_fetcher.py and docs/design/denormalization.md §4); the
-    # dedup that matters is between this for-loop's iterations, not between
-    # PagedFetcher instances.
-    processed: set[str] = {"Dataset"}
+    # The row-completeness invariant (spec §6 step 3, audit SC-06): the local
+    # cache must contain the union of rows every path's
+    # ``(table, rid_column, rids)`` tuple would fetch. Two element paths can
+    # reach the same table via different intermediate routes — e.g. one path
+    # hits ``Image`` with ``rid_column="RID"`` and one rid set, another hits
+    # ``Image`` with ``rid_column="Image"`` (a FK) and a different rid set.
+    # The first walk's narrower fetch must NOT shadow the second's.
+    #
+    # We dedup on the full ``(table, rid_column, frozenset(rids))`` tuple,
+    # which implements the invariant directly: each distinct parametrization
+    # fires its own fetch, and only true duplicates (same table, same rid
+    # column, same rid set) are skipped. The pre-seeded entry covers Step 1's
+    # Dataset fetch so we don't redundantly re-issue it in the loop.
+    processed: set[tuple[str, str, frozenset[str]]] = {
+        ("Dataset", "RID", frozenset(str(r) for r in dataset_rid_list))
+    }
 
     for _key, (path, join_conditions, _join_types) in join_tables.items():
         # Walk in order — each table depends on rows loaded by the previous.
-        prior_tables_in_path: list[str] = ["Dataset"]
         for table_name in path[1:]:
-            if table_name in processed:
-                prior_tables_in_path.append(table_name)
-                continue
-
             target_orm = orm_resolver(table_name)
             if target_orm is None:
                 logger.warning("Skipping fetch for %s: no ORM class resolved", table_name)
-                prior_tables_in_path.append(table_name)
                 continue
 
             target_schema = table_to_schema.get(table_name)
             if target_schema is None:
                 logger.warning("Skipping fetch for %s: no schema known", table_name)
-                prior_tables_in_path.append(table_name)
                 continue
 
             qualified = f"{target_schema}:{table_name}"
@@ -542,16 +544,23 @@ def _populate_from_catalog_inner(
                 # strings since PagedFetcher's Iterable[str] contract expects
                 # stringified RID values.
                 str_rids = [str(r) for r in rids_to_fetch if r is not None]
-                if str_rids:
-                    fetcher.fetch_by_rids(
-                        table=qualified,
-                        rids=str_rids,
-                        target_table=target_orm.__table__,
-                        rid_column=fk_column_on_target,
-                    )
+                if not str_rids:
+                    continue
 
-            processed.add(table_name)
-            prior_tables_in_path.append(table_name)
+                # Dedup on the full (table, rid_column, frozenset(rids)) tuple
+                # — see the comment block above for why the prior table-name
+                # key was wrong.
+                fetch_key = (table_name, fk_column_on_target, frozenset(str_rids))
+                if fetch_key in processed:
+                    continue
+
+                fetcher.fetch_by_rids(
+                    table=qualified,
+                    rids=str_rids,
+                    target_table=target_orm.__table__,
+                    rid_column=fk_column_on_target,
+                )
+                processed.add(fetch_key)
 
 
 def _collect_fk_values(
