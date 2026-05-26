@@ -637,16 +637,20 @@ class Denormalizer:
         row_per: str | None = None,
         via: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Return a 12-key planning-metadata dict describing what a
+        """Return a 13-key planning-metadata dict describing what a
         corresponding :meth:`as_dataframe` call would do.
 
         **Dry-run invariant**: unlike :meth:`as_dataframe`, ``describe``
         never raises. Every failure mode (planner rule violation,
         catalog access error, network timeout) is swallowed and
         represented in the returned dict as ``None`` / ``[]`` / ``{}``
-        in the affected positions. Ambiguities are reported in the
-        ``ambiguities`` list so the caller can inspect before
-        committing to a real call.
+        in the affected positions. **Information-preservation
+        invariant**: whenever a broad-except site swallows an
+        exception, a short one-line diagnostic is appended to
+        ``plan["warnings"]`` so the caller can tell why a key is
+        empty (genuine empty result vs. a swallowed failure).
+        Ambiguities are reported in the ``ambiguities`` list so the
+        caller can inspect before committing to a real call.
 
         Args:
             include_tables: Tables whose columns would appear in the
@@ -695,6 +699,15 @@ class Denormalizer:
             - ``source``: ``"catalog"`` for live Datasets, ``"local"``
               for DatasetBags / canned fixtures, ``"slice"`` for
               attached slices.
+            - ``warnings``: ``list[str]`` — one short human-readable
+              entry per swallowed exception. Each entry names the
+              call that failed (``"_resolve_table_names"``,
+              ``"_find_sinks"``, etc.), what defaulted (``"reverted
+              to original include"``, ``"row_per_candidates is
+              empty"``), and the exception type plus a truncated
+              one-line message. Empty list means describe ran
+              clean. See spec §8.3.1 and audit findings SC-01 /
+              RB-01 / TC-09.
 
         Example::
 
@@ -716,6 +729,18 @@ class Denormalizer:
         original_include = list(include_tables)
         original_via = list(via or [])
 
+        # ── warnings accumulator ────────────────────────────────────────────
+        # Per spec §8.3.1 ("describe() return shape — warnings field"),
+        # every broad-except site below appends a short one-liner
+        # naming the call that failed, what defaulted, and the
+        # exception type + truncated message. This restores the
+        # information-preservation invariant (a caller can tell why a
+        # key is empty) without weakening the dry-run invariant
+        # (describe still never raises). Closes audit findings SC-01,
+        # RB-01, TC-09 in
+        # ``docs/audits/2026-05-26-denormalize-audit.md``.
+        warnings: list[str] = []
+
         # ── feature-name resolution ─────────────────────────────────────────
         # Translate feature names ("Image_Classification") to their
         # underlying feature-association tables
@@ -727,9 +752,13 @@ class Denormalizer:
         # surface the failure as empty fields in the returned dict.
         try:
             include, via_list, row_per = self._resolve_table_names(original_include, via=original_via, row_per=row_per)
-        except Exception:
+        except Exception as e:
             include = original_include
             via_list = original_via
+            warnings.append(
+                f"_resolve_table_names: {type(e).__name__} ({str(e)[:120]}); "
+                "reverted to original include/via"
+            )
 
         # ── row_per resolution ─────────────────────────────────────────────
         # Dry-run invariant: describe() never raises. Every call that could
@@ -740,8 +769,12 @@ class Denormalizer:
         row_per_source = "explicit" if row_per else "auto-inferred"
         try:
             row_per_candidates = self._model._planner._find_sinks(include, via_list)
-        except Exception:
+        except Exception as e:
             row_per_candidates = []
+            warnings.append(
+                f"_find_sinks: {type(e).__name__} ({str(e)[:120]}); "
+                "row_per_candidates is empty"
+            )
         try:
             resolved_row_per: str | None = self._model._planner._determine_row_per(
                 include_tables=include,
@@ -764,9 +797,13 @@ class Denormalizer:
                 via=via_list,
             )
             cols = [(denormalize_column_name(s, t, c, multi_schema), tp) for s, t, c, tp in column_specs]
-        except Exception:
+        except Exception as e:
             element_tables = {}
             cols = []
+            warnings.append(
+                f"_prepare_wide_table: {type(e).__name__} ({str(e)[:120]}); "
+                "element_tables and columns are empty"
+            )
 
         # ── ambiguities (reported, not raised) ─────────────────────────────
         ambiguities_raw: list[dict] = []
@@ -777,10 +814,14 @@ class Denormalizer:
                     include_tables=include,
                     via=via_list,
                 )
-            except Exception:
+            except Exception as e:
                 # If path enumeration fails (e.g., model access error),
                 # treat as "no ambiguities detected" rather than raising.
                 ambiguities_raw = []
+                warnings.append(
+                    f"_find_path_ambiguities: {type(e).__name__} ({str(e)[:120]}); "
+                    "ambiguities not detected"
+                )
         ambiguities = [
             {
                 "type": "multiple_paths",
@@ -820,8 +861,12 @@ class Denormalizer:
         # than raise.
         try:
             anchors = self._anchors_as_dict()
-        except Exception:
+        except Exception as e:
             anchors = {}
+            warnings.append(
+                f"_anchors_as_dict: {type(e).__name__} ({str(e)[:120]}); "
+                "anchors summary is empty"
+            )
         # RB-03: skip empty anchor sets, matching the ``if not rids: continue``
         # guard in :meth:`_classify_anchors`. ``list_dataset_members`` returns
         # ``{"File": []}`` for empty association tables; describe and run must
@@ -897,8 +942,11 @@ class Denormalizer:
                         "orphan_rows": orphan_count,
                         "total": at_row_per_count + orphan_count,
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                warnings.append(
+                    f"estimated_row_count: {type(e).__name__} ({str(e)[:120]}); "
+                    "row-count estimate left as None"
+                )
 
         return {
             "row_per": resolved_row_per,
@@ -913,6 +961,7 @@ class Denormalizer:
             "estimated_row_count": estimated,
             "anchors": {"total": sum(anchors_by_type.values()), "by_type": anchors_by_type},
             "source": getattr(self, "_source", "local"),
+            "warnings": warnings,
         }
 
     def list_paths(
