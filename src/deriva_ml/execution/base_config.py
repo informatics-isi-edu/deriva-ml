@@ -434,6 +434,52 @@ def load_configs(package_name: str = "configs") -> list[str]:
     return sorted(loaded_modules)
 
 
+def _format_description_with_overrides(base_description: str, overrides: list[str]) -> str:
+    """Append Hydra override clauses to a base description.
+
+    The base description comes from the registration-time ``notebook_config()``
+    call and reflects only the config's defaults — it is the same string whether
+    you run with or without overrides. When an analyst (or another agent) runs
+    the notebook with ``assets=roc_all_six`` or any other Hydra override, the
+    catalog's ``Execution.description`` must reflect what actually ran, not the
+    static default-shape description.
+
+    This helper takes the resolved Hydra override list (the same list passed to
+    ``get_notebook_configuration``) and appends a compact ``[overrides: ...]``
+    clause listing only the key=value pairs the user actually changed.
+    Plain ``key=value`` overrides are normalised; Hydra package-spec syntax
+    (``+key=value``, ``~key``, ``key/group=value`` etc.) is preserved verbatim
+    so the description still reproduces the run, but no attempt is made to
+    parse those into a prettier shape.
+
+    Args:
+        base_description: The description string from the resolved config
+            (``config.description``), or a fallback like ``f"Execution of {name}"``.
+        overrides: List of Hydra override strings as supplied to the notebook,
+            e.g. ``["assets=roc_all_six", "deriva_ml=eye_ai"]``. May be empty.
+
+    Returns:
+        ``base_description`` unchanged when there are no overrides; otherwise
+        ``f"{base_description} [overrides: key1=val1, key2=val2]"`` with the
+        overrides joined in the order they were supplied.
+
+    Examples:
+        >>> _format_description_with_overrides("ROC curve analysis", [])
+        'ROC curve analysis'
+        >>> _format_description_with_overrides(
+        ...     "ROC curve analysis", ["assets=roc_all_six"]
+        ... )
+        'ROC curve analysis [overrides: assets=roc_all_six]'
+        >>> _format_description_with_overrides(
+        ...     "Quick run", ["assets=roc_all_six", "deriva_ml=eye_ai"]
+        ... )
+        'Quick run [overrides: assets=roc_all_six, deriva_ml=eye_ai]'
+    """
+    if not overrides:
+        return base_description
+    return f"{base_description} [overrides: {', '.join(overrides)}]"
+
+
 def run_notebook(
     config_name: str,
     overrides: list[str] | None = None,
@@ -521,6 +567,15 @@ def run_notebook(
         overrides=overrides,
     )
 
+    # Reconstruct the full override list the same way get_notebook_configuration
+    # did, so the Execution description reflects what actually ran (not just the
+    # registration-time default). DERIVA_ML_HYDRA_OVERRIDES is set by the
+    # `deriva-ml-run-notebook` CLI when overrides are passed on the command line;
+    # `overrides` is the in-process list passed by the notebook author.
+    env_overrides_json = os.environ.get("DERIVA_ML_HYDRA_OVERRIDES")
+    env_overrides = json.loads(env_overrides_json) if env_overrides_json else []
+    all_overrides = env_overrides + (overrides or [])
+
     # Create DerivaML instance, passing the hydra output dir captured during
     # config resolution so that hydra YAML configs get uploaded with the execution.
     actual_ml_class = ml_class or DerivaML
@@ -547,7 +602,9 @@ def run_notebook(
         for warning in validation_result.warnings:
             _logging.warning(warning)
 
-    # Create workflow
+    # Create workflow. The workflow description is registration-shape (it
+    # identifies the *kind* of work, not this specific run), so it stays at
+    # the base description without override decoration.
     actual_workflow_name = workflow_name or config_name.replace("_", " ").title()
     workflow = ml.create_workflow(
         name=actual_workflow_name,
@@ -555,12 +612,17 @@ def run_notebook(
         description=config.description or f"Running {config_name}",
     )
 
-    # Create execution configuration
+    # Create execution configuration. The execution description is run-shape
+    # (it identifies *this* specific run), so we append the resolved Hydra
+    # overrides so the catalog row matches the work that actually ran. Without
+    # this, an analyst sweeping `find_executions(workflow_type=...)` cannot
+    # tell apart runs that differ only in their asset/datasets group.
+    base_description = config.description or f"Execution of {config_name}"
     exec_config = ExecutionConfiguration(
         workflow=workflow,
         datasets=config.datasets if config.datasets else [],
         assets=config.assets if config.assets else [],
-        description=config.description or f"Execution of {config_name}",
+        description=_format_description_with_overrides(base_description, all_overrides),
     )
 
     # Create execution context (downloads inputs)
