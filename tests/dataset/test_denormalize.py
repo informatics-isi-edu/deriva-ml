@@ -1657,6 +1657,55 @@ class TestNewFKPatterns:
             "for the demo fixture's 1-feature-per-Image setup."
         )
 
+    def test_resolve_table_names_live_feature(self, dataset_test, tmp_path):
+        """``_resolve_table_names`` resolves feature names against a real
+        ``find_features()`` plumbing — not just a stub.
+
+        Audit finding TC-07: the existing
+        ``TestFeatureNameResolution`` tests monkey-patch
+        ``model.find_features`` with synthetic features. This live test
+        exercises the resolver against an actual ``DerivaML`` instance
+        whose model carries real features
+        (``demo_catalog.create_demo_features`` registers
+        ``"Quality"`` as a feature on ``"Image"``, backed by
+        ``Execution_Image_Quality``).
+
+        Verifies that the feature name silently resolves to the
+        underlying feature-table name, which is the contract the
+        analyst/01 fix (PR #228) introduced.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        ml = DerivaML(
+            dataset_test.catalog.hostname,
+            dataset_test.catalog.catalog_id,
+            working_dir=tmp_path,
+            use_minid=False,
+        )
+        dataset = dataset_test.dataset_description.dataset
+        live_ds = ml.lookup_dataset(dataset.dataset_rid)
+        d = Denormalizer(live_ds)
+
+        # Sanity: the model exposes find_features and "Quality" appears.
+        features = list(live_ds.model.find_features())
+        feature_names = {f.feature_name for f in features}
+        assert "Quality" in feature_names, (
+            f"Demo fixture should register a 'Quality' feature on Image; "
+            f"got feature_names={feature_names}. Fixture changed?"
+        )
+
+        # The resolver should substitute the feature name silently.
+        include_resolved, _via_resolved, _row_per = d._resolve_table_names(
+            ["Image", "Quality"]
+        )
+        # Image passes through; Quality resolves to the feature-table.
+        assert include_resolved[0] == "Image"
+        assert include_resolved[1] == "Execution_Image_Quality", (
+            f"Feature name 'Quality' should resolve to 'Execution_Image_Quality' "
+            f"(the underlying feature-association table); got "
+            f"{include_resolved[1]!r}."
+        )
+
     def test_feature_table_multiple_rows_per_anchor(self, dataset_test, tmp_path):
         """Regression for 2026-05-21 finding A01 (C.4 in the test matrix
         in ``docs/design/denormalization.md`` §8).
