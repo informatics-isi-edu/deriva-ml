@@ -925,11 +925,6 @@ class DerivaModel:
     # underscore-prefixed because the planner is internal to the
     # denormalization subsystem; the user-facing API is
     # :class:`local_db.denormalize.Denormalizer`.
-    #
-    # The :meth:`_schema_to_paths` forwarder below exists because
-    # ``dataset/dataset_bag.py:381`` still reaches into the model's FK
-    # traversal directly. A follow-up cleanup will migrate that caller
-    # to ``model._planner._schema_to_paths`` and drop the forwarder.
     # ------------------------------------------------------------------
 
     @property
@@ -951,30 +946,6 @@ class DerivaModel:
         if not hasattr(self, "_planner_cache"):
             self._planner_cache = DenormalizePlanner(self)
         return self._planner_cache
-
-    def _schema_to_paths(
-        self,
-        root: "Table | None" = None,
-        path: "list[Table] | None" = None,
-        exclude_tables: "set[str] | None" = None,
-        skip_tables: "frozenset[str] | None" = None,
-        max_depth: int | None = None,
-        stop_at: str | None = None,
-    ) -> "list[list[Table]]":
-        """Forwarder to :meth:`DenormalizePlanner._schema_to_paths`.
-
-        Kept on ``DerivaModel`` because ``dataset/dataset_bag.py:381``
-        still calls it on the model. New code should use
-        ``model._planner._schema_to_paths``.
-        """
-        return self._planner._schema_to_paths(
-            root=root,
-            path=path,
-            exclude_tables=exclude_tables,
-            skip_tables=skip_tables,
-            max_depth=max_depth,
-            stop_at=stop_at,
-        )
 
     def create_table(self, table_def: TableDefinition, schema: str | None = None) -> Table:
         """Create a new table from TableDefinition.

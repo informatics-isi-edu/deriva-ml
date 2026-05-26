@@ -77,6 +77,11 @@ iterator.
                          ├─ _prepare_wide_table(...)               ← src/deriva_ml/model/denormalize_planner.py
                          │    pure model code; no I/O
                          │    returns:  join_tables, column_specs, multi_schema
+                         │    FK-graph walking delegated to
+                         │      deriva.bag.path_walker.SchemaPathWalker
+                         │      (shared with deriva-py's CatalogBagBuilder;
+                         │       DerivaML layers skip-tables + nested-dataset
+                         │       loopback as an edge_filter hook)
                          │
                          ├─ if source == "catalog":
                          │    _populate_from_catalog(...)
@@ -314,7 +319,12 @@ ignore_unrelated_anchors)`:
 - **Behavior.**
   1. Resolves source mode from the dataset type (see §6.1).
   2. Plans the join via `_prepare_wide_table` (planner is pure;
-     no I/O — see §2).
+     no I/O — see §2). The FK-graph walker is
+     `deriva.bag.path_walker.SchemaPathWalker`, shared with
+     deriva-py's `CatalogBagBuilder`; DerivaML-specific rules (the
+     default `Dataset_Dataset` / `Execution` skip set and the
+     nested-dataset loopback guard) plug in via the walker's
+     `edge_filter` hook so the generic walker stays domain-free.
   3. If `source="catalog"`: populates the local SQLite via
      `_populate_from_catalog`. This step issues catalog fetches and
      must satisfy the **row-completeness invariant** (§6.3): when

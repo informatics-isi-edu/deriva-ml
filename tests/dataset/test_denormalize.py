@@ -251,7 +251,7 @@ class TestDenormalizeSchemaGraph:
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
         # The _schema_to_paths method should return paths through the schema
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
 
         # Should have paths to various tables
         assert len(paths) > 0, "Expected schema paths"
@@ -275,7 +275,7 @@ class TestDenormalizeSchemaGraph:
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
         # Get all paths without exclusion
-        all_paths = bag.model._schema_to_paths()
+        all_paths = bag.model._planner._schema_to_paths()
 
         # Find a table name that appears in at least one path (not Dataset itself)
         table_names_in_paths = {table.name for path in all_paths for table in path if table.name != "Dataset"}
@@ -283,7 +283,7 @@ class TestDenormalizeSchemaGraph:
 
         # Pick a table to exclude
         exclude_name = next(iter(table_names_in_paths))
-        excluded_paths = bag.model._schema_to_paths(exclude_tables={exclude_name})
+        excluded_paths = bag.model._planner._schema_to_paths(exclude_tables={exclude_name})
 
         # Excluded table should not appear in any path (except if it's the root)
         for path in excluded_paths:

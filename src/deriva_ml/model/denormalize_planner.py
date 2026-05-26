@@ -790,122 +790,111 @@ class DenormalizePlanner:
     def _schema_to_paths(
         self,
         root: Table | None = None,
-        path: list[Table] | None = None,
         exclude_tables: set[str] | None = None,
         skip_tables: frozenset[str] | None = None,
         max_depth: int | None = None,
         stop_at: str | None = None,
     ) -> list[list[Table]]:
-        """Discover all FK paths through the schema graph via depth-first traversal.
+        """Discover all FK paths through the schema graph (DFS, every-prefix).
 
-        Used by the denormalization machinery (_prepare_wide_table)
-        to enumerate joinable paths through the schema. Bag export
-        no longer routes through this method — the bag pipeline
-        (:class:`deriva.bag.catalog_builder.CatalogBagBuilder`) has
-        its own walker, anchored at user-supplied :class:`Anchor`s
-        rather than the Dataset table.
+        Delegates the FK walk to deriva-py's
+        :class:`~deriva.bag.path_walker.SchemaPathWalker` and layers
+        the DerivaML-specific rules on top via the walker's
+        ``edge_filter`` hook:
 
-        Traversal rules:
-        - Follows both outbound FKs (table.foreign_keys) and inbound FKs (table.referenced_by)
-        - Only traverses tables in valid schemas (domain + ML)
-        - Terminates at vocabulary tables (paths go INTO vocabs but not OUT)
-        - Skips tables in exclude_tables and skip_tables
-        - Detects and skips cycles (same table appearing twice in a path)
-        - Prevents dataset element loopback (traversing back to Dataset via element associations)
-        - When multiple FKs exist between the same two domain tables, deduplicates
-          arcs to avoid redundant paths (keeps one arc per target table)
+        - Default skip tables (``Dataset_Dataset``, ``Execution``).
+        - Nested-dataset loopback prevention
+          (``Subject → Dataset_Subject → Dataset`` is blocked).
+
+        The generic walker handles the rest: bidirectional FK walk,
+        vocabulary-as-leaf, multi-FK edge deduplication, simple-path
+        cycle guarding, schema allow-list, and depth bounding.
 
         Args:
-            root: Starting table. Defaults to the Dataset table in the ML schema.
-            path: Current path being built (used during recursion).
-            exclude_tables: Caller-specified table names to skip. These tables and
-                all paths through them are pruned from the result.
-            skip_tables: Infrastructure table names to skip. Defaults to
-                _DEFAULT_SKIP_TABLES (Dataset_Dataset, Execution). Override to
-                customize which ML schema tables are excluded from traversal.
-            max_depth: Maximum path length (number of tables). None = unlimited.
-                Use to protect against pathological schemas with deep chains.
-            stop_at: If given, return only paths whose final table's name equals
-                ``stop_at``. The root-only path ``[root]`` is excluded unless
-                ``root.name == stop_at``. Default ``None`` returns all prefixes
-                (the original behavior).
+            root: Starting table. Defaults to the ML schema's
+                ``Dataset`` table.
+            exclude_tables: Caller-specified table names to skip.
+                Pruned along with all paths through them.
+            skip_tables: Infrastructure table names to skip. Defaults
+                to ``_DEFAULT_SKIP_TABLES``
+                (``{"Dataset_Dataset", "Execution"}``). Override to
+                customize which ML-schema tables are excluded.
+            max_depth: Maximum path length (number of tables). ``None``
+                means unbounded.
+            stop_at: If supplied, return only paths whose last table
+                has this name. The full-prefix DFS still runs; this
+                is a post-filter on the result.
 
         Returns:
-            List of paths, where each path is a list of Table objects starting
-            from root. Every prefix of a path is also included (e.g., if
-            [Dataset, A, B, C] is a path, then [Dataset], [Dataset, A], and
-            [Dataset, A, B] are also in the result).
+            Every walked prefix as a list of :class:`Table` objects.
+            If ``[Dataset, A, B, C]`` is walked, ``[Dataset]``,
+            ``[Dataset, A]``, ``[Dataset, A, B]`` are all in the
+            result too.
         """
-        exclude_tables = exclude_tables or set()
-        skip_tables = skip_tables if skip_tables is not None else _DEFAULT_SKIP_TABLES
+        from deriva.bag.path_walker import SchemaPathWalker
+        from deriva.bag.traversal import FKTraversalPolicy
 
-        root = root or self.model.model.schemas[self.model.ml_schema].tables["Dataset"]
-        path = path.copy() if path else []
-        parent = path[-1] if path else None  # Table we are coming from.
-        path.append(root)
-        paths = [path]
+        # Resolve defaults.
+        exclude_names = exclude_tables or set()
+        skip_names = (
+            skip_tables if skip_tables is not None else _DEFAULT_SKIP_TABLES
+        )
+        if root is None:
+            root = self.model.model.schemas[self.model.ml_schema].tables[
+                "Dataset"
+            ]
 
-        # Depth limit check
-        if max_depth is not None and len(path) >= max_depth:
-            if stop_at is not None:
-                return [p for p in paths if p and p[-1].name == stop_at]
-            return paths
+        # Scope to the domain schemas plus the ML schema — the same
+        # filter the legacy ``_fk_neighbors`` enforced.
+        valid_schemas = self.model.domain_schemas | {self.model.ml_schema}
 
-        def is_nested_dataset_loopback(n1: Table, n2: Table) -> bool:
-            """Check if traversal would loop back to Dataset via an element association.
+        # The DerivaML edge filter implements the two domain-specific
+        # rules: skip-table exclusion (Dataset_Dataset / Execution by
+        # default), caller-supplied exclude_tables, and nested-dataset
+        # loopback prevention.
+        dataset_table = (
+            self.model.model.schemas[self.model.ml_schema].tables["Dataset"]
+        )
 
-            Prevents: Subject -> Dataset_Subject -> Dataset (looping back to root).
-            Allows: Dataset -> Dataset_Subject -> Subject (the intended direction).
-
-            Uses :meth:`is_topological_association` (FK-arity topology) rather
-            than ermrest's ``find_associations(pure=True)`` so that non-
-            pure association tables — bridges that carry user metadata
-            like ``Image_Dataset_Legacy`` — are ALSO recognized as
-            dataset-element associations and excluded from upstream
-            traversal. Without this, walking Image → Image_Dataset_Legacy →
-            Dataset creates a phantom "hub" path that spuriously connects
-            Image to any other dataset-member table (e.g. Subject,
-            Observation) through a different Dataset_X association,
-            producing false Rule-6 ambiguities.
-            """
-            dataset_table = self.model.model.schemas[self.model.ml_schema].tables["Dataset"]
-            if n1 == dataset_table:
-                # Outbound from Dataset → Dataset_X is always fine.
+        def edge_filter(src: Table, tgt: Table) -> bool:
+            # Schema scope is handled by the walker (via policy.schemas),
+            # but skip_tables / exclude_tables / loopback are domain
+            # rules — keep them here.
+            if tgt.name in skip_names:
                 return False
-            # Is n2 an association table that points at Dataset (i.e. one
-            # of its FK targets is the Dataset root)?
-            if not self._is_topological_association(n2):
+            if tgt.name in exclude_names:
                 return False
-            for fk in n2.foreign_keys:
-                if fk.pk_table == dataset_table:
-                    return True
-            return False
+            # Nested-dataset loopback: block ``X → assoc → Dataset``
+            # when X is not Dataset itself. Allows
+            # ``Dataset → Dataset_X → ...`` (the intended outbound
+            # direction) but prevents the inverse walk back to the
+            # root through an element association.
+            if (
+                src is not dataset_table
+                and self._is_topological_association(tgt)
+            ):
+                for fk in tgt.foreign_keys:
+                    if fk.pk_table is dataset_table:
+                        return False
+            return True
 
-        # Vocabulary tables are terminal — traverse INTO but not OUT.
-        if self.model.is_vocabulary(root):
-            if stop_at is not None:
-                return [p for p in paths if p and p[-1].name == stop_at]
-            return paths
+        policy = FKTraversalPolicy(schemas=valid_schemas)
+        walker = SchemaPathWalker(
+            model=self.model.model,
+            policy=policy,
+            edge_filter=edge_filter,
+        )
 
-        for child in self._fk_neighbors(root):
-            if child.name in skip_tables:
-                continue
-            if child.name in exclude_tables:
-                continue
-            if child == parent:
-                # Don't loop back to immediate parent via referenced_by
-                continue
-            if is_nested_dataset_loopback(root, child):
-                continue
-            if child in path:
-                # Cycle detected — skip to avoid infinite recursion.
-                logger.warning(f"Cycle in schema path: {child.name} path:{[p.name for p in path]}, skipping")
-                continue
+        prefixes = walker.walk_all_prefixes(
+            root=root, max_depth=max_depth, stop_at=stop_at
+        )
 
-            paths.extend(self._schema_to_paths(child, path, exclude_tables, skip_tables, max_depth, stop_at))
+        # Convert tuples to lists for compatibility with existing
+        # callers (they iterate and slice freely).
+        result: list[list[Table]] = [list(p) for p in prefixes]
         if stop_at is not None:
-            return [p for p in paths if p and p[-1].name == stop_at]
-        return paths
+            return [p for p in result if p and p[-1].name == stop_at]
+        return result
 
     def _table_relationship(
         self,
