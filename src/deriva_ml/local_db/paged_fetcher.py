@@ -17,10 +17,8 @@ exists in the target table are skipped, not overwritten, not raised on).
 request — the server is the authority for what rows match a query, and
 the database's UNIQUE constraint is the authority for insert collisions.
 
-See the "Implementation contract" section of
-``docs/user-guide/denormalization.md`` for the full pipeline
-architecture, state model, and contract. The 2026-05-21
-model-template e2e run
+See ``docs/design/denormalization.md`` for the full pipeline architecture,
+state model, and contract. The 2026-05-21 model-template e2e run
 documented two failure modes this design closes (finding 05: re-INSERT
 crash; finding A01: silent row-drop on FK-column fetch).
 
@@ -117,8 +115,7 @@ class PagedFetcher:
     - :meth:`fetch_by_rids_or_predicate`: automatically routes between the two
       strategies based on ``|rids| / table_row_count`` cardinality ratio.
 
-    Statelessness contract (``docs/user-guide/denormalization.md``
-    "Implementation contract" §4):
+    Statelessness contract (``docs/design/denormalization.md`` §4):
 
     - **No engine-derived dedup.** ``fetch_by_rids``/``fetch_predicate`` do
       not consult the engine to decide what to request. The server is the
@@ -443,8 +440,7 @@ class PagedFetcher:
     def _insert_rows(self, target_table: Table, rows: list[dict[str, Any]]) -> int:
         """Insert *rows* into *target_table* using INSERT-OR-IGNORE.
 
-        Contract (``docs/user-guide/denormalization.md``
-        "Implementation contract" §5):
+        Contract (``docs/design/denormalization.md`` §5):
 
         - For each row: if a row with the same RID already exists in
           ``target_table``, skip (do not update, do not crash).

@@ -4,10 +4,14 @@ Wraps the lower-level ``_denormalize_impl`` primitive in a class-based API
 with support for auto-inferred ``row_per``, explicit ``via`` path routing,
 orphan-row handling, and arbitrary RID anchor sets.
 
-Architecture, state model, fetcher/INSERT contract, fragility map, the
-nine semantic Rules, and the test matrix all live in the
-"Implementation contract" section of:
-    ``docs/user-guide/denormalization.md``
+Architecture, state model, fetcher/INSERT contract, fragility map, and
+test matrix:
+    ``docs/design/denormalization.md``
+
+The semantic Rules 1–8 implemented here (auto-inferred ``row_per``,
+downstream-leaf rejection, ambiguity detection, orphan emission,
+unrelated-anchor handling, etc.) live in:
+    ``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``
 """
 
 from __future__ import annotations
@@ -526,9 +530,8 @@ class Denormalizer:
         results.
 
         True row-by-row streaming over the cursor is a known gap (audit
-        finding SC-07; see ``docs/user-guide/denormalization.md``
-        "Implementation contract" §8.2 for the design discussion).
-        Until that gap is closed, treat
+        finding SC-07; see ``docs/design/denormalization.md`` §8.2 for
+        the design discussion). Until that gap is closed, treat
         ``as_dict`` as "iteration interface, materialised internals."
 
         Args:
@@ -689,9 +692,8 @@ class Denormalizer:
               tables. ``orphan_rows`` is always exact (an orphan
               contributes exactly one row regardless of ``row_per``
               cardinality). Originally surfaced as 2026-05-21 finding
-              A02; documented in
-              ``docs/user-guide/denormalization.md`` "Implementation
-              contract" §7 row F6.
+              A02; documented in ``docs/design/denormalization.md`` §7
+              row F6.
             - ``anchors``: ``{total, by_type}`` — counts of anchor RIDs
               grouped by table.
             - ``source``: ``"catalog"`` for live Datasets, ``"local"``
@@ -873,9 +875,8 @@ class Denormalizer:
 
         # ── estimated row count (anchor-based; honest about unknowns) ───────
         #
-        # Three cases (see ``docs/user-guide/denormalization.md``
-        # "Implementation contract" §6.5 freshness caveat and the
-        # 2026-05-21 finding A02 history):
+        # Three cases (see ``docs/design/denormalization.md`` §6 freshness
+        # caveat and the 2026-05-21 finding A02 history):
         #
         # 1. Anchor table == row_per → in_scope is exact (1 row per anchor).
         # 2. Anchor table reaches row_per via FK chain (downstream or
