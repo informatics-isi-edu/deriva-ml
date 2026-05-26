@@ -590,6 +590,13 @@ class Denormalizer:
         """
         from deriva_ml.model.catalog import denormalize_column_name
 
+        # Translate feature names to feature-association table names so
+        # ``columns`` accepts the same caller-friendly inputs as
+        # ``as_dataframe`` (the symmetry is half the point of this
+        # method — preview the run's column list cheaply).
+        include_resolved, via_resolved, row_per_resolved = self._resolve_table_names(
+            list(include_tables), via=via, row_per=row_per
+        )
         # Invoke the planner on the model alone. _prepare_wide_table runs
         # the Rule 2/5/6 guards and returns the column spec list. Walking
         # that list with denormalize_column_name gives us the final
@@ -597,9 +604,9 @@ class Denormalizer:
         element_tables, column_specs, multi_schema = self._model._planner._prepare_wide_table(
             self._dataset,
             self._dataset_rid,
-            list(include_tables),
-            row_per=row_per,
-            via=via,
+            include_resolved,
+            row_per=row_per_resolved,
+            via=via_resolved,
         )
         return [(denormalize_column_name(s, t, c, multi_schema), tp) for s, t, c, tp in column_specs]
 
@@ -686,8 +693,23 @@ class Denormalizer:
         from deriva_ml.core.exceptions import DerivaMLDenormalizeError
         from deriva_ml.model.catalog import denormalize_column_name
 
-        include = list(include_tables)
-        via_list = list(via or [])
+        original_include = list(include_tables)
+        original_via = list(via or [])
+
+        # ── feature-name resolution ─────────────────────────────────────────
+        # Translate feature names ("Image_Classification") to their
+        # underlying feature-association tables
+        # ("Execution_Image_Image_Classification") so describe and
+        # ``as_dataframe`` agree on what's a valid ``include_tables``
+        # entry. The dry-run invariant says describe never raises, so
+        # any resolution failure (typo, ambiguous feature) collapses
+        # to the original inputs and the downstream planner calls
+        # surface the failure as empty fields in the returned dict.
+        try:
+            include, via_list, row_per = self._resolve_table_names(original_include, via=original_via, row_per=row_per)
+        except Exception:
+            include = original_include
+            via_list = original_via
 
         # ── row_per resolution ─────────────────────────────────────────────
         # Dry-run invariant: describe() never raises. Every call that could
@@ -995,6 +1017,146 @@ class Denormalizer:
     # Private helpers
     # ------------------------------------------------------------------
 
+    def _resolve_table_names(
+        self,
+        include_tables: list[str],
+        *,
+        via: list[str] | None = None,
+        row_per: str | None = None,
+    ) -> tuple[list[str], list[str], str | None]:
+        """Translate caller-supplied names into canonical table names.
+
+        Both :meth:`describe` and :meth:`as_dataframe` accept tables in
+        ``include_tables`` / ``via`` / ``row_per`` by name. The natural
+        mental model — confirmed by the rest of the DerivaML surface
+        (:meth:`find_features`, :meth:`feature_values`,
+        :meth:`lookup_feature`) — uses the **feature name** (e.g.
+        ``"Image_Classification"``) rather than the underlying
+        feature-association table name (e.g.
+        ``"Execution_Image_Image_Classification"``). This helper
+        accepts either form: real table names pass through unchanged;
+        feature names are silently substituted for their backing
+        association table.
+
+        Resolution algorithm for each name:
+
+        1. If ``name_to_table(t)`` succeeds → keep ``t`` as-is.
+        2. Otherwise consult :meth:`DerivaModel.find_features` and look
+           for a feature whose ``feature_name == t``. If exactly one
+           match → substitute with ``feature.feature_table.name``. If
+           multiple matches across different target tables → raise
+           :class:`DerivaMLDenormalizeError` (ambiguous — caller should
+           name the feature table directly).
+        3. If neither path works → raise
+           :class:`DerivaMLTableNotFound`. When the name doesn't match
+           any feature either, the error makes clear that no table or
+           feature with that name exists, so the user can tell whether
+           they typo'd a feature name or pointed at the wrong feature.
+
+        Args:
+            include_tables: Caller's ``include_tables`` (mixed table
+                names and feature names allowed).
+            via: Caller's ``via`` argument.
+            row_per: Caller's ``row_per`` argument.
+
+        Returns:
+            Tuple of ``(resolved_include_tables, resolved_via,
+            resolved_row_per)`` — all canonical table names that
+            ``name_to_table`` will accept.
+
+        Raises:
+            DerivaMLTableNotFound: A name doesn't match any catalog
+                table and isn't a known feature name either. The
+                error message names the offending entry so the user
+                knows whether to fix a typo or pick a different
+                feature.
+            DerivaMLDenormalizeError: A feature name matches multiple
+                features on different target tables — the helper
+                can't disambiguate so the caller must pass the
+                feature-association table name directly.
+
+        Example::
+
+            # Feature name silently resolves to the feature-association table.
+            d._resolve_table_names(["Image", "Image_Classification"])
+            # (["Image", "Execution_Image_Image_Classification"], [], None)
+
+            # Real table names pass through untouched.
+            d._resolve_table_names(["Image", "Subject"])
+            # (["Image", "Subject"], [], None)
+        """
+        from deriva_ml.core.exceptions import (
+            DerivaMLDenormalizeError,
+            DerivaMLException,
+            DerivaMLTableNotFound,
+        )
+
+        # The model may be None on minimal fixtures; in that case we
+        # have no way to resolve names, so return inputs unchanged and
+        # let downstream planner validation produce its own error.
+        if self._model is None:
+            return list(include_tables), list(via or []), row_per
+
+        # Build the {feature_name: [feature]} index once per call.
+        # ``find_features()`` walks every association in the catalog
+        # so we don't want to re-run it for each name in the inputs.
+        # Failures (no find_features, network errors) collapse to an
+        # empty index — the helper then falls through to the
+        # table-not-found branch and the caller gets the original
+        # error.
+        feature_index: dict[str, list[Any]] = {}
+        find_feats = getattr(self._model, "find_features", None)
+        if callable(find_feats):
+            try:
+                for f in find_feats():
+                    fname = getattr(f, "feature_name", None)
+                    if fname:
+                        feature_index.setdefault(fname, []).append(f)
+            except Exception:
+                feature_index = {}
+
+        def _resolve_one(t: str) -> str:
+            """Return canonical table name for ``t`` or raise."""
+            try:
+                self._model.name_to_table(t)
+                return t
+            except DerivaMLException:
+                pass
+            # Not a table — try the feature index.
+            matches = feature_index.get(t, [])
+            if len(matches) == 1:
+                resolved_name = matches[0].feature_table.name
+                logger.info(
+                    "Denormalizer: resolved feature name %r to feature table %r",
+                    t,
+                    resolved_name,
+                )
+                return resolved_name
+            if len(matches) > 1:
+                target_tables = sorted({m.target_table.name for m in matches})
+                feature_tables = sorted({m.feature_table.name for m in matches})
+                raise DerivaMLDenormalizeError(
+                    f"Feature name {t!r} is ambiguous — it is defined on "
+                    f"multiple target tables ({target_tables}). Pass the "
+                    f"feature-association table name directly instead: "
+                    f"one of {feature_tables}."
+                )
+            # Not a table and not a feature name. Distinguish the
+            # error so the user knows it isn't a near-miss for a
+            # feature they typed badly.
+            known_features = sorted(feature_index.keys())
+            if known_features:
+                raise DerivaMLTableNotFound(
+                    t,
+                    msg=(f"No table or feature named {t!r} exists. Known feature names: {known_features}"),
+                )
+            raise DerivaMLTableNotFound(t)
+
+        resolved_include = [_resolve_one(t) for t in include_tables]
+        resolved_via = [_resolve_one(t) for t in (via or [])]
+        resolved_row_per = _resolve_one(row_per) if row_per is not None else None
+        return resolved_include, resolved_via, resolved_row_per
+
     def _run(
         self,
         include_tables: list[str],
@@ -1036,6 +1198,19 @@ class Denormalizer:
             The final :class:`DenormalizeResult` — main SQL rows plus
             any orphan rows appended.
         """
+        # Step 0: translate feature names to feature-association table
+        # names so the caller can pass either form. This is what makes
+        # ``include_tables=["Image", "Image_Classification"]`` work
+        # symmetrically with the rest of the DerivaML surface
+        # (``find_features``, ``feature_values``, ``lookup_feature``) —
+        # see ``_resolve_table_names`` for the algorithm. Validation
+        # errors (typo'd name, ambiguous feature) surface here, before
+        # any planner work.
+        include_tables, via_resolved, row_per = self._resolve_table_names(
+            list(include_tables), via=via, row_per=row_per
+        )
+        via = via_resolved
+
         # Step 1: planner decisions (row_per, ambiguity checks).
         # _determine_row_per either validates an explicit row_per
         # (raising DownstreamLeaf if a downstream table is in
