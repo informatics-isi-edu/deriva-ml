@@ -340,6 +340,323 @@ class TestDatasetOrmGuard:
             )
 
 
+class TestRowCompletenessInvariant:
+    """SC-06 / RB-02 / TC-03 regression: same table, two paths, two parametrizations.
+
+    Spec §6 step 3 requires the local cache to contain the union of rows
+    every path's ``(table, rid_column, rids)`` tuple would fetch — the
+    *row-completeness invariant*. Before the fix, ``_populate_from_catalog_inner``
+    keyed its ``processed`` set on table name only, so the second walk's
+    fetch was silently skipped when two element paths converged on the
+    same table.
+
+    These tests pin the invariant by hand-constructing a two-path
+    ``join_tables`` dict and asserting both fetches actually fire (and
+    that the resulting Image set is the union of what each path
+    legitimately asks for).
+    """
+
+    def _build_two_path_scenario(
+        self,
+        denorm_feature_deriva_model: Any,
+        denorm_local_schema_feature: Any,
+    ) -> dict[str, Any]:
+        """Set up a fixture where two element paths converge on Image.
+
+        The pre-populated state is what ``_collect_fk_values`` will read
+        from the engine to decide which Image RIDs each path needs.
+
+        Path A: ``Dataset → Dataset_Image → Image`` — pulls IMG-A1, IMG-A2.
+        Path B: ``Dataset → Execution_Image_Image_Classification → Image``
+            — pulls IMG-B1, IMG-B2 (a disjoint set; this is what makes
+            the bug visible).
+
+        Returns a dict carrying everything the test needs: the
+        hand-crafted ``join_tables``, the engine, the resolver, the
+        ``FakePagedClient`` (preloaded with rows for *all* Image RIDs so
+        a correct walk pulls the union; a buggy walk pulls only one
+        path's worth).
+        """
+        from sqlalchemy.orm import Session
+
+        from tests.local_db.test_paged_fetcher import FakePagedClient
+
+        ls = denorm_local_schema_feature
+        model = denorm_feature_deriva_model
+
+        ds_rid = "DS-001"
+        path_a_image_rids = ["IMG-A1", "IMG-A2"]
+        path_b_image_rids = ["IMG-B1", "IMG-B2"]
+        exec_rid = "EXE-1"
+        cls_rid = "CLS-cat"
+
+        # Pre-populate the engine with the "prior tables" each path
+        # reads to derive its target RIDs. Path A reads Dataset_Image;
+        # path B reads Execution_Image_Image_Classification.
+        with Session(ls.engine) as session:
+            ds_cls = ls.get_orm_class("Dataset")
+            session.add(ds_cls(RID=ds_rid, Description="t"))
+
+            di_cls = ls.get_orm_class("Dataset_Image")
+            for img in path_a_image_rids:
+                session.add(di_cls(RID=f"DI-{img}", Dataset=ds_rid, Image=img))
+
+            exe_cls = ls.get_orm_class("Execution")
+            session.add(exe_cls(RID=exec_rid, Description="run"))
+
+            cls_cls = ls.get_orm_class("Image_Classification")
+            session.add(cls_cls(RID=cls_rid, Name="cat"))
+
+            feat_cls = ls.get_orm_class("Execution_Image_Image_Classification")
+            for img in path_b_image_rids:
+                session.add(
+                    feat_cls(
+                        RID=f"EIIC-{img}",
+                        Feature_Name="default",
+                        Image=img,
+                        Execution=exec_rid,
+                        Image_Classification=cls_rid,
+                    )
+                )
+            session.commit()
+
+        # Look up the actual ERMrest Column objects so we can build
+        # join_conditions whose `.table.name` / `.name` match what
+        # ``_collect_fk_values`` and ``_col_table_name`` expect.
+        image_tbl = model.name_to_table("Image")
+        dataset_tbl = model.name_to_table("Dataset")
+        dataset_image_tbl = model.name_to_table("Dataset_Image")
+        exec_tbl = model.name_to_table("Execution")
+        feat_tbl = model.name_to_table("Execution_Image_Image_Classification")
+
+        image_rid_col = image_tbl.columns["RID"]
+        dataset_rid_col = dataset_tbl.columns["RID"]
+        di_image_col = dataset_image_tbl.columns["Image"]
+        di_dataset_col = dataset_image_tbl.columns["Dataset"]
+        feat_image_col = feat_tbl.columns["Image"]
+        exec_rid_col = exec_tbl.columns["RID"]
+        feat_exec_col = feat_tbl.columns["Execution"]
+
+        # Hand-crafted join_tables: two element paths both ending at
+        # Image, but reaching it via different intermediate tables.
+        # ``_collect_fk_values`` will read Dataset_Image for path A and
+        # Execution_Image_Image_Classification for path B, producing
+        # disjoint Image RID sets.
+        join_tables = {
+            "Image_via_DatasetImage": (
+                ["Dataset", "Dataset_Image", "Image"],
+                {
+                    "Dataset_Image": {(di_dataset_col, dataset_rid_col)},
+                    "Image": {(di_image_col, image_rid_col)},
+                },
+                {"Dataset_Image": "inner", "Image": "inner"},
+            ),
+            "Image_via_Feature": (
+                ["Dataset", "Execution", "Execution_Image_Image_Classification", "Image"],
+                {
+                    # Synthetic edge: planner-internal, we don't need Dataset→Execution
+                    # FK conditions here because the test calls the *inner* walk
+                    # directly and only the table-targeted conditions matter.
+                    "Execution": set(),
+                    "Execution_Image_Image_Classification": {(feat_exec_col, exec_rid_col)},
+                    "Image": {(feat_image_col, image_rid_col)},
+                },
+                {
+                    "Execution": "inner",
+                    "Execution_Image_Image_Classification": "inner",
+                    "Image": "inner",
+                },
+            ),
+        }
+
+        # FakePagedClient with rows for the union — a correct walk will
+        # pull all four; a buggy walk (today) pulls only path A's two.
+        all_images = path_a_image_rids + path_b_image_rids
+        fake = FakePagedClient(
+            rows_by_table={
+                "deriva-ml:Dataset": [{"RID": ds_rid, "Description": "t"}],
+                "isa:Image": [{"RID": r, "Filename": f"{r}.png", "Subject": None} for r in all_images],
+                # Path A's prior table (Dataset_Image) is already in engine — fetcher
+                # will still issue a fetch for it; provide rows so the call doesn't
+                # crash. The same applies to path B's intermediate tables.
+                "deriva-ml:Dataset_Image": [
+                    {"RID": f"DI-{r}", "Dataset": ds_rid, "Image": r} for r in path_a_image_rids
+                ],
+                "deriva-ml:Execution": [{"RID": exec_rid, "Description": "run"}],
+                "deriva-ml:Execution_Image_Image_Classification": [
+                    {
+                        "RID": f"EIIC-{r}",
+                        "Feature_Name": "default",
+                        "Image": r,
+                        "Execution": exec_rid,
+                        "Image_Classification": cls_rid,
+                    }
+                    for r in path_b_image_rids
+                ],
+            }
+        )
+
+        return {
+            "model": model,
+            "engine": ls.engine,
+            "orm_resolver": ls.get_orm_class,
+            "join_tables": join_tables,
+            "fake_client": fake,
+            "dataset_rid": ds_rid,
+            "path_a_image_rids": path_a_image_rids,
+            "path_b_image_rids": path_b_image_rids,
+            "local_schema": ls,
+        }
+
+    def test_two_paths_both_fetch_their_target_rids(
+        self,
+        denorm_feature_deriva_model: Any,
+        denorm_local_schema_feature: Any,
+    ) -> None:
+        """Both element paths' Image fetches must fire (row-completeness invariant).
+
+        With the bug, ``processed`` adds ``"Image"`` after path A's fetch
+        and path B's fetch is silently skipped. The Image RIDs only
+        reachable via path B are absent from the local cache.
+
+        With the fix, the dedup key is ``(table, rid_column, frozenset(rids))``,
+        so the two paths' distinct parametrizations both issue a fetch.
+
+        The assertion that fails on main is the final
+        ``image_rids_in_engine == set(union)`` — IMG-B1/IMG-B2 are missing
+        because path B's fetch never ran.
+        """
+        from sqlalchemy import select as sa_select
+
+        from deriva_ml.local_db.denormalize import (
+            _foreign_keys_off,
+            _populate_from_catalog_inner,
+        )
+        from deriva_ml.local_db.paged_fetcher import PagedFetcher
+
+        scenario = self._build_two_path_scenario(
+            denorm_feature_deriva_model, denorm_local_schema_feature
+        )
+
+        fetcher = PagedFetcher(client=scenario["fake_client"], engine=scenario["engine"])
+
+        table_to_schema = {
+            "Dataset": "deriva-ml",
+            "Dataset_Image": "deriva-ml",
+            "Image": "isa",
+            "Execution": "deriva-ml",
+            "Execution_Image_Image_Classification": "deriva-ml",
+        }
+
+        with _foreign_keys_off(scenario["engine"]):
+            _populate_from_catalog_inner(
+                fetcher=fetcher,
+                engine=scenario["engine"],
+                orm_resolver=scenario["orm_resolver"],
+                table_to_schema=table_to_schema,
+                join_tables=scenario["join_tables"],
+                dataset_rid_list=[scenario["dataset_rid"]],
+            )
+
+        # Collect all Image fetches the fake client saw.
+        image_fetch_rids: list[set[str]] = []
+        for kind, params in scenario["fake_client"].requests:
+            if kind == "fetch_rid_batch" and params["table"] == "isa:Image":
+                image_fetch_rids.append(set(params["rids"]))
+
+        union_requested = set().union(*image_fetch_rids) if image_fetch_rids else set()
+        expected_union = set(scenario["path_a_image_rids"] + scenario["path_b_image_rids"])
+
+        # The invariant: every (table, rid_column, rids) tuple in the
+        # plan must have its rows in the local cache. The cheapest way
+        # to surface this is: the union of all Image fetches must
+        # include every Image RID either path's parametrization
+        # legitimately asks for.
+        assert union_requested == expected_union, (
+            f"Row-completeness invariant violated: path B's Image fetch was "
+            f"skipped. Image RIDs requested across all fetches: {union_requested}. "
+            f"Expected union of both paths: {expected_union}. "
+            f"Missing: {expected_union - union_requested}."
+        )
+
+        # And the engine must end up holding the union.
+        image_orm = scenario["orm_resolver"]("Image")
+        with scenario["engine"].connect() as conn:
+            image_rids_in_engine = {
+                row[0] for row in conn.execute(sa_select(image_orm.__table__.columns["RID"])).fetchall()
+            }
+        assert image_rids_in_engine == expected_union, (
+            f"Local cache missing rows: engine has {image_rids_in_engine}, "
+            f"expected union {expected_union}."
+        )
+
+    def test_duplicate_parametrization_is_still_deduped(
+        self,
+        denorm_feature_deriva_model: Any,
+        denorm_local_schema_feature: Any,
+    ) -> None:
+        """Two paths with the SAME (table, rid_column, rids) tuple → one fetch.
+
+        The fix preserves the optimization for true duplicates — if both
+        paths converge on Image via the same rid_column with the same
+        rid set, only one fetch should fire. This pins the dedup half of
+        the contract (the other half being row-completeness).
+        """
+        from deriva_ml.local_db.denormalize import (
+            _foreign_keys_off,
+            _populate_from_catalog_inner,
+        )
+        from deriva_ml.local_db.paged_fetcher import PagedFetcher
+
+        scenario = self._build_two_path_scenario(
+            denorm_feature_deriva_model, denorm_local_schema_feature
+        )
+
+        # Replace path B's join_conditions[Image] with an identical
+        # parametrization to path A's — same (rid_column, source) so
+        # _collect_fk_values returns the same (rid_column, rids).
+        model = scenario["model"]
+        image_rid_col = model.name_to_table("Image").columns["RID"]
+        di_image_col = model.name_to_table("Dataset_Image").columns["Image"]
+
+        # Rewire path B's Image conditions to point at Dataset_Image too
+        # (artificial — the point is just that both paths produce the
+        # same (rid_column, frozenset(rids)) tuple for Image).
+        path_b = scenario["join_tables"]["Image_via_Feature"]
+        path_b[1]["Image"] = {(di_image_col, image_rid_col)}
+
+        fetcher = PagedFetcher(client=scenario["fake_client"], engine=scenario["engine"])
+        table_to_schema = {
+            "Dataset": "deriva-ml",
+            "Dataset_Image": "deriva-ml",
+            "Image": "isa",
+            "Execution": "deriva-ml",
+            "Execution_Image_Image_Classification": "deriva-ml",
+        }
+
+        with _foreign_keys_off(scenario["engine"]):
+            _populate_from_catalog_inner(
+                fetcher=fetcher,
+                engine=scenario["engine"],
+                orm_resolver=scenario["orm_resolver"],
+                table_to_schema=table_to_schema,
+                join_tables=scenario["join_tables"],
+                dataset_rid_list=[scenario["dataset_rid"]],
+            )
+
+        image_fetches = [
+            params
+            for kind, params in scenario["fake_client"].requests
+            if kind == "fetch_rid_batch" and params["table"] == "isa:Image"
+        ]
+        # Exactly one Image fetch: the two paths produced an identical
+        # (rid_column, rids) tuple and the second is correctly deduped.
+        assert len(image_fetches) == 1, (
+            f"Expected 1 Image fetch for identical parametrizations, got "
+            f"{len(image_fetches)}: {image_fetches}"
+        )
+
+
 def test_denormalize_result_extend() -> None:
     """DenormalizeResult.extend appends rows and updates row_count."""
     from deriva_ml.local_db.denormalize import DenormalizeResult

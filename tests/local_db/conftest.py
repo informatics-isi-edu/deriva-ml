@@ -688,6 +688,25 @@ def denorm_feature_deriva_model(denorm_feature_model: Model) -> DerivaModel:
     )
 
 
+@pytest.fixture
+def denorm_local_schema_feature(denorm_feature_model: Model, tmp_path: Path) -> LocalSchema:
+    """LocalSchema built from the feature-association fixture.
+
+    Same shape as :func:`denorm_local_schema`, but against the schema
+    that includes ``Execution``, ``Image_Classification``, and the
+    ``Execution_Image_Image_Classification`` feature-association table.
+    Used by the row-completeness invariant tests (SC-06 / RB-02) that
+    need two element paths converging on ``Image``.
+    """
+    db_path = tmp_path / "denorm_feature_db"
+    db_path.mkdir()
+    return LocalSchema.build(
+        model=denorm_feature_model,
+        schemas=["isa", "deriva-ml"],
+        database_path=db_path,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
