@@ -620,7 +620,7 @@ class ExecutionMixin:
 
         # Filter by specific workflow
         if workflow:
-            workflow_rid = workflow.rid if isinstance(workflow, WorkflowClass) else workflow
+            workflow_rid = workflow.workflow_rid if isinstance(workflow, WorkflowClass) else workflow
             filtered_path = filtered_path.filter(execution_path.Workflow == workflow_rid)
 
         # Filter by workflow type - find workflows with matching type, then filter executions
@@ -1150,9 +1150,9 @@ class ExecutionMixin:
 
         try:
             wf_summary: "WorkflowSummary | None" = None
-            if record.workflow is not None and record.workflow.rid is not None:
+            if record.workflow is not None and record.workflow.workflow_rid is not None:
                 wf_summary = WorkflowSummary(
-                    rid=record.workflow.rid,
+                    rid=record.workflow.workflow_rid,
                     name=record.workflow.name,
                 )
 

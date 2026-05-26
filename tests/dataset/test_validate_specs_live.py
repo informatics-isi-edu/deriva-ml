@@ -113,9 +113,9 @@ def test_validate_execution_configuration_live_workflow_rid_is_dataset(test_ml):
         workflow_type="Validate Test",
         description="composite smoke",
     )
-    # Mutate the wf object so its rid points at the dataset (no catalog
-    # round-trip — composite validator only reads config.workflow.rid).
-    wf_swapped = wf.model_copy(update={"rid": rid})
+    # Mutate the wf object so its workflow_rid points at the dataset (no catalog
+    # round-trip — composite validator only reads config.workflow.workflow_rid).
+    wf_swapped = wf.model_copy(update={"workflow_rid": rid})
     config = ExecutionConfiguration(workflow=wf_swapped)
     report = test_ml.validate_execution_configuration(config)
     assert report.all_valid is False

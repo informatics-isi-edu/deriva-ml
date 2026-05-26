@@ -72,7 +72,7 @@ def test_bare_workflow(tmp_path: Path) -> None:
     path = _write(
         tmp_path,
         """
-workflow_store(name="t", spec=Workflow(rid="1-CCCC"))
+workflow_store(name="t", spec=Workflow(workflow_rid="1-CCCC"))
 """,
     )
     entries, err = parse_config_file(path)
@@ -114,12 +114,12 @@ datasets_store(
 
 
 def test_builds_with_known_class(tmp_path: Path) -> None:
-    """``builds(Workflow, rid=...)`` is treated as the Workflow class."""
+    """``builds(Workflow, workflow_rid=...)`` is treated as the Workflow class."""
     path = _write(
         tmp_path,
         """
 from hydra_zen import builds
-workflow_store(name="t", spec=builds(Workflow, rid="1-DDDD"))
+workflow_store(name="t", spec=builds(Workflow, workflow_rid="1-DDDD"))
 """,
     )
     entries, err = parse_config_file(path)

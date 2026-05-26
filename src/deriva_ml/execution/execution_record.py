@@ -200,7 +200,7 @@ class ExecutionRecord(BaseModel):
         Returns:
             The workflow RID, or None if no workflow is associated.
         """
-        return self._workflow.rid if self._workflow else None
+        return self._workflow.workflow_rid if self._workflow else None
 
     @property
     def status(self) -> ExecutionStatus:
