@@ -62,8 +62,11 @@ class Denormalizer:
 
     - :meth:`as_dataframe` — materialize the wide table as a
       :class:`pandas.DataFrame`.
-    - :meth:`as_dict` — stream rows as ``dict[str, Any]`` (memory-efficient
-      for large results).
+    - :meth:`as_dict` — yield rows as ``dict[str, Any]`` one at a time.
+      Convenience for row-by-row iteration; the full result is still
+      materialised internally before the first row is yielded, so this
+      is *not* a memory-efficient alternative to :meth:`as_dataframe`
+      (see the method's own docstring and audit finding SC-07).
     - :meth:`columns` — preview ``(column_name, column_type)`` pairs
       without fetching data (model-only).
     - :meth:`describe` — dry-run: returns a 12-key plan dict (spec §5);
@@ -445,13 +448,27 @@ class Denormalizer:
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
     ) -> Generator[dict[str, Any], None, None]:
-        """Stream the denormalized table row-by-row as dicts.
+        """Convert the denormalized table to dicts and yield row-by-row.
 
         Same planner, same rules, same exceptions as :meth:`as_dataframe` —
         but yields one ``dict[str, Any]`` per row (keyed by the
         ``Table.column`` / ``schema.Table.column`` label) rather than
-        materializing a DataFrame. Use this when the result set won't fit
-        in memory or when downstream code processes rows one at a time.
+        materializing a DataFrame.
+
+        **The full result is materialised before the first row is
+        yielded.** This method is memory-equivalent to
+        :meth:`as_dataframe`, not a streaming alternative — peak memory
+        scales with the full result set, because ``_denormalize_impl``
+        eagerly drains the SQLAlchemy cursor into a Python list before
+        :meth:`as_dict` iterates it. Use this when downstream code
+        processes rows one at a time but does not need DataFrame
+        indexing; do **not** rely on it to bound memory for very large
+        results.
+
+        True row-by-row streaming over the cursor is a known gap (audit
+        finding SC-07; see ``docs/design/denormalization.md`` §8.2 for
+        the design discussion). Until that gap is closed, treat
+        ``as_dict`` as "iteration interface, materialised internals."
 
         Args:
             include_tables: Tables whose columns appear in the output.
@@ -468,8 +485,9 @@ class Denormalizer:
 
         Raises:
             Same as :meth:`as_dataframe`. Exceptions surface on the first
-            ``next()`` — all planner validation runs before any row is
-            yielded, since the pipeline builds the full result up front.
+            ``next()`` — all planner validation and the full SQL execution
+            run before any row is yielded, since the pipeline builds the
+            full result up front.
 
         Example::
 
@@ -759,13 +777,9 @@ class Denormalizer:
                 # (case 1, exact contribution) and "anchors elsewhere
                 # but reaching row_per via FK chain" (case 2, unknown
                 # fan-out).
-                at_row_per_count = sum(
-                    len(rids) for table, rids in scoping.items() if table == resolved_row_per
-                )
+                at_row_per_count = sum(len(rids) for table, rids in scoping.items() if table == resolved_row_per)
                 downstream_anchor_tables = [
-                    table
-                    for table, rids in scoping.items()
-                    if table != resolved_row_per and rids
+                    table for table, rids in scoping.items() if table != resolved_row_per and rids
                 ]
                 orphan_count = sum(len(rids) for rids in orphans.values())
 
