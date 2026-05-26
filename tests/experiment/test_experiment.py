@@ -487,7 +487,7 @@ class TestExperimentFinder:
         ml = execution_with_hydra_config._ml_object
 
         # Find experiments by workflow RID
-        experiments = list(ml.find_experiments(workflow_rid=test_workflow.rid))
+        experiments = list(ml.find_experiments(workflow_rid=test_workflow.workflow_rid))
 
         # The execution with hydra config was created with test_workflow
         experiment_rids = [e.execution_rid for e in experiments]
@@ -526,7 +526,7 @@ class TestExperimentFinder:
         # Find uploaded experiments for the specific workflow
         experiments = list(
             ml.find_experiments(
-                workflow_rid=test_workflow.rid,
+                workflow_rid=test_workflow.workflow_rid,
                 status=ExecutionStatus.Uploaded,
             )
         )

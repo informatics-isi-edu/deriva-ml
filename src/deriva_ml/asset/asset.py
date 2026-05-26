@@ -139,7 +139,7 @@ class Asset:
     def __repr__(self) -> str:
         """Return a string representation of the Asset for debugging."""
         return (
-            f"<deriva_ml.Asset at {hex(id(self))}: rid='{self.asset_rid}', "
+            f"<deriva_ml.Asset at {hex(id(self))}: asset_rid='{self.asset_rid}', "
             f"table='{self.asset_table}', file='{self.filename}', types={self._asset_types}>"
         )
 

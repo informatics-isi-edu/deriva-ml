@@ -54,6 +54,26 @@ def __getattr__(name: str) -> type:
         from deriva_ml.execution.execution import Execution
 
         return Execution
+    elif name == "ExecutionConfiguration":
+        from deriva_ml.execution.execution_configuration import ExecutionConfiguration
+
+        return ExecutionConfiguration
+    elif name == "Workflow":
+        from deriva_ml.execution.workflow import Workflow
+
+        return Workflow
+    elif name == "Dataset":
+        from deriva_ml.dataset.dataset import Dataset
+
+        return Dataset
+    elif name == "DatasetSpec":
+        from deriva_ml.dataset.aux_classes import DatasetSpec
+
+        return DatasetSpec
+    elif name == "DatasetSpecConfig":
+        from deriva_ml.dataset.aux_classes import DatasetSpecConfig
+
+        return DatasetSpecConfig
     elif name == "Asset":
         from deriva_ml.asset.asset import Asset
 
@@ -101,6 +121,14 @@ __all__ = [
     "DerivaML",  # Lazy-loaded
     "DerivaMLConfig",
     "ConnectionMode",
+    # Execution-authoring surface (lazy-loaded)
+    "Execution",
+    "ExecutionConfiguration",
+    "Workflow",
+    # Dataset classes (lazy-loaded)
+    "Dataset",
+    "DatasetSpec",
+    "DatasetSpecConfig",
     # Asset classes (lazy-loaded)
     "Asset",
     "AssetFilePath",

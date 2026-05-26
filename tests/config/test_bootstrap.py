@@ -43,7 +43,7 @@ class _StubAssetTable:
 
 @dataclass
 class _StubWorkflow:
-    rid: str
+    workflow_rid: str
     name: str = ""
 
 
@@ -103,7 +103,7 @@ def test_bootstrap_returns_one_per_kind_minimum() -> None:
         assets_by_table={
             "Image": [_StubAsset(asset_rid="1-BBBB", filename="model_weights.pt")],
         },
-        workflows=[_StubWorkflow(rid="1-CCCC", name="train_cifar10")],
+        workflows=[_StubWorkflow(workflow_rid="1-CCCC", name="train_cifar10")],
     )
     report = ml.bootstrap_config()
 
@@ -231,7 +231,7 @@ def test_kinds_gates_what_is_returned() -> None:
         datasets=[_StubDataset(dataset_rid="1-AA", dataset_types=["Training"])],
         asset_tables=[_StubAssetTable(name="Image")],
         assets_by_table={"Image": [_StubAsset(asset_rid="1-BB")]},
-        workflows=[_StubWorkflow(rid="1-CC")],
+        workflows=[_StubWorkflow(workflow_rid="1-CC")],
     )
     report = ml.bootstrap_config(kinds=["datasets"])
     assert {s.kind for s in report.suggestions} == {"datasets"}
@@ -285,8 +285,8 @@ def test_workflow_with_no_rid_is_silently_dropped() -> None:
     """An in-memory Workflow without a catalog RID isn't suggested."""
     ml = _StubMixin(
         workflows=[
-            _StubWorkflow(rid="1-AA", name="trainer"),
-            _StubWorkflow(rid=None, name="just-in-memory"),  # type: ignore[arg-type]
+            _StubWorkflow(workflow_rid="1-AA", name="trainer"),
+            _StubWorkflow(workflow_rid=None, name="just-in-memory"),  # type: ignore[arg-type]
         ],
     )
     report = ml.bootstrap_config(kinds=["workflow"])
@@ -355,10 +355,10 @@ def test_asset_spec_string_is_ready_to_paste() -> None:
 
 
 def test_workflow_spec_string_is_ready_to_paste() -> None:
-    ml = _StubMixin(workflows=[_StubWorkflow(rid="1-CC")])
+    ml = _StubMixin(workflows=[_StubWorkflow(workflow_rid="1-CC")])
     report = ml.bootstrap_config(kinds=["workflow"])
     s = report.suggestions[0]
-    assert s.spec_string == 'Workflow(rid="1-CC")'
+    assert s.spec_string == 'Workflow(workflow_rid="1-CC")'
 
 
 def test_deriva_ml_spec_string_uses_connection_state() -> None:

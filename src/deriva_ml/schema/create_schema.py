@@ -709,8 +709,74 @@ def create_ml_catalog(
     return catalog
 
 
+def create_or_retarget_ml_catalog(
+    hostname: str,
+    project_name: str,
+    *,
+    alias: str | None = None,
+) -> ErmrestCatalog:
+    """Create a new ML catalog and point ``alias`` at it.
+
+    Idempotent on ``alias``: re-running with the same alias always yields a
+    *fresh* catalog reachable via that alias. The previously-aliased catalog
+    (if any) is left in place — its numeric id is preserved, but the alias
+    no longer resolves to it. Callers who want the orphan deleted must do so
+    explicitly (e.g. via ``server.delete_ermrest_catalog(old_id)``).
+
+    Compare with :func:`create_ml_catalog`, which always creates a new alias
+    and refuses if one with the same name exists. ``create_or_retarget_ml_catalog``
+    is the right call when the alias is a *stable handle* for "the current
+    catalog of project X" rather than a one-shot decoration.
+
+    Args:
+        hostname: Server hostname (e.g., "localhost", "www.eye-ai.org").
+        project_name: Name for the project, becomes the domain schema name.
+        alias: Optional alias name. When given, retargets the alias if it
+            already exists, otherwise creates a new one. When ``None``,
+            behaves identically to :func:`create_ml_catalog` with no alias
+            (the caller must track the numeric id themselves).
+
+    Returns:
+        The created ``ErmrestCatalog`` instance. Callers can read
+        ``catalog.catalog_id`` for the numeric id. The alias (if any) points
+        to this catalog after the call returns.
+
+    Example:
+        >>> # Re-run after a successful run that lost track of the id:
+        >>> catalog = create_or_retarget_ml_catalog(  # doctest: +SKIP
+        ...     "localhost", "my_project", alias="my-project-dev"
+        ... )
+        >>> # The old catalog at the old id still exists; the alias now
+        >>> # resolves to the new catalog. Delete the orphan separately
+        >>> # if desired.
+    """
+    # Always create a new catalog first.
+    new_catalog = create_ml_catalog(hostname, project_name, catalog_alias=None)
+
+    if alias is None:
+        return new_catalog
+
+    # Look up the alias. If it exists, retarget. If not, create.
+    server = new_catalog.deriva_server
+    try:
+        existing_alias = server.connect_ermrest_alias(alias)
+        # Retarget to the new catalog.
+        existing_alias.update(alias_target=str(new_catalog.catalog_id))
+    except Exception:
+        # Alias doesn't exist; create it.
+        server.create_ermrest_alias(
+            id=alias,
+            alias_target=new_catalog.catalog_id,
+            name=project_name,
+            description=f"Alias for {project_name} catalog (ID: {new_catalog.catalog_id})",
+        )
+
+    return new_catalog
+
+
 __all__ = [
     "create_ml_catalog",
+    "create_or_retarget_ml_catalog",
     "create_ml_schema",
     "initialize_ml_schema",
 ]

@@ -466,7 +466,7 @@ class FeatureMixin:
                 >>> # ... or by Workflow RID, when you need a specific run:
                 >>> workflow = ml.lookup_workflow("Glaucoma_Training_v2")  # doctest: +SKIP
                 >>> sel = FeatureRecord.select_by_workflow(  # doctest: +SKIP
-                ...     workflow.rid, container=ml,
+                ...     workflow.workflow_rid, container=ml,
                 ... )
                 >>> labels = [r.Glaucoma for r in ml.feature_values(  # doctest: +SKIP
                 ...     "Image", "Glaucoma", selector=sel,

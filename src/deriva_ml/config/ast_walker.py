@@ -9,7 +9,7 @@ The four recognized constructor names:
 
 - ``DatasetSpecConfig`` -- dataset entries; ``rid=`` and ``version=`` kwargs
 - ``AssetSpecConfig`` -- asset entries; ``rid=`` (and optional ``cache=``)
-- ``Workflow`` -- workflow entries; ``rid=`` kwarg
+- ``Workflow`` -- workflow entries; ``workflow_rid=`` kwarg
 - ``DerivaMLConfig`` -- connection entries; ``hostname=`` and ``catalog_id=``
 
 Edge cases the walker handles:
@@ -266,7 +266,12 @@ class _CallVisitor(ast.NodeVisitor):
     ) -> ConfigEntry | None:
         """Pull the kwargs off a known constructor call into a :class:`ConfigEntry`."""
         kwargs = _kwarg_map(call)
-        rid = self._resolve_str_value(kwargs.get("rid"))
+        # Workflow uses the scoped name `workflow_rid=`; everything else uses
+        # `rid=`. See the deriva-ml typed-record naming convention (scoped names
+        # across Workflow, Dataset, Execution, Asset; Workflow aligned to this
+        # convention in 2026-05-25 e2e developer/01 finding).
+        rid_kw = "workflow_rid" if kind == "Workflow" else "rid"
+        rid = self._resolve_str_value(kwargs.get(rid_kw))
         version = self._resolve_str_value(kwargs.get("version"))
         hostname = self._resolve_str_value(kwargs.get("hostname"))
 

@@ -62,7 +62,7 @@ class Workflow(BaseModel):
         description (str | None): Description of workflow purpose and behavior.
             When the workflow is bound to a writable catalog, setting this property
             will update the catalog record.
-        rid (RID | None): Resource Identifier if registered in catalog.
+        workflow_rid (RID | None): Resource Identifier if registered in catalog.
         checksum (str | None): Git hash of workflow source code.
         is_notebook (bool): Whether workflow is a Jupyter notebook.
 
@@ -116,7 +116,7 @@ class Workflow(BaseModel):
     description: str | None = None
     url: str | None = None
     version: str | None = None
-    rid: RID | None = None
+    workflow_rid: RID | None = None
     checksum: str | None = None
     is_notebook: bool = False
     git_root: Path | None = None
@@ -193,7 +193,7 @@ class Workflow(BaseModel):
         from deriva_ml.execution._helpers import check_writable_catalog
 
         check_writable_catalog(
-            rid=self.rid,
+            rid=self.workflow_rid,
             ml_instance=self._ml_instance,
             entity_label="Workflow",
             operation=operation,
@@ -216,7 +216,7 @@ class Workflow(BaseModel):
 
         self._check_writable_catalog("update description")
         update_field_in_catalog(
-            rid=self.rid,
+            rid=self.workflow_rid,
             ml_instance=self._ml_instance,
             table_name="Workflow",
             updates={"Description": new_description},
@@ -249,7 +249,7 @@ class Workflow(BaseModel):
         if self._ml_instance is not None:
             _, atable_path = self._get_workflow_type_association_table()
             wt_types = (
-                atable_path.filter(atable_path.Workflow == self.rid).attributes(atable_path.Workflow_Type).fetch()
+                atable_path.filter(atable_path.Workflow == self.workflow_rid).attributes(atable_path.Workflow_Type).fetch()
             )
             return [wt[MLVocab.workflow_type] for wt in wt_types]
         return list(self.workflow_type)
@@ -278,7 +278,7 @@ class Workflow(BaseModel):
             return
 
         _, atable_path = self._get_workflow_type_association_table()
-        atable_path.insert([{MLVocab.workflow_type: vocab_term.name, "Workflow": self.rid}])
+        atable_path.insert([{MLVocab.workflow_type: vocab_term.name, "Workflow": self.workflow_rid}])
 
     def remove_workflow_type(self, workflow_type: str | VocabularyTerm) -> None:
         """Remove a workflow type from this workflow.
@@ -303,7 +303,7 @@ class Workflow(BaseModel):
             return
 
         _, atable_path = self._get_workflow_type_association_table()
-        atable_path.filter((atable_path.Workflow == self.rid) & (atable_path.Workflow_Type == vocab_term.name)).delete()
+        atable_path.filter((atable_path.Workflow == self.workflow_rid) & (atable_path.Workflow_Type == vocab_term.name)).delete()
 
     def add_workflow_types(self, workflow_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
         """Add one or more workflow types to this workflow.
@@ -343,11 +343,11 @@ class Workflow(BaseModel):
 
         # Delete all existing type associations
         _, atable_path = self._get_workflow_type_association_table()
-        atable_path.filter(atable_path.Workflow == self.rid).delete()
+        atable_path.filter(atable_path.Workflow == self.workflow_rid).delete()
 
         # Insert new type associations
         if new_workflow_types:
-            atable_path.insert([{MLVocab.workflow_type: wt, "Workflow": self.rid} for wt in new_workflow_types])
+            atable_path.insert([{MLVocab.workflow_type: wt, "Workflow": self.workflow_rid} for wt in new_workflow_types])
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":

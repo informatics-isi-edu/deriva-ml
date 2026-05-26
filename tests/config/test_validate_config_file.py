@@ -132,7 +132,7 @@ def test_clean_config_returns_all_valid(tmp_path: Path) -> None:
     src = """
 datasets_store(name="train", spec=DatasetSpecConfig(rid="1-AAAA", version="0.1.0"))
 assets_store(name="w", spec=AssetSpecConfig(rid="1-BBBB", cache=True))
-workflow_store(name="t", spec=Workflow(rid="1-CCCC"))
+workflow_store(name="t", spec=Workflow(workflow_rid="1-CCCC"))
 deriva_store(DerivaMLConfig, hostname="data.example.org", catalog_id="42")
 """
     path = _write(tmp_path, src)
@@ -302,7 +302,7 @@ def test_asset_not_found(tmp_path: Path) -> None:
 
 
 def test_workflow_not_a_workflow(tmp_path: Path) -> None:
-    src = 'workflow_store(name="t", spec=Workflow(rid="1-WRNG"))\n'
+    src = 'workflow_store(name="t", spec=Workflow(workflow_rid="1-WRNG"))\n'
     path = _write(tmp_path, src)
     ml = _StubMixin(
         workflow_results_by_rid={

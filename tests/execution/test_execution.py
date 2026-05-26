@@ -150,12 +150,12 @@ class TestWorkflow:
 
         # Verify lookup_workflow_by_url returns the workflow
         looked_up_workflow = ml_instance.lookup_workflow_by_url(workflow_url)
-        assert looked_up_workflow.rid == workflow_rid
+        assert looked_up_workflow.workflow_rid == workflow_rid
         assert looked_up_workflow.url == workflow_url
 
         # Verify lookup_workflow works with RID
         looked_up_workflow_by_rid = ml_instance.lookup_workflow(workflow_rid)
-        assert looked_up_workflow_by_rid.rid == workflow_rid
+        assert looked_up_workflow_by_rid.workflow_rid == workflow_rid
         assert looked_up_workflow_by_rid.url == workflow_url
 
         # Verify running again doesn't duplicate

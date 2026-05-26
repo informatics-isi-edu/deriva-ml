@@ -1,7 +1,13 @@
-from deriva_ml.schema.create_schema import create_ml_catalog, create_ml_schema, initialize_ml_schema
+from deriva_ml.schema.create_schema import (
+    create_ml_catalog,
+    create_ml_schema,
+    create_or_retarget_ml_catalog,
+    initialize_ml_schema,
+)
 
 __all__ = [
     "create_ml_catalog",
+    "create_or_retarget_ml_catalog",
     "create_ml_schema",
     "initialize_ml_schema",
 ]

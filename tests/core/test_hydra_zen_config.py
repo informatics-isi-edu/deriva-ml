@@ -215,7 +215,7 @@ class TestHydraZenExecutionConfiguration:
             name="Test Workflow",
             workflow_type="python_script",
             description="Test workflow description",
-            rid="WXYZ",
+            workflow_rid="WXYZ",
         )
 
         exec_config = ExecutionConfiguration(
@@ -224,7 +224,7 @@ class TestHydraZenExecutionConfiguration:
         )
 
         assert exec_config.workflow is workflow
-        assert exec_config.workflow.rid == "WXYZ"
+        assert exec_config.workflow.workflow_rid == "WXYZ"
         assert exec_config.workflow.name == "Test Workflow"
 
     def test_make_config_for_custom_execution(self):

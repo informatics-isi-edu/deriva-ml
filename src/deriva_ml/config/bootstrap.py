@@ -176,8 +176,8 @@ def _format_asset_spec(rid: str, *, cache: bool = False) -> str:
 
 
 def _format_workflow_spec(rid: str) -> str:
-    """Format a ``Workflow(rid=...)`` line."""
-    return f'Workflow(rid="{rid}")'
+    """Format a ``Workflow(workflow_rid=...)`` line."""
+    return f'Workflow(workflow_rid="{rid}")'
 
 
 def _format_deriva_ml_spec(hostname: str, catalog_id: str) -> str:

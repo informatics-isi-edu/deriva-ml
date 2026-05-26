@@ -722,8 +722,8 @@ class DatasetMixin:
 
         # Workflow.
         workflow_result: WorkflowSpecResult | None
-        if config.workflow is not None and config.workflow.rid is not None:
-            workflow_result = self._validate_workflow_rid(config.workflow.rid)
+        if config.workflow is not None and config.workflow.workflow_rid is not None:
+            workflow_result = self._validate_workflow_rid(config.workflow.workflow_rid)
         else:
             workflow_result = None
 
@@ -1087,7 +1087,7 @@ class DatasetMixin:
         if "workflow" in requested_kinds:
             workflows = self.find_workflows()  # type: ignore[attr-defined]
             for wf in workflows:
-                wf_rid = getattr(wf, "rid", None)
+                wf_rid = getattr(wf, "workflow_rid", None)
                 if wf_rid is None:
                     continue  # in-memory Workflow without a catalog row
                 wf_name = getattr(wf, "name", "") or ""
