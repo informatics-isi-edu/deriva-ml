@@ -505,9 +505,7 @@ def _populate_from_catalog_inner(
     # fires its own fetch, and only true duplicates (same table, same rid
     # column, same rid set) are skipped. The pre-seeded entry covers Step 1's
     # Dataset fetch so we don't redundantly re-issue it in the loop.
-    processed: set[tuple[str, str, frozenset[str]]] = {
-        ("Dataset", "RID", frozenset(str(r) for r in dataset_rid_list))
-    }
+    processed: set[tuple[str, str, frozenset[str]]] = {("Dataset", "RID", frozenset(str(r) for r in dataset_rid_list))}
 
     for _key, (path, join_conditions, _join_types) in join_tables.items():
         # Walk in order — each table depends on rows loaded by the previous.

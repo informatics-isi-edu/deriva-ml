@@ -534,9 +534,7 @@ class TestRowCompletenessInvariant:
         )
         from deriva_ml.local_db.paged_fetcher import PagedFetcher
 
-        scenario = self._build_two_path_scenario(
-            denorm_feature_deriva_model, denorm_local_schema_feature
-        )
+        scenario = self._build_two_path_scenario(denorm_feature_deriva_model, denorm_local_schema_feature)
 
         fetcher = PagedFetcher(client=scenario["fake_client"], engine=scenario["engine"])
 
@@ -586,8 +584,7 @@ class TestRowCompletenessInvariant:
                 row[0] for row in conn.execute(sa_select(image_orm.__table__.columns["RID"])).fetchall()
             }
         assert image_rids_in_engine == expected_union, (
-            f"Local cache missing rows: engine has {image_rids_in_engine}, "
-            f"expected union {expected_union}."
+            f"Local cache missing rows: engine has {image_rids_in_engine}, expected union {expected_union}."
         )
 
     def test_duplicate_parametrization_is_still_deduped(
@@ -608,9 +605,7 @@ class TestRowCompletenessInvariant:
         )
         from deriva_ml.local_db.paged_fetcher import PagedFetcher
 
-        scenario = self._build_two_path_scenario(
-            denorm_feature_deriva_model, denorm_local_schema_feature
-        )
+        scenario = self._build_two_path_scenario(denorm_feature_deriva_model, denorm_local_schema_feature)
 
         # Replace path B's join_conditions[Image] with an identical
         # parametrization to path A's — same (rid_column, source) so
@@ -652,8 +647,7 @@ class TestRowCompletenessInvariant:
         # Exactly one Image fetch: the two paths produced an identical
         # (rid_column, rids) tuple and the second is correctly deduped.
         assert len(image_fetches) == 1, (
-            f"Expected 1 Image fetch for identical parametrizations, got "
-            f"{len(image_fetches)}: {image_fetches}"
+            f"Expected 1 Image fetch for identical parametrizations, got {len(image_fetches)}: {image_fetches}"
         )
 
 
