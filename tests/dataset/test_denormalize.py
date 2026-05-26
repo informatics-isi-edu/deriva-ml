@@ -1687,7 +1687,7 @@ class TestNewFKPatterns:
         d = Denormalizer(live_ds)
 
         # Sanity: the model exposes find_features and "Quality" appears.
-        features = list(live_ds.model.find_features())
+        features = list(ml.model.find_features())
         feature_names = {f.feature_name for f in features}
         assert "Quality" in feature_names, (
             f"Demo fixture should register a 'Quality' feature on Image; "
