@@ -65,13 +65,13 @@ What is intentionally **not** transparent:
 **This module is internal.** The user-facing API for denormalization
 is :class:`local_db.denormalize.Denormalizer`. The semantic Rules
 this planner enforces (auto-inferred ``row_per``, downstream-leaf
-rejection, ambiguity detection, orphan emission, …) live in
-``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``.
-The full pipeline (planner → row-population → SQL emission), the
+rejection, ambiguity detection, orphan emission, …), the full
+pipeline (planner → row-population → SQL emission), the
 state-ownership model, and the fragility map for the denormalize
-subsystem live in ``docs/design/denormalization.md`` — start there
-when touching anything in this module. All methods are
-underscore-prefixed because they are private from the user's
+subsystem all live in the "Implementation contract" section of
+``docs/user-guide/denormalization.md`` — start there when touching
+anything in this module. All methods are underscore-prefixed
+because they are private from the user's
 perspective.
 
 ------------------------------------------------------------------

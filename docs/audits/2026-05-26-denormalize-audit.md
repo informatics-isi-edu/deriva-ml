@@ -89,9 +89,8 @@ either confirmed, demoted, dropped, or fixed each finding. Inline
 
 **Files read for this audit (canonical spec is the design doc):**
 
-- Spec: `/Users/carl/GitHub/DerivaML/deriva-ml/docs/design/denormalization.md` (2026-05-21, authoritative).
-- Companion spec: `/Users/carl/GitHub/DerivaML/deriva-ml/docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md` (semantic Rules 1–10).
-- Concept doc cross-check: `/Users/carl/GitHub/DerivaML/deriva-ml/docs/concepts/denormalization.md` (skimmed; user-facing only).
+- Spec: `/Users/carl/GitHub/DerivaML/deriva-ml/docs/user-guide/denormalization.md` (the "Implementation contract" section; merged 2026-05-26 from the prior `docs/design/denormalization.md` spec + `docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md` companion under Mechanism D, audit 2026-05-26-spec-single-source-of-record-plan.md). Section numbers below refer to the §1–§10 of that contract section.
+- User-facing material on the same page (the half above the divider) was reviewed for accuracy but is not the spec source for this audit.
 - Implementation:
   - `/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/local_db/denormalizer.py` (1348 lines)
   - `/Users/carl/GitHub/DerivaML/deriva-ml/src/deriva_ml/local_db/denormalize.py` (681 lines)
