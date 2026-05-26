@@ -666,3 +666,190 @@ def test_denormalize_result_extend() -> None:
     assert [r["A.RID"] for r in extended.iter_rows()] == ["1-A", "1-B", "1-C", "1-D"]
     # Does not mutate the original
     assert base.row_count == 2
+
+
+class TestCacheAgeSeconds:
+    """SC-03 / spec §6 freshness caveat: ``DenormalizeResult.cache_age_seconds``.
+
+    The contract (PR #231 §6): ``DenormalizeResult`` carries
+    ``cache_age_seconds: float | None``:
+
+    - ``None`` for ``source != "catalog"`` (no live fetch happened).
+    - For ``source == "catalog"``: the wall-clock delta between the
+      denormalize call's completion and the *earliest* fetch in the
+      local cache that participated in this result's SQL JOIN.
+
+    These tests pin the contract at the ``_denormalize_impl`` boundary.
+    """
+
+    def test_denormalize_result_carries_cache_age_seconds(
+        self,
+        denorm_deriva_model: Any,
+        denorm_local_schema: Any,
+    ) -> None:
+        """A successful catalog fetch produces a non-negative cache_age_seconds."""
+        from tests.local_db.test_paged_fetcher import FakePagedClient
+
+        ls = denorm_local_schema
+        model = denorm_deriva_model
+        ds_rid = "DS-CA-001"
+
+        fake = FakePagedClient(
+            rows_by_table={
+                "deriva-ml:Dataset": [{"RID": ds_rid, "Description": "t"}],
+                "deriva-ml:Dataset_Image": [
+                    {"RID": "DI-1", "Dataset": ds_rid, "Image": "IMG-A"},
+                ],
+                "isa:Image": [
+                    {"RID": "IMG-A", "Filename": "a.png", "Subject": "S-1"},
+                ],
+                "isa:Subject": [
+                    {"RID": "S-1", "Name": "Alice"},
+                ],
+            }
+        )
+
+        result = _denormalize_impl(
+            model=model,
+            engine=ls.engine,
+            orm_resolver=ls.get_orm_class,
+            dataset_rid=ds_rid,
+            include_tables=["Image", "Subject"],
+            source="catalog",
+            paged_client=fake,
+        )
+
+        assert result.cache_age_seconds is not None, (
+            "source='catalog' with non-empty join plan must surface a freshness signal"
+        )
+        assert result.cache_age_seconds >= 0, f"cache_age_seconds must be non-negative, got {result.cache_age_seconds}"
+
+    def test_denormalize_result_cache_age_is_none_for_local_source(
+        self,
+        populated_denorm: dict[str, Any],
+    ) -> None:
+        """source='local' (no live fetch) reports cache_age_seconds=None.
+
+        The spec carve-out (PR #231 §6): ``None`` for ``source='bag'``
+        (no live fetch happened). ``source='local'`` is the in-tree
+        equivalent — rows are pre-populated, no PagedFetcher is
+        constructed, no ledger exists.
+        """
+        result = _denormalize_impl(
+            model=populated_denorm["model"],
+            engine=populated_denorm["local_schema"].engine,
+            orm_resolver=populated_denorm["local_schema"].get_orm_class,
+            dataset_rid=populated_denorm["dataset_rid"],
+            include_tables=["Image", "Subject"],
+            source="local",
+        )
+
+        assert result.cache_age_seconds is None, (
+            "source='local' must not produce a cache_age_seconds — no live fetch happened"
+        )
+
+    def test_denormalize_result_cache_age_is_none_for_slice_source(
+        self,
+        populated_denorm: dict[str, Any],
+    ) -> None:
+        """source='slice' also produces cache_age_seconds=None (no live fetch).
+
+        Spec PR #231 §6 names ``source='bag'`` explicitly. ``source='slice'``
+        is the production equivalent that ``DatasetBag.get_denormalized_as_dataframe``
+        uses; same carve-out applies.
+        """
+        result = _denormalize_impl(
+            model=populated_denorm["model"],
+            engine=populated_denorm["local_schema"].engine,
+            orm_resolver=populated_denorm["local_schema"].get_orm_class,
+            dataset_rid=populated_denorm["dataset_rid"],
+            include_tables=["Image"],
+            source="slice",
+        )
+
+        assert result.cache_age_seconds is None, (
+            "source='slice' must not produce a cache_age_seconds — no live fetch happened"
+        )
+
+    def test_denormalize_result_cache_age_reflects_oldest_fetch(
+        self,
+        denorm_deriva_model: Any,
+        denorm_local_schema: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """cache_age_seconds reports age of the *oldest* participating fetch.
+
+        Scenario: simulate two fetches in the same call separated by N
+        seconds of wall-clock time. The reported ``cache_age_seconds``
+        must be at least N (the delta from the first fetch to "now"),
+        not the delta from the most recent fetch.
+
+        We drive this deterministically by monkey-patching
+        ``time.monotonic`` in the paged_fetcher and denormalize modules
+        to return successive values from a controlled list — no actual
+        ``sleep`` calls (which would slow the suite and add jitter).
+        """
+        from tests.local_db.test_paged_fetcher import FakePagedClient
+
+        ls = denorm_local_schema
+        model = denorm_deriva_model
+        ds_rid = "DS-CA-AGE-001"
+
+        fake = FakePagedClient(
+            rows_by_table={
+                "deriva-ml:Dataset": [{"RID": ds_rid, "Description": "t"}],
+                "deriva-ml:Dataset_Image": [
+                    {"RID": "DI-1", "Dataset": ds_rid, "Image": "IMG-A"},
+                ],
+                "isa:Image": [
+                    {"RID": "IMG-A", "Filename": "a.png", "Subject": "S-1"},
+                ],
+                "isa:Subject": [
+                    {"RID": "S-1", "Name": "Alice"},
+                ],
+            }
+        )
+
+        # Monkey-patched clock: each call returns the next value in the
+        # sequence. The fetcher calls ``time.monotonic`` once per distinct
+        # ``record_fetch_start``; ``_denormalize_impl`` calls it once at
+        # the end via ``_compute_cache_age_seconds``. We pin those reads
+        # to a deterministic sequence so the assertion below is exact.
+        # Sequence: 100 (Dataset fetch), 110 (Dataset_Image), 120 (Image),
+        # 130 (Subject), then 145 for the final "now" — i.e. the oldest
+        # fetch is 45s in the past at the time of result construction.
+        clock_values = iter([100.0, 110.0, 120.0, 130.0, 145.0])
+
+        def _fake_monotonic() -> float:
+            return next(clock_values)
+
+        # Patch where ``time.monotonic`` is actually called — once in
+        # paged_fetcher.PagedFetcher.record_fetch_start, once in
+        # denormalize._compute_cache_age_seconds. Patching the underlying
+        # ``time`` module on both module surfaces is the cleanest seam.
+        from deriva_ml.local_db import denormalize as denorm_mod
+        from deriva_ml.local_db import paged_fetcher as pf_mod
+
+        monkeypatch.setattr(pf_mod.time, "monotonic", _fake_monotonic)
+        monkeypatch.setattr(denorm_mod.time, "monotonic", _fake_monotonic)
+
+        result = _denormalize_impl(
+            model=model,
+            engine=ls.engine,
+            orm_resolver=ls.get_orm_class,
+            dataset_rid=ds_rid,
+            include_tables=["Image", "Subject"],
+            source="catalog",
+            paged_client=fake,
+        )
+
+        # Oldest fetch at t=100, "now" at t=145 → age = 45s exactly.
+        # The implementation does at most 4 ``record_fetch_start`` calls
+        # (Dataset, Dataset_Image, Image, Subject) plus one final
+        # ``time.monotonic()`` read for the cache_age_seconds computation —
+        # 5 total reads, matching our 5-value sequence. If the planner
+        # ever changes shape, this test will surface it as a StopIteration
+        # from the iterator (a clear signal the contract needs an update).
+        assert result.cache_age_seconds == 45.0, (
+            f"Expected cache_age_seconds reporting oldest fetch age (45.0), got {result.cache_age_seconds}"
+        )

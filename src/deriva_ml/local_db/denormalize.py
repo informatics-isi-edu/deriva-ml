@@ -34,6 +34,7 @@ The ``source`` parameter controls how rows get into the local SQLite engine:
 
 from __future__ import annotations
 
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generator
@@ -102,6 +103,20 @@ class DenormalizeResult:
             names use ``Table.Column`` dot notation (or
             ``schema.Table.Column`` when multi-schema).
         row_count: Number of rows in the result (``len(_rows)``).
+        cache_age_seconds: Caller-visible freshness signal (SC-03, spec §6
+            "Freshness caveat"). The wall-clock time delta, in seconds,
+            between the start of this denormalize call and the *earliest*
+            catalog fetch that participated in the SQL JOIN that built this
+            result. ``None`` when no live catalog fetch happened
+            (``source='bag'`` / ``source='local'`` / ``source='slice'``, or
+            ``source='catalog'`` with all keys already deduped against
+            cache — though in practice the dataset-row fetch always
+            stamps the ledger). A user re-running denormalize in a
+            long-lived process can use this to detect that results draw
+            on cached data older than they're comfortable with — the
+            local SQLite cache is write-through and does NOT observe
+            server-side deletions or updates (see ``docs/design/denormalization.md``
+            §6 and §7 F3/F4).
 
     Example::
 
@@ -110,11 +125,14 @@ class DenormalizeResult:
         df = result.to_dataframe()       # full DataFrame
         for row in result.iter_rows():   # streaming
             process(row)
+        if result.cache_age_seconds is not None and result.cache_age_seconds > 600:
+            warn("denormalize result built from cache >10min old")
     """
 
     columns: list[tuple[str, str]]
     row_count: int
     _rows: list[dict[str, Any]] = field(repr=False)
+    cache_age_seconds: float | None = None
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert the result to a :class:`pandas.DataFrame`.
@@ -170,6 +188,7 @@ class DenormalizeResult:
             columns=self.columns,
             row_count=self.row_count + len(rows),
             _rows=list(self._rows) + list(rows),
+            cache_age_seconds=self.cache_age_seconds,
         )
 
 
@@ -342,8 +361,16 @@ def _denormalize_impl(
     # Step 3b: If source='catalog', fetch rows into the engine's tables
     # before we run the SQL join. Without this step, the join runs against
     # an empty working DB and returns zero rows.
+    #
+    # The returned fetcher carries its freshness ledger
+    # (``fetcher.fetch_ledger``) — a map of ``(table, rid_column, frozenset(rids))``
+    # to the ``time.monotonic()`` of the first fetch attempt for that key.
+    # We use the oldest timestamp in the ledger to compute
+    # :attr:`DenormalizeResult.cache_age_seconds` after the SQL JOIN
+    # materializes (SC-03; spec §6 freshness caveat).
+    fetcher: PagedFetcher | None = None
     if source == "catalog":
-        _populate_from_catalog(
+        fetcher = _populate_from_catalog(
             paged_client=paged_client,
             engine=engine,
             orm_resolver=orm_resolver,
@@ -375,8 +402,22 @@ def _denormalize_impl(
 
         sql_statements.append(stmt)
 
+    # Compute the freshness signal (SC-03). `cache_age_seconds` is the
+    # wall-clock delta between *now* (just before we hand back the result)
+    # and the earliest fetch timestamp in the fetcher's ledger. `None`
+    # when no live catalog fetch happened (`source != "catalog"`, or
+    # `source == "catalog"` but no fetches were recorded — empty join
+    # plan, etc.). See :attr:`DenormalizeResult.cache_age_seconds` for
+    # the user-facing contract.
+    cache_age_seconds = _compute_cache_age_seconds(fetcher)
+
     if not sql_statements:
-        return DenormalizeResult(columns=output_columns, row_count=0, _rows=[])
+        return DenormalizeResult(
+            columns=output_columns,
+            row_count=0,
+            _rows=[],
+            cache_age_seconds=cache_age_seconds,
+        )
 
     # Step 5: Execute.
     final_query = union(*sql_statements) if len(sql_statements) > 1 else sql_statements[0]
@@ -385,7 +426,44 @@ def _denormalize_impl(
         result = session.execute(final_query)
         rows = [dict(row._mapping) for row in result]
 
-    return DenormalizeResult(columns=output_columns, row_count=len(rows), _rows=rows)
+    return DenormalizeResult(
+        columns=output_columns,
+        row_count=len(rows),
+        _rows=rows,
+        cache_age_seconds=cache_age_seconds,
+    )
+
+
+def _compute_cache_age_seconds(fetcher: PagedFetcher | None) -> float | None:
+    """Compute the freshness signal from a fetcher's ledger.
+
+    The contract (SC-03, spec §6 freshness caveat): the wall-clock time
+    delta between *now* and the *earliest* fetch attempt the fetcher
+    recorded. Returns ``None`` when no fetch happened (``fetcher is
+    None`` — bag/local/slice sources don't construct a fetcher) or when
+    the ledger is empty (catalog source with an empty join plan or a
+    no-op call).
+
+    Args:
+        fetcher: The :class:`PagedFetcher` that populated rows for this
+            denormalize call, or ``None`` if no live fetch happened.
+
+    Returns:
+        Wall-clock age in seconds of the oldest participating fetch, or
+        ``None`` if no fetch was recorded.
+
+    Example::
+
+        cache_age = _compute_cache_age_seconds(fetcher)
+        # cache_age >= 0 if at least one fetch happened
+        # cache_age is None for source != "catalog"
+    """
+    if fetcher is None:
+        return None
+    ledger = fetcher.fetch_ledger
+    if not ledger:
+        return None
+    return time.monotonic() - min(ledger.values())
 
 
 def _populate_from_catalog(
@@ -397,7 +475,7 @@ def _populate_from_catalog(
     join_tables: dict,
     dataset_rid_list: list[str],
     model: DerivaModel,
-) -> None:
+) -> PagedFetcher:
     """Fetch rows from a live catalog into the engine's local tables.
 
     Two ordering concerns run in parallel:
@@ -443,6 +521,12 @@ def _populate_from_catalog(
             dataset plus any children from recursive traversal).
         model: The DerivaModel — used to read FK metadata for the FK-safe
             insertion order over the tables we're about to populate.
+
+    Returns:
+        The :class:`PagedFetcher` used for the catalog fetches. The
+        caller reads its :attr:`PagedFetcher.fetch_ledger` to compute
+        :attr:`DenormalizeResult.cache_age_seconds` (SC-03; spec §6
+        freshness caveat).
     """
     # ``model`` is part of the signature for future FK-aware insert
     # ordering (see :func:`_foreign_keys_off` docstring). It's not
@@ -464,6 +548,8 @@ def _populate_from_catalog(
             dataset_rid_list=dataset_rid_list,
         )
 
+    return fetcher
+
 
 def _populate_from_catalog_inner(
     *,
@@ -484,6 +570,11 @@ def _populate_from_catalog_inner(
     # rows during the SQL join.
     dataset_orm = orm_resolver("Dataset")
     dataset_schema = table_to_schema.get("Dataset", "deriva-ml")
+    # Stamp the freshness ledger BEFORE the fetch so the timestamp is the
+    # fetch *start*, not the end (SC-03). The ledger key uses the
+    # unqualified table name to match the dedup-processed key shape used
+    # in Step 2 below — see the row-completeness invariant block.
+    fetcher.record_fetch_start("Dataset", "RID", dataset_rid_list)
     fetcher.fetch_by_rids(
         table=f"{dataset_schema}:Dataset",
         rids=dataset_rid_list,
@@ -552,6 +643,13 @@ def _populate_from_catalog_inner(
                 if fetch_key in processed:
                     continue
 
+                # Stamp the freshness ledger BEFORE the fetch (SC-03).
+                # ``record_fetch_start`` is idempotent on key — though the
+                # dedup check above already guarantees we won't restamp,
+                # the idempotence is what makes the ledger report the
+                # *first* fetch's timestamp rather than the most-recent
+                # restamp.
+                fetcher.record_fetch_start(table_name, fk_column_on_target, str_rids)
                 fetcher.fetch_by_rids(
                     table=qualified,
                     rids=str_rids,

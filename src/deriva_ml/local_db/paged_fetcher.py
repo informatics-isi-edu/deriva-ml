@@ -29,6 +29,7 @@ in tests for the exact interface contract.
 
 from __future__ import annotations
 
+import time
 from typing import Any, Iterable, Protocol
 
 from sqlalchemy import Table, select
@@ -157,6 +158,68 @@ class PagedFetcher:
         # its own lifetime, and it survives only the one denormalize call
         # that built the fetcher.
         self._counts: dict[str, int] = {}
+        # Freshness ledger: ``time.monotonic()`` of the first fetch attempt
+        # for each ``(table, rid_column, frozenset(rids))`` tuple. Used by
+        # the denormalize layer to compute
+        # :attr:`DenormalizeResult.cache_age_seconds` — the wall-clock age of
+        # the *oldest* fetch that participated in this fetcher's lifetime
+        # (SC-03, spec §6 "Freshness caveat" caller-visible freshness signal).
+        # Recorded once per distinct key: a cache-hit re-visit by the
+        # dedup-processed set in ``_populate_from_catalog_inner`` does NOT
+        # overwrite an existing timestamp, so the ledger reports "when did
+        # we first fetch this key", not "when was it most recently touched."
+        self._fetch_ledger: dict[tuple[str, str, frozenset[str]], float] = {}
+
+    def record_fetch_start(self, table: str, rid_column: str, rids: Iterable[str]) -> None:
+        """Record the start time of a fetch attempt in the freshness ledger.
+
+        Idempotent on key — if the same ``(table, rid_column, frozenset(rids))``
+        tuple was already recorded, the existing timestamp is preserved. This
+        is the contract that makes :attr:`DenormalizeResult.cache_age_seconds`
+        report "wall-clock age of the *first* fetch that participated", not
+        "the most recent re-touch."
+
+        Callers in :func:`_populate_from_catalog_inner` invoke this
+        immediately before :meth:`fetch_by_rids` for each distinct fetch
+        key, so the ledger reflects fetch *attempts*, not cache hits. A
+        cache-hit re-visit (where the key is already in the dedup
+        ``processed`` set) does not call this and does not pollute the ledger.
+
+        Args:
+            table: Qualified table name (``"schema:table"``) — the same form
+                passed to :meth:`fetch_by_rids`.
+            rid_column: Column on *table* to filter on.
+            rids: RID values being fetched. Stringified and frozen for use
+                as the ledger key.
+
+        Example::
+
+            fetcher.record_fetch_start("isa:Image", "RID", ["IMG-1", "IMG-2"])
+            fetcher.fetch_by_rids(
+                table="isa:Image",
+                rids=["IMG-1", "IMG-2"],
+                target_table=image_t,
+                rid_column="RID",
+            )
+        """
+        key = (table, rid_column, frozenset(str(r) for r in rids))
+        if key not in self._fetch_ledger:
+            self._fetch_ledger[key] = time.monotonic()
+
+    @property
+    def fetch_ledger(self) -> dict[tuple[str, str, frozenset[str]], float]:
+        """Read-only view of the freshness ledger.
+
+        Maps ``(table, rid_column, frozenset(rids))`` to the
+        ``time.monotonic()`` of the first fetch attempt for that key.
+        Used by :func:`_denormalize_impl` to compute
+        :attr:`DenormalizeResult.cache_age_seconds`.
+
+        Returns:
+            The ledger dict. Mutating the returned dict will mutate the
+            fetcher's internal state; treat as read-only.
+        """
+        return self._fetch_ledger
 
     def fetch_predicate(
         self,
