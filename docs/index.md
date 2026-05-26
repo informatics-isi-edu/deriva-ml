@@ -48,22 +48,42 @@ Weaker fit:
 See also: _Deriva-ML: A Continuous FAIRness Approach to Reproducible
 Machine Learning Models_ (Li et al., 2024, IEEE e-Science).
 
-## Starting a new project
+## Experiments
 
-To start a new deriva-ml project, use the
+DerivaML organizes ML activities into **experiments**. An experiment is a
+**GitHub repository** that holds the *executable* and *human-readable*
+sides of a research project; the catalog stores the *what* (data, RIDs,
+lineage), the experiment repository stores the *how* and the *why*:
+
+- **Code** — model implementations, data-loading scripts, notebooks.
+- **Configuration** — hydra-zen configs (Python, not YAML) declaring
+  which catalog, which datasets, which workflow, which hyperparameters.
+- **Tacit knowledge** — `tacit-knowledge.md` at the repo root, capturing
+  the *why* behind decisions, dead ends explored, and the project's
+  conventions.
+- **Provenance link** — every execution from this repo records the git
+  commit hash on the `Workflow` row, so a result can be traced to the
+  exact code that produced it.
+
+### Starting a new experiment
+
+Bootstrap a new experiment from the
 [deriva-ml-model-template repository](https://github.com/informatics-isi-edu/deriva-ml-model-template).
 It provides:
 
 - Hydra-zen configuration scaffolding
 - CLI entry points (`deriva-ml-run`, `deriva-ml-run-notebook`)
 - GitHub Actions for versioning and documentation deployment
-- An example model (CIFAR-10) with config variants
+- An example model (CIFAR-10) with config variants you can replace with
+  your own
+- A `tacit-knowledge.md` skeleton ready for your project's first entry
 
 These docs cover the deriva-ml library itself, for developers who already
-have a project and want to understand the library's concepts and APIs.
-Start with the [User Guide](user-guide/exploring.md) for a task-oriented
-walkthrough, or jump to the [API Reference](api-reference/deriva_ml_base.md)
-for per-method documentation.
+have an experiment repository and want to understand the library's
+concepts and APIs. Start with the [User Guide](user-guide/exploring.md)
+for a task-oriented walkthrough, or jump to the
+[API Reference](api-reference/deriva_ml_base.md) for per-method
+documentation.
 
 ## Further reading
 
