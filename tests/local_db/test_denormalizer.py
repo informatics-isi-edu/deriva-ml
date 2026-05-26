@@ -458,7 +458,7 @@ class TestDescribe:
         ds = _FakeDataset(populated_denorm)
         d = Denormalizer(ds)
         plan = d.describe(["Image", "Subject"])
-        # Required keys per spec §5
+        # Required keys per spec §5 (+ §8.3.1 warnings envelope).
         for key in [
             "row_per",
             "row_per_source",
@@ -472,6 +472,7 @@ class TestDescribe:
             "estimated_row_count",
             "anchors",
             "source",
+            "warnings",
         ]:
             assert key in plan, f"plan missing key {key}: {list(plan.keys())}"
 
@@ -642,6 +643,9 @@ class TestFeatureNameResolution:
         df = d.as_dataframe(["Image", "ClassifiedAs"])
         # describe's column list shape matches the dataframe's columns.
         assert {name for name, _ in plan["columns"]} == set(df.columns)
+        # SC-01 / spec §8.3.1: when describe and run agree, warnings is empty
+        # — a populated list would mean describe silently swallowed an error.
+        assert plan["warnings"] == [], f"expected clean warnings, got {plan['warnings']}"
 
     def test_unknown_feature_name_distinguishes_from_unknown_table(self, populated_denorm) -> None:
         """Unknown feature name and unknown table produce different
@@ -932,3 +936,185 @@ class _FakeDataset:
 
     def list_dataset_children(self, **kwargs: Any) -> list:
         return []
+
+
+
+class TestDescribeWarningsFieldExists:
+    """``describe()`` always returns a ``warnings: list[str]`` key.
+
+    Per spec §8.3.1 ("describe() return shape — warnings field"), the
+    returned dict carries a 13th key whose value is a list of short
+    diagnostic strings — one per swallowed exception. On a clean run
+    the list is empty; the key is always present.
+    """
+
+    def test_warnings_key_present_on_clean_describe(self, populated_denorm) -> None:
+        """Happy path: warnings key exists and is an empty list."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        assert "warnings" in plan, f"plan missing 'warnings' key: {list(plan.keys())}"
+        assert isinstance(plan["warnings"], list), (
+            f"plan['warnings'] is {type(plan['warnings'])}, expected list"
+        )
+        assert plan["warnings"] == [], (
+            f"clean describe should produce no warnings, got {plan['warnings']}"
+        )
+
+    def test_warnings_key_present_on_bad_row_per(self, populated_denorm) -> None:
+        """Even when describe's planner-rule paths fail, warnings is a list[str]."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image"], row_per="Subject")
+        assert "warnings" in plan
+        assert isinstance(plan["warnings"], list)
+        for w in plan["warnings"]:
+            assert isinstance(w, str), f"warning entry not a string: {w!r}"
+
+    def test_warnings_key_present_on_diamond(self, populated_denorm_diamond) -> None:
+        """Ambiguity is a reported outcome, not a swallowed error — warnings stays empty."""
+        ds = _FakeDataset(populated_denorm_diamond)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        assert "warnings" in plan
+        assert isinstance(plan["warnings"], list)
+
+
+class TestDescribeWarningsPopulated:
+    """Failing-planner-call scenarios produce non-empty ``warnings``.
+
+    Each broad-except site in ``describe()`` appends a one-liner naming
+    the call that failed and what defaulted. We construct a scenario
+    where ``_resolve_table_names`` raises (ambiguous feature name) and
+    verify the corresponding warning lands in ``plan["warnings"]``.
+    """
+
+    @staticmethod
+    def _stub_ambiguous_feature(model):
+        """Set up two synthetic Features with the same feature_name but
+        different target/feature tables, so ``_resolve_table_names``
+        raises ``DerivaMLDenormalizeError("ambiguous")`` per the
+        resolver's documented behavior."""
+
+        class _StubFeature:
+            def __init__(self, feature_name, feature_table, target_table):
+                self.feature_name = feature_name
+                self.feature_table = feature_table
+                self.target_table = target_table
+
+        feat_a = _StubFeature(
+            "AmbigName",
+            model.name_to_table("Subject"),
+            model.name_to_table("Image"),
+        )
+        feat_b = _StubFeature(
+            "AmbigName",
+            model.name_to_table("Image"),
+            model.name_to_table("Subject"),
+        )
+        model.find_features = lambda table=None: [feat_a, feat_b]
+
+    def test_warning_emitted_when_resolve_table_names_raises(
+        self, populated_denorm
+    ) -> None:
+        """Ambiguous feature name → ``_resolve_table_names`` raises →
+        warning appears in plan["warnings"] naming the failing call."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        self._stub_ambiguous_feature(populated_denorm["model"])
+
+        plan = d.describe(["Image", "AmbigName"])
+        assert len(plan["warnings"]) >= 1, (
+            f"expected at least one warning, got {plan['warnings']}"
+        )
+        # The first warning must name the call that failed so a caller can
+        # tell which envelope position is unreliable.
+        joined = " | ".join(plan["warnings"])
+        assert "_resolve_table_names" in joined, (
+            f"warnings should name _resolve_table_names, got {plan['warnings']}"
+        )
+
+    def test_warning_format_includes_exception_type_and_default(
+        self, populated_denorm
+    ) -> None:
+        """Each warning string carries the exception class name and a
+        short ``what defaulted`` clause so the user can diagnose without
+        consulting source."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        self._stub_ambiguous_feature(populated_denorm["model"])
+
+        plan = d.describe(["Image", "AmbigName"])
+        resolve_warnings = [w for w in plan["warnings"] if "_resolve_table_names" in w]
+        assert resolve_warnings, plan["warnings"]
+        w = resolve_warnings[0]
+        # Format: "<call>: <ExcType> (<msg>); <default-explanation>"
+        assert "DerivaMLDenormalizeError" in w, (
+            f"warning should name the exception type: {w!r}"
+        )
+        assert "reverted to original" in w, (
+            f"warning should describe what defaulted: {w!r}"
+        )
+
+
+class TestDescribeStillNeverRaises:
+    """The dry-run invariant: ``describe()`` never raises, even when
+    swallowed exceptions land in ``warnings``.
+
+    These tests guard against a regression where adding the warnings
+    envelope accidentally turns one of the broad-except sites into a
+    re-raise — the information-preservation invariant must not weaken
+    the dry-run invariant.
+    """
+
+    @staticmethod
+    def _stub_ambiguous_feature(model):
+        """See TestDescribeWarningsPopulated._stub_ambiguous_feature."""
+
+        class _StubFeature:
+            def __init__(self, feature_name, feature_table, target_table):
+                self.feature_name = feature_name
+                self.feature_table = feature_table
+                self.target_table = target_table
+
+        feat_a = _StubFeature(
+            "AmbigName",
+            model.name_to_table("Subject"),
+            model.name_to_table("Image"),
+        )
+        feat_b = _StubFeature(
+            "AmbigName",
+            model.name_to_table("Image"),
+            model.name_to_table("Subject"),
+        )
+        model.find_features = lambda table=None: [feat_a, feat_b]
+
+    def test_describe_does_not_raise_when_resolver_fails(
+        self, populated_denorm
+    ) -> None:
+        """Ambiguous feature name in include_tables: ``describe`` swallows,
+        the warning is appended, and the caller still gets a well-formed
+        dict instead of an exception."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        self._stub_ambiguous_feature(populated_denorm["model"])
+
+        # If this raises, the dry-run invariant has regressed.
+        plan = d.describe(["Image", "AmbigName"])
+        # All 13 spec keys should still be present even after a failure.
+        for key in [
+            "row_per",
+            "row_per_source",
+            "row_per_candidates",
+            "columns",
+            "include_tables",
+            "via",
+            "join_path",
+            "transparent_intermediates",
+            "ambiguities",
+            "estimated_row_count",
+            "anchors",
+            "source",
+            "warnings",
+        ]:
+            assert key in plan, f"plan missing key {key} after swallowed error"

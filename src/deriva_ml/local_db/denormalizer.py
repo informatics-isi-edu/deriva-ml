@@ -262,6 +262,44 @@ class Denormalizer:
         if model is None:
             raise ValueError("Denormalizer.from_rids requires either ml= or an explicit model=")
 
+        # SC-02 / TC-05 guard: dataset_rid is None against a live catalog
+        # is a silent-zero failure mode. _denormalize_impl scopes by
+        # ``Dataset.RID IN (dataset_rid, ...)`` and no real dataset has
+        # the placeholder RID, so the result is an empty DataFrame with
+        # no diagnostic. Probe whether the catalog passed in is a real
+        # live one (i.e., one ErmrestPagedClient can wrap) and refuse
+        # the call there. Fixture/local contexts (no catalog, or a
+        # mock that can't be wrapped) keep working with a warning —
+        # those flows pre-populate the engine and the RID acts as an
+        # opaque scoping key the in-memory SQL will match if rows exist.
+        if dataset_rid is None:
+            live_catalog = False
+            if catalog is not None:
+                try:
+                    from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+                    ErmrestPagedClient(catalog=catalog)
+                    live_catalog = True
+                except Exception:
+                    # Catalog can't be wrapped (mock, offline) — treat
+                    # as local mode; warn but don't raise.
+                    live_catalog = False
+            if live_catalog:
+                raise ValueError(
+                    "Denormalizer.from_rids() requires an explicit dataset_rid against "
+                    "a live catalog because the SQL primitive scopes by "
+                    "Dataset.RID IN (dataset_rid, ...). Pass dataset_rid=<existing "
+                    "dataset RID> that contains the anchor RIDs, or use "
+                    "Denormalizer(dataset) where the parent Dataset's RID is "
+                    "used automatically."
+                )
+            logger.warning(
+                "Denormalizer.from_rids() called with dataset_rid=None in "
+                "local/fixture mode; falling back to the first anchor's RID "
+                "as a placeholder scope. This will return zero rows against "
+                "a live catalog — pass dataset_rid=<RID> for production use."
+            )
+
         # Normalize anchors to (table, RID) pairs. Validate tuple arity so
         # a 3-tuple (or 1-tuple) surfaces as a clear ValueError here rather
         # than an opaque unpack error later.
@@ -555,16 +593,20 @@ class Denormalizer:
         row_per: str | None = None,
         via: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Return a 12-key planning-metadata dict describing what a
+        """Return a 13-key planning-metadata dict describing what a
         corresponding :meth:`as_dataframe` call would do.
 
         **Dry-run invariant**: unlike :meth:`as_dataframe`, ``describe``
         never raises. Every failure mode (planner rule violation,
         catalog access error, network timeout) is swallowed and
         represented in the returned dict as ``None`` / ``[]`` / ``{}``
-        in the affected positions. Ambiguities are reported in the
-        ``ambiguities`` list so the caller can inspect before
-        committing to a real call.
+        in the affected positions. **Information-preservation
+        invariant**: whenever a broad-except site swallows an
+        exception, a short one-line diagnostic is appended to
+        ``plan["warnings"]`` so the caller can tell why a key is
+        empty (genuine empty result vs. a swallowed failure).
+        Ambiguities are reported in the ``ambiguities`` list so the
+        caller can inspect before committing to a real call.
 
         Args:
             include_tables: Tables whose columns would appear in the
@@ -613,6 +655,15 @@ class Denormalizer:
             - ``source``: ``"catalog"`` for live Datasets, ``"local"``
               for DatasetBags / canned fixtures, ``"slice"`` for
               attached slices.
+            - ``warnings``: ``list[str]`` — one short human-readable
+              entry per swallowed exception. Each entry names the
+              call that failed (``"_resolve_table_names"``,
+              ``"_find_sinks"``, etc.), what defaulted (``"reverted
+              to original include"``, ``"row_per_candidates is
+              empty"``), and the exception type plus a truncated
+              one-line message. Empty list means describe ran
+              clean. See spec §8.3.1 and audit findings SC-01 /
+              RB-01 / TC-09.
 
         Example::
 
@@ -634,6 +685,18 @@ class Denormalizer:
         original_include = list(include_tables)
         original_via = list(via or [])
 
+        # ── warnings accumulator ────────────────────────────────────────────
+        # Per spec §8.3.1 ("describe() return shape — warnings field"),
+        # every broad-except site below appends a short one-liner
+        # naming the call that failed, what defaulted, and the
+        # exception type + truncated message. This restores the
+        # information-preservation invariant (a caller can tell why a
+        # key is empty) without weakening the dry-run invariant
+        # (describe still never raises). Closes audit findings SC-01,
+        # RB-01, TC-09 in
+        # ``docs/audits/2026-05-26-denormalize-audit.md``.
+        warnings: list[str] = []
+
         # ── feature-name resolution ─────────────────────────────────────────
         # Translate feature names ("Image_Classification") to their
         # underlying feature-association tables
@@ -645,9 +708,13 @@ class Denormalizer:
         # surface the failure as empty fields in the returned dict.
         try:
             include, via_list, row_per = self._resolve_table_names(original_include, via=original_via, row_per=row_per)
-        except Exception:
+        except Exception as e:
             include = original_include
             via_list = original_via
+            warnings.append(
+                f"_resolve_table_names: {type(e).__name__} ({str(e)[:120]}); "
+                "reverted to original include/via"
+            )
 
         # ── row_per resolution ─────────────────────────────────────────────
         # Dry-run invariant: describe() never raises. Every call that could
@@ -658,8 +725,12 @@ class Denormalizer:
         row_per_source = "explicit" if row_per else "auto-inferred"
         try:
             row_per_candidates = self._model._planner._find_sinks(include, via_list)
-        except Exception:
+        except Exception as e:
             row_per_candidates = []
+            warnings.append(
+                f"_find_sinks: {type(e).__name__} ({str(e)[:120]}); "
+                "row_per_candidates is empty"
+            )
         try:
             resolved_row_per: str | None = self._model._planner._determine_row_per(
                 include_tables=include,
@@ -682,9 +753,13 @@ class Denormalizer:
                 via=via_list,
             )
             cols = [(denormalize_column_name(s, t, c, multi_schema), tp) for s, t, c, tp in column_specs]
-        except Exception:
+        except Exception as e:
             element_tables = {}
             cols = []
+            warnings.append(
+                f"_prepare_wide_table: {type(e).__name__} ({str(e)[:120]}); "
+                "element_tables and columns are empty"
+            )
 
         # ── ambiguities (reported, not raised) ─────────────────────────────
         ambiguities_raw: list[dict] = []
@@ -695,10 +770,14 @@ class Denormalizer:
                     include_tables=include,
                     via=via_list,
                 )
-            except Exception:
+            except Exception as e:
                 # If path enumeration fails (e.g., model access error),
                 # treat as "no ambiguities detected" rather than raising.
                 ambiguities_raw = []
+                warnings.append(
+                    f"_find_path_ambiguities: {type(e).__name__} ({str(e)[:120]}); "
+                    "ambiguities not detected"
+                )
         ambiguities = [
             {
                 "type": "multiple_paths",
@@ -738,8 +817,12 @@ class Denormalizer:
         # than raise.
         try:
             anchors = self._anchors_as_dict()
-        except Exception:
+        except Exception as e:
             anchors = {}
+            warnings.append(
+                f"_anchors_as_dict: {type(e).__name__} ({str(e)[:120]}); "
+                "anchors summary is empty"
+            )
         anchors_by_type = {t: len(rids) for t, rids in anchors.items()}
 
         # ── estimated row count (anchor-based; honest about unknowns) ───────
@@ -811,8 +894,11 @@ class Denormalizer:
                         "orphan_rows": orphan_count,
                         "total": at_row_per_count + orphan_count,
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                warnings.append(
+                    f"estimated_row_count: {type(e).__name__} ({str(e)[:120]}); "
+                    "row-count estimate left as None"
+                )
 
         return {
             "row_per": resolved_row_per,
@@ -827,6 +913,7 @@ class Denormalizer:
             "estimated_row_count": estimated,
             "anchors": {"total": sum(anchors_by_type.values()), "by_type": anchors_by_type},
             "source": getattr(self, "_source", "local"),
+            "warnings": warnings,
         }
 
     def list_paths(
@@ -1242,9 +1329,28 @@ class Denormalizer:
         }
         seen_by_table: dict[str, set[str]] = {t: set() for t in upstream_anchors}
         if upstream_anchors:
+            # RB-04: Build per-anchor RID labels via ``denormalize_column_name``
+            # so multi-schema datasets resolve to ``schema.Table.RID`` rather
+            # than the bare ``Table.RID`` form. Previously this loop assumed
+            # single-schema and would silently fail to match any row on
+            # multi-schema datasets, marking every anchor RID as orphan.
+            from deriva_ml.model.catalog import denormalize_column_name
+
+            _, _column_specs, _multi_schema = self._model._planner._prepare_wide_table(
+                self._dataset,
+                self._dataset_rid,
+                list(include_tables),
+                row_per=resolved_row_per,
+                via=list(via or []) or None,
+            )
+            table_to_schema: dict[str, str] = {t: s for s, t, _c, _tp in _column_specs}
+            rid_label_by_anchor: dict[str, str] = {
+                t: denormalize_column_name(table_to_schema.get(t, ""), t, "RID", _multi_schema)
+                for t in seen_by_table
+            }
             for row in main_result.iter_rows():
                 for t, seen in seen_by_table.items():
-                    val = row.get(f"{t}.RID")
+                    val = row.get(rid_label_by_anchor[t])
                     if val is not None:
                         seen.add(val)
         per_rid_orphans: dict[str, list[str]] = {}
