@@ -5,7 +5,20 @@ using a deriva catalog.
 
 Complete on-line documentation for DerivaML can be found [here](https://informatics-isi-edu.github.io/deriva-ml/)
 
-To get started using DerivaML, you can clone the [model template repository](https://github.com/informatics-isi-edu/deriva-ml-model-template), and modify it to suite your requirements.
+## Experiments
+
+DerivaML organizes ML activities into **experiments**. An experiment is a
+**GitHub repository** that holds the *executable* and *human-readable* sides
+of a research project — model code, hydra-zen configurations, and a
+`tacit-knowledge.md` capturing the *why* behind project decisions. The catalog
+stores the *what* (data, RIDs, lineage); the experiment repository stores
+the *how* and the *why*. Every execution from the repo records the git commit
+hash on its Workflow row, so a result traces to the exact code that produced
+it.
+
+To bootstrap a new experiment, clone the
+[deriva-ml-model-template repository](https://github.com/informatics-isi-edu/deriva-ml-model-template)
+and modify it to suit your requirements.
 
 ## API verb conventions
 
