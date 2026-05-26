@@ -542,6 +542,176 @@ class TestDescribe:
         assert plan["row_per"] is None
 
 
+class TestFeatureNameResolution:
+    """``_resolve_table_names`` translates feature names to feature tables.
+
+    Both ``describe_denormalized`` and ``get_denormalized_as_dataframe``
+    accept feature names (e.g. ``"Image_Classification"``) in
+    ``include_tables`` even though the underlying catalog entity is a
+    feature-association table (e.g.
+    ``"Execution_Image_Image_Classification"``). The shared resolver
+    silently substitutes feature names for their backing tables so the
+    two methods agree on what's a valid ``include_tables`` entry.
+
+    These tests stub ``find_features`` on the canned model so we don't
+    have to spin up a feature-aware bag fixture — the resolver only
+    needs the index ``{feature_name: [Feature]}`` to operate.
+    """
+
+    @staticmethod
+    def _stub_find_features(model, mapping):
+        """Monkey-patch ``model.find_features`` to return synthetic features.
+
+        Args:
+            model: The DerivaModel under test.
+            mapping: ``{feature_name: feature_table_name}`` — each entry
+                produces a synthetic Feature wrapping the named tables
+                from ``model.name_to_table``.
+        """
+
+        class _StubFeature:
+            def __init__(self, feature_name, feature_table, target_table):
+                self.feature_name = feature_name
+                self.feature_table = feature_table
+                self.target_table = target_table
+
+        features = []
+        for fname, table_name in mapping.items():
+            tbl = model.name_to_table(table_name)
+            # Pick a deterministic target — the Image table is the
+            # universal sink in the canned fixture.
+            target = model.name_to_table("Image")
+            features.append(_StubFeature(fname, tbl, target))
+        model.find_features = lambda table=None: features
+
+    def test_run_accepts_feature_name_as_include_table(self, populated_denorm) -> None:
+        """``as_dataframe(include_tables=[feature_name])`` runs the same
+        as if the user had passed the feature-association table name.
+
+        Pre-fix: ``name_to_table("Image_Classification")`` would raise
+        because the catalog only has ``Execution_Image_Image_Classification``.
+        Post-fix: the resolver substitutes silently.
+        """
+        # In the canned fixture, Subject is a plain table — we stub
+        # the model so the planner sees a feature called "ClassifiedAs"
+        # backed by the existing "Subject" table. The data is the same;
+        # we just verify the substitution wires through end-to-end.
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        self._stub_find_features(populated_denorm["model"], {"ClassifiedAs": "Subject"})
+
+        df_via_feature = d.as_dataframe(["Image", "ClassifiedAs"])
+        df_via_table = d.as_dataframe(["Image", "Subject"])
+        # Same shape — the feature name was resolved to Subject before
+        # the planner ran.
+        assert len(df_via_feature) == len(df_via_table)
+        assert list(df_via_feature.columns) == list(df_via_table.columns)
+
+    def test_describe_accepts_feature_name(self, populated_denorm) -> None:
+        """``describe(include_tables=[feature_name])`` produces a plan
+        whose ``row_per_candidates`` reflects the resolved table — not
+        the raw feature name, so describe and run agree."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        self._stub_find_features(populated_denorm["model"], {"ClassifiedAs": "Subject"})
+
+        plan = d.describe(["Image", "ClassifiedAs"])
+        # Resolved name, not the raw feature name.
+        assert "Subject" in plan["include_tables"]
+        assert "ClassifiedAs" not in plan["include_tables"]
+        # The plan agrees with what run would produce.
+        assert plan["row_per"] == "Image"
+
+    def test_describe_and_run_agree(self, populated_denorm) -> None:
+        """The Analyst's preferred-fix invariant: describe and run agree
+        on what's a valid ``include_tables`` entry.
+
+        Originally surfaced in the 2026-05-26 multipersona e2e —
+        ``describe_denormalized(include_tables=["Image",
+        "Image_Classification"])`` succeeded but the corresponding
+        ``get_denormalized_as_dataframe`` call raised
+        ``DerivaMLException: The table Image_Classification doesn't
+        exist``. After the fix both calls succeed and produce
+        consistent shapes.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        self._stub_find_features(populated_denorm["model"], {"ClassifiedAs": "Subject"})
+
+        plan = d.describe(["Image", "ClassifiedAs"])
+        df = d.as_dataframe(["Image", "ClassifiedAs"])
+        # describe's column list shape matches the dataframe's columns.
+        assert {name for name, _ in plan["columns"]} == set(df.columns)
+
+    def test_unknown_feature_name_distinguishes_from_unknown_table(self, populated_denorm) -> None:
+        """Unknown feature name and unknown table produce different
+        error messages so the user knows whether to typo-correct a
+        feature name or pick a different table."""
+        from deriva_ml.core.exceptions import DerivaMLTableNotFound
+
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # Stub find_features so the error message lists known features.
+        self._stub_find_features(populated_denorm["model"], {"ClassifiedAs": "Subject"})
+
+        # Bogus name with no feature match → error mentions known features.
+        with pytest.raises(DerivaMLTableNotFound) as exc_info_feature:
+            d.as_dataframe(["Image", "TotallyUnknownThing"])
+        msg_with_features = str(exc_info_feature.value)
+        assert "TotallyUnknownThing" in msg_with_features
+        assert "ClassifiedAs" in msg_with_features
+        assert "Known feature names" in msg_with_features
+
+        # Same bogus name, but with no features defined at all →
+        # plain table-not-found, no "Known feature names" suggestion.
+        populated_denorm["model"].find_features = lambda table=None: []
+        with pytest.raises(DerivaMLTableNotFound) as exc_info_plain:
+            d.as_dataframe(["Image", "TotallyUnknownThing"])
+        msg_plain = str(exc_info_plain.value)
+        assert "TotallyUnknownThing" in msg_plain
+        assert "Known feature names" not in msg_plain
+
+    def test_unknown_table_still_raises_table_not_found(self, populated_denorm) -> None:
+        """Pre-fix behavior preserved: a genuinely-unknown table name
+        still raises ``DerivaMLTableNotFound`` — the resolver doesn't
+        accidentally accept invalid inputs."""
+        from deriva_ml.core.exceptions import DerivaMLTableNotFound
+
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # No find_features stub: the resolver's feature index is empty
+        # and a bogus table name falls through to TableNotFound.
+        with pytest.raises(DerivaMLTableNotFound):
+            d.as_dataframe(["Image", "DefinitelyDoesNotExist"])
+
+    def test_ambiguous_feature_name_raises(self, populated_denorm) -> None:
+        """A feature name defined on multiple target tables is
+        ambiguous — the resolver refuses to guess."""
+        from deriva_ml.core.exceptions import DerivaMLDenormalizeError
+
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+
+        # Two synthetic Features sharing the same feature_name but
+        # backed by different feature_tables.
+        model = populated_denorm["model"]
+
+        class _StubFeature:
+            def __init__(self, feature_name, feature_table, target_table):
+                self.feature_name = feature_name
+                self.feature_table = feature_table
+                self.target_table = target_table
+
+        subj = model.name_to_table("Subject")
+        img = model.name_to_table("Image")
+        model.find_features = lambda table=None: [
+            _StubFeature("Shared", subj, img),
+            _StubFeature("Shared", img, subj),
+        ]
+        with pytest.raises(DerivaMLDenormalizeError, match="ambiguous"):
+            d.as_dataframe(["Image", "Shared"])
+
+
 class TestListPaths:
     """list_paths describes the FK graph from the dataset's anchor types."""
 
