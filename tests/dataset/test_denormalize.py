@@ -780,6 +780,96 @@ class TestCatalogDenormalize:
         assert len(catalog_subject_cols) > 0, "Expected Subject columns in catalog result"
         assert len(bag_subject_cols) > 0, "Expected Subject columns in bag result"
 
+    def test_catalog_and_bag_denormalize_parity_multi_table(self, catalog_with_datasets, tmp_path):
+        """Layer D.1 parity (spec §8 row D.1) for the multi-table case.
+
+        Audit finding TC-01: the existing parity test
+        (``test_catalog_and_bag_denormalize_consistency``) only exercises
+        the trivial single-table case (``include_tables=["Subject"]``).
+        Spec §8 row D.1 names a parity guarantee at the catalog↔bag
+        boundary for multi-table plans: the same plan produces the same
+        row count, column set, and row content irrespective of source.
+
+        This test runs the same multi-table plan
+        (``include_tables=["Image", "Observation", "Subject"]``) against
+        both ``source="catalog"`` (via ``dataset.get_denormalized_*``)
+        and ``source="local"`` (via ``bag.get_denormalized_*``) and
+        asserts:
+
+        - identical row counts;
+        - identical column sets (set equality, not list equality —
+          column ordering is not part of the contract);
+        - identical row content when keyed on the natural primary key
+          (``Image.RID``).
+
+        Lands the cheap smoke test for spec §9 D.2; closes TC-01 of
+        ``docs/audits/2026-05-26-denormalize-audit.md``.
+        """
+        ml_instance, dataset_description = catalog_with_datasets
+
+        dataset = dataset_description.dataset
+        current_version = dataset.current_version
+
+        # Multi-table plan: Image + Observation + Subject. Observation
+        # disambiguates the Image→Subject FK fan-out so the catalog and
+        # bag both pick the same join path.
+        include = ["Image", "Observation", "Subject"]
+
+        catalog_df = dataset.get_denormalized_as_dataframe(include_tables=include)
+
+        bag = dataset.download_dataset_bag(current_version, use_minid=False)
+        bag_df = bag.get_denormalized_as_dataframe(include_tables=include)
+
+        # 1. Row count parity. The same plan must produce the same
+        #    number of rows from either source.
+        assert len(catalog_df) == len(bag_df), (
+            f"Row count mismatch: catalog={len(catalog_df)} vs bag={len(bag_df)} "
+            f"for include_tables={include}. D.1 parity violated."
+        )
+
+        # 2. Column set parity. Ordering isn't part of the contract;
+        #    set equality is.
+        catalog_cols = set(catalog_df.columns)
+        bag_cols = set(bag_df.columns)
+        assert catalog_cols == bag_cols, (
+            f"Column set mismatch: catalog-only={catalog_cols - bag_cols}, "
+            f"bag-only={bag_cols - catalog_cols}. D.1 parity violated."
+        )
+
+        # 3. Row content parity. Index both frames by Image.RID and
+        #    compare the same column set after sorting columns. If the
+        #    fixture has rows with NULL Image.RID (orphans), drop them
+        #    on both sides before keyed comparison — they're legitimately
+        #    present in both sources and don't have a useful join key.
+        assert "Image.RID" in catalog_cols, (
+            "Test assumes Image.RID is in the result; demo fixture changed?"
+        )
+
+        sorted_cols = sorted(catalog_cols)
+        cat_keyed = (
+            catalog_df.dropna(subset=["Image.RID"])
+            .sort_values(by="Image.RID")
+            .reset_index(drop=True)[sorted_cols]
+        )
+        bag_keyed = (
+            bag_df.dropna(subset=["Image.RID"])
+            .sort_values(by="Image.RID")
+            .reset_index(drop=True)[sorted_cols]
+        )
+
+        # Use Image.RID set equality as the strong row-identity check;
+        # full row-by-row equality is too brittle to typing differences
+        # between sources (catalog returns native types; bag may return
+        # str). RID identity covers SC-06 / D.1 — silent row drop on
+        # one source manifests as a missing RID set.
+        cat_rids = set(cat_keyed["Image.RID"])
+        bag_rids = set(bag_keyed["Image.RID"])
+        assert cat_rids == bag_rids, (
+            f"Image.RID set mismatch between sources: "
+            f"catalog-only={cat_rids - bag_rids}, "
+            f"bag-only={bag_rids - cat_rids}. D.1 row-content parity violated."
+        )
+
     def test_catalog_denormalize_with_nested_dataset(self, catalog_with_datasets, tmp_path):
         """Test that catalog denormalization includes nested dataset members.
 
@@ -1686,6 +1776,37 @@ class TestNewFKPatterns:
                 f"output. Currently it is silently omitted (only the demo's "
                 f"original execution survives)."
             )
+
+        # ── TC-10: Layer D.2 parity for the A01 multi-feature-per-anchor
+        # shape (spec §8 row D.2). Audit finding TC-10 names this as the
+        # cheap extension of the live-catalog assertions above. After we
+        # know the catalog source returns the expected (1+N) × image_count
+        # rows, download a bag of the same dataset and run the same
+        # ``include_tables`` against it; assert row count and column set
+        # match the catalog call. A silent path-skip in either source
+        # would surface here as a parity violation.
+        #
+        # The bag captures the catalog state at its version, so we bump
+        # the dataset version first — the rows the extra Executions
+        # added are server-side now but aren't pinned to a version yet.
+        # ``_increment_dataset_version`` stamps a new snapshot;
+        # ``download_dataset_bag(new_version)`` materialises against it.
+        new_version = str(live_ds._increment_dataset_version(component=VersionPart.patch))
+        bag_a01 = live_ds.download_dataset_bag(new_version, use_minid=False)
+        bag_df = bag_a01.get_denormalized_as_dataframe(
+            include_tables=["Image", "Execution_Image_Quality"],
+            row_per="Execution_Image_Quality",
+        )
+        assert len(bag_df) == len(df), (
+            f"D.2 parity violated: catalog={len(df)} rows, bag={len(bag_df)} rows "
+            f"for the A01 multi-feature-per-anchor shape. One source is "
+            f"silently dropping feature rows."
+        )
+        assert set(bag_df.columns) == set(df.columns), (
+            f"D.2 column set mismatch on A01-shape: "
+            f"catalog-only={set(df.columns) - set(bag_df.columns)}, "
+            f"bag-only={set(bag_df.columns) - set(df.columns)}."
+        )
 
 
 class TestVersionPinnedDenormalize:
