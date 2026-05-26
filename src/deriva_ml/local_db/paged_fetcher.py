@@ -395,6 +395,17 @@ class PagedFetcher:
         """
         if not rows:
             return 0
+        # SC-05: explicit guard — rows arriving without a ``RID`` key are
+        # a programming error. The legacy contract relied on SQLite's
+        # NOT NULL constraint to surface this (every supported engine
+        # declares ``RID`` as the PK, and PKs are implicitly NOT NULL),
+        # which produced an opaque ``IntegrityError`` from deep in the
+        # dialect layer. Raise a clear ``ValueError`` instead so the
+        # caller sees the bad row, and the contract is no longer
+        # dialect-coupled.
+        for r in rows:
+            if "RID" not in r:
+                raise ValueError(f"_insert_rows: row missing RID — programming error: {r!r}")
         cols = {c.name for c in target_table.columns}
         projected = [{k: v for k, v in r.items() if k in cols} for r in rows]
         if not projected:

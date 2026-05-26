@@ -163,6 +163,13 @@ class Denormalizer:
         self._orm_resolver = getattr(dataset, "_orm_resolver", None)
         self._paged_client: Any = None
         self._source = "local"
+        # RB-05: diagnostic for the silent-fallback-to-local case. When
+        # ErmrestPagedClient construction fails on a live-catalog path,
+        # this gets populated with a single-line description so the
+        # describe() envelope can surface it (planned: SC-01 warnings
+        # envelope appends this to plan["warnings"]). Empty string means
+        # "no fallback occurred."
+        self._init_warning: str = ""
 
         if ml_instance is not None:
             workspace = getattr(ml_instance, "workspace", None)
@@ -185,11 +192,24 @@ class Denormalizer:
 
                     self._paged_client = ErmrestPagedClient(catalog=catalog)
                     self._source = "catalog"
-                except Exception:
-                    # If the client can't be built (offline tests, mock
-                    # catalog), fall back to local mode silently.
+                except Exception as e:
+                    # RB-05: If the client can't be built (offline tests,
+                    # mock catalog, transient auth race), fall back to
+                    # local mode — but log at WARNING and stash an
+                    # `_init_warning` so describe() can surface the
+                    # fallback to callers. Previously this was silent
+                    # and produced zero-row results on auth/network
+                    # setup races with no diagnostic.
                     self._paged_client = None
                     self._source = "local"
+                    self._init_warning = (
+                        f"ErmrestPagedClient construction failed "
+                        f"({type(e).__name__}: {e}); fell back to "
+                        f"source='local'. Live-catalog fetches are "
+                        f"disabled — results will reflect whatever is "
+                        f"already in the local engine."
+                    )
+                    logger.warning("Denormalizer init: %s", self._init_warning)
 
         if self._orm_resolver is None and self._model is not None:
             # Last resort — model-level ORM resolver.
@@ -802,7 +822,11 @@ class Denormalizer:
             anchors = self._anchors_as_dict()
         except Exception:
             anchors = {}
-        anchors_by_type = {t: len(rids) for t, rids in anchors.items()}
+        # RB-03: skip empty anchor sets, matching the ``if not rids: continue``
+        # guard in :meth:`_classify_anchors`. ``list_dataset_members`` returns
+        # ``{"File": []}`` for empty association tables; describe and run must
+        # agree on the resulting anchor count.
+        anchors_by_type = {t: len(rids) for t, rids in anchors.items() if rids}
 
         # ── estimated row count (anchor-based; honest about unknowns) ───────
         #
@@ -1272,10 +1296,26 @@ class Denormalizer:
                 dataset_children_rids = [
                     getattr(c, "dataset_rid", None) for c in children if getattr(c, "dataset_rid", None)
                 ] or None
-            except Exception:
-                # Fixture-shaped datasets or unusual DatasetLike
+            except (AttributeError, TypeError):
+                # RB-06: Fixture-shaped datasets or unusual DatasetLike
                 # implementations may not support recurse; silently fall
                 # back to root-only scoping rather than break denormalize.
+                dataset_children_rids = None
+            except Exception as e:
+                # RB-06: For a live catalog source, a transient failure
+                # (network, permissions) silently dropping to root-only
+                # produces the silent-zero pattern on nested datasets.
+                # Surface the failure as a WARNING log so operators can
+                # see why their nested-member rows are missing. Fixtures
+                # are caught by the narrow except above, so reaching here
+                # against ``source='catalog'`` is a real catalog issue.
+                if self._source == "catalog":
+                    logger.warning(
+                        "list_dataset_children failed on live catalog: %s; "
+                        "falling back to root-only scoping (nested-dataset "
+                        "members will be absent from the result).",
+                        e,
+                    )
                 dataset_children_rids = None
 
         main_result = _denormalize_impl(
@@ -1304,9 +1344,27 @@ class Denormalizer:
         }
         seen_by_table: dict[str, set[str]] = {t: set() for t in upstream_anchors}
         if upstream_anchors:
+            # RB-04: Build per-anchor RID labels via ``denormalize_column_name``
+            # so multi-schema datasets resolve to ``schema.Table.RID`` rather
+            # than the bare ``Table.RID`` form. Previously this loop assumed
+            # single-schema and would silently fail to match any row on
+            # multi-schema datasets, marking every anchor RID as orphan.
+            from deriva_ml.model.catalog import denormalize_column_name
+
+            _, _column_specs, _multi_schema = self._model._planner._prepare_wide_table(
+                self._dataset,
+                self._dataset_rid,
+                list(include_tables),
+                row_per=resolved_row_per,
+                via=list(via or []) or None,
+            )
+            table_to_schema: dict[str, str] = {t: s for s, t, _c, _tp in _column_specs}
+            rid_label_by_anchor: dict[str, str] = {
+                t: denormalize_column_name(table_to_schema.get(t, ""), t, "RID", _multi_schema) for t in seen_by_table
+            }
             for row in main_result.iter_rows():
                 for t, seen in seen_by_table.items():
-                    val = row.get(f"{t}.RID")
+                    val = row.get(rid_label_by_anchor[t])
                     if val is not None:
                         seen.add(val)
         per_rid_orphans: dict[str, list[str]] = {}

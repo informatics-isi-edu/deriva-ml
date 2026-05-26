@@ -925,6 +925,264 @@ class TestFromRids:
         assert d is not None
 
 
+class TestRB03EmptyAnchorInDescribe:
+    """RB-03: describe's anchor count must skip empty anchor sets to match
+    ``_classify_anchors``' ``if not rids: continue`` guard.
+
+    Without this, ``list_dataset_members`` returns ``{"File": []}`` for
+    empty association tables and the describe envelope reports
+    ``anchors.by_type["File"] == 0`` even though ``_run`` skips it
+    entirely — a cosmetic mismatch that confuses careful readers.
+    """
+
+    def test_empty_anchor_skipped_in_describe_by_type(self, populated_denorm) -> None:
+        """A ``list_dataset_members`` entry with an empty list is dropped."""
+
+        class _DSWithEmptyFile(_FakeDataset):
+            def list_dataset_members(self, **kwargs: Any) -> dict[str, list[dict]]:
+                members = super().list_dataset_members(**kwargs)
+                members["File"] = []
+                return members
+
+        ds = _DSWithEmptyFile(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(["Image", "Subject"])
+        by_type = plan["anchors"]["by_type"]
+        assert "File" not in by_type, (
+            f"Empty anchors should be skipped to match _classify_anchors; got by_type={by_type}"
+        )
+        assert by_type.get("Image") == 3
+
+
+class TestRB04PerRidOrphanScanLabel:
+    """RB-04: the per-RID orphan scan in ``_run`` must label anchor RID
+    columns via ``denormalize_column_name`` rather than the bare
+    ``f"{t}.RID"`` shape, so multi-schema datasets don't silently mark
+    every anchor RID as orphan.
+    """
+
+    def test_label_construction_uses_denormalize_column_name(self) -> None:
+        """Direct: ``denormalize_column_name`` produces the schema-qualified
+        form when ``multi_schema=True`` and the bare form otherwise."""
+        from deriva_ml.model.catalog import denormalize_column_name
+
+        assert denormalize_column_name("isa", "Image", "RID", False) == "Image.RID"
+        assert denormalize_column_name("isa", "Image", "RID", True) == "isa.Image.RID"
+
+    def test_per_rid_scan_still_works_on_single_schema(self, populated_denorm) -> None:
+        """End-to-end: orphan detection works on a single-schema dataset.
+
+        Pin the behavior that the per-RID orphan scan continues to work
+        for single-schema fixtures after the routing change.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        df = d.as_dataframe(["Image", "Subject"])
+        assert len(df) >= 3
+
+
+class TestRB05InitWarning:
+    """RB-05: ErmrestPagedClient construction failure on a live-catalog
+    path must surface as an ``_init_warning`` plus a WARNING log, not a
+    silent fallback to ``source='local'``.
+    """
+
+    def test_init_warning_set_on_paged_client_failure(self, populated_denorm, caplog) -> None:
+        """A bad catalog forces fallback; verify diagnostic + log fire."""
+        import logging
+
+        class _BadCatalog:
+            pass
+
+        class _FakeMlForInit:
+            def __init__(self, pd):
+                self.model = pd["model"]
+                ls = pd["local_schema"]
+                self.workspace = type("WS", (), {"engine": ls.engine, "local_schema": ls})()
+                self.catalog = _BadCatalog()
+
+        class _DSWithMl(_FakeDataset):
+            @property
+            def _ml_instance(self):
+                return self._fake_ml
+
+        ds = _DSWithMl(populated_denorm)
+        ds._fake_ml = _FakeMlForInit(populated_denorm)
+
+        with caplog.at_level(logging.WARNING, logger="deriva_ml.local_db.denormalizer"):
+            d = Denormalizer(ds)
+
+        assert d._source == "local"
+        assert d._init_warning, "Expected _init_warning to be populated after fallback"
+        assert "ErmrestPagedClient construction failed" in d._init_warning
+        assert any("Denormalizer init" in rec.message for rec in caplog.records), (
+            f"Expected WARNING log for init fallback; got {[r.message for r in caplog.records]}"
+        )
+
+    def test_init_warning_empty_on_success(self, populated_denorm) -> None:
+        """No fallback → ``_init_warning`` stays empty (the default sentinel)."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        assert d._init_warning == ""
+
+
+class TestRB06ListChildrenWarning:
+    """RB-06: ``_run``'s ``list_dataset_children`` exception handling must
+    log a WARNING when the source is ``"catalog"`` (a real catalog
+    failure) and stay silent on AttributeError/TypeError from fixture-
+    shaped datasets that simply don't implement recurse.
+    """
+
+    def test_real_exception_warns_under_catalog_source(self, populated_denorm, caplog, monkeypatch) -> None:
+        """Generic exception + source='catalog' → WARNING log.
+
+        Mock out ``_denormalize_impl`` so the test doesn't trip
+        ``_denormalize_impl``'s ``paged_client is required when source='catalog'``
+        validation — we're testing the upstream exception-handling
+        branch, not the SQL executor.
+        """
+        import logging
+
+        from deriva_ml.local_db import denormalizer as denorm_mod
+
+        class _DSRaisesGeneric(_FakeDataset):
+            def list_dataset_children(self, **kwargs: Any) -> list:
+                raise RuntimeError("network blip")
+
+        ds = _DSRaisesGeneric(populated_denorm)
+        d = Denormalizer(ds)
+        d._source = "catalog"
+
+        # Replace the SQL executor with a stub that returns an empty
+        # result — we just need _run's try/except to execute.
+        def _stub_impl(**kwargs: Any) -> Any:
+            from deriva_ml.local_db.denormalize import DenormalizeResult
+
+            return DenormalizeResult(columns=[], row_count=0, _rows=[])
+
+        monkeypatch.setattr(denorm_mod, "_denormalize_impl", _stub_impl)
+
+        with caplog.at_level(logging.WARNING, logger="deriva_ml.local_db.denormalizer"):
+            df = d.as_dataframe(["Image", "Subject"])
+        # Result returned (graceful fallback to root-only scoping).
+        assert len(df) >= 0
+        # Warning emitted because source='catalog' and a non-attr error
+        # was raised.
+        assert any("list_dataset_children failed" in rec.message for rec in caplog.records), (
+            f"Expected WARNING for catalog-source failure; got {[r.message for r in caplog.records]}"
+        )
+
+    def test_attribute_error_silent_for_fixture(self, populated_denorm, caplog) -> None:
+        """AttributeError from a fixture-shaped dataset must NOT warn."""
+        import logging
+
+        class _DSRaisesAttr(_FakeDataset):
+            def list_dataset_children(self, **kwargs: Any) -> list:
+                raise AttributeError("no recurse on this DatasetLike")
+
+        ds = _DSRaisesAttr(populated_denorm)
+        d = Denormalizer(ds)
+        with caplog.at_level(logging.WARNING, logger="deriva_ml.local_db.denormalizer"):
+            df = d.as_dataframe(["Image", "Subject"])
+        assert len(df) >= 0
+        assert not any("list_dataset_children" in rec.message for rec in caplog.records)
+
+
+class TestRB10DeadModelParameter:
+    """RB-10: ``_populate_from_catalog`` no longer accepts a ``model``
+    parameter — it was dead code marked with ``_ = model``.
+    """
+
+    def test_signature_has_no_model_parameter(self) -> None:
+        """Inspect the function signature to pin the parameter removal."""
+        import inspect
+
+        from deriva_ml.local_db.denormalize import _populate_from_catalog
+
+        sig = inspect.signature(_populate_from_catalog)
+        assert "model" not in sig.parameters, (
+            f"_populate_from_catalog should no longer take a 'model' kwarg; got {list(sig.parameters)}"
+        )
+
+
+class TestRB08CompositeFKAssertion:
+    """RB-08: ``_collect_fk_values`` must raise ``NotImplementedError``
+    when more than one workable condition is found, instead of silently
+    returning the first one (under-scoped fetch).
+    """
+
+    def test_composite_fk_raises_not_implemented(self, populated_denorm) -> None:
+        """Two workable conditions, same target table → NotImplementedError."""
+        from sqlalchemy import Column, MetaData, String, Table
+
+        from deriva_ml.local_db.denormalize import _collect_fk_values
+
+        engine = populated_denorm["local_schema"].engine
+        md = MetaData()
+        a = Table("RB08_OtherA", md, Column("RID", String, primary_key=True), Column("FilterCol", String))
+        b = Table("RB08_OtherB", md, Column("RID", String, primary_key=True), Column("FilterCol", String))
+        md.create_all(engine)
+        with engine.begin() as conn:
+            conn.execute(a.insert(), [{"RID": "X1", "FilterCol": "v1"}])
+            conn.execute(b.insert(), [{"RID": "Y1", "FilterCol": "v2"}])
+
+        class _OrmA:
+            __table__ = a
+
+        class _OrmB:
+            __table__ = b
+
+        def resolver(name: str) -> Any:
+            return {"RB08_OtherA": _OrmA, "RB08_OtherB": _OrmB}.get(name)
+
+        def _col(table_name: str, col_name: str) -> Any:
+            t = type("T", (), {"name": table_name})()
+            return type("C", (), {"table": t, "name": col_name})()
+
+        cond_pair_1 = (_col("RB08_OtherA", "FilterCol"), _col("Target", "RID"))
+        cond_pair_2 = (_col("RB08_OtherB", "FilterCol"), _col("Target", "RID"))
+
+        with pytest.raises(NotImplementedError, match="composite FK"):
+            _collect_fk_values(
+                engine=engine,
+                orm_resolver=resolver,
+                conditions={cond_pair_1, cond_pair_2},
+                target_table_name="Target",
+            )
+
+    def test_single_workable_condition_still_returns(self, populated_denorm) -> None:
+        """A single non-empty condition still returns its values."""
+        from sqlalchemy import Column, MetaData, String, Table
+
+        from deriva_ml.local_db.denormalize import _collect_fk_values
+
+        engine = populated_denorm["local_schema"].engine
+        md = MetaData()
+        a = Table("RB08_Only", md, Column("RID", String, primary_key=True), Column("FilterCol", String))
+        md.create_all(engine)
+        with engine.begin() as conn:
+            conn.execute(a.insert(), [{"RID": "X1", "FilterCol": "v1"}])
+
+        class _OrmA:
+            __table__ = a
+
+        def resolver(name: str) -> Any:
+            return _OrmA if name == "RB08_Only" else None
+
+        def _col(table_name: str, col_name: str) -> Any:
+            t = type("T", (), {"name": table_name})()
+            return type("C", (), {"table": t, "name": col_name})()
+
+        values, filter_col = _collect_fk_values(
+            engine=engine,
+            orm_resolver=resolver,
+            conditions={(_col("RB08_Only", "FilterCol"), _col("Target", "RID"))},
+            target_table_name="Target",
+        )
+        assert values == ["v1"]
+        assert filter_col == "RID"
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
