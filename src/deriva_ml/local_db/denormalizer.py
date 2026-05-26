@@ -783,13 +783,9 @@ class Denormalizer:
                 # (case 1, exact contribution) and "anchors elsewhere
                 # but reaching row_per via FK chain" (case 2, unknown
                 # fan-out).
-                at_row_per_count = sum(
-                    len(rids) for table, rids in scoping.items() if table == resolved_row_per
-                )
+                at_row_per_count = sum(len(rids) for table, rids in scoping.items() if table == resolved_row_per)
                 downstream_anchor_tables = [
-                    table
-                    for table, rids in scoping.items()
-                    if table != resolved_row_per and rids
+                    table for table, rids in scoping.items() if table != resolved_row_per and rids
                 ]
                 orphan_count = sum(len(rids) for rids in orphans.values())
 
@@ -1127,8 +1123,7 @@ class Denormalizer:
             )
             table_to_schema: dict[str, str] = {t: s for s, t, _c, _tp in _column_specs}
             rid_label_by_anchor: dict[str, str] = {
-                t: denormalize_column_name(table_to_schema.get(t, ""), t, "RID", _multi_schema)
-                for t in seen_by_table
+                t: denormalize_column_name(table_to_schema.get(t, ""), t, "RID", _multi_schema) for t in seen_by_table
             }
             for row in main_result.iter_rows():
                 for t, seen in seen_by_table.items():
