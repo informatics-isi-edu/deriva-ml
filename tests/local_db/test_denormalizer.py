@@ -736,6 +736,196 @@ class TestFeatureNameResolution:
             d.as_dataframe(["Image", "Shared"])
 
 
+class TestDescribeKeyParity:
+    """Per-key describe-vs-run parity (audit finding TC-02 / spec §8.3).
+
+    The existing ``TestFeatureNameResolution::test_describe_and_run_agree``
+    pins only ``plan["columns"]`` on one specific input. Spec §8.3
+    (the "describe-vs-run agreement contract") commits to the full
+    13-key envelope; each remaining key carries its own
+    analyst/01-shape asymmetry risk. This class pins each one against
+    the values ``_run`` actually uses or that ``as_dataframe`` actually
+    produces, on a fixed multi-table input. Closes audit gap TC-02.
+
+    These tests are unit-style: they use the canned ``populated_denorm``
+    fixture (no live catalog) and the public Denormalizer surface. Each
+    test pins one or two keys so a failure points directly at the
+    asymmetric key.
+    """
+
+    INCLUDE = ["Image", "Subject"]
+
+    def test_row_per_matches_run_resolution(self, populated_denorm) -> None:
+        """``plan["row_per"]`` matches what ``_run`` resolves internally.
+
+        Pin: auto-inferred row_per under describe == the row_per the
+        planner uses inside ``_run`` (driven by the same
+        ``_determine_row_per`` call). Detected via the resolved value
+        appearing in the column names ``as_dataframe`` produces (every
+        row_per table contributes a ``Table.RID`` column).
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        df = d.as_dataframe(self.INCLUDE)
+        # In the canned fixture row_per resolves to "Image" (Subject is
+        # an upstream anchor reached via the Image.Subject FK).
+        assert plan["row_per"] == "Image"
+        # And _run effectively used the same value: an "Image.RID"
+        # column is in the dataframe (row_per table always contributes
+        # its RID column).
+        assert "Image.RID" in df.columns
+
+    def test_row_per_in_candidates(self, populated_denorm) -> None:
+        """``plan["row_per_candidates"]`` is a superset of the resolved row_per.
+
+        Spec §5: row_per_candidates lists the sinks Rule 2 sink-finding
+        considered. The resolved row_per must be one of them (otherwise
+        the resolver picked a value outside its own search space).
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        assert plan["row_per"] in plan["row_per_candidates"], (
+            f"resolved row_per={plan['row_per']!r} should be among "
+            f"row_per_candidates={plan['row_per_candidates']!r}"
+        )
+
+    def test_columns_set_equals_dataframe_columns(self, populated_denorm) -> None:
+        """``plan["columns"]`` set-equals ``as_dataframe`` columns.
+
+        Already pinned by ``test_describe_and_run_agree`` on a feature
+        input; replicate here on the multi-table input to round out the
+        13-key envelope. Set equality, not list equality — column order
+        is not part of the contract.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        df = d.as_dataframe(self.INCLUDE)
+        assert {name for name, _ in plan["columns"]} == set(df.columns)
+
+    def test_join_path_includes_run_tables(self, populated_denorm) -> None:
+        """``plan["join_path"]`` enumerates every table ``_run`` walks.
+
+        Walked tables surface as ``Table.*`` columns in the dataframe;
+        each table in ``join_path`` must therefore appear as a
+        ``Table.`` prefix in at least one dataframe column. The
+        ``Dataset`` root is intentionally absent from ``join_path``
+        (per describe's docstring) and is allowed not to appear in the
+        column prefixes.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        df = d.as_dataframe(self.INCLUDE)
+        col_prefixes = {c.split(".")[0] for c in df.columns}
+        # Every walked table contributes columns. Subject (upstream
+        # anchor via Image.Subject) and Image (row_per) both appear.
+        for table in plan["join_path"]:
+            assert table in col_prefixes or table == "Dataset_Image", (
+                f"join_path table {table!r} should produce columns in the "
+                f"dataframe; got column prefixes {col_prefixes}. "
+                f"(Pure association tables like Dataset_Image are walked "
+                f"through transparently — exempted by name.)"
+            )
+
+    def test_transparent_intermediates_disjoint_from_include(
+        self, populated_denorm
+    ) -> None:
+        """``transparent_intermediates`` ⊂ ``join_path`` and disjoint
+        from ``include_tables``.
+
+        Spec §5: "transparent_intermediates" is the subset of
+        ``join_path`` the user did NOT name in ``include_tables``. The
+        contract has two parts — both pinned here.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        transparent = set(plan["transparent_intermediates"])
+        join_path = set(plan["join_path"])
+        include = set(plan["include_tables"])
+        assert transparent.issubset(join_path), (
+            f"transparent_intermediates={transparent} must be ⊂ "
+            f"join_path={join_path}"
+        )
+        assert transparent.isdisjoint(include), (
+            f"transparent_intermediates={transparent} must be disjoint "
+            f"from include_tables={include}"
+        )
+
+    def test_anchors_by_type_subset_of_member_types(self, populated_denorm) -> None:
+        """``plan["anchors"]["by_type"]`` keys ⊆ dataset element types.
+
+        ``_anchors_as_dict`` is derived from ``list_dataset_members``;
+        every key in ``by_type`` must be an element type the dataset
+        carries. ``list_paths()["member_types"]`` is the canonical
+        source for that set.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        info = d.list_paths()
+        member_types = set(info["member_types"])
+        anchor_types = set(plan["anchors"]["by_type"])
+        assert anchor_types.issubset(member_types), (
+            f"anchors.by_type keys={anchor_types} must be ⊆ "
+            f"member_types={member_types}"
+        )
+
+    def test_estimated_row_count_shape(self, populated_denorm) -> None:
+        """``plan["estimated_row_count"]`` carries the three documented
+        fields and obeys the honest-unknown F6 contract.
+
+        Spec §5 (and §8 row F6): the dict always has
+        ``in_scope_row_per_rows``, ``orphan_rows``, and ``total``. When
+        ``total`` is exact, it equals ``in_scope_row_per_rows +
+        orphan_rows``. When it's ``None`` (downstream-anchor case), a
+        ``reason`` string is included.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        est = plan["estimated_row_count"]
+        for key in ("in_scope_row_per_rows", "orphan_rows", "total"):
+            assert key in est, f"estimated_row_count missing {key!r}: {est}"
+        if est["total"] is None:
+            # Honest-unknown envelope: reason must be present.
+            assert "reason" in est and isinstance(est["reason"], str)
+        else:
+            # Exact estimate: total = in_scope + orphan.
+            assert est["total"] == est["in_scope_row_per_rows"] + est["orphan_rows"]
+
+    def test_source_matches_denormalizer_source(self, populated_denorm) -> None:
+        """``plan["source"]`` matches the Denormalizer's ``_source`` attr.
+
+        The canned fixture uses ``source="local"`` (no live catalog,
+        engine pre-populated). Describe must report the same tag run
+        would consult.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        assert plan["source"] == d._source
+
+    def test_warnings_empty_on_clean_path(self, populated_denorm) -> None:
+        """``plan["warnings"]`` is empty on a clean describe call.
+
+        Spec §8.3.1: a populated warnings list signals that describe
+        silently swallowed an error. On a known-clean input the list
+        must be empty — otherwise we've reintroduced an analyst/01-shape
+        diagnostic loss.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        plan = d.describe(self.INCLUDE)
+        assert plan["warnings"] == [], (
+            f"clean describe call should produce no warnings; got "
+            f"{plan['warnings']}"
+        )
+
+
 class TestListPaths:
     """list_paths describes the FK graph from the dataset's anchor types."""
 
