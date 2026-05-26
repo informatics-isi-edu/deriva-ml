@@ -141,12 +141,12 @@ class TestDeepFKChains:
 
         # Without depth limit, should find paths reaching ChainF
         # Path: Dataset → Dataset_ChainA → ChainA → ChainB → ... → ChainF (8 hops)
-        all_paths = test_ml.model._schema_to_paths()
+        all_paths = test_ml.model._planner._schema_to_paths()
         deep_sigs = {" -> ".join(t.name for t in p) for p in all_paths if any(t.name == "ChainF" for t in p)}
         assert len(deep_sigs) > 0, "Should find paths to ChainF without depth limit"
 
         # With max_depth=4, should NOT reach ChainF (needs 8 hops from Dataset)
-        shallow_paths = test_ml.model._schema_to_paths(max_depth=4)
+        shallow_paths = test_ml.model._planner._schema_to_paths(max_depth=4)
         shallow_sigs = {" -> ".join(t.name for t in p) for p in shallow_paths if any(t.name == "ChainF" for t in p)}
         assert len(shallow_sigs) == 0, "max_depth=4 should not reach ChainF"
 
@@ -500,7 +500,7 @@ class TestSelfReferentialFK:
 
         # Should complete without hanging. The cycle detection in
         # _schema_to_paths prevents infinite recursion.
-        paths = test_ml.model._schema_to_paths()
+        paths = test_ml.model._planner._schema_to_paths()
         assert len(paths) > 0
 
     def test_self_referential_denormalize(self, test_ml: DerivaML, tmp_path):
@@ -565,7 +565,7 @@ class TestWideSchema:
         self._create_wide_schema(test_ml, n_tables=8)
         test_ml.model.refresh_model()
 
-        paths = test_ml.model._schema_to_paths()
+        paths = test_ml.model._planner._schema_to_paths()
         # Should complete. The star topology has bounded paths:
         # Dataset → assoc → Hub, Dataset → assoc → Hub → Spoke_i
         # Not exponential.

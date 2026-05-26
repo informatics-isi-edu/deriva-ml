@@ -328,7 +328,7 @@ class DatasetBag:
         dataset_rids = [self.dataset_rid] + [c.dataset_rid for c in self.list_dataset_children(recurse=True)]
 
         # Find all paths from Dataset to the target table
-        paths = [[t.name for t in p] for p in self.model._schema_to_paths() if p[-1].name == table]
+        paths = [[t.name for t in p] for p in self.model._planner._schema_to_paths() if p[-1].name == table]
 
         # Build a SELECT query for each path and UNION them together
         sql_cmds = []

@@ -67,7 +67,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # Core domain paths through Dataset_Image
@@ -90,7 +90,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # Core domain paths through Dataset_Subject
@@ -109,7 +109,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # Legacy association paths mirror Dataset_Image paths
@@ -127,7 +127,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # Image features (via Dataset_Image)
@@ -149,7 +149,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # ML schema paths
@@ -171,7 +171,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
 
         vocab_tables = {
             "Dataset_Type",
@@ -197,7 +197,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # ClinicalRecord is only reachable via ClinicalRecord_Observation (M:N)
@@ -224,7 +224,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # Direct path: Image → Subject
@@ -238,7 +238,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
 
         for p in paths:
             names = [t.name for t in p]
@@ -257,8 +257,8 @@ class TestSchemaToPathsBenchmark:
             dataset_description.dataset.current_version, use_minid=False
         )
 
-        all_paths = bag.model._schema_to_paths()
-        excluded_paths = bag.model._schema_to_paths(exclude_tables={"Observation"})
+        all_paths = bag.model._planner._schema_to_paths()
+        excluded_paths = bag.model._planner._schema_to_paths(exclude_tables={"Observation"})
 
         all_sigs = path_signatures(all_paths)
         excluded_sigs = path_signatures(excluded_paths)
@@ -287,7 +287,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
 
         # The demo schema with features produces ~115 paths.
         # Allow some tolerance for minor schema changes.
@@ -300,7 +300,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = [path_signature(p) for p in paths]
 
         assert len(sigs) == len(set(sigs)), f"Duplicate paths found: {[s for s in sigs if sigs.count(s) > 1]}"
@@ -311,7 +311,7 @@ class TestSchemaToPathsBenchmark:
         bag = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        paths = bag.model._schema_to_paths()
+        paths = bag.model._planner._schema_to_paths()
         sigs = path_signatures(paths)
 
         # Image asset type association
