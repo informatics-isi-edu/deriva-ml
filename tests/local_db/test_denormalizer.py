@@ -54,7 +54,7 @@ class TestAsDataframe:
 
 
 class TestAsDict:
-    """Denormalizer.as_dict streams rows as dicts."""
+    """Denormalizer.as_dict yields rows as dicts (eager materialisation)."""
 
     def test_yields_dicts(self, populated_denorm) -> None:
         ds = _FakeDataset(populated_denorm)
@@ -63,6 +63,26 @@ class TestAsDict:
         assert len(rows) == 3
         for r in rows:
             assert isinstance(r, dict)
+
+    def test_as_dict_docstring_admits_eager(self) -> None:
+        """as_dict's docstring must admit eager materialisation (SC-07 / TC-06).
+
+        The previous docstring claimed ``as_dict`` streams "when the
+        result set won't fit in memory" — false: ``_denormalize_impl``
+        drains the SQLAlchemy cursor into a Python list before any row
+        is yielded. This meta-test keeps the docstring honest under
+        future edits: any return to "streams"/"memory-efficient" framing
+        must come with an actual streaming implementation (and this
+        test should then be updated to assert the new contract).
+        """
+        doc = Denormalizer.as_dict.__doc__
+        assert doc is not None, "as_dict must keep its docstring"
+        lowered = doc.lower()
+        assert "materialised" in lowered or "materialized" in lowered, (
+            "as_dict docstring must admit eager materialisation (SC-07). "
+            "If true streaming has been implemented, update this test to "
+            "assert the new contract instead."
+        )
 
 
 class TestColumns:
