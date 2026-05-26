@@ -688,6 +688,72 @@ class TestFromRids:
                 dataset_rid=populated_denorm["dataset_rid"],
             )
 
+    # ── SC-02 / TC-05: from_rids(dataset_rid=None) silent-zero guard ──────
+
+    def test_from_rids_rejects_no_dataset_rid_against_live_catalog(self, populated_denorm) -> None:
+        """SC-02 / TC-05: live catalog + dataset_rid=None must raise.
+
+        The SQL primitive scopes by ``Dataset.RID IN (dataset_rid, ...)``;
+        with no real dataset RID, the result is silently empty against a
+        production catalog. ``from_rids`` rejects the call up front rather
+        than letting the user discover the silent-zero failure mode.
+        """
+        ml = _FakeMl(populated_denorm)
+        # Simulate a live catalog: presence of ``catalog_id`` is what makes
+        # ErmrestPagedClient(catalog=catalog) succeed in from_rids' probe.
+        ml.catalog = _LiveShapedCatalog(catalog_id="42")
+        with pytest.raises(
+            ValueError,
+            match=r"requires an explicit dataset_rid against a live catalog",
+        ):
+            Denormalizer.from_rids(
+                [("Image", r) for r in populated_denorm["image_rids"]],
+                ml=ml,
+                # dataset_rid intentionally omitted
+            )
+
+    def test_from_rids_with_explicit_dataset_rid_succeeds(self, populated_denorm) -> None:
+        """Control case: live-shaped catalog + explicit dataset_rid is fine.
+
+        Confirms the guard's discriminator is ``dataset_rid is None``,
+        not the presence of a live catalog. Constructing with an explicit
+        dataset_rid against a live-shaped catalog works as before.
+        """
+        ml = _FakeMl(populated_denorm)
+        ml.catalog = _LiveShapedCatalog(catalog_id="42")
+        # Should NOT raise.
+        d = Denormalizer.from_rids(
+            [("Image", r) for r in populated_denorm["image_rids"]],
+            ml=ml,
+            dataset_rid=populated_denorm["dataset_rid"],
+        )
+        # And the underlying query still works (fixture mode against the
+        # in-memory engine — the live catalog is never actually contacted
+        # because from_rids hard-pins source="local").
+        df = d.as_dataframe(["Image", "Subject"])
+        assert len(df) == 3
+
+    def test_from_rids_no_dataset_rid_local_mode_works(self, populated_denorm, caplog) -> None:
+        """Fixture/local mode still works without dataset_rid — warns, no raise.
+
+        The catalog passed in here can't be wrapped by ``ErmrestPagedClient``
+        (no ``catalog_id``), so the probe falls into the local branch. The
+        constructor logs a warning but returns a usable Denormalizer.
+        """
+        ml = _FakeMl(populated_denorm)  # ml.catalog is None — local mode
+        with caplog.at_level("WARNING", logger="deriva_ml.local_db.denormalizer"):
+            d = Denormalizer.from_rids(
+                [("Image", r) for r in populated_denorm["image_rids"]],
+                ml=ml,
+                dataset_rid=None,
+            )
+        # Warning surfaced.
+        assert any("dataset_rid=None" in rec.message and "local" in rec.message.lower() for rec in caplog.records), (
+            f"expected local-mode warning; got: {[r.message for r in caplog.records]}"
+        )
+        # And the Denormalizer is usable in local mode.
+        assert d is not None
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -709,6 +775,19 @@ class _FakeMl:
 
         self.workspace = _WS(populated_denorm["local_schema"])
         self.catalog = None  # bare-RID lookup not needed for tuple anchors
+
+
+class _LiveShapedCatalog:
+    """Catalog shim that ``ErmrestPagedClient(catalog=...)`` accepts.
+
+    Exposes ``catalog_id`` (the only attribute ``ErmrestPagedClient.__init__``
+    reads with no default), which is enough to make the from_rids probe
+    classify this as a "live catalog" without actually wiring up the HTTP
+    layer. Used to drive SC-02 / TC-05 rejection tests.
+    """
+
+    def __init__(self, catalog_id: str):
+        self.catalog_id = catalog_id
 
 
 class _FakeCatalog:

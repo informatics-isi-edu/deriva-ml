@@ -220,12 +220,10 @@ class Denormalizer:
         The current ``_denormalize_impl`` primitive scopes its SQL query by
         ``Dataset.RID IN (dataset_rid)`` — that is, it always traverses from
         the Dataset root. ``from_rids`` therefore requires a real dataset
-        RID against which the anchors are linked. When ``dataset_rid`` is
-        given, it is used as the scoping root; when omitted, the first
-        anchor's RID is used as a pseudo-scope (which will currently return
-        zero rows against a production catalog — a known limitation that
-        will be addressed when ``_denormalize_impl`` gains an anchor-scoped
-        SQL mode).
+        RID against which the anchors are linked. Pass an explicit
+        ``dataset_rid=<RID>`` that contains the anchor RIDs, or use the
+        :class:`Denormalizer` constructor with a :class:`Dataset` so the
+        parent dataset's RID is used automatically.
 
         Per-call behavior flags (``row_per``, ``via``,
         ``ignore_unrelated_anchors``) are supplied to the public methods
@@ -237,9 +235,13 @@ class Denormalizer:
             ml: Convenience: pass a DerivaML instance. catalog/workspace/model
                 are derived from it.
             catalog, workspace, model, engine, orm_resolver: Explicit deps.
-            dataset_rid: Optional real dataset RID to scope the SQL by. If
-                None, uses the first anchor's RID as a placeholder (see
-                note above).
+            dataset_rid: Real dataset RID to scope the SQL by. Required
+                against a live catalog — otherwise the SQL ``Dataset.RID
+                IN (dataset_rid, ...)`` predicate matches nothing and the
+                caller gets a silent empty DataFrame (SC-02 / TC-05). May
+                be omitted in fixture/local-only contexts where the engine
+                has been pre-populated with arbitrary RIDs; a warning is
+                logged in that path.
 
         Returns:
             A :class:`Denormalizer` bound to the given anchor set.
@@ -247,8 +249,11 @@ class Denormalizer:
         Raises:
             ValueError: if neither ``ml`` nor ``model`` is provided; if a
                 bare RID is passed without a catalog for lookup; if a bare
-                RID cannot be resolved; or if a tuple anchor does not have
-                exactly two elements.
+                RID cannot be resolved; if a tuple anchor does not have
+                exactly two elements; or if ``dataset_rid`` is ``None``
+                against a live catalog (pass an explicit ``dataset_rid``
+                or use the :class:`Denormalizer` constructor with a
+                :class:`Dataset` instead).
         """
         # Derive deps from ml if given.
         if ml is not None:
@@ -264,6 +269,44 @@ class Denormalizer:
 
         if model is None:
             raise ValueError("Denormalizer.from_rids requires either ml= or an explicit model=")
+
+        # SC-02 / TC-05 guard: dataset_rid is None against a live catalog
+        # is a silent-zero failure mode. _denormalize_impl scopes by
+        # ``Dataset.RID IN (dataset_rid, ...)`` and no real dataset has
+        # the placeholder RID, so the result is an empty DataFrame with
+        # no diagnostic. Probe whether the catalog passed in is a real
+        # live one (i.e., one ErmrestPagedClient can wrap) and refuse
+        # the call there. Fixture/local contexts (no catalog, or a
+        # mock that can't be wrapped) keep working with a warning —
+        # those flows pre-populate the engine and the RID acts as an
+        # opaque scoping key the in-memory SQL will match if rows exist.
+        if dataset_rid is None:
+            live_catalog = False
+            if catalog is not None:
+                try:
+                    from deriva_ml.local_db.paged_fetcher_ermrest import ErmrestPagedClient
+
+                    ErmrestPagedClient(catalog=catalog)
+                    live_catalog = True
+                except Exception:
+                    # Catalog can't be wrapped (mock, offline) — treat
+                    # as local mode; warn but don't raise.
+                    live_catalog = False
+            if live_catalog:
+                raise ValueError(
+                    "Denormalizer.from_rids() requires an explicit dataset_rid against "
+                    "a live catalog because the SQL primitive scopes by "
+                    "Dataset.RID IN (dataset_rid, ...). Pass dataset_rid=<existing "
+                    "dataset RID> that contains the anchor RIDs, or use "
+                    "Denormalizer(dataset) where the parent Dataset's RID is "
+                    "used automatically."
+                )
+            logger.warning(
+                "Denormalizer.from_rids() called with dataset_rid=None in "
+                "local/fixture mode; falling back to the first anchor's RID "
+                "as a placeholder scope. This will return zero rows against "
+                "a live catalog — pass dataset_rid=<RID> for production use."
+            )
 
         # Normalize anchors to (table, RID) pairs. Validate tuple arity so
         # a 3-tuple (or 1-tuple) surfaces as a clear ValueError here rather
@@ -316,8 +359,9 @@ class Denormalizer:
             anchors_by_table.setdefault(table, []).append(rid)
 
         # Effective dataset RID used by _denormalize_impl's WHERE clause.
-        # If caller supplied one, use it; otherwise fall back to the first
-        # anchor's RID (placeholder — see docstring for caveat).
+        # If caller supplied one, use it; otherwise (local/fixture mode
+        # only — live-catalog callers were rejected above) fall back to
+        # the first anchor's RID as a placeholder scope.
         effective_dataset_rid = dataset_rid if dataset_rid is not None else (resolved[0][1] if resolved else "")
 
         # Create a pseudo-dataset that exposes the anchors dict as members.
