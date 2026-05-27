@@ -29,6 +29,7 @@ from pathlib import Path
 from deriva.core import BaseCLI
 from hydra_zen import store, zen
 
+from deriva_ml.cli.hydra_overrides import validate_hydra_overrides
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
 from deriva_ml.execution import (
     get_all_multirun_configs,
@@ -135,6 +136,16 @@ class DerivaMLRunCLI(BaseCLI):
             Exit code (0 for success, 1 for failure).
         """
         args = self.parse_cli()
+
+        # Pre-validate Hydra overrides before any work happens, so bare
+        # positional args (e.g. 'cifar10_quick' instead of
+        # '+experiment=cifar10_quick') produce a diagnostic error rather
+        # than the cryptic ANTLR "missing EQUAL at '<EOF>'" from Hydra.
+        try:
+            validate_hydra_overrides(args.hydra_overrides, cli_name="deriva-ml-run")
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
 
         # Resolve config directory
         config_dir = args.config_dir.resolve()

@@ -58,6 +58,7 @@ from jupyter_client.kernelspec import KernelSpecManager
 from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
+from deriva_ml.cli.hydra_overrides import validate_hydra_overrides
 from deriva_ml.core.constants import DRY_RUN_RID
 from deriva_ml.core.enums import ExecMetadataType
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
@@ -371,6 +372,16 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         args = self.parse_cli()
         notebook_file: Path = args.notebook_file
         parameter_file = args.file
+
+        # Pre-validate Hydra overrides before any work happens, so bare
+        # positional args (e.g. 'roc_analysis' instead of
+        # 'assets=roc_analysis') produce a diagnostic error rather than the
+        # cryptic ANTLR "missing EQUAL at '<EOF>'" from Hydra's parser.
+        try:
+            validate_hydra_overrides(args.hydra_overrides, cli_name="deriva-ml-run-notebook")
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            exit(1)
 
         # Build parameters dict from command-line -p/--parameter flags
         # args.parameter is a list of [KEY, VALUE] lists, e.g. [['timeout', '30'], ...]
