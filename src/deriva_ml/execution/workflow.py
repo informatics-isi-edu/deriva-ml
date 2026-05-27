@@ -19,7 +19,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, PrivateAttr, field_validator, model_validator
 
@@ -533,6 +533,69 @@ class Workflow(BaseModel):
         else:
             checksum = "1"
         return github_url, checksum
+
+    # Default paths excluded from the dirty-tree check. These are
+    # directories the project conventions treat as scratch / output /
+    # findings space — not code the workflow could have read, so changes
+    # under them don't affect provenance.
+    _DEFAULT_DIRTY_CHECK_EXCLUSIONS: ClassVar[tuple[str, ...]] = (
+        "findings/",
+        "outputs/",
+        ".scratch/",
+    )
+
+    @staticmethod
+    def _filter_dirty_paths(porcelain_output: str) -> list[str]:
+        """Parse ``git status --porcelain`` output, drop excluded paths.
+
+        Lines whose target path sits under one of the default exclusion
+        prefixes (``findings/``, ``outputs/``, ``.scratch/``) or under
+        any prefix from the ``DERIVA_ML_DIRTY_CHECK_IGNORE`` env var
+        (colon-separated, ``PATH``-like) are removed. The remaining lines
+        — actual code/config changes — are returned in order.
+
+        The helper handles git-status rename lines (``R  old -> new``)
+        by checking the destination path; if the destination is under an
+        excluded prefix the line is dropped.
+
+        Args:
+            porcelain_output: Raw stdout from ``git status --porcelain``.
+                May be empty (clean tree).
+
+        Returns:
+            A list of porcelain lines (verbatim, including the two-letter
+            status code) that survived the exclusion filter. Empty list
+            means "tree is clean for provenance purposes."
+
+        Example:
+            >>> Workflow._filter_dirty_paths(" M src/models/train.py\\n?? findings/x.txt\\n")
+            [' M src/models/train.py']
+        """
+        if not porcelain_output.strip():
+            return []
+
+        # Build the full exclusion list: built-in defaults + env-var extras.
+        # Env-var format mirrors PATH (colon-separated). An empty string
+        # value means "no extra exclusions" (NOT a single empty-prefix
+        # that would match every path).
+        extra = os.environ.get("DERIVA_ML_DIRTY_CHECK_IGNORE", "")
+        extra_prefixes = tuple(p for p in extra.split(":") if p)
+        exclusions = Workflow._DEFAULT_DIRTY_CHECK_EXCLUSIONS + extra_prefixes
+
+        kept: list[str] = []
+        for line in porcelain_output.splitlines():
+            if not line.strip():
+                continue
+            # Porcelain format: two status chars, a space, then the path.
+            # Renames are written as ``R  old -> new``; we want to match
+            # against the destination.
+            path_part = line[3:]
+            if " -> " in path_part:
+                path_part = path_part.split(" -> ", 1)[1]
+            if any(path_part.startswith(prefix) for prefix in exclusions):
+                continue
+            kept.append(line)
+        return kept
 
     @staticmethod
     def _get_git_root(executable_path: Path) -> str | None:

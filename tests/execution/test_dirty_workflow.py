@@ -254,3 +254,102 @@ class TestDirtyDetectionStatusCodes:
         (repo / "other.py").write_text("# modified after commit\n")
         _, is_dirty = Workflow._github_url(test_file)
         assert is_dirty is True
+
+
+class TestFilterDirtyPaths:
+    """Tests for Workflow._filter_dirty_paths.
+
+    The helper parses ``git status --porcelain`` output and drops lines
+    whose paths sit under one of the exclusion prefixes (defaults plus
+    the DERIVA_ML_DIRTY_CHECK_IGNORE env var).
+    """
+
+    def test_empty_porcelain_returns_empty_list(self):
+        """No porcelain output means no dirty paths."""
+        from deriva_ml.execution.workflow import Workflow
+
+        assert Workflow._filter_dirty_paths("") == []
+
+    def test_code_changes_are_reported(self):
+        """Changes outside the exclusion list pass through."""
+        from deriva_ml.execution.workflow import Workflow
+
+        porcelain = " M src/models/train.py\n?? notebooks/explore.ipynb\n"
+        result = Workflow._filter_dirty_paths(porcelain)
+        assert " M src/models/train.py" in result
+        assert "?? notebooks/explore.ipynb" in result
+        assert len(result) == 2
+
+    def test_default_excludes_findings(self):
+        """findings/ is excluded by default."""
+        from deriva_ml.execution.workflow import Workflow
+
+        porcelain = "?? findings/multirun/run_output.txt\n?? findings/sweep_rids.json\n"
+        assert Workflow._filter_dirty_paths(porcelain) == []
+
+    def test_default_excludes_outputs(self):
+        """outputs/ is excluded by default."""
+        from deriva_ml.execution.workflow import Workflow
+
+        porcelain = "?? outputs/results.csv\n"
+        assert Workflow._filter_dirty_paths(porcelain) == []
+
+    def test_default_excludes_scratch(self):
+        """.scratch/ is excluded by default."""
+        from deriva_ml.execution.workflow import Workflow
+
+        porcelain = "?? .scratch/work.txt\n"
+        assert Workflow._filter_dirty_paths(porcelain) == []
+
+    def test_mixed_excluded_and_real_only_real_returned(self):
+        """When both excluded and non-excluded paths appear, only the
+        real ones survive."""
+        from deriva_ml.execution.workflow import Workflow
+
+        porcelain = (
+            " M src/models/train.py\n"
+            "?? findings/run_output.txt\n"
+            "?? outputs/results.csv\n"
+            " M notebooks/explore.ipynb\n"
+        )
+        result = Workflow._filter_dirty_paths(porcelain)
+        assert result == [" M src/models/train.py", " M notebooks/explore.ipynb"]
+
+    def test_env_var_extends_exclusions(self, monkeypatch):
+        """DERIVA_ML_DIRTY_CHECK_IGNORE adds prefixes to the default set."""
+        from deriva_ml.execution.workflow import Workflow
+
+        monkeypatch.setenv("DERIVA_ML_DIRTY_CHECK_IGNORE", "tmp/:logs/")
+        porcelain = (
+            " M src/models/train.py\n"
+            "?? tmp/cache.bin\n"
+            "?? logs/run.log\n"
+            "?? findings/x.txt\n"  # default exclusion still applies
+        )
+        result = Workflow._filter_dirty_paths(porcelain)
+        assert result == [" M src/models/train.py"]
+
+    def test_env_var_empty_string_is_ignored(self, monkeypatch):
+        """An empty DERIVA_ML_DIRTY_CHECK_IGNOR is treated as no extra
+        exclusions (not as a single empty-prefix that would match everything)."""
+        from deriva_ml.execution.workflow import Workflow
+
+        monkeypatch.setenv("DERIVA_ML_DIRTY_CHECK_IGNORE", "")
+        porcelain = " M src/models/train.py\n"
+        assert Workflow._filter_dirty_paths(porcelain) == [" M src/models/train.py"]
+
+    def test_renamed_paths_use_destination(self):
+        """``git status`` renames are formatted as ``R  old -> new``;
+        the helper should match against the destination path (post-arrow)
+        since that's where the file lives now. If the destination is
+        under an excluded prefix, drop it; otherwise keep."""
+        from deriva_ml.execution.workflow import Workflow
+
+        # Rename moving INTO findings/ — excluded
+        porcelain1 = "R  src/old.txt -> findings/new.txt\n"
+        assert Workflow._filter_dirty_paths(porcelain1) == []
+
+        # Rename moving OUT OF findings/ — kept (destination is in src/)
+        porcelain2 = "R  findings/old.txt -> src/new.txt\n"
+        result = Workflow._filter_dirty_paths(porcelain2)
+        assert result == ["R  findings/old.txt -> src/new.txt"]
