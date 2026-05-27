@@ -29,37 +29,39 @@ either confirmed, demoted, dropped, or fixed each finding. Inline
 | Finding | PR | Notes |
 |---|---|---|
 | SC-04, SC-05, SC-08, RB-09 | informatics-isi-edu/deriva-ml#231 | Doc-rot fixed in the spec rewrite, or finding determined not-a-bug after grilling. |
+| Single-source-of-record consolidation | informatics-isi-edu/deriva-ml#242 | Design spec, recovered user guide, and semantics companion merged into `docs/user-guide/denormalization.md` (Mechanism D, 1,712 lines). Old paths removed: `docs/design/denormalization.md`, `docs/concepts/denormalization.md` (was a stub), `docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md`. mkdocs nav + cross-refs updated. |
 
 **Deferred — code work that the spec rewrite calls out:**
 
-| Finding | What the spec says now | Code TODO |
-|---|---|---|
-| SC-01 / RB-01 / TC-09 | §8.3 names a `warnings: list[str]` envelope field on `describe()` | implement the field; route every swallowed exception through it. |
-| SC-02 / TC-05 | §8.1 says `from_rids(dataset_rid=None)` must reject against live catalog (or surface a `reason`) | implement the guard. |
-| SC-03 | §6 Freshness caveat says `DenormalizeResult` should carry a freshness signal | add `cache_age_seconds: float \| None`. |
-| SC-07 / TC-06 | §8.2 declares `as_dict` does NOT stream (matches today's eager materialisation) but flags streaming as the better implementation. | Pick A (correct the docstring — already aligned by spec) or B (implement streaming). Spec is honest either way. |
+| Finding | What the spec says now | Code TODO | Status |
+|---|---|---|---|
+| SC-01 / RB-01 / TC-09 | §8.3 names a `warnings: list[str]` envelope field on `describe()` | implement the field; route every swallowed exception through it. | **Closed** by informatics-isi-edu/deriva-ml#239 — 13-key envelope with `warnings`, 6 broad-except sites instrumented. |
+| SC-02 / TC-05 | §8.1 says `from_rids(dataset_rid=None)` must reject against live catalog (or surface a `reason`) | implement the guard. | **Closed** by informatics-isi-edu/deriva-ml#236 — `from_rids` rejects `dataset_rid=None` against live catalog with `ValueError`. |
+| SC-03 | §6 Freshness caveat says `DenormalizeResult` should carry a freshness signal | add `cache_age_seconds: float \| None`. | **Closed** by informatics-isi-edu/deriva-ml#240 — field landed on `DenormalizeResult`. |
+| SC-07 / TC-06 | §8.2 declares `as_dict` does NOT stream (matches today's eager materialisation) but flags streaming as the better implementation. | Pick A (correct the docstring — already aligned by spec) or B (implement streaming). Spec is honest either way. | **Closed (Pick A)** by informatics-isi-edu/deriva-ml#233 — docstring corrected to admit eager materialisation. Streaming remains a future enhancement. |
 
 **Confirmed remaining test gaps:**
 
-| Finding | Severity (post-grill) | Disposition |
-|---|---|---|
-| TC-01 | Medium (was Blocker) | demoted — the load-bearing role TC-01 played for SC-06 is now covered by `TestRowCompletenessInvariant`. The cross-channel parity test is still worth writing; spec §9 D.2 marks it as "planned, not yet written." |
-| TC-02 | Medium (was High) | demoted — per-key describe-vs-run parity test still worth writing for the 11 keys analyst/01's `test_describe_and_run_agree` doesn't cover. |
-| TC-04 | Medium (unchanged) | §8 C.5x xfail test for server-side delete still missing; spec rewrite reconciled it to "planned." |
-| TC-07 | Medium (unchanged) | live-catalog resolver test still missing. |
-| TC-08 | Medium (unchanged) | `_collect_fk_values` partial-engine-state behavior unpinned. |
-| TC-10 | Low (unchanged) | catalog↔bag parity test for A01-shape data — cheap extension of `test_feature_table_multiple_rows_per_anchor`. |
+| Finding | Severity (post-grill) | Disposition | Status |
+|---|---|---|---|
+| TC-01 | Medium (was Blocker) | demoted — the load-bearing role TC-01 played for SC-06 is now covered by `TestRowCompletenessInvariant`. The cross-channel parity test is still worth writing; spec §9 D.2 marks it as "planned, not yet written." | **Closed** by informatics-isi-edu/deriva-ml#241 (cross-channel parity D.3 added). |
+| TC-02 | Medium (was High) | demoted — per-key describe-vs-run parity test still worth writing for the 11 keys analyst/01's `test_describe_and_run_agree` doesn't cover. | **Closed** by informatics-isi-edu/deriva-ml#241 (`TestDescribeKeyParity` covers the remaining keys). |
+| TC-04 | Medium (unchanged) | §8 C.5x xfail test for server-side delete still missing; spec rewrite reconciled it to "planned." | **Closed** by informatics-isi-edu/deriva-ml#241 (C.5x xfail test added). |
+| TC-07 | Medium (unchanged) | live-catalog resolver test still missing. | **Closed** by informatics-isi-edu/deriva-ml#241 (`test_resolve_table_names_live_feature` added). |
+| TC-08 | Medium (unchanged) | `_collect_fk_values` partial-engine-state behavior unpinned. | **Closed** by informatics-isi-edu/deriva-ml#241 (partial-engine-state coverage added). |
+| TC-10 | Low (unchanged) | catalog↔bag parity test for A01-shape data — cheap extension of `test_feature_table_multiple_rows_per_anchor`. | **Closed** by informatics-isi-edu/deriva-ml#241 (parity assertion added). |
 
 **Confirmed remaining robustness one-liners (code TODOs):**
 
-| Finding | Severity | One-line fix |
-|---|---|---|
-| RB-03 | Low | `if not rids: continue` filter in describe at line 721 (mirror `_classify_anchors` skip). |
-| RB-04 | Low | Multi-schema label hazard in `_run`'s per-RID orphan scan; use `denormalize_column_name` or assert single-schema. |
-| RB-05 | Medium | `Denormalizer.__init__` silent fallback to `source="local"` should log WARNING + attach `_init_warning`. |
-| RB-06 | Medium | `list_dataset_children` silent fallback to root-only should warn for `source="catalog"`. |
-| RB-08 | Medium | `_collect_fk_values` composite-FK assumption — AND conditions or document single-column FK requirement. |
-| RB-10 | Low | Remove unused `model` parameter from `_populate_from_catalog`. |
+| Finding | Severity | One-line fix | Status |
+|---|---|---|---|
+| RB-03 | Low | `if not rids: continue` filter in describe at line 721 (mirror `_classify_anchors` skip). | Pending. |
+| RB-04 | Low | Multi-schema label hazard in `_run`'s per-RID orphan scan; use `denormalize_column_name` or assert single-schema. | Pending. |
+| RB-05 | Medium | `Denormalizer.__init__` silent fallback to `source="local"` should log WARNING + attach `_init_warning`. | Pending. |
+| RB-06 | Medium | `list_dataset_children` silent fallback to root-only should warn for `source="catalog"`. | Pending. |
+| RB-07 | Low | Resolver should dedup after feature-name substitution so `["Image_Classification", "Execution_Image_Image_Classification"]` collapses to one entry. | **Closed** (post-PR-241 follow-up, this branch) — `_resolve_table_names` now dedups resolved `include_tables` / `via` in first-seen order, with `test_resolver_dedupes_after_feature_substitution` as regression. |
+| RB-08 | Medium | `_collect_fk_values` composite-FK assumption — AND conditions or document single-column FK requirement. | **Closed** by informatics-isi-edu/deriva-ml#238 — `_collect_fk_values` raises `NotImplementedError` on composite FK rather than silently mis-fetching. |
+| RB-10 | Low | Remove unused `model` parameter from `_populate_from_catalog`. | Pending. |
 
 **Dropped after grilling:**
 
