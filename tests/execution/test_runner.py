@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from deriva_ml.core.constants import DRY_RUN_RID
-from deriva_ml.execution.upload_report import UploadReport
 from deriva_ml.core.exceptions import DerivaMLStateInconsistency
 from deriva_ml.execution.runner import (
     _complete_parent_execution,
@@ -17,6 +16,7 @@ from deriva_ml.execution.runner import (
     reset_multirun_state,
     run_model,
 )
+from deriva_ml.execution.upload_report import UploadReport
 
 
 class TestMultirunDetection:
@@ -318,6 +318,159 @@ class TestRunModelWithMocks:
 
         # Verify custom class was used for instantiation
         mock_custom_class.instantiate.assert_called_once_with(mock_config)
+
+
+class TestRunModelDescriptionFromOverrides:
+    """run_model must compose Execution.description from Hydra overrides.
+
+    Symmetric with run_notebook (see
+    tests/execution/test_base_config.py::TestRunNotebookDescriptionFromResolvedConfig):
+    the sister entry point already composes a description with an
+    ``[overrides: ...]`` clause via ``_format_description_with_overrides``, so
+    a sweep that differs only in a group or parameter override is
+    distinguishable when browsing executions. run_model previously dropped
+    overrides silently because composition lived in a model-template wrapper
+    that ``zen(run_model).hydra_main(...)`` bypassed. This test pins the fix:
+    composition now lives inside ``run_model`` itself.
+    """
+
+    @pytest.fixture(autouse=True)
+    def reset_state(self):
+        """Reset multirun state before each test."""
+        reset_multirun_state()
+        yield
+        reset_multirun_state()
+
+    @patch("deriva_ml.execution.runner._is_multirun")
+    @patch("deriva_ml.execution.runner.HydraConfig")
+    def test_description_includes_resolved_overrides(self, mock_hydra_config, mock_is_multirun):
+        """Overrides resolved by Hydra must appear in Execution.description."""
+        mock_is_multirun.return_value = False
+
+        mock_hydra_cfg = MagicMock()
+        mock_hydra_cfg.runtime.choices.items.return_value = [
+            ("model_config", "foo"),
+            ("datasets", "bar"),
+        ]
+        mock_hydra_cfg.overrides.task = [
+            "model_config=foo",
+            "datasets=bar",
+            "seed=7",
+        ]
+        mock_hydra_config.get.return_value = mock_hydra_cfg
+
+        mock_ml_class = MagicMock()
+        mock_ml_instance = MagicMock()
+        mock_ml_class.instantiate.return_value = mock_ml_instance
+
+        mock_execution = MagicMock()
+        mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
+        mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
+        mock_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
+        mock_ml_instance.create_execution.return_value = mock_execution
+
+        run_model(
+            deriva_ml=MagicMock(),
+            datasets=[],
+            assets=[],
+            description="Simple model run",
+            workflow=MagicMock(),
+            model_config=Mock(),
+            dry_run=False,
+            ml_class=mock_ml_class,
+        )
+
+        # Inspect the description that landed in ExecutionConfiguration.
+        call_kwargs = mock_ml_instance.create_execution.call_args.kwargs
+        exec_config = mock_ml_instance.create_execution.call_args.args[0]
+        assert exec_config.description == ("Simple model run [overrides: model_config=foo, datasets=bar, seed=7]")
+        assert "workflow" in call_kwargs  # sanity check on the call shape
+
+    @patch("deriva_ml.execution.runner._is_multirun")
+    @patch("deriva_ml.execution.runner.HydraConfig")
+    def test_description_unchanged_when_no_overrides(self, mock_hydra_config, mock_is_multirun):
+        """Empty override list must leave the description untouched -- no bracket clutter."""
+        mock_is_multirun.return_value = False
+
+        mock_hydra_cfg = MagicMock()
+        mock_hydra_cfg.runtime.choices.items.return_value = []
+        mock_hydra_cfg.overrides.task = []
+        mock_hydra_config.get.return_value = mock_hydra_cfg
+
+        mock_ml_class = MagicMock()
+        mock_ml_instance = MagicMock()
+        mock_ml_class.instantiate.return_value = mock_ml_instance
+
+        mock_execution = MagicMock()
+        mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
+        mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
+        mock_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
+        mock_ml_instance.create_execution.return_value = mock_execution
+
+        run_model(
+            deriva_ml=MagicMock(),
+            datasets=[],
+            assets=[],
+            description="Simple model run",
+            workflow=MagicMock(),
+            model_config=Mock(),
+            dry_run=False,
+            ml_class=mock_ml_class,
+        )
+
+        exec_config = mock_ml_instance.create_execution.call_args.args[0]
+        assert exec_config.description == "Simple model run"
+        assert "[overrides:" not in exec_config.description
+
+    @patch("deriva_ml.execution.runner._is_multirun")
+    @patch("deriva_ml.execution.runner.HydraConfig")
+    def test_synthetic_description_override_is_filtered(self, mock_hydra_config, mock_is_multirun):
+        """A ``description='...'`` override (synthesised by the multirun CLI path)
+        must be dropped from the formatted clause -- otherwise the description
+        quotes itself recursively.
+        """
+        mock_is_multirun.return_value = False
+
+        mock_hydra_cfg = MagicMock()
+        mock_hydra_cfg.runtime.choices.items.return_value = []
+        mock_hydra_cfg.overrides.task = [
+            "description='Multirun sweep: lr_grid'",
+            "model_config.learning_rate=0.01",
+        ]
+        mock_hydra_config.get.return_value = mock_hydra_cfg
+
+        mock_ml_class = MagicMock()
+        mock_ml_instance = MagicMock()
+        mock_ml_class.instantiate.return_value = mock_ml_instance
+
+        mock_execution = MagicMock()
+        mock_execution.execute.return_value.__enter__ = Mock(return_value=mock_execution)
+        mock_execution.execute.return_value.__exit__ = Mock(return_value=False)
+        mock_execution.commit_output_assets.return_value = UploadReport(
+            execution_rids=[], total_uploaded=0, total_failed=0, per_table={}, errors=[]
+        )
+        mock_ml_instance.create_execution.return_value = mock_execution
+
+        run_model(
+            deriva_ml=MagicMock(),
+            datasets=[],
+            assets=[],
+            description="Multirun sweep: lr_grid",
+            workflow=MagicMock(),
+            model_config=Mock(),
+            dry_run=False,
+            ml_class=mock_ml_class,
+        )
+
+        exec_config = mock_ml_instance.create_execution.call_args.args[0]
+        # The synthetic description= override is filtered; the real parameter
+        # override survives.
+        assert exec_config.description == ("Multirun sweep: lr_grid [overrides: model_config.learning_rate=0.01]")
+        assert "description=" not in exec_config.description
 
 
 class TestRunModelUploadCallContract:

@@ -471,6 +471,7 @@ def run_model(
     # Import here to avoid circular imports
     from deriva_ml import DerivaML
     from deriva_ml.execution import ExecutionConfiguration
+    from deriva_ml.execution.base_config import _format_description_with_overrides
 
     # ---------------------------------------------------------------------------
     # Clear hydra's logging configuration
@@ -536,17 +537,34 @@ def run_model(
         _create_parent_execution(ml_instance, workflow, description, dry_run)
 
     # ---------------------------------------------------------------------------
-    # Capture Hydra runtime choices for provenance
+    # Capture Hydra runtime choices and overrides for provenance
     # ---------------------------------------------------------------------------
     # The choices dict maps config group names to the selected config names
     # e.g., {"model_config": "cifar10_quick", "datasets": "cifar10_training"}
-    # Filter out None values (some Hydra internal groups have None choices)
+    # Filter out None values (some Hydra internal groups have None choices).
+    #
+    # The overrides list is the resolved Hydra task-override list (the same
+    # list Hydra echoes at the top of every run). It feeds into the Execution
+    # description so the catalog row reflects what actually ran -- mirroring
+    # the run_notebook pattern. Without this, a sweep that differs only in a
+    # group/parameter override is indistinguishable from a default run when
+    # browsing executions.
     config_choices: dict[str, str] = {}
+    task_overrides: list[str] = []
     try:
         hydra_cfg = HydraConfig.get()
         config_choices = {k: v for k, v in hydra_cfg.runtime.choices.items() if v is not None}
+        task_overrides = list(hydra_cfg.overrides.task)
     except Exception as e:
         logger.debug(f"HydraConfig not available (not in Hydra context): {e}")
+
+    # The CLI synthesises a ``description='...'`` override in multirun mode
+    # (see DerivaMLRunCLI.main). Including it inside the formatted
+    # ``[overrides: ...]`` clause would recursively quote the base description
+    # back into itself, so drop self-references on the description parameter
+    # before composing. All other overrides (groups, parameters, package
+    # specs) pass through verbatim, matching run_notebook's behaviour.
+    description_overrides = [o for o in task_overrides if not o.startswith("description=")]
 
     # ---------------------------------------------------------------------------
     # Create the execution context
@@ -554,11 +572,18 @@ def run_model(
     # The ExecutionConfiguration bundles together all the inputs for this run:
     # which datasets to use, which assets (model weights, etc.), and metadata.
 
+    # Compose the description from the resolved Hydra overrides so the
+    # catalog Execution row reflects what actually ran, not just the
+    # registration-time default. This is symmetric with run_notebook
+    # (see base_config.run_notebook), and the two entry points share
+    # the same ``_format_description_with_overrides`` helper.
+    composed_description = _format_description_with_overrides(description, description_overrides)
+
     # In multirun mode, enhance the description with job info
-    job_description = description
+    job_description = composed_description
     if is_multirun:
         job_num = _get_job_num()
-        job_description = f"[Job {job_num}] {description}"
+        job_description = f"[Job {job_num}] {composed_description}"
 
     execution_config = ExecutionConfiguration(
         datasets=datasets,
