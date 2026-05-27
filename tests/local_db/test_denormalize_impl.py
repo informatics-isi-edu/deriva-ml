@@ -853,3 +853,91 @@ class TestCacheAgeSeconds:
         assert result.cache_age_seconds == 45.0, (
             f"Expected cache_age_seconds reporting oldest fetch age (45.0), got {result.cache_age_seconds}"
         )
+
+
+class TestCollectFkValuesPartialEngineState:
+    """TC-08 / spec §7 F4: ``_collect_fk_values`` reads what's IN the engine.
+
+    The audit (TC-08) names a fragility: ``_collect_fk_values`` queries
+    the local engine (``SELECT DISTINCT pull_col FROM other_table``) for
+    the RIDs to feed the next fetch. If a prior tighter-scoped
+    denormalize populated the engine with only a subset of the
+    "other_table" rows, the new (broader) denormalize inherits the
+    tighter scope silently — there's no second consultation of the
+    server to broaden the fetch.
+
+    This is the F4 behavior the spec names. The test below documents it
+    by setting up partial engine state, calling ``_collect_fk_values``,
+    and asserting the returned RID list reflects ONLY what's in the
+    engine. This is the current contract — and is the fragility F4
+    names. If the implementation ever changes to consult the server
+    instead, this test will fail and the spec entry should be revised
+    accordingly.
+    """
+
+    def test_returns_only_rids_present_in_engine(
+        self,
+        denorm_deriva_model: Any,
+        denorm_local_schema: Any,
+    ) -> None:
+        """Partial engine state → ``_collect_fk_values`` returns the
+        partial set, not the broader server set.
+
+        Documents F4 behavior: engine state determines fetch scope.
+        This is the fragility named in spec §7. If the engine has only
+        K of N FK source rows, ``_collect_fk_values`` returns K values
+        — even though against a full catalog the join needs all N.
+        """
+        from sqlalchemy.orm import Session
+
+        from deriva_ml.local_db.denormalize import _collect_fk_values
+
+        ls = denorm_local_schema
+        model = denorm_deriva_model
+
+        # Set up PARTIAL engine state: insert Dataset + only 2 of 4 hypothetical
+        # Dataset_Image rows. Against a "full catalog" the join would pull all
+        # 4 Images; with only 2 in the engine, _collect_fk_values can only
+        # report the 2 it sees.
+        ds_rid = "DS-PE-001"
+        partial_image_rids = ["IMG-A", "IMG-B"]
+        broader_image_rids = ["IMG-A", "IMG-B", "IMG-C", "IMG-D"]  # what catalog has
+
+        with Session(ls.engine) as session:
+            ds_cls = ls.get_orm_class("Dataset")
+            session.add(ds_cls(RID=ds_rid, Description="partial-state"))
+            di_cls = ls.get_orm_class("Dataset_Image")
+            for img in partial_image_rids:
+                session.add(di_cls(RID=f"DI-{img}", Dataset=ds_rid, Image=img))
+            session.commit()
+
+        # Build the join condition the planner would have produced for
+        # the Image fetch leg: Dataset_Image.Image -> Image.RID.
+        dataset_image_tbl = model.name_to_table("Dataset_Image")
+        image_tbl = model.name_to_table("Image")
+        di_image_col = dataset_image_tbl.columns["Image"]
+        image_rid_col = image_tbl.columns["RID"]
+
+        conditions = {(di_image_col, image_rid_col)}
+
+        values, filter_col = _collect_fk_values(
+            engine=ls.engine,
+            orm_resolver=ls.get_orm_class,
+            conditions=conditions,
+            target_table_name="Image",
+        )
+
+        # Filter column on Image is "RID" (the PK side of the FK).
+        assert filter_col == "RID"
+        # The contract: values reflect engine state, not the broader catalog.
+        assert set(values) == set(partial_image_rids), (
+            f"Expected _collect_fk_values to return engine-state values "
+            f"{set(partial_image_rids)} (the rows actually in the local "
+            f"Dataset_Image), got {set(values)}. F4 behavior changed?"
+        )
+        # And NOT the broader set the catalog would have provided.
+        assert set(values) != set(broader_image_rids), (
+            "Sanity check on the test premise: engine should NOT contain "
+            "the broader catalog set; if it does, the partial-state "
+            "precondition is broken."
+        )
