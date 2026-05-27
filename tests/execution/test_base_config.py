@@ -19,6 +19,7 @@ from hydra_zen import builds, store
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.execution.base_config import (
     BaseConfig,
+    _derive_config_name_from_notebook,
     _format_description_with_overrides,
     get_notebook_configuration,
     notebook_config,
@@ -421,3 +422,234 @@ class TestRunNotebookDescriptionFromResolvedConfig:
 
         description = captured["exec_config"].description
         assert "[overrides: assets=roc_all_six]" in description
+
+
+class TestDeriveConfigNameFromNotebook:
+    """Tests for the _derive_config_name_from_notebook() helper.
+
+    The DerivaML convention is that a notebook ``X.ipynb`` uses the Hydra
+    config named ``X``. This helper recovers ``X`` from either the
+    papermill execution env var or the calling notebook's frame so that
+    callers of ``run_notebook()`` don't have to repeat the stem as a
+    string argument.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_papermill_env(self, monkeypatch):
+        """Ensure PAPERMILL_INPUT_PATH never leaks between tests."""
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+        yield
+
+    def test_derives_from_papermill_env_var(self, monkeypatch):
+        """When PAPERMILL_INPUT_PATH is set, return its filename stem."""
+        monkeypatch.setenv("PAPERMILL_INPUT_PATH", "/tmp/work/roc_analysis.ipynb")
+        assert _derive_config_name_from_notebook() == "roc_analysis"
+
+    def test_papermill_env_takes_precedence_over_stack(self, monkeypatch):
+        """PAPERMILL_INPUT_PATH wins over any stack frame.
+
+        The papermill signal is more reliable than stack-walking because it
+        survives kernel-spawned subprocesses and globals-namespace abstractions.
+        """
+        monkeypatch.setenv("PAPERMILL_INPUT_PATH", "/tmp/work/from_env.ipynb")
+        assert _derive_config_name_from_notebook() == "from_env"
+
+    def test_stack_frame_with_ipynb_filename(self, monkeypatch):
+        """A frame whose filename ends in .ipynb yields its stem."""
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+
+        fake_frame_info = MagicMock()
+        fake_frame_info.filename = "/Users/me/notebooks/my_analysis.ipynb"
+        fake_frame_info.frame.f_globals = {}
+
+        with patch("deriva_ml.execution.base_config.inspect.stack", return_value=[fake_frame_info]):
+            assert _derive_config_name_from_notebook() == "my_analysis"
+
+    def test_stack_frame_with_ipynb_in_globals(self, monkeypatch):
+        """A frame exposing the notebook path via __file__ global yields its stem.
+
+        Jupyter sometimes surfaces the notebook path on ``f_globals['__file__']``
+        rather than ``f_code.co_filename`` -- the helper has to check both.
+        """
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+
+        fake_frame_info = MagicMock()
+        fake_frame_info.filename = "<ipython-input-1-abc>"
+        fake_frame_info.frame.f_globals = {"__file__": "/home/user/notebooks/training.ipynb"}
+
+        with patch("deriva_ml.execution.base_config.inspect.stack", return_value=[fake_frame_info]):
+            assert _derive_config_name_from_notebook() == "training"
+
+    def test_raises_value_error_outside_notebook_context(self, monkeypatch):
+        """When neither signal is available, raise ValueError with a helpful message."""
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+
+        fake_frame_info = MagicMock()
+        fake_frame_info.filename = "/some/plain_script.py"
+        fake_frame_info.frame.f_globals = {"__file__": "/some/plain_script.py"}
+
+        with patch("deriva_ml.execution.base_config.inspect.stack", return_value=[fake_frame_info]):
+            with pytest.raises(ValueError, match="config_name is required"):
+                _derive_config_name_from_notebook()
+
+
+class TestRunNotebookConfigNameAutoDerive:
+    """Tests for run_notebook()'s auto-derivation of config_name.
+
+    These tests cover the integration between run_notebook() and
+    _derive_config_name_from_notebook() -- specifically:
+
+    * Explicit ``config_name`` still works (backwards compat).
+    * Omitting ``config_name`` triggers derivation from PAPERMILL_INPUT_PATH.
+    * Omitting ``config_name`` outside a notebook context raises ValueError.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_env(self, monkeypatch):
+        """Reset env vars that might leak between tests."""
+        monkeypatch.delenv("DERIVA_ML_HYDRA_OVERRIDES", raising=False)
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+        yield
+
+    def _patch_catalog_io(self):
+        """Patch the bits of run_notebook() that talk to a real catalog.
+
+        Mirrors TestRunNotebookDescriptionFromResolvedConfig._patch_catalog_io
+        but also exposes the fake DerivaML so callers can assert on the
+        workflow name (which is derived from ``config_name``).
+        """
+        captured = {}
+
+        def _fake_execution_configuration(*, workflow, datasets, assets, description, **kwargs):
+            cfg = MagicMock()
+            cfg.workflow = workflow
+            cfg.datasets = datasets
+            cfg.assets = assets
+            cfg.description = description
+            captured["exec_config"] = cfg
+            return cfg
+
+        validation_result = MagicMock()
+        validation_result.is_valid = True
+        validation_result.warnings = []
+
+        fake_ml = MagicMock()
+        fake_ml.create_workflow.return_value = MagicMock(name="workflow")
+        captured["fake_ml"] = fake_ml
+
+        fake_ml_class = MagicMock(return_value=fake_ml)
+        fake_execution = MagicMock()
+
+        patches = [
+            patch(
+                "deriva_ml.execution.ExecutionConfiguration",
+                side_effect=_fake_execution_configuration,
+            ),
+            patch(
+                "deriva_ml.core.validation.validate_execution_config",
+                return_value=validation_result,
+            ),
+            patch("deriva_ml.DerivaML", fake_ml_class),
+            patch("deriva_ml.execution.Execution", return_value=fake_execution),
+        ]
+        return captured, patches
+
+    def _register_simple_config(self, deriva_name: str, config_name: str):
+        """Register a minimal notebook config sufficient for run_notebook().
+
+        Bypasses ``notebook_config()`` to avoid pulling in the full
+        assets/datasets default groups, which aren't relevant to these
+        tests.
+        """
+        from deriva_ml.execution.base_config import _notebook_configs
+
+        DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+        deriva_store = store(group="deriva_ml")
+        deriva_store(
+            DerivaMLConf,
+            name=deriva_name,
+            hostname="test.example.org",
+            catalog_id="1",
+        )
+        config_builds = builds(
+            BaseConfig,
+            populate_full_signature=True,
+            hydra_defaults=["_self_", {"deriva_ml": deriva_name}],
+        )
+        store(config_builds, name=config_name)
+        _notebook_configs[config_name] = (config_builds, config_name)
+        store.add_to_hydra_store(overwrite_ok=True)
+
+    def test_explicit_config_name_still_honored(self):
+        """Backwards compat: passing config_name explicitly still works.
+
+        This is the existing-call shape used by every checked-in notebook.
+        It must continue to resolve the named config exactly as before.
+        """
+        from deriva_ml.execution.base_config import run_notebook as run_nb
+
+        self._register_simple_config("rn_explicit_deriva", "rn_explicit_config")
+
+        captured, patches = self._patch_catalog_io()
+
+        with patch("deriva_ml.core.config.HydraConfig") as mock_hydra:
+            mock_hydra.get.return_value.runtime.output_dir = "/tmp/hydra_rn_explicit"
+            for p in patches:
+                p.start()
+            try:
+                run_nb("rn_explicit_config")
+            finally:
+                for p in patches:
+                    p.stop()
+
+        fake_ml = captured["fake_ml"]
+        call_kwargs = fake_ml.create_workflow.call_args.kwargs
+        # config_name "rn_explicit_config" -> "Rn Explicit Config" workflow name
+        assert call_kwargs["name"] == "Rn Explicit Config"
+
+    def test_derives_config_name_from_papermill_env(self, monkeypatch, tmp_path):
+        """When config_name is omitted and PAPERMILL_INPUT_PATH is set, derive it.
+
+        This is the production path that runs through ``deriva-ml-run-notebook``.
+        """
+        from deriva_ml.execution.base_config import run_notebook as run_nb
+
+        self._register_simple_config("rn_papermill_deriva", "rn_papermill_config")
+
+        notebook_path = tmp_path / "rn_papermill_config.ipynb"
+        notebook_path.write_text("")
+        monkeypatch.setenv("PAPERMILL_INPUT_PATH", str(notebook_path))
+
+        captured, patches = self._patch_catalog_io()
+
+        with patch("deriva_ml.core.config.HydraConfig") as mock_hydra:
+            mock_hydra.get.return_value.runtime.output_dir = "/tmp/hydra_rn_papermill"
+            for p in patches:
+                p.start()
+            try:
+                run_nb()  # config_name omitted -- must be derived from env
+            finally:
+                for p in patches:
+                    p.stop()
+
+        fake_ml = captured["fake_ml"]
+        call_kwargs = fake_ml.create_workflow.call_args.kwargs
+        assert call_kwargs["name"] == "Rn Papermill Config"
+
+    def test_raises_when_omitted_outside_notebook_context(self, monkeypatch):
+        """Omitting config_name from a plain script must raise ValueError.
+
+        We don't want a silent fallback to something fragile -- if the
+        caller is outside a notebook context they have to pass the name.
+        """
+        from deriva_ml.execution.base_config import run_notebook as run_nb
+
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+
+        fake_frame_info = MagicMock()
+        fake_frame_info.filename = "/some/plain_script.py"
+        fake_frame_info.frame.f_globals = {"__file__": "/some/plain_script.py"}
+
+        with patch("deriva_ml.execution.base_config.inspect.stack", return_value=[fake_frame_info]):
+            with pytest.raises(ValueError, match="config_name is required"):
+                run_nb()  # no explicit name, no notebook context

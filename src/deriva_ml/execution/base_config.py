@@ -39,6 +39,7 @@ Advanced Usage (notebooks with custom parameters):
 """
 
 import importlib
+import inspect
 import json
 import os
 import pkgutil
@@ -480,8 +481,69 @@ def _format_description_with_overrides(base_description: str, overrides: list[st
     return f"{base_description} [overrides: {', '.join(overrides)}]"
 
 
+def _derive_config_name_from_notebook() -> str:
+    """Derive a Hydra config name from the calling notebook's filename.
+
+    The DerivaML convention is that a notebook ``X.ipynb`` uses the config
+    named ``X`` (registered via ``notebook_config("X", ...)``). This helper
+    encodes that convention so callers of :func:`run_notebook` don't have to
+    repeat the notebook's stem as a string argument.
+
+    Resolution strategy, in order:
+
+    1. **Papermill execution.** When the notebook is executed via
+       ``deriva-ml-run-notebook`` (which uses papermill under the hood),
+       papermill sets the ``PAPERMILL_INPUT_PATH`` env var to the notebook
+       being executed. This is the most reliable signal because it survives
+       Jupyter's globals-namespace abstractions.
+    2. **Interactive Jupyter / VS Code.** Walk the call stack looking for a
+       frame whose ``__file__`` (or filename in ``f_code``) ends in
+       ``.ipynb``. Jupyter and VS Code both surface the notebook path on the
+       caller frame this way.
+
+    In both cases the returned name is ``Path(notebook_path).stem``.
+
+    Returns:
+        The notebook's filename stem, suitable for passing as a Hydra
+        ``config_name``.
+
+    Raises:
+        ValueError: If neither signal yields a notebook path -- typically
+            because :func:`run_notebook` was called from a plain ``.py``
+            script rather than a notebook. The caller should either invoke
+            this function from a notebook or pass ``config_name`` explicitly.
+
+    Example:
+        Called inside ``notebooks/roc_analysis.ipynb`` (via papermill or
+        interactively), this returns ``"roc_analysis"``.
+    """
+    # Papermill path. PAPERMILL_INPUT_PATH is set by papermill.execute_notebook
+    # to the absolute path of the notebook being executed.
+    papermill_path = os.environ.get("PAPERMILL_INPUT_PATH")
+    if papermill_path:
+        return Path(papermill_path).stem
+
+    # Interactive (Jupyter / VS Code) path. Walk back through the stack and
+    # pick up the first frame whose source file is an .ipynb. Jupyter
+    # sometimes exposes the notebook path via the frame's __file__ global
+    # rather than f_code.co_filename, so we check both.
+    for frame_info in inspect.stack():
+        filename = frame_info.filename
+        if filename and filename.endswith(".ipynb"):
+            return Path(filename).stem
+        frame_globals = frame_info.frame.f_globals
+        file_global = frame_globals.get("__file__")
+        if isinstance(file_global, str) and file_global.endswith(".ipynb"):
+            return Path(file_global).stem
+
+    raise ValueError(
+        "config_name is required when run_notebook() is called outside a "
+        "notebook context. Pass it explicitly, e.g. run_notebook('my_config')."
+    )
+
+
 def run_notebook(
-    config_name: str,
+    config_name: str | None = None,
     overrides: list[str] | None = None,
     workflow_name: str | None = None,
     workflow_type: str = "Analysis Notebook",
@@ -499,7 +561,12 @@ def run_notebook(
 
     Args:
         config_name: Name of the notebook configuration (registered via
-            notebook_config() or store()).
+            notebook_config() or store()). When omitted, the config name is
+            derived from the calling notebook's filename stem -- the
+            DerivaML convention is that ``X.ipynb`` uses config ``X``
+            (registered with ``notebook_config("X", ...)``). Pass this
+            explicitly only when the notebook's filename does not match
+            its config name, which is rare.
         overrides: Optional list of Hydra override strings
             (e.g., ["assets=different_assets"]).
         workflow_name: Name for the workflow. Defaults to config_name.
@@ -513,11 +580,18 @@ def run_notebook(
         - execution: Execution context with downloaded inputs
         - config: Resolved configuration object
 
+    Raises:
+        ValueError: If ``config_name`` is omitted and cannot be derived
+            from the calling context (e.g. when called from a plain
+            ``.py`` script with no ``PAPERMILL_INPUT_PATH`` set).
+
     Example:
-        # Simple usage
+        # Simple usage -- config name derived from the notebook's
+        # filename. Inside notebooks/roc_analysis.ipynb, this resolves
+        # to config "roc_analysis":
         from deriva_ml.execution import run_notebook
 
-        ml, execution, config = run_notebook("roc_analysis")
+        ml, execution, config = run_notebook()
 
         # Access config values
         print(config.assets)
@@ -531,20 +605,29 @@ def run_notebook(
         # At the end of notebook
         execution.commit_output_assets()
 
+    Example with explicit config_name (rare -- only when the notebook's
+    filename doesn't match its config name):
+        ml, execution, config = run_notebook("custom_config_name")
+
     Example with overrides:
         ml, execution, config = run_notebook(
-            "roc_analysis",
             overrides=["assets=roc_quick_probabilities"],
         )
 
     Example with custom ML class:
         from eye_ai import EyeAI
 
-        ml, execution, config = run_notebook(
-            "eye_analysis",
-            ml_class=EyeAI,
-        )
+        ml, execution, config = run_notebook(ml_class=EyeAI)
     """
+    # Derive config_name from the calling notebook if not provided. The
+    # convention "notebook X.ipynb uses config X" is universal across this
+    # codebase, so the explicit string is redundant in every existing
+    # case. Auto-derivation also removes the wrong example users
+    # mis-imitate at the deriva-ml-run-notebook CLI ("just pass
+    # roc_analysis as the first positional arg").
+    if config_name is None:
+        config_name = _derive_config_name_from_notebook()
+
     # Import here to avoid circular imports
     from deriva_ml import DerivaML
     from deriva_ml.execution import Execution, ExecutionConfiguration
