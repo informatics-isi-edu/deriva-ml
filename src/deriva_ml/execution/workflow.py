@@ -499,15 +499,18 @@ class Workflow(BaseModel):
                 return "", ""
             raise DerivaMLException("Not executing in a Git repository.")
 
-        github_url, is_dirty = Workflow._github_url(executable_path)
+        github_url, dirty_paths = Workflow._github_url(executable_path)
 
-        if is_dirty:
+        if dirty_paths:
             if allow_dirty:
+                offending = ", ".join(p.strip() for p in dirty_paths[:3])
+                more = f" (and {len(dirty_paths) - 3} more)" if len(dirty_paths) > 3 else ""
                 logger.warning(
-                    f"File {executable_path} has uncommitted changes. Proceeding with --allow-dirty override."
+                    f"Worktree has uncommitted changes affecting provenance: "
+                    f"{offending}{more}. Proceeding with --allow-dirty override."
                 )
             else:
-                raise DerivaMLDirtyWorkflowError(str(executable_path))
+                raise DerivaMLDirtyWorkflowError(str(executable_path), dirty_paths=dirty_paths)
 
         # If you are in a notebook, strip out the outputs before computing the checksum.
         if executable_path != "REPL":
@@ -677,21 +680,21 @@ class Workflow(BaseModel):
         return Path(_get_calling_module()), is_notebook
 
     @staticmethod
-    def _github_url(executable_path: Path) -> tuple[str, bool]:
+    def _github_url(executable_path: Path) -> tuple[str, list[str]]:
         """Return a GitHub URL for the latest commit of the script from which this routine is called.
 
         This routine is used to be called from a script or notebook (e.g., python -m file). It assumes that
         the file is in a GitHub repository and committed.  It returns a URL to the last commited version of this
         file in GitHub.
 
-        Returns: A tuple with the gethub_url and a boolean to indicate if uncommited changes
-            have been made to the file.
+        Returns: A tuple with the github_url and a list of porcelain lines describing
+            uncommitted changes that affect provenance (empty if clean).
 
         """
 
         # Get repo URL from local GitHub repo.
         if executable_path == "REPL":
-            return "REPL", True
+            return "REPL", ["REPL"]
         # ``check=True`` is load-bearing: without it ``subprocess.run``
         # never raises, ``result.stdout`` for a missing ``origin``
         # remote is an empty string, and ``github_url`` becomes
@@ -729,20 +732,27 @@ class Workflow(BaseModel):
         # (``UU``), etc. -- exactly the cases ``DERIVA_ML_ALLOW_DIRTY``
         # is supposed to gate honesty about.
         #
-        # ``cwd`` is the worktree's root; ``git status --porcelain``
-        # reports the whole worktree regardless of cwd, but anchoring
-        # at ``repo_root`` makes the call site explicit.
+        # ``_filter_dirty_paths`` then drops lines whose path sits
+        # under one of the project-convention scratch/output prefixes
+        # (``findings/``, ``outputs/``, ``.scratch/``) or any prefix
+        # from ``DERIVA_ML_DIRTY_CHECK_IGNORE``. Those directories
+        # aren't on the workflow's read path, so changes under them
+        # don't compromise reproducibility.
         try:
+            # ``--untracked-files=all`` expands directory-level untracked
+            # entries (``?? src/``) into per-file entries (``?? src/extra.py``)
+            # so the per-prefix filter and the per-path error message both
+            # operate on the leaf filename rather than the parent directory.
             result = subprocess.run(
-                ["git", "status", "--porcelain"],
+                ["git", "status", "--porcelain", "--untracked-files=all"],
                 cwd=repo_root,
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            is_dirty = bool(result.stdout.strip())
+            dirty_paths = Workflow._filter_dirty_paths(result.stdout)
         except subprocess.CalledProcessError:
-            is_dirty = False  # If the Git command fails, assume no changes
+            dirty_paths = []  # If the Git command fails, assume no changes
 
         # Get SHA-1 hash of latest commit of the file in the
         # repository. ``check=False`` here is deliberate: a file
@@ -760,7 +770,7 @@ class Workflow(BaseModel):
         )
         sha = result.stdout.strip()
         url = f"{github_url}/blob/{sha}/{executable_path.relative_to(repo_root)}"
-        return url, is_dirty
+        return url, dirty_paths
 
     @staticmethod
     def get_dynamic_version(root: str | os.PathLike | None = None) -> str:
