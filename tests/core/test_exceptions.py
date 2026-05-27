@@ -114,3 +114,31 @@ def test_definitions_reexports_every_exception_from_exceptions():
         f"``definitions.__all__`` and the corresponding import "
         f"block so the recommended import path works."
     )
+
+
+def test_dirty_workflow_error_with_paths():
+    """When dirty_paths is provided, the message lists each path on its own line."""
+    from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
+
+    exc = DerivaMLDirtyWorkflowError(
+        "src/models/train.py",
+        dirty_paths=["?? findings/run_output.txt", " M src/models/train.py"],
+    )
+    msg = str(exc)
+    assert "src/models/train.py" in msg
+    assert "?? findings/run_output.txt" in msg
+    assert " M src/models/train.py" in msg
+    assert exc.path == "src/models/train.py"
+    assert exc.dirty_paths == ["?? findings/run_output.txt", " M src/models/train.py"]
+
+
+def test_dirty_workflow_error_without_paths_is_backward_compatible():
+    """The single-argument form still works (no dirty_paths passed)."""
+    from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
+
+    exc = DerivaMLDirtyWorkflowError("src/models/train.py")
+    msg = str(exc)
+    assert "src/models/train.py" in msg
+    assert "--allow-dirty" in msg
+    assert exc.path == "src/models/train.py"
+    assert exc.dirty_paths == []
