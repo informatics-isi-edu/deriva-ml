@@ -20,14 +20,14 @@ tracking.  Key public symbols:
 - :class:`ManifestStore`: crash-safe SQLite replacement for the old
   ``asset-manifest.json`` file.
 
-See ``docs/design/denormalization.md`` for the current architecture,
-state model, fetcher/INSERT contract, fragility map, and test matrix.
+See ``docs/user-guide/denormalization.md`` — the single source of
+record for the current architecture, state model, fetcher/INSERT
+contract, the nine semantic Rules, fragility map, and test matrix.
 The older Phase 1 / Phase 2 design specs under
 ``docs/superpowers/specs/`` remain authoritative for the workspace
-layout (ATTACH'd schema files, ``main.db`` registries) and the
-``Denormalizer`` class semantic Rules 1–8 respectively, but are
-superseded by ``docs/design/denormalization.md`` wherever they
-overlap on fetcher/INSERT-side behavior.
+layout (ATTACH'd schema files, ``main.db`` registries) but are
+superseded by the user guide wherever they overlap on
+fetcher/INSERT-side behaviour or Denormalizer semantics.
 
 See ``README.md`` in this directory for a short orientation.
 """

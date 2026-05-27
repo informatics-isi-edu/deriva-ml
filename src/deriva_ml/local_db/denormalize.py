@@ -115,8 +115,8 @@ class DenormalizeResult:
             long-lived process can use this to detect that results draw
             on cached data older than they're comfortable with — the
             local SQLite cache is write-through and does NOT observe
-            server-side deletions or updates (see ``docs/design/denormalization.md``
-            §6 and §7 F3/F4).
+            server-side deletions or updates (see ``docs/user-guide/denormalization.md``
+            §6.5 freshness caveat and §7 F3/F4).
 
     Example::
 
