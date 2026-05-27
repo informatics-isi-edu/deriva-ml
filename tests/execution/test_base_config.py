@@ -436,8 +436,9 @@ class TestDeriveConfigNameFromNotebook:
 
     @pytest.fixture(autouse=True)
     def _clean_papermill_env(self, monkeypatch):
-        """Ensure PAPERMILL_INPUT_PATH never leaks between tests."""
+        """Ensure notebook-path env vars never leak between tests."""
         monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+        monkeypatch.delenv("DERIVA_ML_NOTEBOOK_PATH", raising=False)
         yield
 
     def test_derives_from_papermill_env_var(self, monkeypatch):
@@ -453,6 +454,31 @@ class TestDeriveConfigNameFromNotebook:
         """
         monkeypatch.setenv("PAPERMILL_INPUT_PATH", "/tmp/work/from_env.ipynb")
         assert _derive_config_name_from_notebook() == "from_env"
+
+    def test_derives_from_deriva_ml_notebook_path_env_var(self, monkeypatch):
+        """When DERIVA_ML_NOTEBOOK_PATH is set (and PAPERMILL_INPUT_PATH is not),
+        return the stem of the path it points at.
+
+        This is the headless-runner code path: ``deriva-ml-run-notebook``
+        drives papermill via ``pm.execute_notebook()`` (the Python API), which
+        does not set ``PAPERMILL_INPUT_PATH``. The runner exports
+        ``DERIVA_ML_NOTEBOOK_PATH`` before invoking papermill so this helper
+        has a signal to work with.
+        """
+        monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+        monkeypatch.setenv("DERIVA_ML_NOTEBOOK_PATH", "/tmp/work/roc_analysis.ipynb")
+        assert _derive_config_name_from_notebook() == "roc_analysis"
+
+    def test_papermill_env_takes_precedence_over_deriva_ml_notebook_path(self, monkeypatch):
+        """When both env vars are set, PAPERMILL_INPUT_PATH wins.
+
+        Both vars can legitimately be set at the same time (the papermill CLI
+        sets the former while the project's runner also sets the latter, e.g.
+        if someone wraps the CLI). The papermill-native signal is preferred.
+        """
+        monkeypatch.setenv("PAPERMILL_INPUT_PATH", "/tmp/work/from_papermill.ipynb")
+        monkeypatch.setenv("DERIVA_ML_NOTEBOOK_PATH", "/tmp/work/from_deriva_ml.ipynb")
+        assert _derive_config_name_from_notebook() == "from_papermill"
 
     def test_stack_frame_with_ipynb_filename(self, monkeypatch):
         """A frame whose filename ends in .ipynb yields its stem."""
@@ -509,6 +535,7 @@ class TestRunNotebookConfigNameAutoDerive:
         """Reset env vars that might leak between tests."""
         monkeypatch.delenv("DERIVA_ML_HYDRA_OVERRIDES", raising=False)
         monkeypatch.delenv("PAPERMILL_INPUT_PATH", raising=False)
+        monkeypatch.delenv("DERIVA_ML_NOTEBOOK_PATH", raising=False)
         yield
 
     def _patch_catalog_io(self):
