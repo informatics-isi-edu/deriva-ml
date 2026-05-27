@@ -4,14 +4,12 @@ Wraps the lower-level ``_denormalize_impl`` primitive in a class-based API
 with support for auto-inferred ``row_per``, explicit ``via`` path routing,
 orphan-row handling, and arbitrary RID anchor sets.
 
-Architecture, state model, fetcher/INSERT contract, fragility map, and
-test matrix:
-    ``docs/design/denormalization.md``
-
-The semantic Rules 1–8 implemented here (auto-inferred ``row_per``,
+Architecture, state model, fetcher/INSERT contract, fragility map,
+the nine semantic Rules implemented here (auto-inferred ``row_per``,
 downstream-leaf rejection, ambiguity detection, orphan emission,
-unrelated-anchor handling, etc.) live in:
-    ``docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md``
+unrelated-anchor handling, etc.), and the full test matrix all live in
+the single source of record:
+    ``docs/user-guide/denormalization.md``
 """
 
 from __future__ import annotations
@@ -530,7 +528,7 @@ class Denormalizer:
         results.
 
         True row-by-row streaming over the cursor is a known gap (audit
-        finding SC-07; see ``docs/design/denormalization.md`` §8.2 for
+        finding SC-07; see ``docs/user-guide/denormalization.md`` §8.2 for
         the design discussion). Until that gap is closed, treat
         ``as_dict`` as "iteration interface, materialised internals."
 
@@ -692,7 +690,7 @@ class Denormalizer:
               tables. ``orphan_rows`` is always exact (an orphan
               contributes exactly one row regardless of ``row_per``
               cardinality). Originally surfaced as 2026-05-21 finding
-              A02; documented in ``docs/design/denormalization.md`` §7
+              A02; documented in ``docs/user-guide/denormalization.md`` §7
               row F6.
             - ``anchors``: ``{total, by_type}`` — counts of anchor RIDs
               grouped by table.
@@ -875,7 +873,7 @@ class Denormalizer:
 
         # ── estimated row count (anchor-based; honest about unknowns) ───────
         #
-        # Three cases (see ``docs/design/denormalization.md`` §6 freshness
+        # Three cases (see ``docs/user-guide/denormalization.md`` §6.5 freshness
         # caveat and the 2026-05-21 finding A02 history):
         #
         # 1. Anchor table == row_per → in_scope is exact (1 row per anchor).
@@ -1225,8 +1223,24 @@ class Denormalizer:
                 )
             raise DerivaMLTableNotFound(t)
 
-        resolved_include = [_resolve_one(t) for t in include_tables]
-        resolved_via = [_resolve_one(t) for t in (via or [])]
+        # RB-07: feature-name substitution can collapse two distinct
+        # caller-supplied names onto the same canonical table (e.g.
+        # ["Image_Classification", "Execution_Image_Image_Classification"]
+        # both resolve to the feature-association table). Dedup the
+        # resolved lists in first-seen order so the planner doesn't get
+        # the same table twice — duplicates would trigger spurious
+        # ambiguity/cardinality errors downstream.
+        def _dedup(seq: list[str]) -> list[str]:
+            seen: set[str] = set()
+            out: list[str] = []
+            for x in seq:
+                if x not in seen:
+                    seen.add(x)
+                    out.append(x)
+            return out
+
+        resolved_include = _dedup([_resolve_one(t) for t in include_tables])
+        resolved_via = _dedup([_resolve_one(t) for t in (via or [])])
         resolved_row_per = _resolve_one(row_per) if row_per is not None else None
         return resolved_include, resolved_via, resolved_row_per
 
