@@ -491,24 +491,30 @@ def _derive_config_name_from_notebook() -> str:
 
     Resolution strategy, in order:
 
-    1. **Papermill execution.** When the notebook is executed via
-       ``deriva-ml-run-notebook`` (which uses papermill under the hood),
-       papermill sets the ``PAPERMILL_INPUT_PATH`` env var to the notebook
-       being executed. This is the most reliable signal because it survives
-       Jupyter's globals-namespace abstractions.
-    2. **Interactive Jupyter / VS Code.** Walk the call stack looking for a
+    1. **Papermill CLI execution.** When papermill is invoked via its
+       command-line entry point (``papermill <input.ipynb> <output.ipynb>``),
+       it sets the ``PAPERMILL_INPUT_PATH`` env var to the notebook being
+       executed. Note that ``papermill.execute_notebook()`` (the Python API)
+       does *not* set this var -- only the CLI does.
+    2. **deriva-ml-run-notebook (headless).** The project's headless runner
+       drives papermill via ``pm.execute_notebook(...)`` (the Python API),
+       so ``PAPERMILL_INPUT_PATH`` is unset on that path. To bridge the gap,
+       the runner exports ``DERIVA_ML_NOTEBOOK_PATH`` with the notebook path
+       before invoking papermill; this helper consults that env var as a
+       second-priority source.
+    3. **Interactive Jupyter / VS Code.** Walk the call stack looking for a
        frame whose ``__file__`` (or filename in ``f_code``) ends in
        ``.ipynb``. Jupyter and VS Code both surface the notebook path on the
        caller frame this way.
 
-    In both cases the returned name is ``Path(notebook_path).stem``.
+    In all cases the returned name is ``Path(notebook_path).stem``.
 
     Returns:
         The notebook's filename stem, suitable for passing as a Hydra
         ``config_name``.
 
     Raises:
-        ValueError: If neither signal yields a notebook path -- typically
+        ValueError: If no signal yields a notebook path -- typically
             because :func:`run_notebook` was called from a plain ``.py``
             script rather than a notebook. The caller should either invoke
             this function from a notebook or pass ``config_name`` explicitly.
@@ -517,11 +523,20 @@ def _derive_config_name_from_notebook() -> str:
         Called inside ``notebooks/roc_analysis.ipynb`` (via papermill or
         interactively), this returns ``"roc_analysis"``.
     """
-    # Papermill path. PAPERMILL_INPUT_PATH is set by papermill.execute_notebook
-    # to the absolute path of the notebook being executed.
+    # Papermill CLI path. PAPERMILL_INPUT_PATH is set by the papermill
+    # command-line entry point to the absolute path of the notebook being
+    # executed. It is NOT set by pm.execute_notebook() (the Python API).
     papermill_path = os.environ.get("PAPERMILL_INPUT_PATH")
     if papermill_path:
         return Path(papermill_path).stem
+
+    # deriva-ml-run-notebook (headless) path. Because the project's runner
+    # uses pm.execute_notebook() rather than the papermill CLI, it sets
+    # DERIVA_ML_NOTEBOOK_PATH itself before invoking papermill so this
+    # helper still has a signal to work with.
+    deriva_notebook_path = os.environ.get("DERIVA_ML_NOTEBOOK_PATH")
+    if deriva_notebook_path:
+        return Path(deriva_notebook_path).stem
 
     # Interactive (Jupyter / VS Code) path. Walk back through the stack and
     # pick up the first frame whose source file is an .ipynb. Jupyter
