@@ -2,6 +2,51 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — Issue #251: dirty-tree check scoping + clearer error
+
+### Changed
+
+- **`Workflow._github_url` no longer treats every untracked file as
+  dirty (#251).** A `2>&1 | tee findings/run_output.txt` command in
+  the user's pipeline used to trip the dirty-tree check on its own
+  output file, because that file was an untracked entry in the
+  worktree by the time the check ran. The check now filters
+  `git status --porcelain` output through `_filter_dirty_paths`,
+  which drops paths under three project-convention scratch directories
+  by default: `findings/`, `outputs/`, and `.scratch/`. Changes to
+  code (`src/`, `notebooks/`, `pyproject.toml`, etc.) still reject
+  exactly as before — only output / scratch / findings space is
+  excluded. Extend the exclusion list at runtime via
+  `DERIVA_ML_DIRTY_CHECK_IGNORE` (colon-separated prefixes,
+  `PATH`-like). The `--untracked-files=all` flag was also added to
+  the underlying `git status` invocation so the filter and the
+  user-facing error message operate on per-file paths rather than
+  parent-directory roll-ups.
+
+- **`DerivaMLDirtyWorkflowError` now lists the actual offending
+  paths in its message (#251).** The previous error named only the
+  executable being run, which sent readers hunting in
+  `.venv/.../workflow.py` when the dirty file was a user-created
+  output capture. The new message reads:
+
+  ```
+  Workflow check rejected: src/models/train.py is in a worktree with
+  uncommitted changes that affect provenance.
+  Offending paths:
+    ?? findings/run_output.txt
+    M  src/models/train.py
+  Either commit these files, or use --allow-dirty / DERIVA_ML_ALLOW_DIRTY=true
+  to proceed with a non-reproducible recording. To exclude directories from
+  this check, set DERIVA_ML_DIRTY_CHECK_IGNORE to a colon-separated list of
+  prefixes (defaults already cover findings/, outputs/, .scratch/).
+  ```
+
+  The exception's constructor accepts an optional `dirty_paths`
+  kwarg; passing only `path` still works (backward-compatible) and
+  produces the previous single-line message. The `--allow-dirty`
+  warning log now also names up to 3 offending paths plus a
+  count of any extras.
+
 ## Unreleased — Issue #181: download_asset overwrite warning
 
 ### Changed
