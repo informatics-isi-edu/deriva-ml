@@ -735,6 +735,35 @@ class TestFeatureNameResolution:
         with pytest.raises(DerivaMLDenormalizeError, match="ambiguous"):
             d.as_dataframe(["Image", "Shared"])
 
+    def test_resolver_dedupes_after_feature_substitution(self, populated_denorm) -> None:
+        """RB-07: caller passes both the feature name and the underlying
+        feature-association table name in ``include_tables``. After
+        substitution they collapse onto the same canonical table — the
+        resolver must dedup so the planner sees the table only once.
+
+        Pre-fix: ``include_tables`` came back with the same table twice
+        and downstream planner logic would either emit a duplicate
+        column or trip a cardinality check. Post-fix: first-seen-order
+        dedup yields a single canonical entry.
+        """
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        # Synthetic feature ``ClassifiedAs`` backed by ``Subject`` — same
+        # stub the other tests in this class use.
+        self._stub_find_features(populated_denorm["model"], {"ClassifiedAs": "Subject"})
+
+        # Both names resolve to ``Subject``.
+        include_resolved, via_resolved, row_per_resolved = d._resolve_table_names(
+            ["Image", "ClassifiedAs", "Subject"],
+            via=["ClassifiedAs", "Subject"],
+            row_per=None,
+        )
+        # ``Image`` and ``Subject`` survive; the feature-name duplicate
+        # is removed, preserving first-seen order.
+        assert include_resolved == ["Image", "Subject"]
+        assert via_resolved == ["Subject"]
+        assert row_per_resolved is None
+
 
 class TestDescribeKeyParity:
     """Per-key describe-vs-run parity (audit finding TC-02 / spec §8.3).
