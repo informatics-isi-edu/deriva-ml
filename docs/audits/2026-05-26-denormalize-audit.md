@@ -23,6 +23,8 @@ either confirmed, demoted, dropped, or fixed each finding. Inline
 | Finding | PR | Notes |
 |---|---|---|
 | SC-06 / RB-02 / TC-03 | informatics-isi-edu/deriva-ml#230 | row-completeness invariant in `_populate_from_catalog_inner`; hermetic unit test `TestRowCompletenessInvariant` written failing-first, then fix; spec §7 F5 rewritten in the same PR to distinguish invariant from planner-output coincidence. |
+| RB-03 / RB-04 / RB-05 / RB-06 / RB-08 / RB-10 + SC-05 | informatics-isi-edu/deriva-ml#237 | Defensive one-liners batch: empty-anchor guard in `describe`, schema-qualified orphan labels, `_init_warning` for catalog-client build failure, narrowed `list_dataset_children` exception handling, composite-FK `NotImplementedError`, dead `model` param removal. Eight regression tests landed alongside. |
+| RB-07 | informatics-isi-edu/deriva-ml#243 | Post-grill follow-up: `_resolve_table_names` dedups resolved `include_tables` / `via` in first-seen order so feature-name + feature-table-name in one call collapses to one entry. |
 
 **Closed (spec rewrite):**
 
@@ -51,17 +53,17 @@ either confirmed, demoted, dropped, or fixed each finding. Inline
 | TC-08 | Medium (unchanged) | `_collect_fk_values` partial-engine-state behavior unpinned. | **Closed** by informatics-isi-edu/deriva-ml#241 (partial-engine-state coverage added). |
 | TC-10 | Low (unchanged) | catalog↔bag parity test for A01-shape data — cheap extension of `test_feature_table_multiple_rows_per_anchor`. | **Closed** by informatics-isi-edu/deriva-ml#241 (parity assertion added). |
 
-**Confirmed remaining robustness one-liners (code TODOs):**
+**Robustness one-liners — all closed:**
 
 | Finding | Severity | One-line fix | Status |
 |---|---|---|---|
-| RB-03 | Low | `if not rids: continue` filter in describe at line 721 (mirror `_classify_anchors` skip). | Pending. |
-| RB-04 | Low | Multi-schema label hazard in `_run`'s per-RID orphan scan; use `denormalize_column_name` or assert single-schema. | Pending. |
-| RB-05 | Medium | `Denormalizer.__init__` silent fallback to `source="local"` should log WARNING + attach `_init_warning`. | Pending. |
-| RB-06 | Medium | `list_dataset_children` silent fallback to root-only should warn for `source="catalog"`. | Pending. |
-| RB-07 | Low | Resolver should dedup after feature-name substitution so `["Image_Classification", "Execution_Image_Image_Classification"]` collapses to one entry. | **Closed** (post-PR-241 follow-up, this branch) — `_resolve_table_names` now dedups resolved `include_tables` / `via` in first-seen order, with `test_resolver_dedupes_after_feature_substitution` as regression. |
-| RB-08 | Medium | `_collect_fk_values` composite-FK assumption — AND conditions or document single-column FK requirement. | **Closed** by informatics-isi-edu/deriva-ml#238 — `_collect_fk_values` raises `NotImplementedError` on composite FK rather than silently mis-fetching. |
-| RB-10 | Low | Remove unused `model` parameter from `_populate_from_catalog`. | Pending. |
+| RB-03 | Low | `if not rids: continue` filter in describe at line 721 (mirror `_classify_anchors` skip). | **Closed** by informatics-isi-edu/deriva-ml#237 — `describe`'s `anchors.by_type` skips empty anchor sets, matching the `_classify_anchors` guard. |
+| RB-04 | Low | Multi-schema label hazard in `_run`'s per-RID orphan scan; use `denormalize_column_name` or assert single-schema. | **Closed** by informatics-isi-edu/deriva-ml#237 — per-RID orphan scan builds labels via `denormalize_column_name`, so multi-schema datasets produce schema-qualified RID columns. |
+| RB-05 | Medium | `Denormalizer.__init__` silent fallback to `source="local"` should log WARNING + attach `_init_warning`. | **Closed** by informatics-isi-edu/deriva-ml#237 — `ErmrestPagedClient` build failure logs WARNING and stashes a single-line diagnostic on `Denormalizer._init_warning`; routed through the `describe()` warnings envelope from #239. |
+| RB-06 | Medium | `list_dataset_children` silent fallback to root-only should warn for `source="catalog"`. | **Closed** by informatics-isi-edu/deriva-ml#237 — exception handling narrowed to `AttributeError`/`TypeError` for fixture compatibility; other exceptions emit a WARNING under `source="catalog"` instead of falling back silently. |
+| RB-07 | Low | Resolver should dedup after feature-name substitution so `["Image_Classification", "Execution_Image_Image_Classification"]` collapses to one entry. | **Closed** by informatics-isi-edu/deriva-ml#243 — `_resolve_table_names` now dedups resolved `include_tables` / `via` in first-seen order, with `test_resolver_dedupes_after_feature_substitution` as regression. |
+| RB-08 | Medium | `_collect_fk_values` composite-FK assumption — AND conditions or document single-column FK requirement. | **Closed** by informatics-isi-edu/deriva-ml#237 — `_collect_fk_values` raises `NotImplementedError` on composite FK rather than silently returning the first under-scoped match; single-column FK path unchanged. |
+| RB-10 | Low | Remove unused `model` parameter from `_populate_from_catalog`. | **Closed** by informatics-isi-edu/deriva-ml#237 — dead `model` parameter removed from `_populate_from_catalog` and inner walker; `TestRB10DeadModelParameter` pins the signature. |
 
 **Dropped after grilling:**
 
