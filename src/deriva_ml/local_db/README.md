@@ -96,17 +96,17 @@ DatasetBag.get_denormalized_as_dataframe ─> Denormalizer(bag).as_dataframe(...
 
 ## Further reading
 
-- **Primary design reference:** `docs/design/denormalization.md` —
-  current architecture, state-ownership model, fetcher / INSERT
-  contracts, fragility map, and test matrix. Start here.
-- **Semantic Rules 1–8 (planner):**
-  `docs/superpowers/specs/2026-04-17-denormalization-semantics-design.md`.
-  Still authoritative for `Denormalizer` semantics.
+- **Primary design reference:** `docs/user-guide/denormalization.md` —
+  single-source-of-record user guide + architecture, state-ownership
+  model, fetcher / INSERT contracts, nine semantic Rules, fragility
+  map, and test matrix. Start here. The horizontal-rule divider
+  separates the user-tier prose (above) from the `# Implementation
+  contract` engineering reference (below).
 - **Workspace layout (ATTACH'd schema files, registries):**
   `docs/superpowers/specs/2026-04-15-unified-local-db-design.md`
   and `…/2026-04-15-unified-local-db-phase2-design.md`. Still
   authoritative for storage; superseded by
-  `docs/design/denormalization.md` wherever they overlap on
+  `docs/user-guide/denormalization.md` wherever they overlap on
   fetcher/INSERT semantics.
 - **Implementation plans (historical):**
   `docs/superpowers/plans/archive/` — point-in-time records of
