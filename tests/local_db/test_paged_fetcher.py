@@ -282,6 +282,70 @@ class TestFetchByRids:
         assert len(get_requests) == 2
         assert len(post_requests) == 0
 
+    def test_oversized_get_chunk_loops_until_all_rids_fetched(self, engine):
+        """500-RID batch above the URL guard → chunk-loop fetches all 500.
+
+        2026-05-27 regression: the prior shrink-on-URL-too-long path
+        returned after the first prefix that fit, silently dropping
+        the suffix. With 500 RIDs and a max_url_bytes that fits ~462
+        RIDs, the old code returned 462 rows and never fetched the
+        remaining ~38. This test pins the row-completeness invariant
+        at the fetcher layer: every RID requested must be present
+        in the local DB after the call.
+        """
+        rows = _make_rows(500)
+        # 128 + 13*462 = 6134 fits; 128 + 13*500 = 6628 doesn't.
+        threshold = 6144
+        client = FakePagedClient(rows_by_table={"Image": rows}, max_get_bytes=threshold)
+        table = _make_target_table(engine, "Image")
+        fetcher = PagedFetcher(client=client, engine=engine)
+        rids = [r["RID"] for r in rows]
+
+        fetcher.fetch_by_rids("Image", rids, table, batch_size=500, max_url_bytes=threshold)
+
+        # All 500 rows landed in the local DB.
+        assert _rows_count(engine, table) == 500
+
+        # Two GET requests (one fits-the-limit chunk + one remainder)
+        # and no POST fallback for this case.
+        batch_requests = [r for r in client.requests if r[0] == "fetch_rid_batch"]
+        get_requests = [r for r in batch_requests if r[1]["method"] == "GET"]
+        post_requests = [r for r in batch_requests if r[1]["method"] == "POST"]
+        # The first GET is the largest prefix that fits (~462 rids);
+        # the second GET is the remainder (~38 rids).
+        assert len(get_requests) == 2
+        assert len(post_requests) == 0
+        # Sanity-check the chunk split adds up to all rids.
+        total_requested = sum(len(r[1]["rids"]) for r in get_requests)
+        assert total_requested == 500
+
+    def test_oversized_get_eventually_falls_back_to_post(self, engine):
+        """When even a single-RID URL won't fit, fall back to POST.
+
+        Defensive path: the chunk-loop's first iteration computes
+        ``fits = (max_url_bytes - 128) // 13``; if that yields 0,
+        no chunk can be sent via GET and the method falls back to
+        POST with the full original RID list. Pins this behaviour
+        so a future "simplify the loop" refactor doesn't drop the
+        last-resort path.
+        """
+        rows = _make_rows(50)
+        # max_url_bytes < 128 + 13 = 141 means even one RID can't be
+        # sent via GET. The fake client also rejects GETs of any size.
+        client = FakePagedClient(rows_by_table={"Image": rows}, max_get_bytes=1)
+        table = _make_target_table(engine, "Image")
+        fetcher = PagedFetcher(client=client, engine=engine)
+        rids = [r["RID"] for r in rows]
+
+        fetcher.fetch_by_rids("Image", rids, table, batch_size=50, max_url_bytes=1)
+
+        assert _rows_count(engine, table) == 50
+        post_requests = [
+            r for r in client.requests
+            if r[0] == "fetch_rid_batch" and r[1]["method"] == "POST"
+        ]
+        assert len(post_requests) >= 1, "POST fallback should have fired"
+
     def test_empty_rid_set_returns_zero(self, engine):
         """Empty rids list → 0 returned, no requests issued."""
         client = FakePagedClient(rows_by_table={"Image": _make_rows(10)})

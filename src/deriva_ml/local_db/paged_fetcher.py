@@ -325,26 +325,106 @@ class PagedFetcher:
         rids: list[str],
         max_url_bytes: int,
     ) -> list[dict[str, Any]]:
-        attempt = list(rids)
-        while attempt:
-            estimated = 128 + 13 * len(attempt)
+        """Fetch rows for *rids* via GET, shrinking + chunking if URL too long.
+
+        Strategy, designed to preserve the row-completeness invariant
+        (every RID in ``rids`` is requested exactly once across one or
+        more HTTP calls, and every response row is returned):
+
+        1. Try GET with the full list. If the estimated URL fits under
+           ``max_url_bytes`` and the server accepts it, return the rows.
+        2. If the URL is too long (either by local estimate or by a
+           runtime "URL too long" error), shrink to the largest prefix
+           that does fit and request *that* prefix via GET — then
+           recurse on the remaining suffix, accumulating rows.
+        3. If even a single-RID URL exceeds the limit (impossible in
+           practice, but defensive), fall back to a POST request with
+           the full original ``rids`` list.
+
+        The earlier implementation shrunk to the first prefix that fit
+        and returned the result, silently dropping the suffix — a SC-06
+        row-completeness violation at the fetcher layer. The chunk-loop
+        below preserves the "always POST as a last resort" fallback for
+        clients without POST while guaranteeing every RID is requested.
+
+        Args:
+            table: Qualified table name (``"schema:table"``).
+            column: Column to filter on.
+            rids: RIDs to request.
+            max_url_bytes: URL-length guard threshold.
+
+        Returns:
+            All rows from the server for *rids*, concatenated.
+        """
+        remaining = list(rids)
+        out: list[dict[str, Any]] = []
+        while remaining:
+            estimated = 128 + 13 * len(remaining)
             if estimated <= max_url_bytes:
+                # URL should fit — try GET on the entire remaining set.
                 try:
-                    return self._client.fetch_rid_batch(table=table, column=column, rids=attempt, method="GET")
+                    out.extend(
+                        self._client.fetch_rid_batch(
+                            table=table, column=column, rids=remaining, method="GET"
+                        )
+                    )
+                    return out
                 except RuntimeError as exc:
                     if "too long" not in str(exc).lower():
                         raise
-            half = len(attempt) // 2
-            if half == 0:
+                    # Local estimate was optimistic — fall through to
+                    # shrink-and-chunk.
+
+            # Find the largest prefix that fits under the URL guard.
+            # Solve 128 + 13 * k <= max_url_bytes for k.
+            fits = (max_url_bytes - 128) // 13
+            if fits <= 0:
+                # max_url_bytes is so small that even one RID doesn't
+                # fit — last-resort POST with the original rids list.
                 logger.debug(
                     "POST fallback for table=%s column=%s rids=%d",
                     table,
                     column,
                     len(rids),
                 )
-                return self._client.fetch_rid_batch(table=table, column=column, rids=rids, method="POST")
-            attempt = attempt[:half]
-        return []
+                return self._client.fetch_rid_batch(
+                    table=table, column=column, rids=rids, method="POST"
+                )
+            chunk = remaining[:fits]
+            try:
+                out.extend(
+                    self._client.fetch_rid_batch(
+                        table=table, column=column, rids=chunk, method="GET"
+                    )
+                )
+            except RuntimeError as exc:
+                if "too long" not in str(exc).lower():
+                    raise
+                # Local estimate was wrong even for this chunk size.
+                # Halve and retry once; if that also rejects, POST is
+                # the only remaining option.
+                half = max(1, len(chunk) // 2)
+                chunk = chunk[:half]
+                try:
+                    out.extend(
+                        self._client.fetch_rid_batch(
+                            table=table, column=column, rids=chunk, method="GET"
+                        )
+                    )
+                except RuntimeError as exc2:
+                    if "too long" not in str(exc2).lower():
+                        raise
+                    logger.debug(
+                        "POST fallback after GET-shrink rejected: table=%s column=%s rids=%d",
+                        table,
+                        column,
+                        len(rids),
+                    )
+                    return self._client.fetch_rid_batch(
+                        table=table, column=column, rids=rids, method="POST"
+                    )
+            remaining = remaining[len(chunk) :]
+        return out
 
     def fetch_by_rids_or_predicate(
         self,
