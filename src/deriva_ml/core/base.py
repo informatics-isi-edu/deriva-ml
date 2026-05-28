@@ -42,7 +42,7 @@ DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
 from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.connection_mode import ConnectionMode
-from deriva_ml.core.definitions import ML_SCHEMA, RID, TableDefinition, VocabularyTableDef
+from deriva_ml.core.definitions import DRY_RUN_RID, ML_SCHEMA, RID, TableDefinition, VocabularyTableDef
 from deriva_ml.core.exceptions import (
     DerivaMLConfigurationError,
     DerivaMLException,
@@ -1051,7 +1051,22 @@ class DerivaML(
 
             Using a dictionary:
                 >>> url = ml.cite({"RID": "1-abc123"})
+
+            Dry-run sentinel — no catalog round-trip, no clickable link:
+                >>> url = ml.cite("0000")
+                >>> print(url)
+                'dry-run (rid=0000)'
         """
+        # Dry-run sentinel: ``run_notebook(dry_run=True)`` and friends
+        # hand back ``DRY_RUN_RID`` as the execution RID because no row
+        # was created on the catalog. Resolving it would 404. Return a
+        # bare, non-link string so notebook templates that embed the
+        # output in ``[label]({url})`` markdown render it as plain text
+        # rather than a clickable link to a 404.
+        rid_value = entity if isinstance(entity, str) else entity.get("RID")
+        if rid_value == DRY_RUN_RID:
+            return f"dry-run (rid={DRY_RUN_RID})"
+
         # Return if already a citation URL
         if isinstance(entity, str) and entity.startswith(f"https://{self.host_name}/id/{self.catalog_id}/"):
             return entity

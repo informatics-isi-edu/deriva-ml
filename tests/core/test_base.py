@@ -231,6 +231,45 @@ def test_cite_accepts_dict_with_rid_key():
     assert url.startswith("https://deriva.example.org/id/42/1-XYZ@")
 
 
+def test_cite_dry_run_sentinel_returns_placeholder_string():
+    """Dry-run sentinel RID ``"0000"`` short-circuits to a non-link string.
+
+    ``run_notebook(dry_run=True)`` (and related dry-run paths) hand back
+    ``DRY_RUN_RID`` ("0000") as the execution RID because no execution
+    row was created on the catalog. Notebook templates commonly embed
+    the cite output in ``[label]({url})`` markdown. Resolving "0000"
+    against the catalog 404s and crashes the informational header cell,
+    so ``cite`` must guard the sentinel before reaching the catalog.
+
+    The placeholder is a bare string (no scheme) so a markdown link
+    renderer leaves it as plain text rather than rendering a clickable
+    link that would resolve to a 404.
+    """
+    from deriva_ml.core.base import DerivaML
+    from deriva_ml.core.constants import DRY_RUN_RID
+
+    harness = _CiteHarness()
+
+    def _explode(_rid):  # pragma: no cover - sentinel must not call this
+        raise AssertionError("resolve_rid must not be invoked for the dry-run sentinel")
+
+    harness.resolve_rid = _explode  # type: ignore[assignment]
+
+    out = DerivaML.cite(harness, DRY_RUN_RID)  # type: ignore[arg-type]
+    assert out == f"dry-run (rid={DRY_RUN_RID})"
+    assert "http" not in out  # not a clickable link
+
+
+def test_cite_dry_run_sentinel_via_dict():
+    """Same short-circuit when the sentinel arrives wrapped in ``{"RID": ...}``."""
+    from deriva_ml.core.base import DerivaML
+    from deriva_ml.core.constants import DRY_RUN_RID
+
+    harness = _CiteHarness()
+    out = DerivaML.cite(harness, {"RID": DRY_RUN_RID})  # type: ignore[arg-type]
+    assert out == f"dry-run (rid={DRY_RUN_RID})"
+
+
 # ---------------------------------------------------------------------------
 # catalog_snapshot — kwarg forwarding
 # ---------------------------------------------------------------------------
