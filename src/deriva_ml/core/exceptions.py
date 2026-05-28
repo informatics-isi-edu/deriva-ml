@@ -577,17 +577,51 @@ class DerivaMLDirtyWorkflowError(DerivaMLWorkflowError):
 
     Args:
         path: Path to the file with uncommitted changes.
+        dirty_paths: Optional list of git-status-porcelain lines describing
+            which paths tripped the check. When provided, the message lists
+            them; otherwise falls back to a single-path message.
 
     Example:
         >>> raise DerivaMLDirtyWorkflowError("src/models/train.py")  # doctest: +SKIP
         DerivaMLDirtyWorkflowError: File src/models/train.py has uncommitted changes. ...
     """
 
-    def __init__(self, path: str) -> None:
-        super().__init__(
-            f"File {path} has uncommitted changes. Commit before running, or use --allow-dirty to override."
-        )
+    def __init__(
+        self,
+        path: str,
+        dirty_paths: list[str] | None = None,
+    ) -> None:
+        """Args:
+            path: Path to the executable file whose workflow is being recorded.
+            dirty_paths: Optional list of git-status-porcelain lines describing
+                the actual offending paths (e.g. ["?? findings/out.txt",
+                " M src/models/train.py"]). When provided, the lines are
+                included in the exception message so the user can see what
+                tripped the check rather than having to run ``git status``
+                themselves.
+        """
         self.path = path
+        self.dirty_paths = list(dirty_paths) if dirty_paths else []
+        if self.dirty_paths:
+            offending = "\n".join(f"  {line}" for line in self.dirty_paths)
+            message = (
+                f"Workflow check rejected: {path} is in a worktree with "
+                f"uncommitted changes that affect provenance.\n"
+                f"Offending paths:\n{offending}\n"
+                f"Either commit these files, or use --allow-dirty / "
+                f"DERIVA_ML_ALLOW_DIRTY=true to proceed with a non-reproducible "
+                f"recording. To exclude directories from this check, set "
+                f"DERIVA_ML_DIRTY_CHECK_IGNORE to a colon-separated list of "
+                f"prefixes (defaults already cover findings/, outputs/, .scratch/)."
+            )
+        else:
+            # Backward-compatible single-arg form. Kept for any external
+            # caller that constructs this exception without the path list.
+            message = (
+                f"File {path} has uncommitted changes. Commit before running, "
+                f"or use --allow-dirty to override."
+            )
+        super().__init__(message)
 
 
 class DerivaMLUploadError(DerivaMLExecutionError):
