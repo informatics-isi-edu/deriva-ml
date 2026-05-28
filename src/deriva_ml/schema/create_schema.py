@@ -90,16 +90,49 @@ def create_dataset_table(
     dataset_table = schema.create_table(
         TableDef(
             name=MLTable.dataset,
+            comment=(
+                "A versioned collection of catalog rows that an execution "
+                "consumed or produced. Datasets are typed (see "
+                "`Dataset_Type`), carry a current version (`Dataset_Version`), "
+                "may contain other datasets as members (`Dataset_Dataset`), "
+                "and can be downloaded as a self-describing BDBag. "
+                "Soft-deleted rows are marked via the `Deleted` flag rather "
+                "than physically removed, so historical references in "
+                "executions and citations remain valid."
+            ),
             columns=[
-                ColumnDef("Description", BuiltinType.markdown),
-                ColumnDef("Deleted", BuiltinType.boolean),
+                ColumnDef(
+                    "Description",
+                    BuiltinType.markdown,
+                    comment=(
+                        "Human-readable description of what this dataset represents. Rendered as Markdown in Chaise."
+                    ),
+                ),
+                ColumnDef(
+                    "Deleted",
+                    BuiltinType.boolean,
+                    comment=(
+                        "Soft-delete flag. When true, the dataset is hidden "
+                        "from default listings but retained so existing "
+                        "execution provenance and citations remain resolvable."
+                    ),
+                ),
             ],
             annotations=dataset_annotation if dataset_annotation is not None else {},
         )
     )
 
     dataset_type = schema.create_table(
-        VocabularyTableDef(name=MLVocab.dataset_type, curie_template=f"{project_name}:{{RID}}")
+        VocabularyTableDef(
+            name=MLVocab.dataset_type,
+            curie_template=f"{project_name}:{{RID}}",
+            comment=(
+                "Controlled vocabulary classifying datasets by role "
+                "(`Training`, `Testing`, `Validation`, `Complete`, `Split`, "
+                "`Labeled`, `Unlabeled`, `File`). Domain-specific dataset "
+                "categories belong in user vocabularies, not here."
+            ),
+        )
     )
 
     # Association table for Dataset <-> Dataset_Type
@@ -108,7 +141,12 @@ def create_dataset_table(
             associates=[
                 ("Dataset", dataset_table),
                 (MLVocab.dataset_type, dataset_type),
-            ]
+            ],
+            comment=(
+                "Many-to-many tag assignments between datasets and dataset "
+                "types. A dataset can carry multiple types (for example "
+                "`Training` + `Labeled`)."
+            ),
         )
     )
 
@@ -117,10 +155,25 @@ def create_dataset_table(
 
     # Nested datasets.
     schema.create_table(
-        Table.define_association(associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)])
+        Table.define_association(
+            associates=[("Dataset", dataset_table), ("Nested_Dataset", dataset_table)],
+            comment=(
+                "Self-association expressing dataset nesting: the `Dataset` "
+                "column is the parent, `Nested_Dataset` is a member. Used to "
+                "model train/test/validation splits as nested children of a "
+                "parent collection."
+            ),
+        )
     )
     schema.create_table(
-        Table.define_association(associates=[("Dataset", dataset_table), ("Execution", execution_table)])
+        Table.define_association(
+            associates=[("Dataset", dataset_table), ("Execution", execution_table)],
+            comment=(
+                "Many-to-many association between datasets and executions. "
+                "An execution can consume or produce multiple datasets; a "
+                "dataset can be referenced by multiple executions over time."
+            ),
+        )
     )
     return dataset_table
 
@@ -137,6 +190,13 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) 
     """
     return TableDef(
         name=MLTable.dataset_version,
+        comment=(
+            "Version history for a dataset. Each row pins a (Dataset, "
+            "Version) pair, optionally with a catalog Snapshot for released "
+            "versions and a MINID URL for the materialized bag. The current "
+            "version of a dataset is selected by the outbound FK "
+            "`Dataset.Version`."
+        ),
         columns=[
             ColumnDef(
                 name="Version",
@@ -151,9 +211,25 @@ def define_table_dataset_version(sname: str, annotation: Optional[dict] = None) 
                     "initial release row created at dataset creation time."
                 ),
             ),
-            ColumnDef("Description", BuiltinType.markdown),
+            ColumnDef(
+                "Description",
+                BuiltinType.markdown,
+                comment=(
+                    "Release notes for this version: what changed since the "
+                    "previous version, why the bump was made, anything a "
+                    "consumer downloading this version should know."
+                ),
+            ),
             ColumnDef("Dataset", BuiltinType.text, comment="RID of dataset"),
-            ColumnDef("Execution", BuiltinType.text, comment="RID of execution"),
+            ColumnDef(
+                "Execution",
+                BuiltinType.text,
+                comment=(
+                    "RID of the execution that produced this version (NULL "
+                    "for the initial release row, which has no producing "
+                    "execution)."
+                ),
+            ),
             ColumnDef("Minid", BuiltinType.text, comment="URL to MINID for dataset"),
             ColumnDef(
                 name="Minid_Spec_Hash",
@@ -207,9 +283,35 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
     execution = schema.create_table(
         TableDef(
             name=MLTable.execution,
+            comment=(
+                "One run of a Workflow against specific input Datasets, "
+                "producing output Datasets, Features, and Assets. Carries "
+                "the execution state machine (`Status`), provenance edges "
+                "to its inputs and outputs (via `Dataset_Execution`, "
+                "`Execution_Asset_Execution`, `Execution_Metadata_Execution`), "
+                "and timing breakdown across the three lifecycle phases "
+                "(`Download_Duration`, `Execution_Duration`, `Upload_Duration`)."
+            ),
             columns=[
-                ColumnDef("Workflow", BuiltinType.text),
-                ColumnDef("Description", BuiltinType.markdown),
+                ColumnDef(
+                    "Workflow",
+                    BuiltinType.text,
+                    comment=(
+                        "FK to the Workflow row whose URL + git commit hash "
+                        "uniquely identifies the code that ran this execution."
+                    ),
+                ),
+                ColumnDef(
+                    "Description",
+                    BuiltinType.markdown,
+                    comment=(
+                        "Human-readable description of what this execution "
+                        "is doing — purpose, hyperparameters worth calling "
+                        "out, anything a reader scanning a list of "
+                        "executions should know. Rendered as Markdown in "
+                        "Chaise."
+                    ),
+                ),
                 # Three duration columns, each measuring a distinct phase:
                 #   Execution_Duration — algorithm time inside the `with`
                 #     block (start of __enter__ → end of __exit__).
@@ -219,11 +321,56 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
                 #     time (_initialize_execution).
                 #   Upload_Duration   — commit_output_assets time
                 #     (bag commit + Hatrac PUTs).
-                ColumnDef("Execution_Duration", BuiltinType.text),
-                ColumnDef("Download_Duration", BuiltinType.text),
-                ColumnDef("Upload_Duration", BuiltinType.text),
-                ColumnDef("Status", BuiltinType.text),
-                ColumnDef("Status_Detail", BuiltinType.text),
+                ColumnDef(
+                    "Execution_Duration",
+                    BuiltinType.text,
+                    comment=(
+                        "Wall-clock time spent in the algorithm phase — "
+                        "from the start of the `with ml.create_execution()` "
+                        "block to its exit, excluding download and upload. "
+                        "Stored as an ISO 8601 duration string."
+                    ),
+                ),
+                ColumnDef(
+                    "Download_Duration",
+                    BuiltinType.text,
+                    comment=(
+                        "Wall-clock time spent in the initialization phase, "
+                        "which downloads input datasets and assets from the "
+                        "catalog into the local working directory. Stored "
+                        "as an ISO 8601 duration string."
+                    ),
+                ),
+                ColumnDef(
+                    "Upload_Duration",
+                    BuiltinType.text,
+                    comment=(
+                        "Wall-clock time spent in the commit phase — "
+                        "writing output bags, uploading output assets to "
+                        "Hatrac, and finalizing catalog rows. Stored as an "
+                        "ISO 8601 duration string."
+                    ),
+                ),
+                ColumnDef(
+                    "Status",
+                    BuiltinType.text,
+                    comment=(
+                        "Current state of the execution state machine. FK "
+                        "to `Execution_Status` (`Created`, `Running`, "
+                        "`Stopped`, `Failed`, `Pending_Upload`, `Uploaded`, "
+                        "`Aborted`)."
+                    ),
+                ),
+                ColumnDef(
+                    "Status_Detail",
+                    BuiltinType.text,
+                    comment=(
+                        "Free-form context for the current Status — usually "
+                        "the most recent stage message, error text on "
+                        "`Failed`, or progress indicator on long-running "
+                        "phases."
+                    ),
+                ),
             ],
             foreign_keys=[
                 ForeignKeyDef(
@@ -248,7 +395,13 @@ def create_execution_table(schema: Schema, annotation: Optional[dict] = None) ->
     schema.create_table(
         Table.define_association(
             associates=[("Execution", execution), ("Nested_Execution", execution)],
-            comment="Association table for hierarchical execution nesting (parent-child relationships)",
+            comment=(
+                "Self-association expressing execution nesting: the "
+                "`Execution` column is the parent (typically a sweep or "
+                "multirun controller), `Nested_Execution` is one of its "
+                "children. `Sequence` orders children within a parent for "
+                "sequential runs; NULL means parallel siblings."
+            ),
             metadata=[
                 ColumnDef(
                     name="Sequence",
@@ -269,6 +422,7 @@ def create_asset_table(
     asset_type_table: Table,
     asset_role_table: Table,
     use_hatrac: bool = True,
+    comment: Optional[str] = None,
 ) -> Table:
     """Create an asset table with associated type and execution associations.
 
@@ -288,6 +442,11 @@ def create_asset_table(
             this parameter was accepted but silently ignored, so
             the ``File`` table got the same Hatrac template as
             ``Execution_Asset``.
+        comment: Optional table-level comment describing the
+            purpose of this specific asset table. Used to
+            distinguish the three asset tables (Execution_Asset,
+            Execution_Metadata, File) which otherwise share the
+            same generic shape.
 
     Returns:
         The created asset Table object.
@@ -302,6 +461,7 @@ def create_asset_table(
             schema_name=schema.name,
             name=asset_name,
             hatrac_template=hatrac_template,
+            comment=comment,
         )
     )
     schema.create_table(
@@ -310,6 +470,11 @@ def create_asset_table(
                 (asset_name, asset_table),
                 ("Asset_Type", asset_type_table),
             ],
+            comment=(
+                f"Many-to-many tag assignments between {asset_name} rows "
+                f"and Asset_Type vocabulary terms. An asset can carry "
+                f"multiple types (for example `Model_File` + `Output_File`)."
+            ),
         )
     )
 
@@ -319,6 +484,11 @@ def create_asset_table(
                 (asset_name, asset_table),
                 ("Execution", execution_table),
             ],
+            comment=(
+                f"Many-to-many association between {asset_name} rows and "
+                f"executions. Carries an Asset_Role FK indicating whether "
+                f"the asset was an Input to or an Output of the execution."
+            ),
         )
     )
     atable.create_reference(asset_role_table)
@@ -339,19 +509,85 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
     workflow_table = schema.create_table(
         TableDef(
             name=MLTable.workflow,
+            comment=(
+                "A versioned reference to the code that knows how to run "
+                "an ML step. Workflows are content-addressed by `(URL, "
+                "Checksum)` — the same script at the same git commit "
+                "always resolves to the same Workflow row. Workflows are "
+                "typed via the `Workflow_Workflow_Type` association "
+                "(`Training`, `Prediction`, `Analysis`, ...). Each "
+                "execution links back to exactly one Workflow row, making "
+                "the producing code recoverable for any result in the "
+                "catalog."
+            ),
             columns=[
-                ColumnDef("Name", BuiltinType.text),
-                ColumnDef("Description", BuiltinType.markdown),
-                ColumnDef("URL", BuiltinType.ermrest_uri),
-                ColumnDef("Checksum", BuiltinType.text),
-                ColumnDef("Version", BuiltinType.text),
+                ColumnDef(
+                    "Name",
+                    BuiltinType.text,
+                    comment=(
+                        "Short human-readable name for the workflow. Used "
+                        "in execution listings and citations; not required "
+                        "to be unique."
+                    ),
+                ),
+                ColumnDef(
+                    "Description",
+                    BuiltinType.markdown,
+                    comment=(
+                        "Longer description of what the workflow does, "
+                        "what inputs it expects, and what outputs it "
+                        "produces. Rendered as Markdown in Chaise."
+                    ),
+                ),
+                ColumnDef(
+                    "URL",
+                    BuiltinType.ermrest_uri,
+                    comment=(
+                        "Location of the workflow code — typically a "
+                        "GitHub URL pinned to a specific commit hash, or "
+                        "a notebook URL. Combined with `Checksum` to "
+                        "content-address the workflow."
+                    ),
+                ),
+                ColumnDef(
+                    "Checksum",
+                    BuiltinType.text,
+                    comment=(
+                        "Git commit hash (or other content hash) of the "
+                        "code at `URL`. Together with `URL` this uniquely "
+                        "identifies the executable code; two executions "
+                        "of the same Workflow row are guaranteed to have "
+                        "run identical source."
+                    ),
+                ),
+                ColumnDef(
+                    "Version",
+                    BuiltinType.text,
+                    comment=(
+                        "Semantic version string of the workflow (e.g. "
+                        "`1.2.0`). Independent from `Checksum`; used for "
+                        "human-readable release tracking when the "
+                        "workflow code is itself published as a "
+                        "versioned package."
+                    ),
+                ),
             ],
             annotations=annotations if annotations else {},
         )
     )
 
     workflow_type_table = schema.create_table(
-        VocabularyTableDef(name=MLVocab.workflow_type, curie_template=f"{schema.name}:{{RID}}")
+        VocabularyTableDef(
+            name=MLVocab.workflow_type,
+            curie_template=f"{schema.name}:{{RID}}",
+            comment=(
+                "Controlled vocabulary classifying workflows by their "
+                "role in an ML pipeline (`Training`, `Prediction`, "
+                "`Analysis`, `Feature_Creation`, `Data_Cleaning`, ...). "
+                "A workflow can carry multiple types via the "
+                "`Workflow_Workflow_Type` association."
+            ),
+        )
     )
 
     # Association table for Workflow <-> Workflow_Type
@@ -360,7 +596,12 @@ def create_workflow_table(schema: Schema, annotations: Optional[dict[str, Any]] 
             associates=[
                 ("Workflow", workflow_table),
                 (MLVocab.workflow_type, workflow_type_table),
-            ]
+            ],
+            comment=(
+                "Many-to-many tag assignments between workflows and "
+                "workflow types. A workflow can carry multiple types "
+                "(for example `Training` + `Feature_Creation`)."
+            ),
         )
     )
 
@@ -408,15 +649,58 @@ def create_ml_schema(
 
     # Create workflow and execution table.
 
-    schema.create_table(VocabularyTableDef(name=MLVocab.feature_name, curie_template=f"{project_name}:{{RID}}"))
+    schema.create_table(
+        VocabularyTableDef(
+            name=MLVocab.feature_name,
+            curie_template=f"{project_name}:{{RID}}",
+            comment=(
+                "Controlled vocabulary of feature names. Every Feature "
+                "defined on a target table draws its name from a term in "
+                "this vocabulary, so the name space of features is "
+                "audited and searchable rather than free-form."
+            ),
+        )
+    )
     asset_type_table = schema.create_table(
-        VocabularyTableDef(name=MLVocab.asset_type, curie_template=f"{project_name}:{{RID}}")
+        VocabularyTableDef(
+            name=MLVocab.asset_type,
+            curie_template=f"{project_name}:{{RID}}",
+            comment=(
+                "Controlled vocabulary classifying assets by purpose "
+                "(`Model_File`, `Hydra_Config`, `Metrics_File`, "
+                "`Notebook_Output`, ...). Used as the FK target for "
+                "Asset_Type tagging on every asset table in the catalog "
+                "(`Execution_Asset_Asset_Type`, "
+                "`Execution_Metadata_Asset_Type`, `File_Asset_Type`, plus "
+                "any domain-specific asset tables)."
+            ),
+        )
     )
     asset_role_table = schema.create_table(
-        VocabularyTableDef(name=MLVocab.asset_role, curie_template=f"{project_name}:{{RID}}")
+        VocabularyTableDef(
+            name=MLVocab.asset_role,
+            curie_template=f"{project_name}:{{RID}}",
+            comment=(
+                "Controlled vocabulary distinguishing inputs from outputs "
+                "(`Input`, `Output`). Carried on every "
+                "<asset>_Execution association row to record which "
+                "direction the asset moves relative to the execution."
+            ),
+        )
     )
-    execution_status_table = schema.create_table(
-        VocabularyTableDef(name=MLVocab.execution_status, curie_template=f"{project_name}:{{RID}}")
+    schema.create_table(
+        VocabularyTableDef(
+            name=MLVocab.execution_status,
+            curie_template=f"{project_name}:{{RID}}",
+            comment=(
+                "Controlled vocabulary describing the lifecycle state of "
+                "an Execution: `Created` → `Running` → `Stopped` → "
+                "`Pending_Upload` → `Uploaded`, with `Failed` and "
+                "`Aborted` as terminal error states. Managed by the "
+                "execution state machine; do not extend without coordinating "
+                "with the deriva-ml execution lifecycle."
+            ),
+        )
     )
 
     create_workflow_table(schema, annotations["workflow_annotation"])
@@ -435,6 +719,13 @@ def create_ml_schema(
         execution_table,
         asset_type_table,
         asset_role_table,
+        comment=(
+            "Asset table for files describing an execution's environment "
+            "and configuration — Hydra configs, runtime info, DerivaML "
+            "execution configuration JSON. Stored in Hatrac. Distinguished "
+            "from `Execution_Asset` (which holds the execution's data "
+            "outputs) by purpose, not by file shape."
+        ),
     )
 
     create_asset_table(
@@ -443,6 +734,13 @@ def create_ml_schema(
         execution_table,
         asset_type_table,
         asset_role_table,
+        comment=(
+            "Asset table for files produced or consumed by an execution as "
+            "data — trained model weights, prediction CSVs, plots, "
+            "notebook outputs. Stored in Hatrac. Distinguished from "
+            "`Execution_Metadata` (which holds environment/configuration) "
+            "by purpose, not by file shape."
+        ),
     )
 
     # File table
@@ -453,6 +751,13 @@ def create_ml_schema(
         asset_type_table,
         asset_role_table,
         use_hatrac=False,
+        comment=(
+            "Asset table for files that live outside Hatrac — typically "
+            "external URLs pointing at data the catalog references but "
+            "does not host. Same row shape as the Hatrac-backed asset "
+            "tables; the difference is that `URL` is a plain string with "
+            "no upload template wired up."
+        ),
     )
     # And make Files be part of a dataset.
     schema.create_table(
@@ -460,7 +765,12 @@ def create_ml_schema(
             associates=[
                 ("Dataset", dataset_table),
                 (MLTable.file, file_table),
-            ]
+            ],
+            comment=(
+                "Many-to-many membership of File rows in Datasets. A file "
+                "can belong to multiple datasets; a dataset can contain "
+                "multiple files."
+            ),
         )
     )
 
