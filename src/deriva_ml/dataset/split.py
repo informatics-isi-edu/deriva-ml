@@ -1341,29 +1341,26 @@ def split_dataset(
                 testing_types=["Labeled"],
             )
 
-        Stratified split preserving class distribution::
+        Stratified split preserving class distribution (one row per
+        Image, projecting the Image_Class vocab term as a column)::
 
+            # Image and Image_Class are linked by the feature-
+            # association table Execution_Image_Image_Classification,
+            # which is a transparent bridge for the denormalizer.
+            # Pass the **vocab/value table** (``Image_Class``) in
+            # ``include_tables``, not the feature-name shorthand
+            # (``Image_Classification``): the shorthand resolves to
+            # the feature-association table, which is downstream of
+            # Image and would trip Rule 5 against the auto-defaulted
+            # ``row_per="Image"``. Stratify on the dotted column
+            # against the vocab table.
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
-                include_tables=["Image", "Image_Classification"],
-            )
-
-        Stratified split on a feature-target column (one row per
-        Image, projecting the Image_Classification vocab term)::
-
-            # Image and Image_Classification are linked by the feature-
-            # association table Execution_Image_Image_Classification.
-            # ``split_dataset`` auto-defaults ``row_per=element_table``
-            # when stratifying, so the join produces one row per Image
-            # with the classification label projected as a column.
-            result = split_dataset(
-                ml, "28D0",
-                test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
-                include_tables=["Image", "Image_Classification"],
+                stratify_by_column="Image_Class.Name",
+                include_tables=["Image", "Image_Class"],
                 element_table="Image",
+                partition_by="element",
             )
 
         Override ``row_per`` to project one row per feature value
@@ -1377,24 +1374,46 @@ def split_dataset(
 
             # Per-annotation statistics — element RIDs may legitimately
             # appear in multiple partitions because each annotator-image
-            # pair is its own observation.
+            # pair is its own observation. The feature-name shorthand
+            # ``Image_Classification`` resolves to the feature-
+            # association table; setting ``row_per`` to that table
+            # explicitly makes the per-observation intent visible.
+            # Stratify on the FK column on the feature-association
+            # table (the resolver does not pull the vocab table into
+            # the join when the shorthand is used with an explicit
+            # feature-assoc ``row_per``).
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
-                include_tables=["Image", "Execution_Image_Image_Classification"],
+                stratify_by_column="Execution_Image_Image_Classification.Image_Class",
+                include_tables=["Image", "Image_Classification"],
                 row_per="Execution_Image_Image_Classification",
                 partition_by="row",
             )
+
+        Note: to get "one row per element with a feature value
+        projected as a column," pass the vocab/value table in
+        ``include_tables`` (as in the first stratified example
+        above), not the feature-name shorthand. Rule 5 of the
+        denormalizer rejects the shorthand combined with
+        ``row_per=<element>`` because the feature-association table
+        the shorthand resolves to is strictly downstream of the
+        element — aggregation is not supported. To partition by
+        feature *observation* instead (per-annotation statistics),
+        use the shorthand together with an explicit
+        ``row_per=<feature-assoc-table>`` and ``partition_by="row"``
+        as in the second example above.
 
         Stratified split dropping rows with missing labels::
 
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
+                stratify_by_column="Image_Class.Name",
                 stratify_missing="drop",
-                include_tables=["Image", "Image_Classification"],
+                include_tables=["Image", "Image_Class"],
+                element_table="Image",
+                partition_by="element",
             )
 
         Custom selection function for balanced sampling::
@@ -1403,7 +1422,7 @@ def split_dataset(
 
             def balanced_selector(df, partition_sizes, seed):
                 rng = np.random.default_rng(seed)
-                label_col = "Image_Classification_Image_Class"
+                label_col = "Image_Class_Name"
                 classes = df[label_col].unique()
                 result = {name: [] for name in partition_sizes}
                 for cls in classes:
@@ -1420,7 +1439,9 @@ def split_dataset(
                 ml, "28D0",
                 test_size=100,
                 selection_fn=balanced_selector,
-                include_tables=["Image", "Image_Classification"],
+                include_tables=["Image", "Image_Class"],
+                element_table="Image",
+                partition_by="element",
             )
 
         Dry run to preview the split plan without modifying the catalog::
