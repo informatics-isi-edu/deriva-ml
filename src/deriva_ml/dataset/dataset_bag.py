@@ -903,6 +903,7 @@ class DatasetBag:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
     ) -> pd.DataFrame:
         """Return the dataset bag as a denormalized wide table (DataFrame).
 
@@ -918,6 +919,14 @@ class DatasetBag:
             via: Optional path-only intermediates (Rule 6).
             ignore_unrelated_anchors: If True, silently drop anchors
                 with no FK path (Rule 8).
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. See ``FeatureRecord`` for
+                built-ins (``select_newest``, ``select_first``, etc.).
+                Requires ``include_tables`` to contain exactly one
+                feature-association table; raises ``ValueError``
+                otherwise. Identical contract to
+                :meth:`feature_values`'s ``selector`` argument.
 
         Returns:
             A :class:`pandas.DataFrame` with one row per ``row_per``
@@ -927,6 +936,13 @@ class DatasetBag:
 
             bag = dataset.download_dataset_bag(version)
             df = bag.get_denormalized_as_dataframe(["Image", "Subject"])
+
+            # Reduce multi-annotator feature rows to one row per Image:
+            from deriva_ml.feature import FeatureRecord
+            df = bag.get_denormalized_as_dataframe(
+                ["Image", "Execution_Image_Image_Classification"],
+                selector=FeatureRecord.select_newest,
+            )
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -935,6 +951,7 @@ class DatasetBag:
             row_per=row_per,
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
+            selector=selector,
         )
 
     def get_denormalized_as_dict(
@@ -944,6 +961,7 @@ class DatasetBag:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized dataset bag rows as dicts.
 
@@ -960,6 +978,10 @@ class DatasetBag:
             via: Optional path-only intermediates (Rule 6).
             ignore_unrelated_anchors: If True, silently drop anchors
                 with no FK path (Rule 8).
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. Same contract as
+                :meth:`get_denormalized_as_dataframe`.
 
         Yields:
             ``dict[str, Any]`` per row — keys are ``Table.column``
@@ -969,6 +991,13 @@ class DatasetBag:
 
             for row in bag.get_denormalized_as_dict(["Image", "Subject"]):
                 process(row["Image.RID"], row["Subject.Name"])
+
+            # With selector reduction:
+            from deriva_ml.feature import FeatureRecord
+            rows = bag.get_denormalized_as_dict(
+                ["Image", "Execution_Image_Image_Classification"],
+                selector=FeatureRecord.select_newest,
+            )
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -977,6 +1006,7 @@ class DatasetBag:
             row_per=row_per,
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
+            selector=selector,
         )
 
     def list_denormalized_columns(

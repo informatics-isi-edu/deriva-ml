@@ -1655,6 +1655,7 @@ class Dataset:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
         version: DatasetVersion | str | None = None,
     ) -> pd.DataFrame:
         """Return the dataset as a denormalized wide table (DataFrame).
@@ -1670,6 +1671,14 @@ class Dataset:
             via: Optional path-only intermediates (Rule 6).
             ignore_unrelated_anchors: If True, silently drop anchors
                 with no FK path (Rule 8).
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. See ``FeatureRecord`` for
+                built-ins (``select_newest``, ``select_first``, etc.).
+                Requires ``include_tables`` to contain exactly one
+                feature-association table; raises ``ValueError``
+                otherwise. Identical contract to
+                :meth:`feature_values`'s ``selector`` argument.
             version: Optional dataset version. When given, queries run
                 against the corresponding catalog snapshot for
                 reproducibility (same semantics as
@@ -1690,6 +1699,12 @@ class Dataset:
             df = dataset.get_denormalized_as_dataframe(
                 ["Image", "Subject"], version="1.0.0"
             )
+            # Reduce multi-annotator feature rows to one row per Image:
+            from deriva_ml.feature import FeatureRecord
+            df = dataset.get_denormalized_as_dataframe(
+                ["Image", "Execution_Image_Image_Classification"],
+                selector=FeatureRecord.select_newest,
+            )
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -1698,6 +1713,7 @@ class Dataset:
             row_per=row_per,
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
+            selector=selector,
         )
 
     def get_denormalized_as_dict(
@@ -1707,6 +1723,7 @@ class Dataset:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
         version: DatasetVersion | str | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized dataset rows as dicts.
@@ -1724,6 +1741,10 @@ class Dataset:
             via: Optional path-only intermediates (Rule 6).
             ignore_unrelated_anchors: If True, silently drop anchors
                 with no FK path (Rule 8).
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. Same contract as
+                :meth:`get_denormalized_as_dataframe`.
             version: Optional dataset version (snapshot-bound queries).
                 Same semantics as
                 :meth:`get_denormalized_as_dataframe`'s ``version``.
@@ -1736,6 +1757,13 @@ class Dataset:
 
             for row in dataset.get_denormalized_as_dict(["Image", "Subject"]):
                 print(row["Image.RID"], row["Subject.Name"])
+
+            # With selector reduction:
+            from deriva_ml.feature import FeatureRecord
+            rows = dataset.get_denormalized_as_dict(
+                ["Image", "Execution_Image_Image_Classification"],
+                selector=FeatureRecord.select_newest,
+            )
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -1744,6 +1772,7 @@ class Dataset:
             row_per=row_per,
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
+            selector=selector,
         )
 
     def list_denormalized_columns(
@@ -2019,8 +2048,7 @@ class Dataset:
             nonlocal _cycle_rids_cache
             if _cycle_rids_cache is None:
                 _cycle_rids_cache = {self.dataset_rid} | {
-                    child.dataset_rid
-                    for child in self.list_dataset_children(recurse=True)
+                    child.dataset_rid for child in self.list_dataset_children(recurse=True)
                 }
             return _cycle_rids_cache
 
