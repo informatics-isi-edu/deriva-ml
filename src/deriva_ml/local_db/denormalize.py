@@ -37,6 +37,7 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import timezone
 from typing import Any, Callable, Generator
 
 import pandas as pd
@@ -664,68 +665,17 @@ def _apply_selector(
     target_label = _label(target_table_name)
     rid_label = _label("RID")
 
-    # Supplementary fetch: the wide-table SELECT in
-    # ``_prepare_wide_table`` skips the system columns
-    # ``{RCT, RMT, RCB, RMB}`` on every contributing table — but the
-    # selector contract reads them (``select_newest`` keys on RCT,
-    # ``select_by_execution`` keys on Execution which IS preserved).
-    # Fetch RCT (and any other FeatureRecord field that's missing from
-    # the wide-table row) keyed by the feature-assoc RID before we
-    # build the FeatureRecord shadows. Without this step,
-    # ``select_newest`` falls back to the empty-string default on every
-    # record and picks an arbitrary group member.
-    feature_rids = [row.get(rid_label) for row in rows if row.get(rid_label) is not None]
-    supplements: dict[str, dict[str, Any]] = {}
-    if feature_rids:
-        from sqlalchemy import select as sa_select
-
-        feat_orm = orm_resolver(feature_assoc_table)
-        if feat_orm is not None:
-            # Pull the columns the FeatureRecord cares about that the
-            # wide table doesn't already carry. The wide table preserves
-            # the feature-association table's domain columns; we only
-            # need to fetch the system columns the planner skipped.
-            wanted_cols = [c for c in field_names if c not in {"feature", "Feature_Name"}]
-            try:
-                with engine.connect() as conn:
-                    rows_supp = (
-                        conn.execute(sa_select(feat_orm.__table__).where(feat_orm.__table__.c.RID.in_(feature_rids)))
-                        .mappings()
-                        .all()
-                    )
-                for r in rows_supp:
-                    rid = r.get("RID")
-                    if rid is None:
-                        continue
-                    # ``RCT`` may come back from SQLite as a Python
-                    # ``datetime`` (depending on the column type
-                    # affinity), but the FeatureRecord schema declares
-                    # ``RCT: Optional[str]`` to match the ISO-8601
-                    # shape ``Dataset.feature_values`` materializes.
-                    # Normalize timestamp-shaped values to ISO strings
-                    # so the selector built-ins (lexicographic
-                    # comparison on RCT) behave the same way they do
-                    # on the ``feature_values`` surface.
-                    coerced: dict[str, Any] = {}
-                    for col in wanted_cols:
-                        if col not in r:
-                            continue
-                        val = r.get(col)
-                        if hasattr(val, "isoformat"):
-                            val = val.isoformat()
-                        coerced[col] = val
-                    supplements[rid] = coerced
-            except Exception as e:
-                # Supplementary fetch is best-effort: if it fails, the
-                # selector falls back to whatever fields the wide-table
-                # row provides. Log so operators can see the path was
-                # exercised but degraded.
-                logger.warning(
-                    "Denormalizer selector path: supplementary fetch of %s system columns failed (%s); "
-                    "selector may see None for skipped fields.",
-                    feature_assoc_table,
-                    e,
-                )
+    # Recover the system columns the planner skipped (RCT, etc.) keyed by
+    # the feature-assoc RID. Shared with ``Dataset.feature_values``'s
+    # delegation via :func:`_recover_system_columns`.
+    supplements = _recover_system_columns(
+        rows=rows,
+        engine=engine,
+        orm_resolver=orm_resolver,
+        feature_assoc_table=feature_assoc_table,
+        rid_label=rid_label,
+        field_names=field_names,
+    )
 
     # Group rows by target RID. We carry source rows alongside their
     # built FeatureRecord shadow so the selector's choice can be mapped
@@ -796,6 +746,231 @@ def _apply_selector(
     # silently. A caller that wants them gone can filter the result.
     reduced.extend(untouched)
     return reduced
+
+
+def _recover_system_columns(
+    *,
+    rows: list[dict[str, Any]],
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    feature_assoc_table: str,
+    rid_label: str,
+    field_names: set[str],
+) -> dict[str, dict[str, Any]]:
+    """Fetch the system columns the wide-table SELECT dropped, keyed by RID.
+
+    The denormalize planner (``_prepare_wide_table``) skips the system
+    columns ``{RCT, RMT, RCB, RMB}`` on every contributing table, so a
+    materialized wide-table row carries the feature-association table's
+    domain columns but not its ``RCT``. The selector built-ins read
+    ``RCT`` (``select_newest`` / ``select_first`` compare it
+    lexicographically) and ``Dataset.feature_values`` exposes ``RCT`` on
+    every yielded ``FeatureRecord`` — both need it back.
+
+    This is a single ``SELECT * FROM <feat_assoc> WHERE RID IN (:rids)``
+    against the local engine, returning ``{feature_assoc_RID:
+    {field: value}}`` for the ``FeatureRecord`` fields the wide table did
+    not already carry. Timestamp-shaped values (``RCT`` may come back from
+    SQLite as a Python ``datetime`` depending on column affinity) are
+    normalized to ISO-8601 strings so the selector built-ins and the
+    ``FeatureRecord.RCT: Optional[str]`` schema see the same shape the
+    PathBuilder path materializes.
+
+    Shared by :func:`_apply_selector` (the ``Denormalizer`` selector path)
+    and :func:`materialize_feature_records` (the ``Dataset.feature_values``
+    delegation) so RCT recovery lives in exactly one place.
+
+    Args:
+        rows: Materialized wide-table rows from the SQL JOIN.
+        engine: SQLAlchemy engine to read the feature-association table.
+        orm_resolver: Maps ``feature_assoc_table`` -> ORM class.
+        feature_assoc_table: Name of the feature-association table.
+        rid_label: The dotted output label for the feature-assoc table's
+            ``RID`` column (e.g. ``"Execution_Image_Quality.RID"``).
+        field_names: ``FeatureRecord`` field names — the wanted columns
+            (minus ``feature`` / ``Feature_Name``) are pulled.
+
+    Returns:
+        ``{feature_assoc_RID: {field_name: coerced_value}}``. Empty when
+        no feature RIDs are present in ``rows`` or the supplementary
+        fetch fails (best-effort — a failure is logged, not raised).
+
+    Example::
+
+        supplements = _recover_system_columns(
+            rows=rows, engine=engine, orm_resolver=resolver,
+            feature_assoc_table="Execution_Image_Quality",
+            rid_label="Execution_Image_Quality.RID",
+            field_names={"Image", "Quality", "RCT", "Execution"},
+        )
+        # supplements["3-ABC"] == {"RCT": "2026-05-28T16:54:02+00:00", ...}
+    """
+    feature_rids = [row.get(rid_label) for row in rows if row.get(rid_label) is not None]
+    supplements: dict[str, dict[str, Any]] = {}
+    if not feature_rids:
+        return supplements
+
+    from sqlalchemy import select as sa_select
+
+    feat_orm = orm_resolver(feature_assoc_table)
+    if feat_orm is None:
+        return supplements
+
+    # Pull the FeatureRecord fields the wide table doesn't already carry.
+    # The wide table preserves the feature-association table's domain
+    # columns; we only need the system columns the planner skipped.
+    wanted_cols = [c for c in field_names if c not in {"feature", "Feature_Name"}]
+    try:
+        with engine.connect() as conn:
+            rows_supp = (
+                conn.execute(sa_select(feat_orm.__table__).where(feat_orm.__table__.c.RID.in_(feature_rids)))
+                .mappings()
+                .all()
+            )
+        for r in rows_supp:
+            rid = r.get("RID")
+            if rid is None:
+                continue
+            coerced: dict[str, Any] = {}
+            for col in wanted_cols:
+                if col not in r:
+                    continue
+                val = r.get(col)
+                if hasattr(val, "isoformat"):
+                    # Deriva ``timestamptz`` columns (RCT, etc.) are stored
+                    # as UTC, and the PathBuilder ``feature_values`` path
+                    # surfaces them as ISO-8601 strings WITH a ``+00:00``
+                    # offset. The local SQLite round-trip drops the tzinfo
+                    # (the value comes back tz-naive), so a bare
+                    # ``.isoformat()`` would emit ``...232194`` instead of
+                    # ``...232194+00:00`` and diverge from the legacy shape.
+                    # Re-attach UTC on naive datetimes so the recovered RCT
+                    # is bit-identical to the PathBuilder output (selectors
+                    # compare RCT lexicographically — a missing offset also
+                    # breaks ordering against catalog-shaped timestamps).
+                    if getattr(val, "tzinfo", None) is None:
+                        val = val.replace(tzinfo=timezone.utc)
+                    val = val.isoformat()
+                coerced[col] = val
+            supplements[rid] = coerced
+    except Exception as e:
+        # Best-effort: if the fetch fails, callers fall back to whatever
+        # fields the wide-table row provides. Log so operators can see
+        # the path was exercised but degraded.
+        logger.warning(
+            "Denormalizer: supplementary fetch of %s system columns failed (%s); "
+            "RCT and other skipped fields may be None.",
+            feature_assoc_table,
+            e,
+        )
+    return supplements
+
+
+def materialize_feature_records(
+    rows: list[dict[str, Any]],
+    *,
+    record_class: type,
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    feature_assoc_table: str,
+    target_table_name: str,
+    schema_for_table: dict[str, str],
+    multi_schema: bool,
+) -> list[Any]:
+    """Materialize wide-table denormalize rows into typed ``FeatureRecord`` instances.
+
+    The strip-prefix-and-project adapter from audit finding 08 §4: the
+    wide-table rows carry dotted column labels
+    (``Execution_Image_Quality.Quality``) plus the target table's own
+    columns (``Image.URL``, etc.). This function:
+
+    1. Strips the feature-association table's dotted prefix.
+    2. Projects down to only the keys in ``record_class.model_fields``
+       (so ``Image.URL`` and other non-FeatureRecord columns are dropped —
+       ``FeatureRecord`` is ``extra="forbid"``).
+    3. Overlays the recovered system columns (RCT) from
+       :func:`_recover_system_columns`.
+    4. Constructs ``record_class(**projected)``.
+
+    Rows whose target FK is ``None`` are dropped — matching the
+    ``reduce_with_selector`` / PathBuilder semantics where a feature row
+    with a NULL target is never surfaced (audit §10). This guards against
+    the Denormalizer's LEFT-JOIN emit producing an orphan row with
+    ``target=None`` that the PathBuilder path could never return.
+
+    Args:
+        rows: Materialized wide-table rows (no selector reduction applied
+            — that happens upstream of this call if requested).
+        record_class: The ``FeatureRecord`` subclass from
+            ``Feature.feature_record_class()``.
+        engine: SQLAlchemy engine for the RCT supplementary fetch.
+        orm_resolver: Maps table name -> ORM class.
+        feature_assoc_table: Name of the feature-association table (the
+            column-label prefix to strip).
+        target_table_name: Name of the feature's target table (its FK
+            column on the feature-assoc table — used for the null-target
+            drop).
+        schema_for_table: ``{table_name: schema_name}`` for label building.
+        multi_schema: Whether output labels carry the schema prefix.
+
+    Returns:
+        List of ``record_class`` instances — one per input row whose
+        target FK is non-null. Each has ``RCT`` populated from the
+        supplementary fetch (the wide table drops it).
+
+    Example::
+
+        recs = materialize_feature_records(
+            rows,
+            record_class=feat.feature_record_class(),
+            engine=engine, orm_resolver=resolver,
+            feature_assoc_table="Execution_Image_Quality",
+            target_table_name="Image",
+            schema_for_table={"Image": "domain", "Execution_Image_Quality": "deriva-ml"},
+            multi_schema=False,
+        )
+        # recs[0].Image == "1-ABC"; recs[0].RCT == "2026-05-28T..."
+    """
+    field_names = set(record_class.model_fields.keys())
+    schema_name = schema_for_table.get(feature_assoc_table, "")
+
+    def _label(col_name: str) -> str:
+        return denormalize_column_name(schema_name, feature_assoc_table, col_name, multi_schema)
+
+    target_label = _label(target_table_name)
+    rid_label = _label("RID")
+
+    supplements = _recover_system_columns(
+        rows=rows,
+        engine=engine,
+        orm_resolver=orm_resolver,
+        feature_assoc_table=feature_assoc_table,
+        rid_label=rid_label,
+        field_names=field_names,
+    )
+
+    records: list[Any] = []
+    for row in rows:
+        # Null target FK → drop, matching reduce_with_selector / PathBuilder
+        # (audit §10). The Denormalizer's LEFT-JOIN emit could otherwise
+        # surface a feature row with target=None that the PathBuilder path
+        # never returns.
+        if row.get(target_label) is None:
+            continue
+        # Strip prefix + project down to FeatureRecord fields only.
+        record_kwargs: dict[str, Any] = {}
+        for field_name in field_names:
+            label = _label(field_name)
+            if label in row:
+                record_kwargs[field_name] = row[label]
+        # Overlay recovered system columns (RCT) where the wide table
+        # left a gap.
+        supp = supplements.get(row.get(rid_label), {})
+        for field_name, value in supp.items():
+            if field_name in field_names and record_kwargs.get(field_name) is None:
+                record_kwargs[field_name] = value
+        records.append(record_class(**record_kwargs))
+    return records
 
 
 def _compute_cache_age_seconds(fetcher: PagedFetcher | None) -> float | None:

@@ -42,7 +42,6 @@ from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
 
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
-    from deriva_ml.feature import FeatureRecord
 
 # Third-party imports
 import pandas as pd
@@ -67,7 +66,7 @@ from deriva_ml.dataset.aux_classes import (
 )
 from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 from deriva_ml.dataset.dataset_bag import DatasetBag
-from deriva_ml.feature import Feature
+from deriva_ml.feature import Feature, FeatureRecord
 from deriva_ml.interfaces import DerivaMLCatalog
 from deriva_ml.model.database import DatabaseModel
 
@@ -594,6 +593,7 @@ class Dataset:
         members = self.list_dataset_members()
         return [r["RID"] for r in members.get(table_name, [])]
 
+    @validate_call(config=VALIDATION_CONFIG)
     def feature_values(
         self,
         table: str | Table,
@@ -605,9 +605,19 @@ class Dataset:
         """Dataset-scoped feature values — identical signature to DerivaML.feature_values.
 
         Yields only records whose target RID is a member of this dataset.
-        Filtering is applied to the raw feature table query before selector
-        reduction — a target RID outside the dataset's member set is never
-        presented to the selector.
+        Dataset scoping is enforced by the denormalize SQL join (the
+        feature rows are reached *through* the dataset's membership
+        tables), so a target RID outside the dataset is never materialized.
+
+        **Implementation (Stage 3a of the ``feature_values`` /
+        ``Denormalizer`` consolidation):** this method delegates to
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.feature_records`
+        rather than running its own PathBuilder query. The catalog-wide
+        ``DerivaML.feature_values`` keeps its PathBuilder path (it has no
+        dataset anchor for the denormalize join); ``Dataset.feature_values``
+        is intrinsically dataset-scoped, so the denormalize join is the
+        natural fit and the two surfaces now share one SQL-join
+        implementation instead of two.
 
         See :meth:`deriva_ml.core.mixins.feature.FeatureMixin.feature_values`
         for the full contract (return type, selector semantics, exceptions).
@@ -618,36 +628,45 @@ class Dataset:
             selector: Optional callable ``(list[FeatureRecord]) -> FeatureRecord | None``
                 used to reduce multi-value groups. See ``FeatureRecord`` for built-ins.
                 Return ``None`` from a selector to omit that target RID.
-            materialize_limit: Optional cap on the upstream catalog
-                query's row materialization. Forwarded to
-                ``DerivaML.feature_values``; raises
-                ``DerivaMLMaterializeLimitExceeded`` if exceeded.
-                Default ``None`` preserves unbounded behavior.
+            materialize_limit: Optional cap on the number of feature rows
+                materialized. Raises ``DerivaMLMaterializeLimitExceeded``
+                when exceeded. Default ``None`` preserves unbounded
+                behavior.
 
-                **The cap applies to the catalog query, not to the
-                dataset-filtered result.** ``Dataset.feature_values``
-                fetches every feature row from the catalog first, then
-                drops rows whose target RID isn't a dataset member.
-                A feature with ``10*N`` catalog rows where only ``N/2``
-                belong to this dataset will trip the limit at ``N``
-                even though the post-filter yield would be small.
-                To bound the dataset-scope output instead, leave
-                ``materialize_limit`` unset and consume the iterator
-                with ``itertools.islice``.
-            execution_rids: Optional filter forwarded to the upstream
-                catalog query. When set, only feature rows whose
-                ``Execution`` value is in this list are materialized.
-                Empty list short-circuits to an empty result.
+                **Post-count guard (Stage 3a behavior note).** The
+                denormalize join materializes the dataset-scoped feature
+                rows into memory, then this wrapper counts them and raises
+                if the count exceeds the cap. This is a *weaker* guard than
+                the legacy PathBuilder server-side cap — the rows are
+                already in memory when the check fires — but it is no worse
+                than the full materialization the PathBuilder fetch also
+                performed. To bound the output by yield count instead, leave
+                ``materialize_limit`` unset and consume the iterator with
+                ``itertools.islice``.
+            execution_rids: Optional filter on the ``Execution`` column.
+                When set, only feature rows whose ``Execution`` value is in
+                this list survive. Empty list short-circuits to an empty
+                result.
+
+                **Post-filter (Stage 3a behavior note).** The denormalize
+                join has no server-side ``Execution`` predicate, so this
+                filter is applied in Python after the dataset-scoped rows
+                are materialized. The legacy PathBuilder path filtered
+                server-side, saving a round-trip's worth of rows; the
+                delegation trades that round-trip-savings for one
+                consolidated SQL-join implementation. The filter runs
+                *before* selector reduction, matching the legacy ordering.
 
         Returns:
-            Iterator of ``FeatureRecord`` — filtered to dataset members, then
-            reduced by selector if provided.
+            Iterator of ``FeatureRecord`` — dataset-scoped, optionally
+            filtered by ``execution_rids``, then reduced by selector if
+            provided. ``RCT`` is populated on every record.
 
         Raises:
             DerivaMLTableNotFound: ``table`` does not exist.
             DerivaMLException: ``feature_name`` is not a feature on ``table``.
-            DerivaMLMaterializeLimitExceeded: If the upstream
-                materialization exceeds ``materialize_limit``.
+            DerivaMLMaterializeLimitExceeded: If the materialized row count
+                exceeds ``materialize_limit``.
 
         Example:
             >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
@@ -655,36 +674,46 @@ class Dataset:
             ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
             ... ))
         """
-        members = set(self.list_members(table))
-        target_col = table if isinstance(table, str) else table.name
+        from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+        from deriva_ml.feature import reduce_with_selector
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        # Filter upstream raw records to dataset members. Forward
-        # materialize_limit and execution_rids to the catalog query so
-        # the upstream materialization is bounded too. The dataset-scope
-        # filter is applied AFTER the catalog query, so the limit check
-        # in the upstream guards us against memory blow-up before we
-        # filter further.
-        raw_in_scope = [
-            rec
-            for rec in self._ml_instance.feature_values(
-                table,
-                feature_name,
-                selector=None,
-                materialize_limit=materialize_limit,
-                execution_rids=execution_rids,
+        # execution_rids=[] short-circuits to empty — preserve the legacy
+        # PathBuilder behavior explicitly (audit §10).
+        if execution_rids is not None and not execution_rids:
+            return
+
+        feat = self.lookup_feature(table, feature_name)
+        target_col = feat.target_table.name
+
+        # Delegate the dataset-scoped SQL join + RCT recovery + FeatureRecord
+        # materialization to the Denormalizer. Selector reduction is applied
+        # in this wrapper (not pushed into feature_records) so the
+        # execution_rids filter runs first — matching the legacy ordering
+        # "filter by execution, then reduce".
+        records = Denormalizer(self).feature_records(feat, selector=None)
+
+        # materialize_limit: post-count guard. Weaker than the legacy
+        # server-side cap (rows are already materialized), documented above.
+        if materialize_limit is not None and len(records) > materialize_limit:
+            raise DerivaMLMaterializeLimitExceeded(
+                actual_count=len(records),
+                limit=materialize_limit,
             )
-            if getattr(rec, target_col, None) in members
-        ]
+
+        # execution_rids: post-filter in the wrapper. The denormalize join
+        # has no server-side Execution predicate (audit §6).
+        if execution_rids is not None:
+            exec_set = set(execution_rids)
+            records = [rec for rec in records if rec.Execution in exec_set]
 
         if selector is None:
-            yield from raw_in_scope
+            yield from records
             return
 
         # Group by target RID + apply selector — shared helper
         # so the three feature_values surfaces stay in lockstep.
-        from deriva_ml.feature import reduce_with_selector
-
-        yield from reduce_with_selector(raw_in_scope, target_col, selector)
+        yield from reduce_with_selector(records, target_col, selector)
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """Look up a Feature definition — delegates to the owning DerivaML.
