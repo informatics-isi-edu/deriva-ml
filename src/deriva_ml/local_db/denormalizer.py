@@ -609,6 +609,91 @@ class Denormalizer:
         )
         yield from result.iter_rows()
 
+    def feature_records(
+        self,
+        feature: Any,
+        *,
+        selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"] | None = None,
+    ) -> list["FeatureRecord"]:
+        """Materialize one feature's values as typed ``FeatureRecord`` instances.
+
+        Dataset-scoped feature read built on the denormalize SQL join — the
+        delegation target for :meth:`Dataset.feature_values` (Stage 3a of
+        the ``feature_values`` / ``Denormalizer`` consolidation). Runs the
+        wide-table join over ``[target_table, feature_assoc_table]``,
+        optionally reduces multi-row groups with ``selector``, then strips
+        the dotted column prefix, projects down to the ``FeatureRecord``
+        fields, recovers the ``RCT`` system column the planner skips, and
+        constructs typed records.
+
+        Unlike :meth:`as_dict` (which yields the raw wide-table dict with
+        dotted labels and no ``RCT``), this returns ``FeatureRecord``
+        objects with ``RCT`` populated — the same shape the legacy
+        PathBuilder ``feature_values`` produced.
+
+        Args:
+            feature: A :class:`~deriva_ml.feature.Feature` (from
+                ``lookup_feature``). Supplies the feature-association
+                table, the target table, and ``feature_record_class()``.
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. ``None`` yields every
+                record (no reduction). See ``FeatureRecord`` for built-ins.
+
+        Returns:
+            List of ``FeatureRecord`` instances — one per surviving feature
+            row (after selector reduction, if any), with ``RCT`` populated
+            and rows whose target FK is ``None`` dropped.
+
+        Example::
+
+            feat = ml.lookup_feature("Image", "Quality")
+            d = Denormalizer(dataset)
+            records = d.feature_records(feat, selector=FeatureRecord.select_newest)
+            # records[0].Image, records[0].Quality, records[0].RCT all set
+        """
+        from deriva_ml.local_db.denormalize import materialize_feature_records
+
+        feat_table = feature.feature_table.name
+        target_table_name = feature.target_table.name
+        record_class = feature.feature_record_class()
+
+        # Run the wide-table join over the target + feature-assoc tables.
+        # row_per is the feature-assoc table so each output row is one
+        # feature value (matching the PathBuilder "one row per feature-assoc
+        # row" shape). The selector, when given, reduces multi-row groups
+        # inside _denormalize_impl before we materialize records.
+        result = self._run(
+            [target_table_name, feat_table],
+            row_per=feat_table,
+            via=None,
+            ignore_unrelated_anchors=False,
+            selector=selector,
+        )
+
+        # Recompute the (schema_for_table, multi_schema) metadata the
+        # materialization adapter needs to build/strip dotted labels.
+        # This is the same planner call _denormalize_impl makes; it is
+        # model-only (no data fetch) so the cost is negligible.
+        _, column_specs, multi_schema = self._model._planner._prepare_wide_table(
+            self._dataset,
+            self._dataset_rid,
+            [target_table_name, feat_table],
+            row_per=feat_table,
+        )
+        schema_for_table = {t: s for s, t, _c, _tp in column_specs}
+
+        return materialize_feature_records(
+            list(result.iter_rows()),
+            record_class=record_class,
+            engine=self._engine,
+            orm_resolver=self._orm_resolver,
+            feature_assoc_table=feat_table,
+            target_table_name=target_table_name,
+            schema_for_table=schema_for_table,
+            multi_schema=multi_schema,
+        )
+
     def columns(
         self,
         include_tables: list[str],
