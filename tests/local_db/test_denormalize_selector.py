@@ -83,6 +83,13 @@ def populated_feature_denorm(
         cls_cls = ls.get_orm_class("Image_Classification")
         session.add(cls_cls(RID=cls_rid, Name="cat"))
 
+        # Feature_Name vocab term the feature-assoc rows reference. The
+        # feature-assoc table's Feature_Name column is now an FK to
+        # deriva-ml.Feature_Name.Name (the real 4-FK feature shape), so
+        # the term has to exist before the feature rows are inserted.
+        fn_cls = ls.get_orm_class("Feature_Name")
+        session.add(fn_cls(RID="FN-default", Name="default"))
+
         feat_cls = ls.get_orm_class("Execution_Image_Image_Classification")
         for img_rid in image_rids:
             for erid in exec_rids:
@@ -381,3 +388,89 @@ class TestSelectorPlumbing:
             selector=FeatureRecord.select_newest,
         )
         assert len(df) == len(image_rids)
+
+
+# ----------------------------------------------------------------------
+# Regression guard: the selector path must ENGAGE on a real 4-FK feature
+# (finding 09 — the predicate originally rejected every real feature, so
+# the Stage 1 selector raised "no feature-association table" on real
+# catalogs and was dead on arrival).
+# ----------------------------------------------------------------------
+
+
+class TestSelectorEngagesOnRealFourFkFeature:
+    """The selector gate recognizes a real 4-FK feature-association table.
+
+    The fixture's ``Execution_Image_Image_Classification`` now carries
+    the real four domain FKs (Image, Image_Classification, Feature_Name,
+    Execution). This class proves the selector path engages on that
+    shape — the regression guard so the predicate bug (a 3-FK count
+    check that rejected every real feature) can't silently kill the
+    selector again.
+    """
+
+    def test_fixture_feature_table_is_four_fk(self, populated_feature_denorm: dict[str, Any]) -> None:
+        """Sanity: the fixture models the real 4-FK shape, not the old 3-FK one."""
+        model = populated_feature_denorm["model"]
+        feature_assoc = populated_feature_denorm["feature_assoc_table"]
+        tbl = model.name_to_table(feature_assoc)
+        domain_fks = [fk for fk in tbl.foreign_keys if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
+        targets = sorted(fk.pk_table.name for fk in domain_fks)
+        assert targets == ["Execution", "Feature_Name", "Image", "Image_Classification"], (
+            f"fixture must model the real 4-FK feature shape; got domain FK targets {targets}"
+        )
+        # The predicate must recognize it (it would have returned False
+        # under the old !=3 count guard).
+        assert model._planner._is_feature_association(feature_assoc)
+
+    def test_selector_engages_and_reduces_on_real_shape(self, populated_feature_denorm: dict[str, Any]) -> None:
+        """as_dict(selector=...) engages (no ValueError) and reduces to one row per target.
+
+        Before the fix, the selector gate at ``denormalize.py`` would
+        raise ``ValueError: selector requires a feature-association
+        table ...`` because ``_is_feature_association`` returned False
+        for the real 4-FK table. This test fails closed if that gate
+        ever stops recognizing the real shape.
+        """
+        from deriva_ml.local_db.denormalizer import Denormalizer
+
+        model = populated_feature_denorm["model"]
+        ls = populated_feature_denorm["local_schema"]
+        ds_rid = populated_feature_denorm["dataset_rid"]
+        image_rids = populated_feature_denorm["image_rids"]
+        feature_assoc = populated_feature_denorm["feature_assoc_table"]
+        newest_exec = populated_feature_denorm["newest_execution"]
+
+        class _Shim:
+            def __init__(self, m: Any) -> None:
+                self.dataset_rid = ds_rid
+                self.model = m
+                self.engine = ls.engine
+                self._orm_resolver = ls.get_orm_class
+
+            def list_dataset_members(self, **_kwargs: Any) -> dict[str, list[dict]]:
+                return {"Image": [{"RID": r} for r in image_rids]}
+
+            def list_dataset_children(self, **_kwargs: Any) -> list:
+                return []
+
+        d = Denormalizer(_Shim(model))
+        # Must NOT raise the "no feature-association table" ValueError.
+        rows = list(
+            d.as_dict(
+                ["Image", feature_assoc],
+                row_per=feature_assoc,
+                selector=FeatureRecord.select_newest,
+            )
+        )
+        target_label = f"{feature_assoc}.Image"
+        exec_label = f"{feature_assoc}.Execution"
+        assert len(rows) == len(image_rids), (
+            f"selector should reduce the multi-row feature to one row per Image ({len(image_rids)}); got {len(rows)}."
+        )
+        assert {r[target_label] for r in rows} == set(image_rids)
+        # The kept row per Image comes from the newest execution.
+        for r in rows:
+            assert r[exec_label] == newest_exec, (
+                f"select_newest should pick {newest_exec}; got {r[exec_label]} for Image {r[target_label]}."
+            )
