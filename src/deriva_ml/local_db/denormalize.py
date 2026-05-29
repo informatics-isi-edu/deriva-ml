@@ -555,9 +555,8 @@ def _apply_selector(
         # record per Image — with the rest of the wide-table columns
         # preserved.
     """
-    from collections import defaultdict
-
     from deriva_ml.core.exceptions import DerivaMLException
+    from deriva_ml.feature import reduce_with_selector
 
     # Locate the target table for the feature-association table. The
     # preferred path is ``DerivaModel.find_features`` — that returns
@@ -677,27 +676,45 @@ def _apply_selector(
         field_names=field_names,
     )
 
-    # Group rows by target RID. We carry source rows alongside their
-    # built FeatureRecord shadow so the selector's choice can be mapped
-    # back to a full wide-table row. Rows whose target RID is missing
-    # (NULL on a LEFT JOIN, etc.) can't be grouped and are passed
-    # through unchanged — mirrors ``reduce_with_selector``, which
-    # silently drops records with no target.
-    groups: dict[str, list[tuple[Any, dict[str, Any]]]] = defaultdict(list)
+    # Build a FeatureRecord shadow for every row that carries a target
+    # RID, recording the source row keyed by ``id(shadow)``. The id map
+    # is the only ``_apply_selector``-specific piece: it lets us recover
+    # the full wide-table dict row after the selector picks a shadow,
+    # since ``reduce_with_selector`` (the shared grouping + selector
+    # algorithm) yields ``FeatureRecord`` instances, not rows.
+    #
+    # ``id(shadow)`` — never the shadow itself — keys the map: two
+    # distinct rows can build value-equal FeatureRecords (``FeatureRecord``
+    # is a pydantic model with value-based equality), so a record-keyed
+    # dict would collide and mis-map rows under duplicate feature values.
+    # Identity (``id``) is stable for the lifetime of each shadow object
+    # and unique per live instance — and the shadows stay referenced in
+    # ``shadows`` for the whole call, so no id is reused mid-flight.
+    #
+    # Two sets of rows stay out of the reduction and pass through
+    # untouched, exactly as before:
+    #   - rows whose target RID is missing (NULL on a LEFT JOIN, etc.) —
+    #     ``reduce_with_selector`` drops None-target *records* before
+    #     grouping, but ``_apply_selector`` must *keep* the source row,
+    #     so we partition them out here rather than feed them in;
+    #   - rows whose FeatureRecord construction raises (e.g. an
+    #     unexpected NULL where the schema declares non-null) — kept so
+    #     the selector path doesn't silently eat them.
+    #
+    # The generated record class is constructed by
+    # ``Feature.feature_record_class`` with ``extra="forbid"`` inherited
+    # from ``FeatureRecord.Config``, so we feed only the fields the class
+    # declares — other include_tables columns are excluded. Supplementary
+    # fetch values overlay onto the wide-table row contributions so the
+    # FeatureRecord sees RCT etc. when the wide table dropped them.
+    shadows: list[Any] = []
+    id_to_row: dict[int, dict[str, Any]] = {}
     untouched: list[dict[str, Any]] = []
     for row in rows:
         target_rid = row.get(target_label)
         if target_rid is None:
             untouched.append(row)
             continue
-        # Build a FeatureRecord shadow from just the feature-assoc
-        # columns. The generated record class is constructed by
-        # ``Feature.feature_record_class`` with ``extra="forbid"``
-        # inherited from ``FeatureRecord.Config``, so we feed only the
-        # fields the class declares — other include_tables columns are
-        # excluded. Supplementary fetch values overlay onto the
-        # wide-table row contributions, so the FeatureRecord sees RCT
-        # etc. when the wide table dropped them.
         record_kwargs: dict[str, Any] = {}
         for field_name in field_names:
             label = _label(field_name)
@@ -710,34 +727,27 @@ def _apply_selector(
         try:
             record = record_class(**record_kwargs)
         except Exception:
-            # If a row can't be coerced into the FeatureRecord (e.g.,
-            # unexpected NULL where the schema declares non-null), keep
-            # the raw row in untouched so the selector path doesn't
-            # silently eat it.
             untouched.append(row)
             continue
-        groups[target_rid].append((record, row))
+        shadows.append(record)
+        id_to_row[id(record)] = row
 
-    if not groups:
+    if not shadows:
         # No feature rows present (every materialized row was a
         # passthrough). Return verbatim so this behaves identically to
         # selector=None on a result with no feature side.
         return untouched
 
-    # Apply the selector per-group and map the chosen FeatureRecord
-    # back to its source row by identity. Built-in selectors
-    # (``select_newest``, ``select_by_execution``, etc.) always return
-    # one of the inputs, so ``is`` comparison resolves the original
-    # row deterministically. ``reduce_with_selector`` follows the same
-    # contract; we inline the loop here instead of delegating so we can
-    # walk (record, row) pairs together rather than threading an index
-    # alongside a record-only iteration.
+    # Delegate grouping + per-group selector application to the one
+    # canonical helper. ``reduce_with_selector`` groups the shadows by
+    # ``target_table_name`` (defaultdict), applies the selector per group,
+    # drops ``None`` survivors, and yields the chosen shadow *instances*
+    # (the built-in selectors return a group member, so identity holds —
+    # the helper never copies records). We map each chosen shadow back to
+    # its source dict row via ``id()``.
     reduced: list[dict[str, Any]] = []
-    for pairs in groups.values():
-        chosen = selector([rec for rec, _ in pairs])
-        if chosen is None:
-            continue
-        match = next((row for rec, row in pairs if rec is chosen), None)
+    for chosen in reduce_with_selector(shadows, target_table_name, selector):
+        match = id_to_row.get(id(chosen))
         if match is not None:
             reduced.append(match)
 
