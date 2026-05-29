@@ -205,6 +205,7 @@ def _denormalize_impl(
     *,
     row_per: str | None = None,
     via: list[str] | None = None,
+    selector: Callable[[list[Any]], Any] | None = None,
 ) -> DenormalizeResult:
     """Unified denormalization: plan joins via ``_prepare_wide_table``, execute locally.
 
@@ -234,12 +235,24 @@ def _denormalize_impl(
         via: Optional list of tables forced into the join chain without
             contributing columns. Used to disambiguate path ambiguity
             (Rule 6).
+        selector: Optional callable
+            ``(list[FeatureRecord]) -> FeatureRecord | None`` used to reduce
+            multi-row feature groups after materialization. When provided,
+            ``include_tables`` must contain exactly one feature-association
+            table; materialized rows are grouped by the feature's target RID
+            and the selector picks one row per group (or returns ``None``
+            to omit the group). Same contract as
+            :meth:`~deriva_ml.core.mixins.feature.FeatureMixin.feature_values`'s
+            ``selector`` argument. See ``FeatureRecord`` for built-in
+            selectors (``select_newest``, ``select_first``, etc.).
 
     Returns:
         :class:`DenormalizeResult` with rows and column metadata.
 
     Raises:
-        ValueError: If ``source="catalog"`` but ``paged_client`` is ``None``.
+        ValueError: If ``source="catalog"`` but ``paged_client`` is ``None``;
+            if ``selector`` is given and ``include_tables`` contains zero or
+            more than one feature-association table.
         RuntimeError: If the ``"Dataset"`` ORM class cannot be resolved
             (likely because ``build_local_schema`` was not called with the
             ``deriva-ml`` schema).
@@ -285,6 +298,28 @@ def _denormalize_impl(
         raise ValueError(
             "paged_client is required when source='catalog'. Pass an ErmrestPagedClient (or compatible) to fetch rows."
         )
+
+    # Validate selector / include_tables shape up front. The selector
+    # reduction in Step 6 needs exactly one feature-association table to
+    # group rows by — zero gives nothing to reduce, more than one would
+    # require a per-feature ``dict[name, selector]`` shape (future Stage 2
+    # extension; not in this stage's scope).
+    feature_assoc_table: str | None = None
+    if selector is not None:
+        feature_assoc_tables = [t for t in include_tables if model._planner._is_feature_association(t)]
+        if not feature_assoc_tables:
+            raise ValueError(
+                "selector requires a feature-association table in include_tables; "
+                f"none found in {include_tables!r}. Pass include_tables that contains "
+                "exactly one feature-association table (or the feature name that resolves "
+                "to one), or drop the selector."
+            )
+        if len(feature_assoc_tables) > 1:
+            raise ValueError(
+                "selector with multiple feature-association tables not yet supported "
+                f"({feature_assoc_tables!r}); pass include_tables with one feature at a time."
+            )
+        feature_assoc_table = feature_assoc_tables[0]
 
     # Step 1: Plan the join.
     if dataset is None:
@@ -425,12 +460,342 @@ def _denormalize_impl(
         result = session.execute(final_query)
         rows = [dict(row._mapping) for row in result]
 
+    # Step 6: Apply selector reduction (Stage 1 of the
+    # Denormalizer / feature_values consolidation). When a selector is
+    # provided, group materialized rows by their feature-assoc target RID
+    # and let the selector pick one row per group. Same "filter then
+    # reduce" ordering used by ``Dataset.feature_values`` — materialize
+    # first, then reduce.
+    if selector is not None and feature_assoc_table is not None and rows:
+        rows = _apply_selector(
+            rows=rows,
+            model=model,
+            engine=engine,
+            orm_resolver=orm_resolver,
+            feature_assoc_table=feature_assoc_table,
+            schema_for_table=table_to_schema,
+            multi_schema=multi_schema,
+            selector=selector,
+        )
+
     return DenormalizeResult(
         columns=output_columns,
         row_count=len(rows),
         _rows=rows,
         cache_age_seconds=cache_age_seconds,
     )
+
+
+def _apply_selector(
+    rows: list[dict[str, Any]],
+    *,
+    model: DerivaModel,
+    engine: Engine,
+    orm_resolver: Callable[[str], Any],
+    feature_assoc_table: str,
+    schema_for_table: dict[str, str],
+    multi_schema: bool,
+    selector: Callable[[list[Any]], Any],
+) -> list[dict[str, Any]]:
+    """Group materialized denormalize rows by feature target RID and reduce.
+
+    Shared selector application for the ``Denormalizer`` surface
+    (Stage 1 of the ``feature_values`` / ``Denormalizer`` consolidation).
+
+    For each materialized row, builds a ``FeatureRecord`` instance from
+    the feature-association columns and runs
+    :func:`~deriva_ml.feature.reduce_with_selector` over groups keyed by
+    the feature's target RID. The selected ``FeatureRecord`` is mapped
+    back to its source row so the output preserves the full wide-table
+    shape (all ``include_tables`` columns, not just the feature ones).
+
+    Args:
+        rows: Materialized denormalize rows (``Table.column`` /
+            ``schema.Table.column`` labelled dicts) from the SQL JOIN.
+        model: :class:`DerivaModel` used to look up the
+            :class:`~deriva_ml.feature.Feature` for
+            ``feature_assoc_table`` and the schema name for label
+            construction.
+        feature_assoc_table: Name of the feature-association table
+            in ``include_tables`` (already validated by the caller).
+        schema_for_table: ``{table_name: schema_name}`` map produced by
+            ``_denormalize_impl`` for use with
+            :func:`denormalize_column_name`.
+        multi_schema: Whether output labels carry the schema prefix.
+        selector: Callable
+            ``(list[FeatureRecord]) -> FeatureRecord | None`` — the
+            same shape as :meth:`Dataset.feature_values`'s ``selector``.
+
+    Returns:
+        Reduced rows — one per target RID for which the selector
+        returned a non-``None`` choice. Order follows the surviving
+        target RIDs in dict iteration order (insertion order of
+        first-seen target RID in the input rows). When the selector
+        drops every group, returns an empty list.
+
+    Raises:
+        DerivaMLException: If the feature-association table can't be
+            resolved to a :class:`~deriva_ml.feature.Feature` (e.g. the
+            model exposes no ``find_features`` or the table name doesn't
+            match any feature).
+
+    Example::
+
+        # Materialized rows from Execution_Image_Quality + Image.
+        reduced = _apply_selector(
+            rows=rows,
+            model=model,
+            feature_assoc_table="Execution_Image_Quality",
+            schema_for_table={"Image": "domain", "Execution_Image_Quality": "deriva-ml"},
+            multi_schema=False,
+            selector=FeatureRecord.select_newest,
+        )
+        # ``reduced`` has one row per Image RID — the newest Quality
+        # record per Image — with the rest of the wide-table columns
+        # preserved.
+    """
+    from collections import defaultdict
+
+    from deriva_ml.core.exceptions import DerivaMLException
+
+    # Locate the target table for the feature-association table. The
+    # preferred path is ``DerivaModel.find_features`` — that returns
+    # canonical :class:`Feature` objects with a real
+    # ``feature_record_class()``, keeping this code in lockstep with
+    # ``Dataset.feature_values``. Some model shapes (minimal offline
+    # fixtures whose ``Model.fromfile`` doesn't wire ``referenced_by``)
+    # don't surface features that way, so we fall back to a structural
+    # lookup on the feature-association table's own foreign keys.
+    find_feats = getattr(model, "find_features", None)
+    feature = None
+    if callable(find_feats):
+        try:
+            feature = next(
+                (f for f in find_feats() if f.feature_table.name == feature_assoc_table),
+                None,
+            )
+        except Exception:
+            feature = None
+
+    if feature is not None:
+        record_class = feature.feature_record_class()
+        target_table_name = feature.target_table.name
+        field_names = set(record_class.model_fields.keys())
+    else:
+        # Structural fallback. The planner's
+        # ``_is_feature_association`` predicate already guaranteed the
+        # table has the feature-association shape (Execution FK +
+        # target FK + value FK). Walk the FKs, identify the target
+        # (the one that is neither Execution nor a vocabulary/asset),
+        # and synthesize a minimal FeatureRecord subclass so the
+        # selector contract still resolves.
+        from typing import Optional
+
+        from pydantic import create_model
+
+        from deriva_ml.feature import FeatureRecord
+
+        try:
+            feat_tbl = model.name_to_table(feature_assoc_table)
+        except Exception as e:
+            raise DerivaMLException(
+                f"Cannot apply selector: {feature_assoc_table!r} is not a "
+                f"known table in the catalog model ({type(e).__name__}: {e})."
+            ) from e
+        ml_schema = getattr(model, "ml_schema", "deriva-ml")
+        domain_fks = [fk for fk in feat_tbl.foreign_keys if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
+        target_fk = None
+        for fk in domain_fks:
+            pk_table = fk.pk_table
+            if pk_table.name == "Execution" and pk_table.schema.name == ml_schema:
+                continue
+            is_vocab = getattr(model, "is_vocabulary", None)
+            if callable(is_vocab):
+                try:
+                    if is_vocab(pk_table):
+                        continue
+                except Exception:
+                    pass
+            is_asset = getattr(model, "is_asset", None)
+            if callable(is_asset):
+                try:
+                    if is_asset(pk_table):
+                        continue
+                except Exception:
+                    pass
+            target_fk = fk
+            break
+        if target_fk is None:
+            raise DerivaMLException(
+                f"Cannot apply selector: could not identify the target FK on "
+                f"{feature_assoc_table!r}. The table's domain FKs do not match "
+                f"the feature-association shape (Execution + target + value)."
+            )
+        target_table_name = target_fk.pk_table.name
+        # Build a minimal subclass keyed by the feature-assoc table's
+        # columns. Field types collapse to ``Optional[str]`` — the
+        # built-in selectors read string-shaped fields (``RCT``
+        # lexicographic compare, ``Execution`` equality), so this is
+        # type-safe for the contract. Customer selectors that need
+        # typed feature columns should use ``feature_values`` or
+        # ``lookup_feature``-built records instead.
+        record_fields: dict[str, Any] = {}
+        for col in feat_tbl.columns:
+            if col.name in {"RID", "RMB", "RCB", "RMT", "Execution", "Feature_Name", "RCT"}:
+                continue
+            record_fields[col.name] = (Optional[str], None)
+        # Target FK column is required so grouping always finds a key.
+        record_fields[target_table_name] = (str, ...)
+        feature_name_default = feat_tbl.columns["Feature_Name"].default or "default"
+        record_fields["Feature_Name"] = (str, feature_name_default)
+        record_class = create_model(  # type: ignore[call-overload]
+            f"_Denormalize_{feature_assoc_table}_Record",
+            __base__=FeatureRecord,
+            **record_fields,
+        )
+        field_names = set(record_class.model_fields.keys())
+
+    # Resolve the wide-table column prefix for the feature-assoc table.
+    schema_name = schema_for_table.get(feature_assoc_table, "")
+
+    def _label(col_name: str) -> str:
+        return denormalize_column_name(schema_name, feature_assoc_table, col_name, multi_schema)
+
+    target_label = _label(target_table_name)
+    rid_label = _label("RID")
+
+    # Supplementary fetch: the wide-table SELECT in
+    # ``_prepare_wide_table`` skips the system columns
+    # ``{RCT, RMT, RCB, RMB}`` on every contributing table — but the
+    # selector contract reads them (``select_newest`` keys on RCT,
+    # ``select_by_execution`` keys on Execution which IS preserved).
+    # Fetch RCT (and any other FeatureRecord field that's missing from
+    # the wide-table row) keyed by the feature-assoc RID before we
+    # build the FeatureRecord shadows. Without this step,
+    # ``select_newest`` falls back to the empty-string default on every
+    # record and picks an arbitrary group member.
+    feature_rids = [row.get(rid_label) for row in rows if row.get(rid_label) is not None]
+    supplements: dict[str, dict[str, Any]] = {}
+    if feature_rids:
+        from sqlalchemy import select as sa_select
+
+        feat_orm = orm_resolver(feature_assoc_table)
+        if feat_orm is not None:
+            # Pull the columns the FeatureRecord cares about that the
+            # wide table doesn't already carry. The wide table preserves
+            # the feature-association table's domain columns; we only
+            # need to fetch the system columns the planner skipped.
+            wanted_cols = [c for c in field_names if c not in {"feature", "Feature_Name"}]
+            try:
+                with engine.connect() as conn:
+                    rows_supp = (
+                        conn.execute(sa_select(feat_orm.__table__).where(feat_orm.__table__.c.RID.in_(feature_rids)))
+                        .mappings()
+                        .all()
+                    )
+                for r in rows_supp:
+                    rid = r.get("RID")
+                    if rid is None:
+                        continue
+                    # ``RCT`` may come back from SQLite as a Python
+                    # ``datetime`` (depending on the column type
+                    # affinity), but the FeatureRecord schema declares
+                    # ``RCT: Optional[str]`` to match the ISO-8601
+                    # shape ``Dataset.feature_values`` materializes.
+                    # Normalize timestamp-shaped values to ISO strings
+                    # so the selector built-ins (lexicographic
+                    # comparison on RCT) behave the same way they do
+                    # on the ``feature_values`` surface.
+                    coerced: dict[str, Any] = {}
+                    for col in wanted_cols:
+                        if col not in r:
+                            continue
+                        val = r.get(col)
+                        if hasattr(val, "isoformat"):
+                            val = val.isoformat()
+                        coerced[col] = val
+                    supplements[rid] = coerced
+            except Exception as e:
+                # Supplementary fetch is best-effort: if it fails, the
+                # selector falls back to whatever fields the wide-table
+                # row provides. Log so operators can see the path was
+                # exercised but degraded.
+                logger.warning(
+                    "Denormalizer selector path: supplementary fetch of %s system columns failed (%s); "
+                    "selector may see None for skipped fields.",
+                    feature_assoc_table,
+                    e,
+                )
+
+    # Group rows by target RID. We carry source rows alongside their
+    # built FeatureRecord shadow so the selector's choice can be mapped
+    # back to a full wide-table row. Rows whose target RID is missing
+    # (NULL on a LEFT JOIN, etc.) can't be grouped and are passed
+    # through unchanged — mirrors ``reduce_with_selector``, which
+    # silently drops records with no target.
+    groups: dict[str, list[tuple[Any, dict[str, Any]]]] = defaultdict(list)
+    untouched: list[dict[str, Any]] = []
+    for row in rows:
+        target_rid = row.get(target_label)
+        if target_rid is None:
+            untouched.append(row)
+            continue
+        # Build a FeatureRecord shadow from just the feature-assoc
+        # columns. The generated record class is constructed by
+        # ``Feature.feature_record_class`` with ``extra="forbid"``
+        # inherited from ``FeatureRecord.Config``, so we feed only the
+        # fields the class declares — other include_tables columns are
+        # excluded. Supplementary fetch values overlay onto the
+        # wide-table row contributions, so the FeatureRecord sees RCT
+        # etc. when the wide table dropped them.
+        record_kwargs: dict[str, Any] = {}
+        for field_name in field_names:
+            label = _label(field_name)
+            if label in row:
+                record_kwargs[field_name] = row[label]
+        supp = supplements.get(row.get(rid_label), {})
+        for field_name, value in supp.items():
+            if field_name in field_names and record_kwargs.get(field_name) is None:
+                record_kwargs[field_name] = value
+        try:
+            record = record_class(**record_kwargs)
+        except Exception:
+            # If a row can't be coerced into the FeatureRecord (e.g.,
+            # unexpected NULL where the schema declares non-null), keep
+            # the raw row in untouched so the selector path doesn't
+            # silently eat it.
+            untouched.append(row)
+            continue
+        groups[target_rid].append((record, row))
+
+    if not groups:
+        # No feature rows present (every materialized row was a
+        # passthrough). Return verbatim so this behaves identically to
+        # selector=None on a result with no feature side.
+        return untouched
+
+    # Apply the selector per-group and map the chosen FeatureRecord
+    # back to its source row by identity. Built-in selectors
+    # (``select_newest``, ``select_by_execution``, etc.) always return
+    # one of the inputs, so ``is`` comparison resolves the original
+    # row deterministically. ``reduce_with_selector`` follows the same
+    # contract; we inline the loop here instead of delegating so we can
+    # walk (record, row) pairs together rather than threading an index
+    # alongside a record-only iteration.
+    reduced: list[dict[str, Any]] = []
+    for pairs in groups.values():
+        chosen = selector([rec for rec, _ in pairs])
+        if chosen is None:
+            continue
+        match = next((row for rec, row in pairs if rec is chosen), None)
+        if match is not None:
+            reduced.append(match)
+
+    # Preserve passthrough rows (no target RID) — they never
+    # participated in reduction so it would be wrong to drop them
+    # silently. A caller that wants them gone can filter the result.
+    reduced.extend(untouched)
+    return reduced
 
 
 def _compute_cache_age_seconds(fetcher: PagedFetcher | None) -> float | None:

@@ -14,7 +14,7 @@ the single source of record:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import pandas as pd
 
@@ -22,6 +22,7 @@ from deriva_ml.core.logging_config import get_logger
 from deriva_ml.local_db.denormalize import DenormalizeResult, _denormalize_impl
 
 if TYPE_CHECKING:
+    from deriva_ml.feature import FeatureRecord
     from deriva_ml.interfaces import DatasetLike
 
 logger = get_logger(__name__)
@@ -431,12 +432,17 @@ class Denormalizer:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"] | None = None,
     ) -> pd.DataFrame:
         """Materialize the denormalized table as a :class:`pandas.DataFrame`.
 
         Runs the full 4-phase pipeline: planner decisions (Rules 2/5/6) →
         anchor classification (Rules 7/8) → main SQL join → orphan-row
-        combine.
+        combine. When ``selector`` is provided, a final reduction pass
+        groups rows by the feature-association table's target RID and
+        applies the selector per group — same contract as
+        :meth:`~deriva_ml.core.mixins.feature.FeatureMixin.feature_values`'s
+        ``selector`` argument.
 
         Args:
             include_tables: Tables whose columns appear in the output.
@@ -453,13 +459,25 @@ class Denormalizer:
                 table has no FK path to any requested table. Default
                 False raises :class:`DerivaMLDenormalizeUnrelatedAnchor`
                 (Rule 8).
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. See ``FeatureRecord`` for
+                built-ins (``select_newest``, ``select_first``,
+                ``select_by_execution``, ``select_by_workflow``,
+                ``select_majority_vote``). Return ``None`` from a selector
+                to omit that target RID. Requires ``include_tables`` to
+                contain exactly one feature-association table; raises
+                ``ValueError`` when zero or more than one are present
+                (multi-feature reduction is a future extension).
 
         Returns:
             A :class:`pandas.DataFrame` with one row per ``row_per``
             instance in scope, plus any orphan rows from upstream anchors
             that don't reach a ``row_per`` row (Rule 7 case 3). Upstream
             table columns are hoisted onto each row; orphan rows have
-            ``row_per``-side columns set to ``NaN``.
+            ``row_per``-side columns set to ``NaN``. When ``selector`` is
+            provided, multi-row feature groups collapse to one row per
+            target RID per the selector's choice.
 
         Raises:
             DerivaMLDenormalizeMultiLeaf: auto-inference finds multiple
@@ -472,6 +490,8 @@ class Denormalizer:
             DerivaMLDenormalizeUnrelatedAnchor: anchor has no FK path to
                 any table in ``include_tables`` (Rule 8) — unless the
                 ``ignore_unrelated_anchors`` flag is set.
+            ValueError: ``selector`` was provided but ``include_tables``
+                does not contain exactly one feature-association table.
 
         Example::
 
@@ -493,12 +513,21 @@ class Denormalizer:
             df = d.as_dataframe(
                 ["Image", "Subject"], ignore_unrelated_anchors=True
             )
+
+            # Reduce multi-row feature groups (e.g., multiple annotators
+            # per Image) to one row per Image — the newest by RCT:
+            from deriva_ml.feature import FeatureRecord
+            df = d.as_dataframe(
+                ["Image", "Execution_Image_Image_Classification"],
+                selector=FeatureRecord.select_newest,
+            )
         """
         result = self._run(
             include_tables,
             row_per=row_per,
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
+            selector=selector,
         )
         return result.to_dataframe()
 
@@ -509,6 +538,7 @@ class Denormalizer:
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """Convert the denormalized table to dicts and yield row-by-row.
 
@@ -538,6 +568,11 @@ class Denormalizer:
             via: Path-only intermediates (Rule 6 disambiguation).
             ignore_unrelated_anchors: If True, silently drop unrelated
                 anchors (Rule 8).
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups after materialization.
+                Same contract as :meth:`as_dataframe`. See
+                ``FeatureRecord`` for built-in selectors.
 
         Yields:
             ``dict[str, Any]`` — one per output row. Keys are
@@ -556,12 +591,21 @@ class Denormalizer:
             d = Denormalizer(dataset)
             for row in d.as_dict(["Image", "Subject"]):
                 print(row["Image.RID"], row["Subject.Name"])
+
+            # With selector reduction:
+            from deriva_ml.feature import FeatureRecord
+            for row in d.as_dict(
+                ["Image", "Execution_Image_Image_Classification"],
+                selector=FeatureRecord.select_newest,
+            ):
+                ...
         """
         result = self._run(
             include_tables,
             row_per=row_per,
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
+            selector=selector,
         )
         yield from result.iter_rows()
 
@@ -754,8 +798,7 @@ class Denormalizer:
             include = original_include
             via_list = original_via
             warnings.append(
-                f"_resolve_table_names: {type(e).__name__} ({str(e)[:120]}); "
-                "reverted to original include/via"
+                f"_resolve_table_names: {type(e).__name__} ({str(e)[:120]}); reverted to original include/via"
             )
 
         # ── row_per resolution ─────────────────────────────────────────────
@@ -769,10 +812,7 @@ class Denormalizer:
             row_per_candidates = self._model._planner._find_sinks(include, via_list)
         except Exception as e:
             row_per_candidates = []
-            warnings.append(
-                f"_find_sinks: {type(e).__name__} ({str(e)[:120]}); "
-                "row_per_candidates is empty"
-            )
+            warnings.append(f"_find_sinks: {type(e).__name__} ({str(e)[:120]}); row_per_candidates is empty")
         try:
             resolved_row_per: str | None = self._model._planner._determine_row_per(
                 include_tables=include,
@@ -799,8 +839,7 @@ class Denormalizer:
             element_tables = {}
             cols = []
             warnings.append(
-                f"_prepare_wide_table: {type(e).__name__} ({str(e)[:120]}); "
-                "element_tables and columns are empty"
+                f"_prepare_wide_table: {type(e).__name__} ({str(e)[:120]}); element_tables and columns are empty"
             )
 
         # ── ambiguities (reported, not raised) ─────────────────────────────
@@ -817,8 +856,7 @@ class Denormalizer:
                 # treat as "no ambiguities detected" rather than raising.
                 ambiguities_raw = []
                 warnings.append(
-                    f"_find_path_ambiguities: {type(e).__name__} ({str(e)[:120]}); "
-                    "ambiguities not detected"
+                    f"_find_path_ambiguities: {type(e).__name__} ({str(e)[:120]}); ambiguities not detected"
                 )
         ambiguities = [
             {
@@ -861,10 +899,7 @@ class Denormalizer:
             anchors = self._anchors_as_dict()
         except Exception as e:
             anchors = {}
-            warnings.append(
-                f"_anchors_as_dict: {type(e).__name__} ({str(e)[:120]}); "
-                "anchors summary is empty"
-            )
+            warnings.append(f"_anchors_as_dict: {type(e).__name__} ({str(e)[:120]}); anchors summary is empty")
         # RB-03: skip empty anchor sets, matching the ``if not rids: continue``
         # guard in :meth:`_classify_anchors`. ``list_dataset_members`` returns
         # ``{"File": []}`` for empty association tables; describe and run must
@@ -942,8 +977,7 @@ class Denormalizer:
                     }
             except Exception as e:
                 warnings.append(
-                    f"estimated_row_count: {type(e).__name__} ({str(e)[:120]}); "
-                    "row-count estimate left as None"
+                    f"estimated_row_count: {type(e).__name__} ({str(e)[:120]}); row-count estimate left as None"
                 )
 
         return {
@@ -1251,6 +1285,7 @@ class Denormalizer:
         row_per: str | None,
         via: list[str] | None,
         ignore_unrelated_anchors: bool,
+        selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"] | None = None,
     ) -> DenormalizeResult:
         """Execute the full 4-phase denormalization pipeline.
 
@@ -1268,18 +1303,21 @@ class Denormalizer:
            ``ignored`` (Rule 7 case 5 silent drop / Rule 8 with flag).
            Raises if Rule 8 fires and the flag is off.
         3. **Main SQL**: delegate to :func:`_denormalize_impl` with
-           ``row_per`` / ``via`` threaded through. For live Datasets
-           ``source="catalog"`` and a :class:`PagedClient` fetches rows
-           before the join; for DatasetBag / fixtures ``source="local"``
-           and the engine is assumed pre-populated.
+           ``row_per`` / ``via`` / ``selector`` threaded through. For
+           live Datasets ``source="catalog"`` and a :class:`PagedClient`
+           fetches rows before the join; for DatasetBag / fixtures
+           ``source="local"`` and the engine is assumed pre-populated.
+           Selector reduction (when supplied) runs inside
+           ``_denormalize_impl`` after materialization, before this
+           method's orphan-row combine.
         4. **Orphan-row combine**: both table-level orphans (case 3)
            AND per-RID orphans (scoping anchors whose specific RIDs
            didn't appear in the main result) are emitted as LEFT-JOIN-
            shaped rows and appended via :meth:`DenormalizeResult.extend`.
 
         Args:
-            include_tables, row_per, via, ignore_unrelated_anchors:
-                forwarded from the public method.
+            include_tables, row_per, via, ignore_unrelated_anchors,
+            selector: forwarded from the public method.
 
         Returns:
             The final :class:`DenormalizeResult` — main SQL rows plus
@@ -1393,6 +1431,7 @@ class Denormalizer:
             paged_client=self._paged_client,
             row_per=resolved_row_per,
             via=list(via or []) or None,
+            selector=selector,
         )
 
         # Step 4a: Augment orphans with scoping-upstream anchors whose specific

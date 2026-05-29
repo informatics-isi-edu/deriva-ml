@@ -300,6 +300,7 @@ class DatasetLike(Protocol):
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
     ) -> pd.DataFrame:
         """Return the dataset as a denormalized wide table (DataFrame).
 
@@ -325,6 +326,12 @@ class DatasetLike(Protocol):
                 columns (useful to disambiguate path ambiguity).
             ignore_unrelated_anchors: If True, silently drop anchors whose
                 table has no FK path to any requested table.
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. Same contract as
+                :meth:`feature_values`'s ``selector`` argument. Requires
+                ``include_tables`` to contain exactly one
+                feature-association table.
 
         Returns:
             pd.DataFrame: Wide table with columns from all included tables.
@@ -343,6 +350,7 @@ class DatasetLike(Protocol):
         row_per: str | None = None,
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
+        selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
     ) -> Generator[dict[str, Any], None, None]:
         """Stream the denormalized dataset rows as dicts.
 
@@ -355,6 +363,10 @@ class DatasetLike(Protocol):
             row_per: Explicit leaf table. Must be in ``include_tables``.
             via: Tables forced into the join chain without contributing columns.
             ignore_unrelated_anchors: See :meth:`get_denormalized_as_dataframe`.
+            selector: Optional callable
+                ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
+                reduce multi-row feature groups. Same contract as
+                :meth:`get_denormalized_as_dataframe`.
 
         Yields:
             dict[str, Any]: Dictionary per row; keys are ``Table.Column``.
