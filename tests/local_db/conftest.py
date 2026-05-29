@@ -438,18 +438,23 @@ def denorm_schema_feature(tmp_path: Path) -> Path:
     Extends :func:`denorm_schema` by adding:
 
     - ``Execution`` table in the ``deriva-ml`` schema (provenance).
+    - ``Feature_Name`` vocabulary table in the ``deriva-ml`` schema
+      (one of the two feature marker FK targets).
     - ``Image_Classification`` vocabulary table in the ``isa`` schema
       (the value table — i.e. the term).
     - ``Execution_Image_Image_Classification`` association table with
-      three FKs (Image, Execution, Image_Classification) and a
-      ``Feature_Name`` column. This is the canonical shape of a
-      DerivaML feature value table — see ``DerivaModel.find_features``
-      for the runtime predicate.
+      **four** domain FKs (Image, Image_Classification, Feature_Name,
+      Execution). This is the canonical real shape of a DerivaML
+      feature value table — exactly what ``create_feature`` produces.
+      The Feature_Name FK + Execution FK are the structural markers
+      ``_is_feature_association`` keys off; see
+      ``DerivaModel.find_features`` for the equivalent runtime
+      predicate.
 
     Plus a *non-feature* 3-FK association,
     ``Image_Subject_UnrelatedThing``, with three domain FKs but no
-    FK to ``Execution`` — used to verify
-    :meth:`_is_feature_association` correctly rejects 3-FK associations
+    FK to ``Execution`` or ``Feature_Name`` — used to verify
+    :meth:`_is_feature_association` correctly rejects associations
     that aren't features.
 
     Used by the planner-rules tests in
@@ -504,6 +509,28 @@ def denorm_schema_feature(tmp_path: Path) -> Path:
         "foreign_keys": [],
     }
 
+    # Add Feature_Name vocabulary table (deriva-ml schema). Every
+    # DerivaML feature-association table carries an FK to this vocab —
+    # it's one of the two structural markers
+    # ``_is_feature_association`` keys off (the other is the Execution
+    # FK). See ``DerivaModel.find_features``'s is_feature predicate and
+    # ``FeatureMixin.create_feature`` (which always adds this FK).
+    doc["schemas"]["deriva-ml"]["tables"]["Feature_Name"] = {
+        "table_name": "Feature_Name",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
     # Add Image_Classification vocabulary term table (isa schema)
     doc["schemas"]["isa"]["tables"]["Image_Classification"] = {
         "table_name": "Image_Classification",
@@ -522,9 +549,18 @@ def denorm_schema_feature(tmp_path: Path) -> Path:
     }
 
     # Add Execution_Image_Image_Classification feature-assoc table.
-    # Three domain FKs: Image, Execution, Image_Classification.
-    # Includes a Feature_Name column to match the DerivaML runtime
-    # predicate (DerivaModel.find_features's is_feature check).
+    # Four domain FKs — the canonical real DerivaML feature shape:
+    #   Image                (feature target)
+    #   Image_Classification (value: vocab term)
+    #   Feature_Name         (-> deriva-ml.Feature_Name vocab)
+    #   Execution            (-> deriva-ml.Execution, provenance)
+    # The Feature_Name FK + Execution FK are the two structural markers
+    # ``_is_feature_association`` keys off (mirroring
+    # ``DerivaModel.find_features``'s is_feature check). This matches
+    # what ``FeatureMixin.create_feature`` actually produces; an earlier
+    # version of this fixture modeled Feature_Name as a plain text
+    # column and gave the table only 3 FKs, which is why the 4-FK
+    # predicate bug shipped green (see finding 09).
     doc["schemas"]["deriva-ml"]["tables"]["Execution_Image_Image_Classification"] = {
         "table_name": "Execution_Image_Image_Classification",
         "schema_name": "deriva-ml",
@@ -560,6 +596,18 @@ def denorm_schema_feature(tmp_path: Path) -> Path:
                     }
                 ],
                 "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Image_Image_Classification",
+                        "column_name": "Feature_Name",
+                    }
+                ],
+                "referenced_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Feature_Name", "column_name": "Name"}
+                ],
             },
             {
                 "foreign_key_columns": [
@@ -683,6 +731,55 @@ def denorm_feature_deriva_model(denorm_feature_model: Model) -> DerivaModel:
     """DerivaModel for the feature-association fixture."""
     return DerivaModel(
         model=denorm_feature_model,
+        ml_schema="deriva-ml",
+        domain_schemas={"isa"},
+    )
+
+
+@pytest.fixture
+def denorm_schema_feature_diamond(denorm_schema_feature: Path, tmp_path: Path) -> Path:
+    """Feature fixture + a *second* independent FK path target↔value.
+
+    Builds the "diamond-with-feature-bridge" shape (finding 09 §7.1,
+    §10 limitation #2): ``Image`` reaches ``Image_Classification`` via
+    **two** routes —
+
+    1. the transparent feature bridge
+       ``Execution_Image_Image_Classification`` (4-FK feature), and
+    2. a direct ``Image.Image_Classification`` FK.
+
+    Under the old (broken) predicate the feature bridge was opaque, so
+    Rule 6 saw only the direct path and planned silently. Under the
+    Option E2 predicate the bridge is transparent and hops in
+    ``_is_downstream_chain``, so Rule 6 now sees two competing
+    downstream chains from ``Image`` to ``Image_Classification`` and
+    must raise ``DerivaMLDenormalizeAmbiguousPath``. This fixture pins
+    that intentional new behavior.
+    """
+    # Start from the JSON the feature fixture already wrote, then add a
+    # direct Image → Image_Classification FK to create the second path.
+    doc = json.loads(denorm_schema_feature.read_text())
+    image = doc["schemas"]["isa"]["tables"]["Image"]
+    image["column_definitions"].append({"name": "Image_Classification", "type": {"typename": "text"}, "nullok": True})
+    image["foreign_keys"].append(
+        {
+            "foreign_key_columns": [
+                {"schema_name": "isa", "table_name": "Image", "column_name": "Image_Classification"}
+            ],
+            "referenced_columns": [{"schema_name": "isa", "table_name": "Image_Classification", "column_name": "RID"}],
+        }
+    )
+
+    out = tmp_path / "schema_feature_diamond.json"
+    out.write_text(json.dumps(doc))
+    return out
+
+
+@pytest.fixture
+def denorm_feature_diamond_deriva_model(denorm_schema_feature_diamond: Path) -> DerivaModel:
+    """DerivaModel for the diamond-with-feature-bridge fixture."""
+    return DerivaModel(
+        model=Model.fromfile("file-system", denorm_schema_feature_diamond),
         ml_schema="deriva-ml",
         domain_schemas={"isa"},
     )
