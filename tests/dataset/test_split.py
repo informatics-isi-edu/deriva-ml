@@ -1385,7 +1385,13 @@ class TestDenormalizationPlumbing:
 
     @requires_sklearn
     def test_row_per_explicit_passed_through(self):
-        """Explicit ``row_per`` overrides the element_table default."""
+        """Explicit ``row_per`` overrides the element_table default.
+
+        Note: when ``row_per != element_table``, ``partition_by`` is
+        required — the (row_per, element_table) shape is exactly the
+        silent-leakage case. The stub returns one row per Item.RID so
+        the within-element check is trivially satisfied.
+        """
         captured: dict = {}
         ml, _ = self._stub_ml_and_dataset(captured)
 
@@ -1400,6 +1406,7 @@ class TestDenormalizationPlumbing:
             include_tables=["Item", "Vocab"],
             element_table="Item",
             row_per="Vocab",
+            partition_by="element",
             dry_run=True,
         )
         assert captured["row_per"] == "Vocab"

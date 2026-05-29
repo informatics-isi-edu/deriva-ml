@@ -277,6 +277,43 @@ to the underlying feature-association table
 backs `find_features` / `feature_values`. The full table name
 works too.
 
+**Setting `row_per=<target_table>` with a feature shorthand in
+`include_tables` is rejected (Rule 5).** The feature-association
+table is downstream of the target table, and the denormalizer does
+not aggregate. The two intents the caller might have in mind are
+spelled differently:
+
+```python
+# Intent A: "one row per Image with the feature value projected
+# as a column." Pass the value table (vocabulary) directly, not
+# the feature-name shorthand. The feature-association table
+# becomes a transparent bridge in the join.
+ds.get_denormalized_as_dataframe(
+    ["Image", "Image_Class"],
+    row_per="Image",
+)
+# OK: one row per Image, Image_Class.Name projected.
+
+# Intent B: "one row per feature observation." Let auto-inference
+# pick the feature-association table as row_per (the default
+# behavior shown at the top of this section), or name it
+# explicitly. Image RIDs repeat across multi-execution annotations.
+ds.get_denormalized_as_dataframe(
+    ["Image", "Image_Classification"],
+    row_per="Execution_Image_Image_Classification",
+)
+# OK: one row per feature observation.
+
+# Forbidden combination: feature shorthand with row_per=<target>.
+ds.get_denormalized_as_dataframe(
+    ["Image", "Image_Classification"],
+    row_per="Image",
+)
+# RAISES DerivaMLDenormalizeDownstreamLeaf: the shorthand resolves
+# to Execution_Image_Image_Classification, which is downstream of
+# Image. To project the feature value, use Intent A's shape.
+```
+
 ### Heterogeneous dataset with orphan members
 
 ```python

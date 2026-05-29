@@ -2,6 +2,46 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased — `split_dataset` partition_by parameter + element-RID disjointness invariant
+
+### Added
+
+- **`split_dataset(..., partition_by="element" | "row")`.** Makes
+  the partition unit an explicit caller decision whenever the
+  `(row_per, element_table)` pair is ambiguous (`row_per !=
+  element_table`). `partition_by="element"` deduplicates the
+  denormalized dataframe to one row per `element_table` RID before
+  the selector runs and enforces within-element agreement on
+  `stratify_by_column`; `partition_by="row"` keeps the
+  one-row-per-denormalized-row behavior callers used pre-#174 with
+  `row_per=<feature_table>`. Auto-defaults to `"element"` when
+  `row_per` is `None` or equals `element_table` (the unambiguous
+  case). Required — no default — when `row_per` is set and differs
+  from `element_table`.
+
+### Changed
+
+- **`split_dataset` now refuses the ambiguous `(row_per !=
+  element_table)` shape at the call site with a `ValueError` that
+  names both modes.** This is intentionally breaking for callers
+  that previously relied on the implicit-row-partition behavior of
+  `row_per=<feature_table>`; that shape silently sent the same
+  element RID's multiple denormalized rows to opposite partitions
+  (train/test leakage). Adding `partition_by="row"` restores the
+  prior behavior; `partition_by="element"` switches to safer
+  per-element semantics. Callers passing `row_per=None` (or
+  `row_per == element_table`) get the auto-default and remain
+  unchanged.
+
+- **Internal: element-RID disjointness invariant.** When
+  `partition_by="element"` is in effect, `_compute_partitions`
+  asserts that no element_table RID appears in more than one
+  partition after the selector returns. The assertion is
+  defensive — a correct dedupe + a contract-obeying selector can
+  never trip it — but it catches future regressions in either
+  piece. Cites `findings/curator/02` and `findings/evaluator/02`
+  from the 2026-05-28 e2e run.
+
 ## Unreleased — Issue #251: dirty-tree check scoping + clearer error
 
 ### Changed

@@ -91,7 +91,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -485,10 +485,13 @@ def _validate_split_inputs(
     stratify_by_column: str | None,
     selection_fn: SelectionFunction | None,
     include_tables: list[str] | None,
-) -> None:
+    row_per: str | None = None,
+    element_table: str | None = None,
+    partition_by: Literal["element", "row"] | None = None,
+) -> Literal["element", "row"]:
     """Validate the mutually-exclusive + required-companion arg constraints.
 
-    Three rules:
+    Four rules:
 
     1. ``stratify_by_column`` and ``selection_fn`` are mutually
        exclusive — both produce per-element partitioning decisions
@@ -498,11 +501,46 @@ def _validate_split_inputs(
        drives a denormalization that needs explicit table scope).
     3. ``selection_fn`` requires ``include_tables`` for the same
        reason.
+    4. ``partition_by`` is required whenever ``row_per`` is set and
+       differs from ``element_table`` — the (row_per !=
+       element_table) shape is exactly the silent-leakage case
+       (one element_table RID can have multiple denormalized rows
+       that the selector may scatter across partitions), so the
+       caller must declare intent explicitly. When ``row_per`` is
+       ``None`` or equals ``element_table`` the partition unit is
+       unambiguous and ``partition_by`` auto-defaults to
+       ``"element"``.
 
-    Raises ``ValueError`` rather than a ``DerivaMLException`` to
-    match the existing surface: these are argument-shape errors
-    the caller should fix at the call site, not catalog-side
-    failures.
+    Args:
+        stratify_by_column: As passed to :func:`split_dataset`.
+        selection_fn: As passed to :func:`split_dataset`.
+        include_tables: As passed to :func:`split_dataset`.
+        row_per: As passed to :func:`split_dataset`. Used only to
+            decide whether ``partition_by`` is required.
+        element_table: As passed to :func:`split_dataset`. Compared
+            against ``row_per`` to decide ambiguity.
+        partition_by: As passed to :func:`split_dataset`.
+
+    Returns:
+        The effective ``partition_by`` value after defaulting. When
+        the caller passed ``"element"`` or ``"row"`` it is returned
+        as-is. When the caller passed ``None`` and ambiguity is
+        absent (``row_per`` is ``None`` or equals ``element_table``),
+        returns ``"element"``. When ``partition_by`` is required and
+        the caller passed ``None``, raises ``ValueError`` instead of
+        returning.
+
+    Raises:
+        ValueError: When the mutual-exclusion / requires rules are
+            violated, or when ``partition_by`` is required and not
+            supplied, or when ``partition_by`` is not one of the
+            allowed string values.
+
+    Note:
+        ``ValueError`` rather than a ``DerivaMLException`` to match
+        the existing surface: these are argument-shape errors the
+        caller should fix at the call site, not catalog-side
+        failures.
     """
     if stratify_by_column and selection_fn:
         raise ValueError("stratify_by_column and selection_fn are mutually exclusive. Use one or the other.")
@@ -519,6 +557,156 @@ def _validate_split_inputs(
             "include_tables is required when using a custom selection_fn. "
             "Specify the tables needed for denormalization."
         )
+
+    if partition_by is not None and partition_by not in ("element", "row"):
+        raise ValueError(f"partition_by must be 'element', 'row', or None, got {partition_by!r}.")
+
+    # Decide whether the (row_per, element_table) pair is ambiguous.
+    # Ambiguity exists only when row_per is set AND differs from the
+    # element_table — that's the shape where one element_table RID
+    # can have multiple denormalized rows that the selector may
+    # scatter across partitions (the silent-leakage case).
+    row_per_differs = row_per is not None and row_per != element_table
+
+    if partition_by is None:
+        if row_per_differs:
+            raise ValueError(
+                "partition_by is required when row_per != element_table "
+                f"(got row_per={row_per!r}, element_table={element_table!r}). "
+                "This (row_per, element_table) shape is ambiguous: the "
+                "denormalized dataframe has multiple rows per "
+                f"{element_table or 'element'} RID, and the selector "
+                "may scatter them across partitions — silently putting "
+                "the same RID in train and test.\n\n"
+                "Pick the intent explicitly:\n"
+                "  partition_by='element' — dedupe rows per "
+                f"{element_table or 'element'} RID before partitioning; "
+                "partitions are disjoint at the element-RID level. "
+                "Requires within-element agreement on selector-read "
+                "columns (stratify_by_column).\n"
+                "  partition_by='row'     — partition rows directly; "
+                f"{element_table or 'element'} RIDs may appear in "
+                "multiple partitions (per-annotation statistics, "
+                "intentional row-level granularity)."
+            )
+        # Unambiguous case: auto-default to "element".
+        return "element"
+
+    return partition_by
+
+
+def _dedupe_for_element_partition(
+    df: pd.DataFrame,
+    *,
+    rid_column: str,
+    element_table: str | None,
+    stratify_by_column: str | None,
+    stratify_missing: str,
+    using_selection_fn: bool,
+) -> pd.DataFrame:
+    """Reduce the denormalized df to one row per element_table RID.
+
+    Two steps:
+
+    1. Verify within-element agreement on selector-read columns.
+       For stratified splits that means ``stratify_by_column``;
+       for custom ``selection_fn`` we skip (the read set is opaque)
+       and the docstring warns the caller they own this check.
+       NaN-handling follows ``stratify_missing`` — ``"error"`` raises
+       on any NaN in a group, ``"drop"`` excludes whole groups whose
+       members are NaN, ``"include"`` treats NaN as a sentinel that
+       must match.
+    2. Dedupe with stable, seed-deterministic ordering — sort by
+       ``rid_column`` to make iteration order reproducible, then
+       ``drop_duplicates(keep="first")`` on ``rid_column``. When
+       within-element values agree (guaranteed by step 1), the
+       first row encountered is representative.
+
+    Args:
+        df: Denormalized DataFrame from
+            :meth:`Dataset.get_denormalized_as_dataframe`.
+        rid_column: Name of the column carrying element_table RIDs
+            (e.g., ``"Image.RID"``).
+        element_table: Element table name (used in error messages).
+        stratify_by_column: Column the stratified selector will
+            read, or ``None`` when using ``selection_fn``.
+        stratify_missing: NaN policy as passed to
+            :func:`split_dataset` (``"error"`` / ``"drop"`` /
+            ``"include"``). Only applied during the within-element
+            check; doesn't override the selector's own NaN policy.
+        using_selection_fn: ``True`` when the caller passed a custom
+            ``selection_fn``. Skips the within-element check —
+            the selector's read set is opaque so we can't enforce
+            uniformity, and the docstring documents this is the
+            caller's responsibility.
+
+    Returns:
+        DataFrame with one row per ``rid_column`` value.
+
+    Raises:
+        ValueError: When ``stratify_by_column`` is set and some
+            element_table RID has disagreeing values across its
+            rows. The error message names the consensus-feature
+            pattern as the deriva-ml-shape fix.
+    """
+    if stratify_by_column and not using_selection_fn:
+        if stratify_by_column not in df.columns:
+            # Defer this error to the selector, which prints
+            # the available columns helpfully.
+            pass
+        else:
+            check_df = df[[rid_column, stratify_by_column]].copy()
+
+            # NaN handling: match stratify_missing policy at the
+            # group level.
+            null_mask = check_df[stratify_by_column].isna()
+            if null_mask.any():
+                if stratify_missing == "error":
+                    null_count = int(null_mask.sum())
+                    raise ValueError(
+                        f"Column '{stratify_by_column}' has {null_count} missing values. "
+                        "Use stratify_missing='drop' to exclude these rows, "
+                        "or 'include' to treat nulls as a separate class."
+                    )
+                elif stratify_missing == "drop":
+                    # Drop any group that has ANY NaN — even partial
+                    # NaN agreement within a group is uninformative
+                    # for stratification.
+                    bad_rids = set(check_df.loc[null_mask, rid_column])
+                    check_df = check_df[~check_df[rid_column].isin(bad_rids)].copy()
+                    df = df[~df[rid_column].isin(bad_rids)].copy()
+                elif stratify_missing == "include":
+                    check_df[stratify_by_column] = check_df[stratify_by_column].fillna("__missing__")
+
+            # Within-element uniformity check.
+            disagreement = check_df.groupby(rid_column)[stratify_by_column].nunique(dropna=False).loc[lambda s: s > 1]
+            if len(disagreement) > 0:
+                offenders = list(disagreement.index)[:5]
+                raise ValueError(
+                    f"split_dataset cannot partition by element when stratify column "
+                    f"{stratify_by_column!r} has disagreeing values for the same "
+                    f"{element_table or 'element'} RID. This usually means you're "
+                    "stratifying on a multi-annotator feature without consensus "
+                    "resolution.\n\n"
+                    "The deriva-ml pattern for this is a separate consensus feature "
+                    "that records the resolved label per element (e.g., "
+                    f"'{element_table or 'Element'}_Classification_Consensus' written "
+                    "by your adjudication workflow). Stratify on the consensus "
+                    "feature, not the raw annotator feature.\n\n"
+                    "Alternatively, pass partition_by='row' if you intend per-row "
+                    "partitioning and accept that the same "
+                    f"{element_table or 'element'} RID may appear in multiple "
+                    "partitions.\n\n"
+                    f"Offending RIDs (first {len(offenders)} of "
+                    f"{len(disagreement)}): {offenders}"
+                )
+
+    # Stable, seed-deterministic dedupe. mergesort preserves the
+    # original row order within equal sort keys, and keep="first"
+    # then picks the first encountered occurrence. The result is
+    # deterministic for a given input df.
+    deduped = df.sort_values(by=rid_column, kind="mergesort").drop_duplicates(subset=[rid_column], keep="first")
+    return deduped.reset_index(drop=True)
 
 
 def _compute_partitions(
@@ -538,6 +726,7 @@ def _compute_partitions(
     row_per: str | None,
     via: list[str] | None,
     ignore_unrelated_anchors: bool,
+    partition_by: Literal["element", "row"] = "element",
 ) -> tuple[
     dict[str, list[str]],
     dict[str, int],
@@ -574,6 +763,15 @@ def _compute_partitions(
             selection_fn, row_per, via,
             ignore_unrelated_anchors: As passed to
             :func:`split_dataset`.
+        partition_by: Effective partition unit after defaulting in
+            :func:`_validate_split_inputs`. ``"element"`` (default)
+            dedupes the denormalized dataframe to one row per
+            ``element_table`` RID before partitioning, enforces
+            within-element agreement on selector-read columns, and
+            asserts element-RID disjointness at the end.
+            ``"row"`` partitions denormalized rows directly with no
+            dedupe — element RIDs may legitimately appear in
+            multiple partitions.
 
     Returns:
         Four-tuple ``(partition_rids, partition_sizes,
@@ -638,7 +836,9 @@ def _compute_partitions(
         # explicitly. See issue #174 for the motivating case.
         effective_row_per = row_per if row_per is not None else element_table
         logger.info(
-            f"Denormalizing dataset with tables: {include_tables} (row_per={effective_row_per}, via={via or []})"
+            f"Denormalizing dataset with tables: {include_tables} "
+            f"(row_per={effective_row_per}, via={via or []}, "
+            f"partition_by={partition_by!r})"
         )
         df = source_ds.get_denormalized_as_dataframe(
             include_tables,
@@ -647,6 +847,43 @@ def _compute_partitions(
             ignore_unrelated_anchors=ignore_unrelated_anchors,
         )
         logger.info(f"Denormalized DataFrame: {len(df)} rows, {len(df.columns)} columns")
+
+        # Resolve the element_table RID column once — both the
+        # element-level dedupe and the partition-RID extraction need it.
+        rid_column = f"{element_table}.RID"
+        if rid_column not in df.columns:
+            rid_column = "RID"
+            if rid_column not in df.columns:
+                raise ValueError(
+                    f"Cannot find RID column. Tried '{element_table}.RID' and 'RID'. "
+                    f"Available columns: {list(df.columns)}"
+                )
+
+        if partition_by == "element":
+            # Element-mode contract: the selector sees one row per
+            # element_table RID. Two steps:
+            #
+            # 1. Verify within-element agreement on every column the
+            #    selector will read. For stratified splits that's
+            #    just stratify_by_column; for selection_fn the read
+            #    set is opaque, so we skip and document that the
+            #    caller is responsible.
+            # 2. Dedupe to one row per element_table RID with stable
+            #    seed-deterministic ordering — sort by element_RID
+            #    then drop_duplicates(keep="first").
+            df = _dedupe_for_element_partition(
+                df,
+                rid_column=rid_column,
+                element_table=element_table,
+                stratify_by_column=stratify_by_column,
+                stratify_missing=stratify_missing,
+                using_selection_fn=selection_fn is not None,
+            )
+            logger.info(f"After element-level dedupe: {len(df)} rows")
+            # Re-resolve partition sizes against the deduped row count.
+            partition_sizes = _resolve_sizes(len(df), test_size, train_size, val_size)
+            size_summary = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
+            logger.info(f"Adjusted split sizes after dedupe: {size_summary} (total={len(df)})")
 
         if stratify_by_column:
             logger.info(f"Using stratified split on column: {stratify_by_column}")
@@ -657,17 +894,26 @@ def _compute_partitions(
 
         partition_indices = selector(df, partition_sizes, seed)
 
-        # Map indices back to RIDs (dot notation: Table.RID).
-        rid_column = f"{element_table}.RID"
-        if rid_column not in df.columns:
-            rid_column = "RID"
-            if rid_column not in df.columns:
-                raise ValueError(
-                    f"Cannot find RID column. Tried '{element_table}.RID' and 'RID'. "
-                    f"Available columns: {list(df.columns)}"
-                )
-
         partition_rids = {name: df.iloc[indices][rid_column].tolist() for name, indices in partition_indices.items()}
+
+        if partition_by == "element":
+            # Defensive invariant — after a correct dedupe the
+            # selector sees disjoint rows (one per element_RID), so
+            # mapping indices → RIDs preserves disjointness. If this
+            # ever fires, the dedupe logic regressed or a selector
+            # ignored its input contract; either case is a bug, not
+            # bad user input — hence ``assert``, not ``ValueError``.
+            seen: dict[str, str] = {}
+            for name, rids in partition_rids.items():
+                for r in rids:
+                    assert r not in seen, (
+                        "partition_by='element' disjointness invariant violated: "
+                        f"RID {r!r} appears in both {seen.get(r)!r} and {name!r}. "
+                        "Internal correctness bug — the element-level dedupe "
+                        "failed to produce one row per element_table RID, or "
+                        "the selector returned overlapping indices."
+                    )
+                    seen[r] = name
     else:
         all_rids = [record["RID"] for record in member_records]
 
@@ -889,6 +1135,8 @@ def split_dataset(
     row_per: str | None = None,
     via: list[str] | None = None,
     ignore_unrelated_anchors: bool = False,
+    # Partition-unit selector
+    partition_by: Literal["element", "row"] | None = None,
 ) -> SplitResult:
     """Split a DerivaML dataset into training, testing, and optionally validation subsets.
 
@@ -969,7 +1217,9 @@ def split_dataset(
             natural anchor when partitioning element rows. Set
             explicitly to override (e.g., when projecting a feature
             value table's columns through a feature-association
-            bridge and you want one row per feature value).
+            bridge and you want one row per feature value). When
+            ``row_per != element_table`` the partition unit becomes
+            ambiguous; ``partition_by`` must then be set explicitly.
         via: Tables forced into the join chain without contributing
             columns (denormalizer ``via=`` parameter). Useful to
             disambiguate path ambiguity (Rule 6) without polluting
@@ -979,6 +1229,77 @@ def split_dataset(
             table. Pass-through to the denormalizer (Rule 8) — useful
             when the source dataset has heterogeneous member tables
             and only a subset participates in the split.
+        partition_by: Explicit declaration of the partition unit
+            when ``row_per`` is set and differs from ``element_table``.
+            Either ``"element"`` (one element_table RID per
+            partition; dedupe rows before partitioning; enforces
+            within-element agreement on the stratify column) or
+            ``"row"`` (one denormalized row per partition; element
+            RIDs may legitimately appear in multiple partitions).
+            Auto-defaults to ``"element"`` when ``row_per`` is
+            ``None`` or equals ``element_table`` (the unambiguous
+            case). Required — no default — when ``row_per`` is set
+            and differs from ``element_table``. See the
+            "When to use ``partition_by='element'`` vs
+            ``partition_by='row'``" section below.
+
+    When to use ``partition_by='element'`` vs ``partition_by='row'``:
+        The (``row_per``, ``element_table``) pair encodes two
+        independent choices that the old API conflated:
+
+        - ``element_table`` — what catalog entity does each partition
+          collect (Image, Subject, Trial, ...).
+        - ``row_per`` — how does the denormalized dataframe shape
+          its rows (one per element_table RID, one per
+          feature-value, one per visit, ...).
+
+        When ``row_per`` equals ``element_table`` (or is unset) the
+        two intents collapse: one element RID = one row, the
+        selector partitions rows, and the resulting partitions are
+        naturally disjoint at the element level. This is the
+        unambiguous case and ``partition_by`` auto-defaults to
+        ``"element"``.
+
+        When ``row_per`` differs from ``element_table`` the same
+        element RID can have multiple denormalized rows (the 1:N
+        feature case). The selector now faces a real architectural
+        choice the caller must make explicitly:
+
+        ``partition_by="element"`` — partition the *elements*. The
+        dataframe is deduplicated to one row per element_table RID
+        before the selector runs. Partitions are guaranteed
+        disjoint at the element-RID level. Use this when downstream
+        consumers (training loaders, ROC analysis, accuracy
+        metrics) operate at the element level — every reasonable ML
+        evaluation does. Requires within-element agreement on any
+        selector-read column: stratifying on
+        ``Image_Classification.Image_Class`` only makes sense if
+        every Image_RID has one class. When multiple annotators
+        disagree per image, resolve them upstream (the deriva-ml
+        pattern is a separate consensus feature that records the
+        resolved label per element, written by your adjudication
+        workflow) and stratify on the consensus feature, not on
+        the raw annotator rows. ``split_dataset`` enforces this
+        with a within-element uniformity check that names the
+        offending RIDs.
+
+        ``partition_by="row"`` — partition the *rows*. No dedupe,
+        no uniformity check. Element RIDs may appear in multiple
+        partitions; this is the expected shape for legitimate
+        per-row use cases such as per-annotation statistics (each
+        annotator-image pair scored independently) or time-series
+        splits within a subject. The caller is responsible for
+        ensuring partition disjointness at whatever granularity
+        downstream consumers actually need.
+
+        Migration note: callers that previously relied on the
+        implicit-row-partition behavior of
+        ``row_per=<feature_table>`` get a ``ValueError`` at the
+        call site directing them to choose. Adding
+        ``partition_by="row"`` restores the prior behavior;
+        ``partition_by="element"`` switches to the safer
+        per-element semantics (and almost always what the caller
+        meant).
 
     Returns:
         SplitResult with partition info for split, training, testing,
@@ -1020,50 +1341,79 @@ def split_dataset(
                 testing_types=["Labeled"],
             )
 
-        Stratified split preserving class distribution::
+        Stratified split preserving class distribution (one row per
+        Image, projecting the Image_Class vocab term as a column)::
 
+            # Image and Image_Class are linked by the feature-
+            # association table Execution_Image_Image_Classification,
+            # which is a transparent bridge for the denormalizer.
+            # Pass the **vocab/value table** (``Image_Class``) in
+            # ``include_tables``, not the feature-name shorthand
+            # (``Image_Classification``): the shorthand resolves to
+            # the feature-association table, which is downstream of
+            # Image and would trip Rule 5 against the auto-defaulted
+            # ``row_per="Image"``. Stratify on the dotted column
+            # against the vocab table.
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
-                include_tables=["Image", "Image_Classification"],
-            )
-
-        Stratified split on a feature-target column (one row per
-        Image, projecting the Image_Classification vocab term)::
-
-            # Image and Image_Classification are linked by the feature-
-            # association table Execution_Image_Image_Classification.
-            # ``split_dataset`` auto-defaults ``row_per=element_table``
-            # when stratifying, so the join produces one row per Image
-            # with the classification label projected as a column.
-            result = split_dataset(
-                ml, "28D0",
-                test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
-                include_tables=["Image", "Image_Classification"],
+                stratify_by_column="Image_Class.Name",
+                include_tables=["Image", "Image_Class"],
                 element_table="Image",
+                partition_by="element",
             )
 
         Override ``row_per`` to project one row per feature value
-        instead (e.g., when computing per-annotation statistics)::
+        instead — *per-annotation* statistics. Because ``row_per``
+        differs from ``element_table``, ``partition_by`` must be set
+        explicitly. ``"row"`` accepts that the same Image RID may
+        appear in multiple partitions (its multiple annotation
+        rows can land independently); ``"element"`` would dedupe
+        to one row per Image before partitioning and would raise
+        if annotators disagreed::
 
+            # Per-annotation statistics — element RIDs may legitimately
+            # appear in multiple partitions because each annotator-image
+            # pair is its own observation. The feature-name shorthand
+            # ``Image_Classification`` resolves to the feature-
+            # association table; setting ``row_per`` to that table
+            # explicitly makes the per-observation intent visible.
+            # Stratify on the FK column on the feature-association
+            # table (the resolver does not pull the vocab table into
+            # the join when the shorthand is used with an explicit
+            # feature-assoc ``row_per``).
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
-                include_tables=["Image", "Execution_Image_Image_Classification"],
+                stratify_by_column="Execution_Image_Image_Classification.Image_Class",
+                include_tables=["Image", "Image_Classification"],
                 row_per="Execution_Image_Image_Classification",
+                partition_by="row",
             )
+
+        Note: to get "one row per element with a feature value
+        projected as a column," pass the vocab/value table in
+        ``include_tables`` (as in the first stratified example
+        above), not the feature-name shorthand. Rule 5 of the
+        denormalizer rejects the shorthand combined with
+        ``row_per=<element>`` because the feature-association table
+        the shorthand resolves to is strictly downstream of the
+        element — aggregation is not supported. To partition by
+        feature *observation* instead (per-annotation statistics),
+        use the shorthand together with an explicit
+        ``row_per=<feature-assoc-table>`` and ``partition_by="row"``
+        as in the second example above.
 
         Stratified split dropping rows with missing labels::
 
             result = split_dataset(
                 ml, "28D0",
                 test_size=0.2,
-                stratify_by_column="Image_Classification.Image_Class",
+                stratify_by_column="Image_Class.Name",
                 stratify_missing="drop",
-                include_tables=["Image", "Image_Classification"],
+                include_tables=["Image", "Image_Class"],
+                element_table="Image",
+                partition_by="element",
             )
 
         Custom selection function for balanced sampling::
@@ -1072,7 +1422,7 @@ def split_dataset(
 
             def balanced_selector(df, partition_sizes, seed):
                 rng = np.random.default_rng(seed)
-                label_col = "Image_Classification_Image_Class"
+                label_col = "Image_Class_Name"
                 classes = df[label_col].unique()
                 result = {name: [] for name in partition_sizes}
                 for cls in classes:
@@ -1089,7 +1439,9 @@ def split_dataset(
                 ml, "28D0",
                 test_size=100,
                 selection_fn=balanced_selector,
-                include_tables=["Image", "Image_Classification"],
+                include_tables=["Image", "Image_Class"],
+                element_table="Image",
+                partition_by="element",
             )
 
         Dry run to preview the split plan without modifying the catalog::
@@ -1146,10 +1498,13 @@ def split_dataset(
     # 3. ``_create_split_hierarchy`` — catalog-writing path
     #    (parent/child datasets, member assignment).
 
-    _validate_split_inputs(
+    effective_partition_by = _validate_split_inputs(
         stratify_by_column=stratify_by_column,
         selection_fn=selection_fn,
         include_tables=include_tables,
+        row_per=row_per,
+        element_table=element_table,
+        partition_by=partition_by,
     )
 
     logger.info(f"Looking up source dataset: {source_dataset_rid}")
@@ -1171,6 +1526,7 @@ def split_dataset(
         row_per=row_per,
         via=via,
         ignore_unrelated_anchors=ignore_unrelated_anchors,
+        partition_by=effective_partition_by,
     )
 
     # Dry-run early return — no catalog writes.
@@ -1228,6 +1584,7 @@ def split_dataset(
         "row_per": row_per,
         "via": via,
         "ignore_unrelated_anchors": ignore_unrelated_anchors,
+        "partition_by": effective_partition_by,
         "training_types": train_types,
         "testing_types": test_types,
         "validation_types": val_types if val_types else None,
@@ -1396,6 +1753,16 @@ def main() -> int:
         help="Silently drop dataset anchors with no FK path to any requested table (denormalizer Rule 8 escape hatch).",
     )
     parser.add_argument(
+        "--partition-by",
+        choices=["element", "row"],
+        default=None,
+        help="Partition unit: 'element' dedupes per element_table RID before "
+        "partitioning (disjoint at the element level); 'row' partitions "
+        "denormalized rows directly (element RIDs may overlap). Required when "
+        "--row-per is set and differs from --element-table; auto-defaults to "
+        "'element' otherwise.",
+    )
+    parser.add_argument(
         "--training-types",
         default="Labeled",
         help="Comma-separated additional dataset types for training set (default: Labeled)",
@@ -1490,6 +1857,7 @@ def main() -> int:
                 row_per=args.row_per,
                 via=via,
                 ignore_unrelated_anchors=args.ignore_unrelated_anchors,
+                partition_by=args.partition_by,
                 dry_run=True,
             )
         else:
