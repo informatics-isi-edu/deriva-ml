@@ -106,7 +106,7 @@ class WorkflowMixin:
                 - workflow_type: Type(s) of workflow
                 - version: Version identifier
                 - description: Workflow description
-                - rid: Resource identifier
+                - workflow_rid: Resource identifier
                 - checksum: Source code checksum
 
         Examples:
@@ -145,7 +145,7 @@ class WorkflowMixin:
                 workflow_type=types_index.get(w["RID"], []),
                 version=w["Version"],
                 description=w["Description"],
-                rid=w["RID"],
+                workflow_rid=w["RID"],
                 checksum=w["Checksum"],
             )
             # Bind the workflow to this catalog instance
@@ -274,7 +274,7 @@ class WorkflowMixin:
             workflow_type=workflow_types,
             version=w["Version"],
             description=w["Description"],
-            rid=w["RID"],
+            workflow_rid=w["RID"],
             checksum=w["Checksum"],
         )
         # Bind the workflow to this catalog instance for write-back support
