@@ -41,6 +41,7 @@ from deriva_ml.core.exceptions import (
     DerivaMLException,
     DerivaMLFeatureNotFound,
     DerivaMLReadOnlyError,
+    DerivaMLTableNotFound,
     DerivaMLTableTypeError,
     NoAssociationException,
 )
@@ -377,7 +378,7 @@ class DerivaModel:
           Table object.
 
         Raises:
-          DerivaMLException: If the table doesn't exist in any searchable schema.
+          DerivaMLTableNotFound: If the table doesn't exist in any searchable schema.
         """
         if isinstance(table, Table):
             return table
@@ -390,7 +391,7 @@ class DerivaModel:
             s = self.model.schemas[sname]
             if table in s.tables:
                 return s.tables[table]
-        raise DerivaMLException(f"The table {table} doesn't exist.")
+        raise DerivaMLTableNotFound(str(table), msg="Table doesn't exist in any searchable schema")
 
     def is_vocabulary(self, table: TableInput) -> bool:
         """Check if a given table is a controlled vocabulary table.
@@ -412,7 +413,7 @@ class DerivaModel:
             False otherwise.
 
         Raises:
-            DerivaMLException: If the table doesn't exist in any searchable
+            DerivaMLTableNotFound: If the table doesn't exist in any searchable
                 schema (raised by :meth:`name_to_table`).
         """
         table = self.name_to_table(table)
@@ -434,7 +435,7 @@ class DerivaModel:
             or ``{"Name": "Name", "ID": "ID", ...}`` for DerivaML tables.
 
         Raises:
-            DerivaMLException: If the table doesn't exist (raised by
+            DerivaMLTableNotFound: If the table doesn't exist (raised by
                 :meth:`name_to_table`).
         """
         table = self.name_to_table(table)
@@ -475,7 +476,7 @@ class DerivaModel:
             See :meth:`Table.is_association` for the full contract.
 
         Raises:
-            DerivaMLException: If ``table`` doesn't exist in any searchable
+            DerivaMLTableNotFound: If ``table`` doesn't exist in any searchable
                 schema (raised by :meth:`name_to_table`).
         """
         table = self.name_to_table(table)
@@ -543,7 +544,7 @@ class DerivaModel:
             True if all asset-table requirements are satisfied.
 
         Raises:
-            DerivaMLException: If ``table`` doesn't exist in any searchable
+            DerivaMLTableNotFound: If ``table`` doesn't exist in any searchable
                 schema (raised by :meth:`name_to_table`).
         """
         table = self.name_to_table(table)
@@ -778,7 +779,7 @@ class DerivaModel:
 
         Raises:
             DerivaMLTableTypeError: If ``table`` is not an asset table.
-            DerivaMLException: If ``table`` doesn't exist (raised by
+            DerivaMLTableNotFound: If ``table`` doesn't exist (raised by
                 :meth:`name_to_table`).
         """
         table = self.name_to_table(table)

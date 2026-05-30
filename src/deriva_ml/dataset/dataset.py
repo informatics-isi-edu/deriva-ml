@@ -54,7 +54,11 @@ from deriva_ml.core.definitions import (
     MLVocab,
     VocabularyTerm,
 )
-from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.exceptions import (
+    DerivaMLCycleError,
+    DerivaMLException,
+    DerivaMLValidationError,
+)
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.mixins.rid_resolution import AnyQuantifier
 from deriva_ml.core.validation import VALIDATION_CONFIG
@@ -1080,9 +1084,14 @@ class Dataset:
             The new released ``DatasetVersion``.
 
         Raises:
-            DerivaMLException: If this dataset has no dev row to
-                promote, or if a concurrent writer modified the dev
-                row between this call's read and write.
+            DerivaMLValidationError: If this dataset has no dev row to
+                promote (per ADR-0003, ``release`` on a dataset with no
+                dev period is a validation error; call ``mark_dev()``
+                first to declare a dev period).
+            DerivaMLException: If a concurrent writer modified the dev
+                row between this call's read and write, or if the
+                catalog is in an inconsistent state (multiple dev rows,
+                or no released version to anchor against).
 
         Example:
             >>> dataset.add_dataset_members(["1-abc", "1-def"])  # doctest: +SKIP
@@ -1098,7 +1107,7 @@ class Dataset:
         history = self.dataset_history()
         dev_entries = [h for h in history if h.dataset_version.is_devrelease]
         if not dev_entries:
-            raise DerivaMLException(
+            raise DerivaMLValidationError(
                 f"Dataset {self.dataset_rid} has no dev period to release "
                 f"(current_version={self.current_version}). To release a "
                 "no-op change, call mark_dev() first to declare a dev "
@@ -2036,10 +2045,12 @@ class Dataset:
             execution_rid: Optional execution RID to associate with changes.
 
         Raises:
+            DerivaMLCycleError: If adding a member dataset would create a
+                cycle in the nested-dataset graph (the member is this
+                dataset or one of its transitive descendants).
             DerivaMLException: If:
                 - Any RID is invalid or cannot be resolved
                 - Any RID belongs to a table that isn't registered as a dataset element type
-                - Adding members would create a cycle (for nested datasets)
                 - Validation finds duplicate members (when validate=True)
 
         See Also:
@@ -2130,7 +2141,10 @@ class Dataset:
                 if rid_info.table_name not in association_map:
                     raise DerivaMLException(f"RID table: {rid_info.table_name} not part of dataset_table")
                 if rid_info.table == self._dataset_table and check_dataset_cycle(rid_info.rid):
-                    raise DerivaMLException("Creating cycle of datasets is not allowed")
+                    raise DerivaMLCycleError(
+                        [self.dataset_rid, rid_info.rid],
+                        msg="Creating cycle of datasets is not allowed",
+                    )
                 dataset_elements.setdefault(rid_info.table_name, []).append(rid_info.rid)
         else:
             dataset_elements = {t: list(set(ms)) for t, ms in members.items()}
