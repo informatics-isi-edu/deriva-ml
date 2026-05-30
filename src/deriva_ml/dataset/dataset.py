@@ -711,9 +711,12 @@ class Dataset:
             yield from records
             return
 
-        # Group by target RID + apply selector — shared helper
+        # Group by feature identity + apply selector — shared helper
         # so the three feature_values surfaces stay in lockstep.
-        yield from reduce_with_selector(records, target_col, selector)
+        # ``qualifier_columns`` is empty for ordinary features
+        # (group-by-target, unchanged) and carries the identity FKs for
+        # key-qualified features so distinct observations aren't collapsed.
+        yield from reduce_with_selector(records, target_col, selector, feat.qualifier_columns)
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """Look up a Feature definition — delegates to the owning DerivaML.

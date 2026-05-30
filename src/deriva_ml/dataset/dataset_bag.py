@@ -648,11 +648,13 @@ class DatasetBag:
             yield from records
             return
 
-        # Group by target RID, then apply selector to every group
+        # Group by feature identity, then apply selector to every group
         # — always call selector, never short-circuit for
         # single-element groups. Shared helper so the three
-        # feature_values surfaces stay in lockstep.
-        yield from reduce_with_selector(records, target_col, selector)
+        # feature_values surfaces stay in lockstep. ``qualifier_columns``
+        # is empty for ordinary features (group-by-target, unchanged) and
+        # carries the identity FKs for key-qualified features.
+        yield from reduce_with_selector(records, target_col, selector, feat.qualifier_columns)
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
         """Look up a feature definition from bag metadata — works fully offline.

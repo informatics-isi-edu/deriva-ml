@@ -50,8 +50,9 @@ def reduce_with_selector(
     records: Iterable["FeatureRecord"],
     target_col: str,
     selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"],
+    qualifier_cols: Iterable[str] = (),
 ) -> Iterator["FeatureRecord"]:
-    """Group records by target RID, apply ``selector`` per group, drop ``None`` results.
+    """Group records by feature identity, apply ``selector`` per group, drop ``None`` results.
 
     Centralises the three-step pattern that previously lived inline
     in three places — ``feature_values`` on
@@ -59,15 +60,33 @@ def reduce_with_selector(
     :class:`~deriva_ml.dataset.dataset.Dataset`, and
     :class:`~deriva_ml.dataset.dataset_bag.DatasetBag`:
 
-    1. Group raw records by their target-RID column (the FK to the
-       target table, e.g. ``Image`` for an Image feature).
+    1. Group raw records by their *feature identity*: the target-RID
+       column (the FK to the target table, e.g. ``Image`` for an
+       Image feature) plus any ``qualifier_cols`` (value FKs that
+       participate in the association table's compound uniqueness
+       key, e.g. ``Image_Side`` for a per-eye feature).
     2. Apply the selector to each group; the selector picks one
        record from the group (or returns ``None`` to drop).
     3. Yield surviving selections.
 
+    A selector exists to reduce *redundant* records describing the
+    same logical observation (the same Image labelled by three
+    annotators, say) down to one. The grouping unit must therefore
+    be the feature's identity, not the target RID alone. For an
+    ordinary (unqualified) feature, identity *is* the target RID, so
+    with the default empty ``qualifier_cols`` the composite key
+    degenerates to ``(target_rid,)`` and the behavior is byte-identical
+    to grouping on the target RID alone. For a *key-qualified* feature
+    (a value FK in the uniqueness key), the schema author declared
+    ``(target, *qualifiers)`` to be the identity — e.g. a left-eye and
+    a right-eye ``Chart_Label`` for the same Subject are two distinct
+    observations, not redundant copies — so the selector must reduce
+    *within* each qualifier bucket and preserve both.
+
     Records whose ``target_col`` is missing or ``None`` are
     silently dropped before grouping — they have no target to
-    group under.
+    group under. ``None`` qualifier values are tolerated and form
+    their own bucket.
 
     Args:
         records: Raw feature records to group + reduce. Iterated
@@ -75,28 +94,35 @@ def reduce_with_selector(
         target_col: Name of the FK column on each record that
             identifies its target row (e.g. ``"Image"``).
         selector: Callable that takes a non-empty list of records
-            sharing one target RID and returns the chosen record
-            (or ``None`` to skip). Examples:
+            sharing one feature identity and returns the chosen
+            record (or ``None`` to skip). Examples:
             :meth:`FeatureRecord.select_newest`,
             :meth:`FeatureRecord.select_by_workflow` (returned by
             the closure factory of the same name).
+        qualifier_cols: Names of additional record fields that, with
+            ``target_col``, form the feature's composite identity key
+            (a :class:`~deriva_ml.feature.Feature`'s
+            ``qualifier_columns``). Defaults to empty — group by target
+            RID alone, the historical behavior for unqualified features.
 
     Yields:
-        One :class:`FeatureRecord` per target RID for which the
-        selector returned a non-``None`` choice. Order is
-        unspecified (dict iteration order, i.e. insertion order
-        of first-seen target RIDs in ``records``).
+        One :class:`FeatureRecord` per ``(target_rid, *qualifiers)``
+        identity for which the selector returned a non-``None`` choice.
+        Order is unspecified (dict iteration order, i.e. insertion
+        order of first-seen identities in ``records``).
 
     Example:
         >>> from deriva_ml.feature import FeatureRecord, reduce_with_selector
         >>> callable(reduce_with_selector)
         True
     """
-    grouped: dict[str, list[FeatureRecord]] = defaultdict(list)
+    qualifier_cols = tuple(qualifier_cols)
+    grouped: dict[tuple, list[FeatureRecord]] = defaultdict(list)
     for rec in records:
         target_rid = getattr(rec, target_col, None)
         if target_rid is not None:
-            grouped[target_rid].append(rec)
+            key = (target_rid, *(getattr(rec, q, None) for q in qualifier_cols))
+            grouped[key].append(rec)
     for group in grouped.values():
         chosen = selector(group)
         if chosen is not None:
@@ -561,6 +587,12 @@ class Feature:
         asset_columns (set[Column]): Columns referencing asset tables.
         term_columns (set[Column]): Columns referencing vocabulary tables.
         value_columns (set[Column]): Columns containing direct values (not FK references).
+        qualifier_columns (list[str]): Names of value-FK columns that participate
+            in the association table's compound uniqueness key (e.g. ``Image_Side``
+            on a per-eye feature). Empty for ordinary features, where the target
+            RID alone is the identity. Used by ``reduce_with_selector`` to group on
+            ``(target, *qualifiers)`` so a selector preserves distinct qualified
+            observations instead of collapsing them.
 
     Example:
         >>> feature = ml.lookup_feature("Image", "Diagnosis")  # doctest: +SKIP
@@ -613,6 +645,29 @@ class Feature:
         # this subtraction, those structural FKs would be misclassified as feature
         # columns and create spurious fields in the generated FeatureRecord class.
         assoc_fkeys = {atable.self_fkey} | atable.other_fkeys
+
+        # Qualifier columns are the value FKs that participate in the
+        # association table's compound uniqueness key — i.e. ``other_fkeys``
+        # minus the structural ``Feature_Name`` / ``Execution`` FKs (the
+        # self-FK to the target is never in ``other_fkeys``). Their presence
+        # means the schema author declared ``(target, *qualifiers)`` — not the
+        # target alone — to be the feature's identity (e.g. ``Image_Side`` on
+        # ``Execution_Subject_Chart_Label``: one Chart_Label row per eye per
+        # Subject). ``reduce_with_selector`` must group on this composite
+        # identity so a selector reduces redundant records *within* each
+        # qualifier bucket instead of collapsing distinct observations.
+        #
+        # For an unqualified feature ``other_fkeys`` is exactly
+        # ``{Feature_Name FK, Execution FK}``, so this set is empty and
+        # grouping degenerates to group-by-target — the historical behavior.
+        # Exposed as the FeatureRecord *field names* (the association table's
+        # own column names) so ``reduce_with_selector`` can ``getattr`` them.
+        structural_fk_names = {"Feature_Name", "Execution"}
+        self.qualifier_columns: list[str] = [
+            fk.foreign_key_columns[0].name
+            for fk in atable.other_fkeys
+            if fk.foreign_key_columns[0].name not in structural_fk_names
+        ]
 
         # Determine the role of each column in the feature outside the FK columns.
         self.asset_columns = {

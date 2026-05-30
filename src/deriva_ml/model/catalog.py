@@ -657,9 +657,28 @@ class DerivaModel:
             }.issubset({c.name for c in a.table.columns})
 
         def find_table_features(t: Table) -> list[Feature]:
-            """Find all features for a single table."""
+            """Find all features for a single table.
+
+            ``max_arity`` is left unbounded (``None``) so that
+            *key-qualified* multi-value features are discovered. A
+            qualifier is a value FK that participates in the
+            association table's compound uniqueness key — e.g.
+            ``Image_Side`` on eye-ai's ``Execution_Subject_Chart_Label``,
+            where the same Subject legitimately has a left-eye and a
+            right-eye row. Such a key includes
+            ``{Execution, Subject, Feature_Name, Image_Side}``, giving a
+            key-FK arity of 4. The former ``max_arity=3`` cap silently
+            excluded these features from discovery (and therefore from
+            ``lookup_feature`` / ``feature_values``).
+
+            ``is_feature`` remains the sole filter: it still requires the
+            ``Feature_Name`` and ``Execution`` FKs plus the target FK, so
+            removing the ceiling cannot admit a non-feature association
+            (a plain N-way domain join lacks ``Feature_Name``).
+            ``min_arity=3`` is retained as the lower bound.
+            """
             return [
-                Feature(a, self) for a in t.find_associations(min_arity=3, max_arity=3, pure=False) if is_feature(a)
+                Feature(a, self) for a in t.find_associations(min_arity=3, max_arity=None, pure=False) if is_feature(a)
             ]
 
         if table is not None:

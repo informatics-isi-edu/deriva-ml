@@ -520,13 +520,15 @@ class FeatureMixin:
             yield from records
             return
 
-        # Group by target RID, apply selector, skip None results.
+        # Group by feature identity, apply selector, skip None results.
         # Three sites (this one, Dataset.feature_values,
         # DatasetBag.feature_values) share the same reduction
-        # shape; the helper pins it in one place.
+        # shape; the helper pins it in one place. ``qualifier_columns``
+        # carries the per-eye-style identity FKs (empty for ordinary
+        # features → group-by-target, unchanged).
         from deriva_ml.feature import reduce_with_selector
 
-        yield from reduce_with_selector(records, target_col, selector)
+        yield from reduce_with_selector(records, target_col, selector, feat.qualifier_columns)
 
     @validate_call(config=VALIDATION_CONFIG)
     def list_workflow_executions(self, workflow: str) -> list[str]:
@@ -589,4 +591,3 @@ class FeatureMixin:
                 f"No workflow resolved for '{workflow}' — tried as Workflow RID and Workflow_Type name."
             )
         return rids
-

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from deriva.core.ermrest_model import Model
+from deriva.core.ermrest_model import Model, tag
 from sqlalchemy.orm import Session
 
 from deriva_ml.local_db.schema import LocalSchema
@@ -802,6 +802,632 @@ def denorm_local_schema_feature(denorm_feature_model: Model, tmp_path: Path) -> 
         schemas=["isa", "deriva-ml"],
         database_path=db_path,
     )
+
+
+# ---------------------------------------------------------------------------
+# Key-qualified feature fixture (findings 10 + 12)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def denorm_schema_qualified_feature(tmp_path: Path) -> Path:
+    """Canned schema with a *key-qualified* multi-value feature.
+
+    This is the structural shape that no prior fixture modeled — and the
+    gap that hid two coupled bugs (findings 10 + 12). It mirrors eye-ai's
+    real ``Execution_Subject_Chart_Label`` feature: a feature-association
+    table whose **compound uniqueness key includes a qualifier FK** beyond
+    ``{target, Feature_Name, Execution}``. The same target (Subject) can
+    therefore have two rows distinguished only by the qualifier.
+
+    Tables added on top of :func:`_base_schema_doc`:
+
+    - ``Execution`` and ``Feature_Name`` (``deriva-ml`` schema) — the two
+      structural feature markers.
+    - ``Image_Side`` vocabulary (``isa`` schema) — the qualifier's target
+      (terms: ``Left`` / ``Right``).
+    - ``Condition_Label`` vocabulary (``isa`` schema) — an ordinary value
+      term (NOT in the key).
+    - ``Execution_Subject_Chart_Label`` feature-association table with FKs
+      to ``Subject`` (target), ``Execution``, ``Feature_Name``,
+      ``Image_Side`` (qualifier), and ``Condition_Label`` (value). Its
+      compound key is
+      ``[Execution, Subject, Feature_Name, Image_Side]`` — exactly the
+      eye-ai shape. The ``Image_Side`` FK is *in the key* (a qualifier);
+      ``Condition_Label`` is *not* (a value).
+
+    Because the key-FK arity is 4, ``find_associations(max_arity=3)`` —
+    the former ``find_features`` cap — silently excludes this table.
+    ``find_associations(max_arity=None)`` discovers it. The fixture thus
+    fails the old code and passes the new code, which is the whole point.
+    """
+    doc = _base_schema_doc()
+
+    # Execution (deriva-ml).
+    doc["schemas"]["deriva-ml"]["tables"]["Execution"] = {
+        "table_name": "Execution",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [],
+    }
+
+    # Feature_Name vocabulary (deriva-ml).
+    doc["schemas"]["deriva-ml"]["tables"]["Feature_Name"] = {
+        "table_name": "Feature_Name",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # Image_Side vocabulary (isa) — the QUALIFIER's target (Left/Right).
+    doc["schemas"]["isa"]["tables"]["Image_Side"] = {
+        "table_name": "Image_Side",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # Condition_Label vocabulary (isa) — an ordinary VALUE term (NOT in key).
+    doc["schemas"]["isa"]["tables"]["Condition_Label"] = {
+        "table_name": "Condition_Label",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # The key-qualified feature-association table. Its compound key
+    # includes Image_Side (the qualifier), giving key-FK arity 4.
+    doc["schemas"]["deriva-ml"]["tables"]["Execution_Subject_Chart_Label"] = {
+        "table_name": "Execution_Subject_Chart_Label",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            # Default on Feature_Name is what Feature.feature_name reads.
+            {
+                "name": "Feature_Name",
+                "type": {"typename": "text"},
+                "nullok": False,
+                "default": "Chart_Label",
+            },
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image_Side", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Condition_Label", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # The compound IDENTITY key — Image_Side IN the key makes it a
+            # qualifier (key-FK arity 4, the eye-ai Chart_Label shape).
+            {"unique_columns": ["Execution", "Subject", "Feature_Name", "Image_Side"]},
+        ],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Subject",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Subject", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Execution",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Feature_Name",
+                    }
+                ],
+                "referenced_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Feature_Name", "column_name": "Name"}
+                ],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Image_Side",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image_Side", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Condition_Label",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Condition_Label", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    # An ORDINARY (unqualified) feature alongside the qualified one, so a
+    # single fixture proves both the fix AND the backward-compat invariant
+    # via the same ``find_features`` path. Compound key is
+    # ``[Execution, Image, Feature_Name]`` (key-FK arity 3, no qualifier),
+    # so ``Feature.qualifier_columns`` must be empty and a selector must
+    # reduce to one-per-Image — unchanged from before the fix.
+    doc["schemas"]["deriva-ml"]["tables"]["Execution_Image_Quality"] = {
+        "table_name": "Execution_Image_Quality",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False, "default": "Quality"},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Condition_Label", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # No qualifier in the key — the target (Image) alone is identity.
+            {"unique_columns": ["Execution", "Image", "Feature_Name"]},
+        ],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Execution_Image_Quality", "column_name": "Image"}
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Execution_Image_Quality", "column_name": "Execution"}
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Execution_Image_Quality", "column_name": "Feature_Name"}
+                ],
+                "referenced_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Feature_Name", "column_name": "Name"}
+                ],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Image_Quality",
+                        "column_name": "Condition_Label",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Condition_Label", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    out = tmp_path / "schema_qualified_feature.json"
+    out.write_text(json.dumps(doc))
+    return out
+
+
+@pytest.fixture
+def denorm_qualified_feature_model(denorm_schema_qualified_feature: Path) -> Model:
+    """ERMrest Model with a key-qualified feature-association table."""
+    return Model.fromfile("file-system", denorm_schema_qualified_feature)
+
+
+@pytest.fixture
+def denorm_qualified_feature_deriva_model(denorm_qualified_feature_model: Model) -> DerivaModel:
+    """DerivaModel for the key-qualified feature fixture."""
+    return DerivaModel(
+        model=denorm_qualified_feature_model,
+        ml_schema="deriva-ml",
+        domain_schemas={"isa"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Arbitrary-shape qualified-feature fixtures (PR #261 generalization proof)
+# ---------------------------------------------------------------------------
+#
+# The single-qualifier ``denorm_schema_qualified_feature`` above proved the
+# #261 fix on ONE vocab-FK qualifier (the eye-ai Chart_Label / Image_Side
+# shape). The fix generalizes *by construction* — ``Feature.qualifier_columns``
+# is a comprehension over ``atable.other_fkeys`` (the compound-key-covered
+# FKs), so it is agnostic to the number of qualifiers and to the referent
+# type of each qualifier FK. These fixtures make that generalization
+# *empirical*: arbitrary qualifier counts, an asset-table qualifier referent,
+# and the inverse — a many-column unqualified feature that must NOT be
+# mistaken for a qualified one (the over-split guard).
+#
+# The structural distinction the whole fix hinges on: a qualifier FK's column
+# is part of a multi-column uniqueness KEY (→ it appears in deriva-py's
+# ``covered_fkeys`` / ``other_fkeys``); a decoration FK is NOT in any compound
+# key (→ it never appears there). Each fixture below is verified in its test
+# to actually produce the intended ``qualifier_columns`` via the real
+# ``find_features`` / ``Feature`` path — never asserted by construction alone.
+
+
+def _qf_sys_cols() -> list[dict[str, Any]]:
+    """The five ERMrest system columns every table carries."""
+    return [
+        {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+        {"name": "RCT", "type": {"typename": "timestamptz"}},
+        {"name": "RMT", "type": {"typename": "timestamptz"}},
+        {"name": "RCB", "type": {"typename": "text"}},
+        {"name": "RMB", "type": {"typename": "text"}},
+    ]
+
+
+def _qf_simple_vocab(name: str, schema: str = "isa") -> dict[str, Any]:
+    """A name-keyed reference table (Name/Description only).
+
+    NOT a deriva-py *vocabulary* (which requires ID/URI/Synonyms of specific
+    types) — so an FK to it that is NOT key-covered classifies as a
+    ``value_column``, mirroring the existing fixtures' Condition_Label shape.
+    Used where the referent's vocab-vs-value classification is irrelevant and
+    only the FK's key-coverage matters.
+    """
+    return {
+        "table_name": name,
+        "schema_name": schema,
+        "column_definitions": _qf_sys_cols()
+        + [
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+
+def _qf_real_vocab(name: str, schema: str = "isa") -> dict[str, Any]:
+    """A proper deriva-py vocabulary table (ID/URI/Name/Description/Synonyms).
+
+    Recognized by ``DerivaModel.is_vocabulary``, so a non-key-covered FK to it
+    classifies as a ``term_column`` on the feature. Used for the decoration
+    vocab FK so the over-split guard can assert the FeatureRecord carries it
+    as a real term field (feature data, just not identity).
+    """
+    return {
+        "table_name": name,
+        "schema_name": schema,
+        "column_definitions": _qf_sys_cols()
+        + [
+            {"name": "ID", "type": {"typename": "ermrest_curie"}, "nullok": False},
+            {"name": "URI", "type": {"typename": "ermrest_uri"}, "nullok": False},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "markdown"}, "nullok": False},
+            {"name": "Synonyms", "type": {"typename": "text[]"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            {"unique_columns": ["Name"]},
+            {"unique_columns": ["ID"]},
+        ],
+        "foreign_keys": [],
+    }
+
+
+def _qf_asset(name: str, schema: str = "isa") -> dict[str, Any]:
+    """A proper deriva-py asset table (URL/Filename/Length/MD5 + asset tag).
+
+    Recognized by ``DerivaModel.is_asset``. Used both as a *qualifier* referent
+    (fixture 2 — proving the qualifier derivation is referent-type-agnostic)
+    and as a *decoration* referent (fixtures 3 + 4 — a non-key asset FK that
+    becomes a record asset field but not part of identity).
+    """
+    return {
+        "table_name": name,
+        "schema_name": schema,
+        "column_definitions": _qf_sys_cols()
+        + [
+            {
+                "name": "URL",
+                "type": {"typename": "text"},
+                "nullok": False,
+                "annotations": {tag.asset: {}},
+            },
+            {"name": "Filename", "type": {"typename": "text"}, "nullok": True},
+            {"name": "Length", "type": {"typename": "int8"}, "nullok": False},
+            {"name": "MD5", "type": {"typename": "text"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [],
+    }
+
+
+def _qf_fk(table: str, col: str, ref_schema: str, ref_table: str, ref_col: str = "RID") -> dict[str, Any]:
+    """An outbound single-column FK from ``deriva-ml.<table>.<col>`` to a referent."""
+    return {
+        "foreign_key_columns": [{"schema_name": "deriva-ml", "table_name": table, "column_name": col}],
+        "referenced_columns": [{"schema_name": ref_schema, "table_name": ref_table, "column_name": ref_col}],
+    }
+
+
+def _qf_base_doc() -> dict[str, Any]:
+    """Base schema for the arbitrary-shape fixtures: Subject, Image, Execution, Feature_Name.
+
+    ``_base_schema_doc`` carries Dataset + UnrelatedThing that these fixtures
+    don't need; this trimmed base keeps each fixture's intent legible.
+    """
+    return {
+        "schemas": {
+            "isa": {
+                "tables": {
+                    "Subject": {
+                        "table_name": "Subject",
+                        "schema_name": "isa",
+                        "column_definitions": _qf_sys_cols()
+                        + [{"name": "Name", "type": {"typename": "text"}, "nullok": True}],
+                        "keys": [{"unique_columns": ["RID"]}],
+                        "foreign_keys": [],
+                    },
+                    "Image": {
+                        "table_name": "Image",
+                        "schema_name": "isa",
+                        "column_definitions": _qf_sys_cols()
+                        + [{"name": "Filename", "type": {"typename": "text"}, "nullok": True}],
+                        "keys": [{"unique_columns": ["RID"]}],
+                        "foreign_keys": [],
+                    },
+                }
+            },
+            "deriva-ml": {
+                "tables": {
+                    "Execution": {
+                        "table_name": "Execution",
+                        "schema_name": "deriva-ml",
+                        "column_definitions": _qf_sys_cols()
+                        + [{"name": "Description", "type": {"typename": "text"}, "nullok": True}],
+                        "keys": [{"unique_columns": ["RID"]}],
+                        "foreign_keys": [],
+                    },
+                    "Feature_Name": _qf_simple_vocab("Feature_Name", "deriva-ml"),
+                }
+            },
+        }
+    }
+
+
+def _qf_model(doc: dict[str, Any], tmp_path: Path, name: str) -> DerivaModel:
+    """Write ``doc`` to ``tmp_path/<name>.json`` and build a DerivaModel."""
+    out = tmp_path / f"{name}.json"
+    out.write_text(json.dumps(doc))
+    model = Model.fromfile("file-system", out)
+    return DerivaModel(model=model, ml_schema="deriva-ml", domain_schemas={"isa"})
+
+
+@pytest.fixture
+def denorm_multi_qualifier_deriva_model(tmp_path: Path) -> DerivaModel:
+    """A feature with TWO key-covered qualifier FKs (``Image_Side`` + ``Visit_Number``).
+
+    The compound uniqueness key is
+    ``[Execution, Subject, Feature_Name, Image_Side, Visit_Number]`` (key-FK
+    arity 5). The same Subject therefore has rows distinguished by a
+    *combination* of two qualifiers — (Left, V1), (Left, V2), (Right, V1), …
+    ``Condition_Label`` and ``Score`` are non-key value columns. Proves the
+    qualifier derivation handles an arbitrary qualifier count, not just one.
+    """
+    doc = _qf_base_doc()
+    doc["schemas"]["isa"]["tables"]["Image_Side"] = _qf_simple_vocab("Image_Side")
+    doc["schemas"]["isa"]["tables"]["Visit_Number"] = _qf_simple_vocab("Visit_Number")
+    doc["schemas"]["isa"]["tables"]["Condition_Label"] = _qf_simple_vocab("Condition_Label")
+    t = "Execution_Subject_Visit_Chart"
+    doc["schemas"]["deriva-ml"]["tables"][t] = {
+        "table_name": t,
+        "schema_name": "deriva-ml",
+        "column_definitions": _qf_sys_cols()
+        + [
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False, "default": "Visit_Chart"},
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image_Side", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Visit_Number", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Condition_Label", "type": {"typename": "text"}, "nullok": True},
+            {"name": "Score", "type": {"typename": "float8"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # BOTH qualifiers are in the key — the composite identity is
+            # (Subject, Image_Side, Visit_Number) per execution.
+            {"unique_columns": ["Execution", "Subject", "Feature_Name", "Image_Side", "Visit_Number"]},
+        ],
+        "foreign_keys": [
+            _qf_fk(t, "Subject", "isa", "Subject"),
+            _qf_fk(t, "Execution", "deriva-ml", "Execution"),
+            _qf_fk(t, "Feature_Name", "deriva-ml", "Feature_Name", "Name"),
+            _qf_fk(t, "Image_Side", "isa", "Image_Side"),
+            _qf_fk(t, "Visit_Number", "isa", "Visit_Number"),
+            _qf_fk(t, "Condition_Label", "isa", "Condition_Label"),
+        ],
+    }
+    return _qf_model(doc, tmp_path, "multi_qualifier")
+
+
+@pytest.fixture
+def denorm_asset_qualifier_deriva_model(tmp_path: Path) -> DerivaModel:
+    """A feature whose key-covered qualifier FK points to an ASSET table.
+
+    ``Image_Region`` is a proper asset table and is *in* the compound key
+    ``[Execution, Subject, Feature_Name, Image_Region]``. Proves
+    ``qualifier_columns`` keys off FK-in-``other_fkeys`` membership, NOT off
+    the referent being a vocabulary — the derivation is referent-type-agnostic.
+    ``Condition_Label`` is a non-key value column.
+    """
+    doc = _qf_base_doc()
+    doc["schemas"]["isa"]["tables"]["Image_Region"] = _qf_asset("Image_Region")
+    doc["schemas"]["isa"]["tables"]["Condition_Label"] = _qf_simple_vocab("Condition_Label")
+    t = "Execution_Subject_Region_Label"
+    doc["schemas"]["deriva-ml"]["tables"][t] = {
+        "table_name": t,
+        "schema_name": "deriva-ml",
+        "column_definitions": _qf_sys_cols()
+        + [
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False, "default": "Region_Label"},
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image_Region", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Condition_Label", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # The qualifier FK referent is an ASSET table, not a vocabulary.
+            {"unique_columns": ["Execution", "Subject", "Feature_Name", "Image_Region"]},
+        ],
+        "foreign_keys": [
+            _qf_fk(t, "Subject", "isa", "Subject"),
+            _qf_fk(t, "Execution", "deriva-ml", "Execution"),
+            _qf_fk(t, "Feature_Name", "deriva-ml", "Feature_Name", "Name"),
+            _qf_fk(t, "Image_Region", "isa", "Image_Region"),
+            _qf_fk(t, "Condition_Label", "isa", "Condition_Label"),
+        ],
+    }
+    return _qf_model(doc, tmp_path, "asset_qualifier")
+
+
+@pytest.fixture
+def denorm_decoration_feature_deriva_model(tmp_path: Path) -> DerivaModel:
+    """A decoration-heavy UNQUALIFIED feature — the over-split guard.
+
+    ``Execution_Image_RichQuality`` has many non-key columns: three scalar
+    metadata columns (``Confidence`` float, ``Vote_Count`` int, ``Notes``
+    text), an asset FK (``Thumbnail``), and a vocab FK (``Quality_Grade``) —
+    NONE in the compound key ``[Execution, Image, Feature_Name]`` (impure
+    decoration; ``pure=False`` keeps it discoverable). Its identity is the
+    target ``Image`` alone, so ``qualifier_columns`` must be EMPTY and a
+    selector must reduce to one-row-per-Image. Proves a many-column feature is
+    NOT mistaken for a qualified one (the inverse of the qualifier bug).
+    """
+    doc = _qf_base_doc()
+    doc["schemas"]["isa"]["tables"]["Thumbnail"] = _qf_asset("Thumbnail")
+    doc["schemas"]["isa"]["tables"]["Quality_Grade"] = _qf_real_vocab("Quality_Grade")
+    t = "Execution_Image_RichQuality"
+    doc["schemas"]["deriva-ml"]["tables"][t] = {
+        "table_name": t,
+        "schema_name": "deriva-ml",
+        "column_definitions": _qf_sys_cols()
+        + [
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False, "default": "RichQuality"},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            # Scalar metadata — real feature data, NOT identity, NOT in key.
+            {"name": "Confidence", "type": {"typename": "float8"}, "nullok": True},
+            {"name": "Vote_Count", "type": {"typename": "int4"}, "nullok": True},
+            {"name": "Notes", "type": {"typename": "text"}, "nullok": True},
+            # Asset FK + vocab FK — decoration, NOT in key.
+            {"name": "Thumbnail", "type": {"typename": "text"}, "nullok": True},
+            {"name": "Quality_Grade", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # No decoration FK in the key — the target (Image) alone is identity.
+            {"unique_columns": ["Execution", "Image", "Feature_Name"]},
+        ],
+        "foreign_keys": [
+            _qf_fk(t, "Image", "isa", "Image"),
+            _qf_fk(t, "Execution", "deriva-ml", "Execution"),
+            _qf_fk(t, "Feature_Name", "deriva-ml", "Feature_Name", "Name"),
+            _qf_fk(t, "Thumbnail", "isa", "Thumbnail"),
+            _qf_fk(t, "Quality_Grade", "isa", "Quality_Grade"),
+        ],
+    }
+    return _qf_model(doc, tmp_path, "decoration_feature")
+
+
+@pytest.fixture
+def denorm_mixed_feature_deriva_model(tmp_path: Path) -> DerivaModel:
+    """A feature with a key qualifier AND non-key decoration columns together.
+
+    ``Execution_Subject_MixedLabel`` puts ``Image_Side`` *in* the compound key
+    ``[Execution, Subject, Feature_Name, Image_Side]`` (a qualifier) while
+    carrying ``Severity_Label`` (vocab), ``Heatmap`` (asset), and
+    ``Confidence`` (scalar) as non-key decoration. Proves the two are
+    correctly separated: the qualifier joins the group key; the decoration
+    becomes record fields but does NOT split the group.
+    """
+    doc = _qf_base_doc()
+    doc["schemas"]["isa"]["tables"]["Image_Side"] = _qf_simple_vocab("Image_Side")
+    doc["schemas"]["isa"]["tables"]["Severity_Label"] = _qf_real_vocab("Severity_Label")
+    doc["schemas"]["isa"]["tables"]["Heatmap"] = _qf_asset("Heatmap")
+    t = "Execution_Subject_MixedLabel"
+    doc["schemas"]["deriva-ml"]["tables"][t] = {
+        "table_name": t,
+        "schema_name": "deriva-ml",
+        "column_definitions": _qf_sys_cols()
+        + [
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False, "default": "MixedLabel"},
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image_Side", "type": {"typename": "text"}, "nullok": False},  # qualifier (IN key)
+            {"name": "Severity_Label", "type": {"typename": "text"}, "nullok": True},  # decoration vocab
+            {"name": "Heatmap", "type": {"typename": "text"}, "nullok": True},  # decoration asset
+            {"name": "Confidence", "type": {"typename": "float8"}, "nullok": True},  # decoration scalar
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # Only Image_Side is in the key; Severity_Label/Heatmap/Confidence are not.
+            {"unique_columns": ["Execution", "Subject", "Feature_Name", "Image_Side"]},
+        ],
+        "foreign_keys": [
+            _qf_fk(t, "Subject", "isa", "Subject"),
+            _qf_fk(t, "Execution", "deriva-ml", "Execution"),
+            _qf_fk(t, "Feature_Name", "deriva-ml", "Feature_Name", "Name"),
+            _qf_fk(t, "Image_Side", "isa", "Image_Side"),
+            _qf_fk(t, "Severity_Label", "isa", "Severity_Label"),
+            _qf_fk(t, "Heatmap", "isa", "Heatmap"),
+        ],
+    }
+    return _qf_model(doc, tmp_path, "mixed_feature")
 
 
 # ---------------------------------------------------------------------------
