@@ -581,6 +581,12 @@ def _apply_selector(
         record_class = feature.feature_record_class()
         target_table_name = feature.target_table.name
         field_names = set(record_class.model_fields.keys())
+        # Identity qualifiers (value FKs in the compound key, e.g.
+        # ``Image_Side``). Empty for ordinary features. Threaded into
+        # ``reduce_with_selector`` so key-qualified features group on
+        # ``(target, *qualifiers)`` — same identity semantics as the
+        # ``feature_values`` wrappers.
+        qualifier_cols: list[str] = list(feature.qualifier_columns)
     else:
         # Structural fallback. The planner's
         # ``_is_feature_association`` predicate already guaranteed the
@@ -654,6 +660,11 @@ def _apply_selector(
             **record_fields,
         )
         field_names = set(record_class.model_fields.keys())
+        # The structural fallback can't reconstruct compound-key
+        # membership without a ``FindAssociationResult``, so it groups by
+        # target alone. This path only fires for minimal offline fixtures
+        # that don't model key-qualified features.
+        qualifier_cols = []
 
     # Resolve the wide-table column prefix for the feature-assoc table.
     schema_name = schema_for_table.get(feature_assoc_table, "")
@@ -740,13 +751,14 @@ def _apply_selector(
 
     # Delegate grouping + per-group selector application to the one
     # canonical helper. ``reduce_with_selector`` groups the shadows by
-    # ``target_table_name`` (defaultdict), applies the selector per group,
+    # the feature identity ``(target_table_name, *qualifier_cols)``
+    # (defaultdict), applies the selector per group,
     # drops ``None`` survivors, and yields the chosen shadow *instances*
     # (the built-in selectors return a group member, so identity holds —
     # the helper never copies records). We map each chosen shadow back to
     # its source dict row via ``id()``.
     reduced: list[dict[str, Any]] = []
-    for chosen in reduce_with_selector(shadows, target_table_name, selector):
+    for chosen in reduce_with_selector(shadows, target_table_name, selector, qualifier_cols):
         match = id_to_row.get(id(chosen))
         if match is not None:
             reduced.append(match)
