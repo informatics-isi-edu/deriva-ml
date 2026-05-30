@@ -112,15 +112,15 @@ class WorkflowMixin:
         Examples:
             List all workflows and their descriptions::
 
-                >>> workflows = ml.find_workflows()
-                >>> for w in workflows:
+                >>> workflows = ml.find_workflows()  # doctest: +SKIP
+                >>> for w in workflows:  # doctest: +SKIP
                 ...     print(f"{w.name} (v{w.version}): {w.description}")
                 ...     print(f"  Source: {w.url}")
 
             Update a workflow's description (workflows are catalog-bound)::
 
-                >>> workflows = ml.find_workflows()
-                >>> workflows[0].description = "Updated description"
+                >>> workflows = ml.find_workflows()  # doctest: +SKIP
+                >>> workflows[0].description = "Updated description"  # doctest: +SKIP
 
             Newest-first (most common)::
 
@@ -171,14 +171,14 @@ class WorkflowMixin:
             DerivaMLException: If workflow insertion fails or required fields are missing.
 
         Examples:
-            >>> workflow = Workflow(
+            >>> workflow = Workflow(  # doctest: +SKIP
             ...     name="Gene Analysis",
             ...     url="https://github.com/org/repo/workflows/gene_analysis.py",
             ...     workflow_type="python_script",
             ...     version="1.0.0",
             ...     description="Analyzes gene expression patterns"
             ... )
-            >>> workflow_rid = ml._add_workflow(workflow)
+            >>> workflow_rid = ml._add_workflow(workflow)  # doctest: +SKIP
         """
         # Check if a workflow already exists by URL or checksum
         if workflow_rid := self._find_workflow_rid_by_url(workflow.checksum or workflow.url):
@@ -238,22 +238,22 @@ class WorkflowMixin:
         Examples:
             Look up a workflow and read its properties::
 
-                >>> workflow = ml.lookup_workflow("2-ABC1")
-                >>> print(f"Name: {workflow.name}")
-                >>> print(f"Description: {workflow.description}")
-                >>> print(f"Type: {workflow.workflow_type}")
+                >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
+                >>> print(f"Name: {workflow.name}")  # doctest: +SKIP
+                >>> print(f"Description: {workflow.description}")  # doctest: +SKIP
+                >>> print(f"Type: {workflow.workflow_type}")  # doctest: +SKIP
 
             Update a workflow's description (persisted to catalog)::
 
-                >>> workflow = ml.lookup_workflow("2-ABC1")
-                >>> workflow.description = "Updated analysis pipeline for RNA sequences"
+                >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
+                >>> workflow.description = "Updated analysis pipeline for RNA sequences"  # doctest: +SKIP
                 >>> # The change is immediately written to the catalog
 
             Attempting to update on a read-only catalog raises an error::
 
-                >>> snapshot = ml.catalog_snapshot("2023-01-15T10:30:00")
-                >>> workflow = snapshot.lookup_workflow("2-ABC1")
-                >>> workflow.description = "New description"
+                >>> snapshot = ml.catalog_snapshot("2023-01-15T10:30:00")  # doctest: +SKIP
+                >>> workflow = snapshot.lookup_workflow("2-ABC1")  # doctest: +SKIP
+                >>> workflow.description = "New description"  # doctest: +SKIP
                 DerivaMLException: Cannot update workflow description on a read-only
                     catalog snapshot. Use a writable catalog connection instead.
         """
@@ -335,21 +335,21 @@ class WorkflowMixin:
         Examples:
             Look up a workflow by its GitHub URL::
 
-                >>> url = "https://github.com/org/repo/blob/abc123/analysis.py"
-                >>> workflow = ml.lookup_workflow_by_url(url)
-                >>> print(f"Found: {workflow.name}")
-                >>> print(f"Version: {workflow.version}")
+                >>> url = "https://github.com/org/repo/blob/abc123/analysis.py"  # doctest: +SKIP
+                >>> workflow = ml.lookup_workflow_by_url(url)  # doctest: +SKIP
+                >>> print(f"Found: {workflow.name}")  # doctest: +SKIP
+                >>> print(f"Version: {workflow.version}")  # doctest: +SKIP
 
             Look up by Git object hash (checksum)::
 
-                >>> workflow = ml.lookup_workflow_by_url("abc123def456789...")
-                >>> print(f"Name: {workflow.name}")
-                >>> print(f"URL: {workflow.url}")
+                >>> workflow = ml.lookup_workflow_by_url("abc123def456789...")  # doctest: +SKIP
+                >>> print(f"Name: {workflow.name}")  # doctest: +SKIP
+                >>> print(f"URL: {workflow.url}")  # doctest: +SKIP
 
             Update the workflow's description after lookup::
 
-                >>> workflow = ml.lookup_workflow_by_url(url)
-                >>> workflow.description = "Updated analysis pipeline"
+                >>> workflow = ml.lookup_workflow_by_url(url)  # doctest: +SKIP
+                >>> workflow.description = "Updated analysis pipeline"  # doctest: +SKIP
                 >>> # The change is persisted to the catalog
 
             Typical GitHub URL formats supported::
@@ -388,16 +388,16 @@ class WorkflowMixin:
             DerivaMLException: If any workflow_type is not in the vocabulary.
 
         Examples:
-            >>> workflow = ml.create_workflow(
+            >>> workflow = ml.create_workflow(  # doctest: +SKIP
             ...     name="RNA Analysis",
             ...     workflow_type="python_notebook",
             ...     description="RNA sequence analysis pipeline"
             ... )
-            >>> rid = ml._add_workflow(workflow)
+            >>> rid = ml._add_workflow(workflow)  # doctest: +SKIP
 
             Multiple types::
 
-                >>> workflow = ml.create_workflow(
+                >>> workflow = ml.create_workflow(  # doctest: +SKIP
                 ...     name="Training Pipeline",
                 ...     workflow_type=["Training", "Embedding"],
                 ...     description="Combined training and embedding pipeline"

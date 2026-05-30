@@ -137,6 +137,8 @@ class DerivaMLModel(Protocol):
     Checking protocol compliance:
 
         >>> from deriva_ml.execution.model_protocol import DerivaMLModel
+        >>> def my_model(epochs=10, ml_instance=None, execution=None):
+        ...     pass
         >>> isinstance(my_model, DerivaMLModel)
         True
     """

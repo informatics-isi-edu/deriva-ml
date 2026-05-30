@@ -57,11 +57,11 @@ class DerivaMLRunCLI(BaseCLI):
         parser: ArgumentParser instance with configured arguments.
 
     Example:
-        >>> cli = DerivaMLRunCLI(
+        >>> cli = DerivaMLRunCLI(  # doctest: +SKIP
         ...     description="Run ML model",
         ...     epilog="See documentation for more details"
         ... )
-        >>> cli.main()  # Parses args and runs model
+        >>> cli.main()  # doctest: +SKIP
     """
 
     def __init__(self, description: str, epilog: str, **kwargs) -> None:

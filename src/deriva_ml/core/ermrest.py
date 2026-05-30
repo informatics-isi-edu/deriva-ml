@@ -261,9 +261,9 @@ class VocabularyTermHandle(VocabularyTerm):
 
     Example:
         >>> term = ml.lookup_term("Dataset_Type", "Training")  # doctest: +SKIP
-        >>> term.description = "Data used for model training"
-        >>> term.synonyms = ("Train", "TrainingData")
-        >>> term.delete()
+        >>> term.description = "Data used for model training"  # doctest: +SKIP
+        >>> term.synonyms = ("Train", "TrainingData")  # doctest: +SKIP
+        >>> term.delete()  # doctest: +SKIP
     """
 
     _ml: Any = PrivateAttr()

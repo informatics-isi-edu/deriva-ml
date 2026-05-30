@@ -6,9 +6,9 @@ matching the table's metadata columns (everything beyond the standard
 Filename, URL, Length, MD5, Description, and system columns).
 
 Example:
-    >>> ImageAsset = ml.asset_record_class("Image")
-    >>> record = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")
-    >>> path = exe.asset_file_path("Image", "scan001.jpg", metadata=record)
+    >>> ImageAsset = ml.asset_record_class("Image")  # doctest: +SKIP
+    >>> record = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")  # doctest: +SKIP
+    >>> path = exe.asset_file_path("Image", "scan001.jpg", metadata=record)  # doctest: +SKIP
 """
 
 from __future__ import annotations

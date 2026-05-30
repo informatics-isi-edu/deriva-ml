@@ -53,10 +53,10 @@ class DatasetCollection:
     mapping semantics.
 
     Example:
-        >>> for bag in exe.datasets:
+        >>> for bag in exe.datasets:  # doctest: +SKIP
         ...     print(bag.dataset_rid, len(bag.list_dataset_members()))
-        >>> specific = exe.datasets["1-XYZ"]
-        >>> "1-XYZ" in exe.datasets
+        >>> specific = exe.datasets["1-XYZ"]  # doctest: +SKIP
+        >>> "1-XYZ" in exe.datasets  # doctest: +SKIP
         True
     """
 

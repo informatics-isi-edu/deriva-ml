@@ -63,9 +63,9 @@ def post_lease_batch(
             two-phase SQLite write in Task F2).
 
     Example:
-        >>> tokens = [generate_lease_token() for _ in range(100)]
-        >>> assigned = post_lease_batch(catalog=cat, tokens=tokens)
-        >>> assigned[tokens[0]]
+        >>> tokens = [generate_lease_token() for _ in range(100)]  # doctest: +SKIP
+        >>> assigned = post_lease_batch(catalog=cat, tokens=tokens)  # doctest: +SKIP
+        >>> assigned[tokens[0]]  # doctest: +SKIP
         'EXE-ABC'
     """
     if not tokens:

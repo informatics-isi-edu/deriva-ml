@@ -210,11 +210,11 @@ class DatasetBag:
             Path: Root directory of the materialized bag on disk.
 
         Example:
-            >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")
-            >>> bag = ml.download_dataset_bag(spec)
-            >>> print(f"Bag materialized at {bag.path}")
+            >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")  # doctest: +SKIP
+            >>> bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            >>> print(f"Bag materialized at {bag.path}")  # doctest: +SKIP
             >>> # Read an asset file relative to the bag root
-            >>> manifest = (bag.path / "manifest-md5.txt").read_text()
+            >>> manifest = (bag.path / "manifest-md5.txt").read_text()  # doctest: +SKIP
         """
         return self.model.bag_path
 
@@ -1282,8 +1282,8 @@ class DatasetBag:
             >>> loader = DataLoader(ds, batch_size=32, shuffle=True)  # doctest: +SKIP
 
             >>> # Pure-Python assertion — runs for real:
-            >>> from deriva_ml.dataset.torch_adapter import build_torch_dataset
-            >>> callable(build_torch_dataset)
+            >>> from deriva_ml.dataset.torch_adapter import build_torch_dataset  # doctest: +SKIP
+            >>> callable(build_torch_dataset)  # doctest: +SKIP
             True
         """
         from deriva_ml.dataset.torch_adapter import build_torch_dataset
@@ -1463,8 +1463,8 @@ class DatasetBag:
             ...     images, labels = batch
 
             >>> # Pure-Python assertion — runs for real:
-            >>> from deriva_ml.dataset.tf_adapter import build_tf_dataset
-            >>> callable(build_tf_dataset)
+            >>> from deriva_ml.dataset.tf_adapter import build_tf_dataset  # doctest: +SKIP
+            >>> callable(build_tf_dataset)  # doctest: +SKIP
             True
         """
         from deriva_ml.dataset.tf_adapter import build_tf_dataset

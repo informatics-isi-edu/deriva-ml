@@ -166,8 +166,8 @@ def run(
         subprocess.CalledProcessError: If check=True and the command fails.
 
     Example:
-        >>> result = run(["git", "status"], capture=True)
-        >>> print(result.stdout)
+        >>> result = run(["git", "status"], capture=True)  # doctest: +SKIP
+        >>> print(result.stdout)  # doctest: +SKIP
     """
     if not quiet:
         print(f"$ {' '.join(cmd)}")
@@ -186,7 +186,7 @@ def in_git_repo() -> bool:
         True if inside a git working tree, False otherwise.
 
     Example:
-        >>> if not in_git_repo():
+        >>> if not in_git_repo():  # doctest: +SKIP
         ...     print("Not a git repository")
     """
     try:
@@ -203,7 +203,7 @@ def has_commits() -> bool:
         True if the repository has commits, False if it's empty.
 
     Example:
-        >>> if not has_commits():
+        >>> if not has_commits():  # doctest: +SKIP
         ...     print("Repository has no commits yet")
     """
     try:
@@ -226,8 +226,8 @@ def latest_semver_tag(prefix: str) -> str | None:
         The full tag string (e.g., "v1.2.3") if found, None if no matching tag exists.
 
     Example:
-        >>> tag = latest_semver_tag("v")
-        >>> if tag:
+        >>> tag = latest_semver_tag("v")  # doctest: +SKIP
+        >>> if tag:  # doctest: +SKIP
         ...     print(f"Current version: {tag}")
         ... else:
         ...     print("No version tag found")
@@ -252,7 +252,7 @@ def seed_initial_tag(tag: str) -> None:
         tag: The full tag string to create (e.g., "v0.1.0").
 
     Example:
-        >>> seed_initial_tag("v0.1.0")
+        >>> seed_initial_tag("v0.1.0")  # doctest: +SKIP
         No existing semver tag found. Seeding initial tag: v0.1.0
         $ git tag v0.1.0 -m Initial release v0.1.0
         $ git push --tags
@@ -276,8 +276,8 @@ def require_tool(name: str) -> None:
         SystemExit: If the tool is not found on PATH.
 
     Example:
-        >>> require_tool("git")  # Passes silently if git is installed
-        >>> require_tool("nonexistent")
+        >>> require_tool("git")  # doctest: +SKIP
+        >>> require_tool("nonexistent")  # doctest: +SKIP
         Error: required tool 'nonexistent' not found on PATH.
     """
     if shutil.which(name) is None:
@@ -314,9 +314,9 @@ def main() -> int:
         >>> # python bump_version.py minor
 
         >>> # Called programmatically
-        >>> import sys
-        >>> sys.argv = ["bump_version.py", "patch"]
-        >>> exit_code = main()
+        >>> import sys  # doctest: +SKIP
+        >>> sys.argv = ["bump_version.py", "patch"]  # doctest: +SKIP
+        >>> exit_code = main()  # doctest: +SKIP
     """
     parser = argparse.ArgumentParser(
         description="Set a new version tag for the current repository, and push to remote."

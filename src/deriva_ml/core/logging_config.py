@@ -23,7 +23,7 @@ Example:
     >>> from deriva_ml.core.logging_config import configure_logging, get_logger
     >>> import logging
     >>>
-    >>> configure_logging(level=logging.DEBUG)
+    >>> _ = configure_logging(level=logging.DEBUG)
     >>> logger = get_logger()
     >>> logger.info("DerivaML initialized")
 """
@@ -164,10 +164,10 @@ def configure_logging(
     Example:
         >>> import logging
         >>> # Same level for everything
-        >>> configure_logging(level=logging.DEBUG)
+        >>> _ = configure_logging(level=logging.DEBUG)
         >>>
         >>> # Verbose DerivaML, quieter deriva-py libraries
-        >>> configure_logging(
+        >>> _ = configure_logging(
         ...     level=logging.INFO,
         ...     deriva_level=logging.WARNING,
         ... )

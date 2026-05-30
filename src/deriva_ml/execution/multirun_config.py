@@ -93,9 +93,9 @@ def multirun_config(
         The registered MultirunSpec instance.
 
     Example:
-        >>> from deriva_ml.execution import multirun_config
+        >>> from deriva_ml.execution import multirun_config  # doctest: +SKIP
         >>>
-        >>> multirun_config(
+        >>> multirun_config(  # doctest: +SKIP
         ...     "lr_sweep",
         ...     overrides=[
         ...         "+experiment=cifar10_lr_sweep",

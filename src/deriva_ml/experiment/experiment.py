@@ -6,13 +6,13 @@ configuration details, model parameters, and experiment metadata.
 
 Typical usage example:
     >>> from deriva_ml import DerivaML  # doctest: +SKIP
-    >>> from deriva_ml.execution import Experiment
+    >>> from deriva_ml.execution import Experiment  # doctest: +SKIP
     >>>
-    >>> ml = DerivaML("localhost", 45)
-    >>> exp = Experiment(ml, "47BE")
-    >>> print(exp.name)  # e.g., "cifar10_quick"
-    >>> print(exp.config_choices)  # Hydra config names used
-    >>> print(exp.model_config)  # Model hyperparameters
+    >>> ml = DerivaML("localhost", 45)  # doctest: +SKIP
+    >>> exp = Experiment(ml, "47BE")  # doctest: +SKIP
+    >>> print(exp.name)  # e.g., "cifar10_quick"  # doctest: +SKIP
+    >>> print(exp.config_choices)  # Hydra config names used  # doctest: +SKIP
+    >>> print(exp.model_config)  # Model hyperparameters  # doctest: +SKIP
 """
 
 from __future__ import annotations
@@ -54,9 +54,9 @@ class Experiment:
 
     Example:
         >>> exp = Experiment(ml, "47BE")  # doctest: +SKIP
-        >>> print(f"Experiment: {exp.name}")
-        >>> print(f"Config: {exp.config_choices}")
-        >>> for ds in exp.input_datasets:
+        >>> print(f"Experiment: {exp.name}")  # doctest: +SKIP
+        >>> print(f"Config: {exp.config_choices}")  # doctest: +SKIP
+        >>> for ds in exp.input_datasets:  # doctest: +SKIP
         ...     print(f"  Input: {ds.dataset_rid}")
     """
 
@@ -337,7 +337,7 @@ class Experiment:
 
         Example:
             >>> exp = ml.lookup_experiment("47BE")  # doctest: +SKIP
-            >>> print(exp.to_markdown())
+            >>> print(exp.to_markdown())  # doctest: +SKIP
         """
         lines = []
 
@@ -386,7 +386,7 @@ class Experiment:
 
         Example:
             >>> exp = ml.lookup_experiment("47BE")  # doctest: +SKIP
-            >>> exp.display_markdown()
+            >>> exp.display_markdown()  # doctest: +SKIP
         """
         from IPython.display import Markdown, display
 

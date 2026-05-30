@@ -12,21 +12,21 @@ The module provides:
 
 Example (Pydantic config):
     >>> from deriva_ml.core.validation import VALIDATION_CONFIG  # doctest: +SKIP
-    >>> from pydantic import validate_call
+    >>> from pydantic import validate_call  # doctest: +SKIP
     >>>
-    >>> @validate_call(config=VALIDATION_CONFIG)
+    >>> @validate_call(config=VALIDATION_CONFIG)  # doctest: +SKIP
     ... def process_table(table: Table) -> None:
     ...     pass
 
 Example (RID validation):
     >>> from deriva_ml.core.validation import validate_rids  # doctest: +SKIP
     >>>
-    >>> result = validate_rids(
+    >>> result = validate_rids(  # doctest: +SKIP
     ...     ml,
     ...     dataset_rids=["1-ABC", "2-DEF"],
     ...     asset_rids=["3-GHI"],
     ... )
-    >>> if not result.is_valid:
+    >>> if not result.is_valid:  # doctest: +SKIP
     ...     for error in result.errors:
     ...         print(f"ERROR: {error}")
 """
@@ -201,7 +201,7 @@ def validate_rids(
         resolved RID information.
 
     Example:
-        >>> result = validate_rids(
+        >>> result = validate_rids(  # doctest: +SKIP
         ...     ml,
         ...     dataset_rids=["1-ABC", "2-DEF"],
         ...     dataset_versions={"1-ABC": "0.4.0"},
@@ -390,8 +390,8 @@ def validate_execution_config(
 
     Example
     -------
-    >>> result = validate_execution_config(ml, datasets, assets)
-    >>> if not result.is_valid:
+    >>> result = validate_execution_config(ml, datasets, assets)  # doctest: +SKIP
+    >>> if not result.is_valid:  # doctest: +SKIP
     ...     raise DerivaMLException(f"Config validation failed:\\n{result}")
     """
     # Extract dataset RIDs and versions

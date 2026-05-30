@@ -141,10 +141,10 @@ class ExecutionMixin:
                 ...     description="Process samples",
                 ...     datasets=[DatasetSpec(rid="4HM", version="1.0.0")],
                 ... )
-                >>> with ml.create_execution(config) as execution:
+                >>> with ml.create_execution(config) as execution:  # doctest: +SKIP
                 ...     # Run analysis
                 ...     pass
-                >>> execution.commit_output_assets()
+                >>> execution.commit_output_assets()  # doctest: +SKIP
 
             Kwargs form (equivalent)::
 
@@ -255,7 +255,7 @@ class ExecutionMixin:
 
         Example:
             >>> record = ml.lookup_execution("1-abc123")  # doctest: +SKIP
-            >>> record.status = ExecutionStatus.Uploaded   # writes to catalog
+            >>> record.status = ExecutionStatus.Uploaded   # writes to catalog  # doctest: +SKIP
         """
         # Import here to avoid circular dependency
         from deriva_ml.execution.execution_record import ExecutionRecord
@@ -345,8 +345,8 @@ class ExecutionMixin:
 
         Example:
             >>> from deriva_ml.execution.state_store import ExecutionStatus  # doctest: +SKIP
-            >>> failed = ml.list_executions(status=ExecutionStatus.Failed)
-            >>> for snap in failed:
+            >>> failed = ml.list_executions(status=ExecutionStatus.Failed)  # doctest: +SKIP
+            >>> for snap in failed:  # doctest: +SKIP
             ...     print(snap.rid, snap.error)
         """
         store = self.workspace.execution_state_store()
@@ -444,10 +444,10 @@ class ExecutionMixin:
 
         Example:
             >>> ml = DerivaML(hostname="example.org", catalog_id="42")  # doctest: +SKIP
-            >>> exe = ml.resume_execution("5-ABC")
-            >>> exe.status
+            >>> exe = ml.resume_execution("5-ABC")  # doctest: +SKIP
+            >>> exe.status  # doctest: +SKIP
             <ExecutionStatus.Stopped>
-            >>> exe.commit_output_assets()
+            >>> exe.commit_output_assets()  # doctest: +SKIP
         """
         from deriva_ml.execution.execution import Execution
 
@@ -516,13 +516,13 @@ class ExecutionMixin:
 
         Example:
             >>> from datetime import timedelta  # doctest: +SKIP
-            >>> from deriva_ml.execution.state_store import ExecutionStatus
-            >>> n = ml.gc_executions(
+            >>> from deriva_ml.execution.state_store import ExecutionStatus  # doctest: +SKIP
+            >>> n = ml.gc_executions(  # doctest: +SKIP
             ...     status=ExecutionStatus.Uploaded,
             ...     older_than=timedelta(days=30),
             ...     delete_working_dir=True,
             ... )
-            >>> print(f"cleaned {n} old executions")
+            >>> print(f"cleaned {n} old executions")  # doctest: +SKIP
         """
         import shutil
         from datetime import datetime, timezone
@@ -667,9 +667,9 @@ class ExecutionMixin:
 
         Example:
             >>> exp = ml.lookup_experiment("47BE")  # doctest: +SKIP
-            >>> print(exp.name)  # e.g., "cifar10_quick"
-            >>> print(exp.config_choices)  # Hydra config names used
-            >>> print(exp.model_config)  # Model hyperparameters
+            >>> print(exp.name)  # e.g., "cifar10_quick"  # doctest: +SKIP
+            >>> print(exp.config_choices)  # Hydra config names used  # doctest: +SKIP
+            >>> print(exp.model_config)  # Model hyperparameters  # doctest: +SKIP
         """
         from deriva_ml.experiment import Experiment
 
@@ -695,7 +695,7 @@ class ExecutionMixin:
 
         Example:
             >>> experiments = list(ml.find_experiments(status=ExecutionStatus.Uploaded))  # doctest: +SKIP
-            >>> for exp in experiments:
+            >>> for exp in experiments:  # doctest: +SKIP
             ...     print(f"{exp.name}: {exp.config_choices}")
         """
         import re
@@ -784,7 +784,7 @@ class ExecutionMixin:
 
         Example:
             >>> report = ml.commit_pending_executions()  # doctest: +SKIP
-            >>> print(f"{report.total_uploaded} uploaded, "
+            >>> print(f"{report.total_uploaded} uploaded, "  # doctest: +SKIP
             ...       f"{report.total_failed} failed")
         """
         from deriva_ml.execution.upload_report import UploadReport
@@ -894,8 +894,8 @@ class ExecutionMixin:
             Trace an output asset back to its training dataset::
 
                 >>> result = ml.lookup_lineage("3JSE")  # doctest: +SKIP
-                >>> assert result.walked_complete
-                >>> for ds in result.lineage.consumed_datasets:
+                >>> assert result.walked_complete  # doctest: +SKIP
+                >>> for ds in result.lineage.consumed_datasets:  # doctest: +SKIP
                 ...     print(ds.rid, ds.version)
 
             Just the immediate producer (one round-trip)::
@@ -903,7 +903,7 @@ class ExecutionMixin:
                 >>> result = ml.lookup_lineage(  # doctest: +SKIP
                 ...     "3JSE", depth=0,
                 ... )
-                >>> producer = result.lineage.execution
+                >>> producer = result.lineage.execution  # doctest: +SKIP
 
             For the orchestration view (which execution called
             which), use ``record.list_execution_parents()`` /

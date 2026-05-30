@@ -93,9 +93,9 @@ class RidResolutionMixin:
             DerivaMLException: If RID doesn't exist in catalog.
 
         Examples:
-            >>> result = ml.resolve_rid("1-abc123")
-            >>> print(f"Found in {result.schema}.{result.table}")
-            >>> data = result.datapath.entities().fetch()
+            >>> result = ml.resolve_rid("1-abc123")  # doctest: +SKIP
+            >>> print(f"Found in {result.schema}.{result.table}")  # doctest: +SKIP
+            >>> data = result.datapath.entities().fetch()  # doctest: +SKIP
         """
         try:
             # Attempt to resolve RID using catalog model
@@ -118,8 +118,8 @@ class RidResolutionMixin:
             DerivaMLException: If the RID doesn't exist in the catalog.
 
         Example:
-            >>> record = ml._retrieve_rid("1-abc123")
-            >>> print(f"Name: {record['name']}, Created: {record['creation_date']}")
+            >>> record = ml._retrieve_rid("1-abc123")  # doctest: +SKIP
+            >>> print(f"Name: {record['name']}, Created: {record['creation_date']}")  # doctest: +SKIP
         """
         # Resolve RID and fetch the first (only) matching record
         return self.resolve_rid(rid).datapath.entities().fetch()[0]
@@ -148,8 +148,8 @@ class RidResolutionMixin:
             DerivaMLException: If any RID cannot be resolved.
 
         Example:
-            >>> results = ml.resolve_rids(["1-ABC", "2-DEF", "3-GHI"])
-            >>> for rid, info in results.items():
+            >>> results = ml.resolve_rids(["1-ABC", "2-DEF", "3-GHI"])  # doctest: +SKIP
+            >>> for rid, info in results.items():  # doctest: +SKIP
             ...     print(f"{rid} is in table {info.table_name}")
         """
         rids = set(rids)

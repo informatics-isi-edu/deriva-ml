@@ -139,7 +139,7 @@ class DatasetBagBuilder:
     Example:
         Build a download spec for a dataset::
 
-            >>> from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+            >>> from deriva_ml.dataset.bag_builder import DatasetBagBuilder  # doctest: +SKIP
             >>> builder = DatasetBagBuilder(  # doctest: +SKIP
             ...     ml_instance=ml,
             ...     s3_bucket="s3://my-bucket",

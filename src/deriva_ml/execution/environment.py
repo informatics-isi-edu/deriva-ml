@@ -12,9 +12,9 @@ This information is stored as execution metadata to ensure reproducibility and
 debugging capabilities.
 
 Typical usage example:
-    >>> env = get_execution_environment()
-    >>> print(f"Python version: {env['platform']['python_version']}")
-    >>> print(f"Operating system: {env['os']['name']}")
+    >>> env = get_execution_environment()  # doctest: +SKIP
+    >>> print(f"Python version: {env['platform']['python_version']}")  # doctest: +SKIP
+    >>> print(f"Operating system: {env['os']['name']}")  # doctest: +SKIP
 """
 
 import importlib.metadata
@@ -41,9 +41,9 @@ def get_execution_environment() -> Dict[str, Any]:
             - platform: Detailed platform information
 
     Example:
-        >>> env = get_execution_environment()
-        >>> print(f"Python: {env['platform']['python_version']}")
-        >>> print(f"OS: {env['platform']['system']}")
+        >>> env = get_execution_environment()  # doctest: +SKIP
+        >>> print(f"Python: {env['platform']['python_version']}")  # doctest: +SKIP
+        >>> print(f"OS: {env['platform']['system']}")  # doctest: +SKIP
     """
     return dict(
         imports=get_loaded_modules(),
@@ -65,8 +65,8 @@ def get_loaded_modules() -> Dict[str, str]:
         Dict[str, str]: Mapping of package names to version strings.
 
     Example:
-        >>> modules = get_loaded_modules()
-        >>> print(f"NumPy version: {modules.get('numpy')}")
+        >>> modules = get_loaded_modules()  # doctest: +SKIP
+        >>> print(f"NumPy version: {modules.get('numpy')}")  # doctest: +SKIP
     """
     return {dist.metadata["Name"]: dist.version for dist in importlib.metadata.distributions()}
 
@@ -85,8 +85,8 @@ def get_site_info() -> Dict[str, Any]:
             - USER_BASE: Base directory for user site-packages
 
     Example:
-        >>> info = get_site_info()
-        >>> print(f"User site-packages: {info['USER_SITE']}")
+        >>> info = get_site_info()  # doctest: +SKIP
+        >>> print(f"User site-packages: {info['USER_SITE']}")  # doctest: +SKIP
     """
     return {attr: getattr(site, attr) for attr in ["PREFIXES", "ENABLE_USER_SITE", "USER_SITE", "USER_BASE"]}
 
@@ -109,9 +109,9 @@ def get_platform_info() -> Dict[str, Any]:
             Additional fields vary by platform.
 
     Example:
-        >>> info = get_platform_info()
-        >>> print(f"OS: {info['system']} {info['release']}")
-        >>> print(f"Architecture: {info['machine']}")
+        >>> info = get_platform_info()  # doctest: +SKIP
+        >>> print(f"OS: {info['system']} {info['release']}")  # doctest: +SKIP
+        >>> print(f"Architecture: {info['machine']}")  # doctest: +SKIP
     """
     attributes: list[str] = [
         attr for attr in dir(platform) if (not attr.startswith("_")) and callable(getattr(platform, attr))
@@ -147,9 +147,9 @@ def get_os_info() -> Dict[str, Any]:
             - environ: Environment variables
 
     Example:
-        >>> info = get_os_info()
-        >>> print(f"User: {info.get('login')}")
-        >>> print(f"Working directory: {info['cwd']}")
+        >>> info = get_os_info()  # doctest: +SKIP
+        >>> print(f"User: {info.get('login')}")  # doctest: +SKIP
+        >>> print(f"Working directory: {info['cwd']}")  # doctest: +SKIP
     """
     values: Dict[str, Any] = {}
     for func in [
@@ -209,9 +209,9 @@ def get_sys_info() -> Dict[str, Any]:
             - encoding settings and recursion limits
 
     Example:
-        >>> info = get_sys_info()
-        >>> print(f"Python path: {info['executable']}")
-        >>> print(f"Arguments: {info['argv']}")
+        >>> info = get_sys_info()  # doctest: +SKIP
+        >>> print(f"Python path: {info['executable']}")  # doctest: +SKIP
+        >>> print(f"Arguments: {info['argv']}")  # doctest: +SKIP
     """
     values: Dict[str, Any] = {}
     for attr in [

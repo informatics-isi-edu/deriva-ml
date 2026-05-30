@@ -92,7 +92,7 @@ class ExecutionStateStore:
 
     Example:
         >>> store = ExecutionStateStore(engine=workspace.engine)  # doctest: +SKIP
-        >>> store.ensure_schema()
+        >>> store.ensure_schema()  # doctest: +SKIP
         >>> # then use store.executions for queries.
 
     Attributes:
@@ -168,7 +168,7 @@ class ExecutionStateStore:
 
         Example:
             >>> store = ExecutionStateStore(engine=workspace.engine)  # doctest: +SKIP
-            >>> store.ensure_schema()
+            >>> store.ensure_schema()  # doctest: +SKIP
             >>> # Table now exists; safe to insert/select.
         """
         self.metadata.create_all(self.engine)
@@ -248,7 +248,7 @@ class ExecutionStateStore:
 
         Example:
             >>> row = store.get_execution("EXE-A")  # doctest: +SKIP
-            >>> row["status"] if row else None
+            >>> row["status"] if row else None  # doctest: +SKIP
             'running'
         """
         with self.engine.connect() as conn:
@@ -312,7 +312,7 @@ class ExecutionStateStore:
             >>> incomplete = [ExecutionStatus.Created, ExecutionStatus.Running,  # doctest: +SKIP
             ...               ExecutionStatus.Stopped, ExecutionStatus.Failed,
             ...               ExecutionStatus.Pending_Upload]
-            >>> rows = store.list_executions(status=incomplete)
+            >>> rows = store.list_executions(status=incomplete)  # doctest: +SKIP
         """
         stmt = select(self.executions)
 
@@ -412,8 +412,8 @@ class ExecutionStateStore:
             execution_rid: Which execution to remove.
 
         Example:
-            >>> store.delete_execution("EXE-A")
-            >>> store.get_execution("EXE-A") is None
+            >>> store.delete_execution("EXE-A")  # doctest: +SKIP
+            >>> store.get_execution("EXE-A") is None  # doctest: +SKIP
             True
         """
         with self.engine.begin() as conn:

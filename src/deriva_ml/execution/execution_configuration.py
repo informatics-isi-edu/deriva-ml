@@ -12,12 +12,12 @@ The module supports both direct parameter specification and JSON-based configura
 
 Typical usage example:
     >>> workflow = ml.lookup_workflow_by_url("https://github.com/my-org/my-repo")  # doctest: +SKIP
-    >>> config = ExecutionConfiguration(
+    >>> config = ExecutionConfiguration(  # doctest: +SKIP
     ...     workflow=workflow,
     ...     datasets=[DatasetSpec(rid="1-abc123", version="1.0.0")],
     ...     description="Process sample data"
     ... )
-    >>> execution = ml.create_execution(config)
+    >>> execution = ml.create_execution(config)  # doctest: +SKIP
 """
 
 from __future__ import annotations
@@ -133,8 +133,8 @@ class ExecutionConfiguration(BaseModel):
 
         Example:
             >>> config = ExecutionConfiguration.load_configuration(Path("config.json"))  # doctest: +SKIP
-            >>> print(f"Workflow: {config.workflow}")
-            >>> print(f"Datasets: {len(config.datasets)}")
+            >>> print(f"Workflow: {config.workflow}")  # doctest: +SKIP
+            >>> print(f"Datasets: {len(config.datasets)}")  # doctest: +SKIP
         """
         with Path(path).open() as fd:
             config = json.load(fd)

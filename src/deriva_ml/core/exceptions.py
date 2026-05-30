@@ -40,7 +40,7 @@ Exception Hierarchy:
         └── DerivaMLDenormalizeUnrelatedAnchor
 
 Example:
-    >>> from deriva_ml.core.exceptions import DerivaMLException, DerivaMLNotFoundError
+    >>> from deriva_ml.core.exceptions import DerivaMLException, DerivaMLNotFoundError  # doctest: +SKIP
     >>> try:  # doctest: +SKIP
     ...     dataset = ml.lookup_dataset("invalid_rid")
     ... except DerivaMLDatasetNotFound as e:
@@ -486,7 +486,7 @@ class NoAssociationException(DerivaMLNotFoundError):
     Example:
         Branch on the typed exception instead of message text::
 
-            >>> from deriva_ml.core.exceptions import NoAssociationException
+            >>> from deriva_ml.core.exceptions import NoAssociationException  # doctest: +SKIP
             >>> try:  # doctest: +SKIP
             ...     model.find_association("Image", "Subject")
             ... except NoAssociationException:
@@ -520,7 +520,7 @@ class AmbiguousAssociationException(DerivaMLDataError):
         count: Number of association tables that matched.
 
     Example:
-        >>> from deriva_ml.core.exceptions import AmbiguousAssociationException
+        >>> from deriva_ml.core.exceptions import AmbiguousAssociationException  # doctest: +SKIP
         >>> try:  # doctest: +SKIP
         ...     model.find_association("Image", "Dataset")
         ... except AmbiguousAssociationException as e:

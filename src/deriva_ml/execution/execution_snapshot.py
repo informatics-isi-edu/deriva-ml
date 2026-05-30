@@ -75,8 +75,8 @@ class ExecutionSnapshot(BaseModel):
         failed_files: Count of asset-file rows in status='failed'.
 
     Example:
-        >>> snapshots = ml.find_incomplete_executions()
-        >>> for snap in snapshots:
+        >>> snapshots = ml.find_incomplete_executions()  # doctest: +SKIP
+        >>> for snap in snapshots:  # doctest: +SKIP
         ...     print(snap.rid, snap.status, snap.pending_rows)
     """
 
@@ -125,9 +125,9 @@ class ExecutionSnapshot(BaseModel):
             A frozen ``ExecutionSnapshot`` instance.
 
         Example:
-            >>> row = store.get_execution("EXE-A")
-            >>> counts = store.count_pending_by_kind(execution_rid="EXE-A")
-            >>> snap = ExecutionSnapshot.from_row(row, **counts)
+            >>> row = store.get_execution("EXE-A")  # doctest: +SKIP
+            >>> counts = store.count_pending_by_kind(execution_rid="EXE-A")  # doctest: +SKIP
+            >>> snap = ExecutionSnapshot.from_row(row, **counts)  # doctest: +SKIP
         """
         return cls(
             rid=row["rid"],
@@ -161,7 +161,7 @@ class ExecutionSnapshot(BaseModel):
             PendingSummary for this execution.
 
         Example:
-            >>> for snap in ml.list_executions():
+            >>> for snap in ml.list_executions():  # doctest: +SKIP
             ...     s = snap.pending_summary(ml=ml)
             ...     if s.has_pending:
             ...         print(s.render())
@@ -204,7 +204,7 @@ class ExecutionSnapshot(BaseModel):
             DerivaMLStateInconsistency: If catalog sync detects divergence.
 
         Example:
-            >>> snap.update_status(ExecutionStatus.Aborted, ml=ml, error="user cancel")
+            >>> snap.update_status(ExecutionStatus.Aborted, ml=ml, error="user cancel")  # doctest: +SKIP
         """
         from deriva_ml.execution.state_machine import transition
 

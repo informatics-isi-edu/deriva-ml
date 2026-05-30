@@ -80,7 +80,7 @@ class Workflow(BaseModel):
     Example:
         Create a workflow directly (without catalog validation)::
 
-            >>> workflow = Workflow(
+            >>> workflow = Workflow(  # doctest: +SKIP
             ...     name="RNA Analysis",
             ...     url="https://github.com/org/repo/analysis.ipynb",
             ...     workflow_type="python_notebook",
@@ -91,22 +91,22 @@ class Workflow(BaseModel):
         Look up an existing workflow by RID and update its properties::
 
             >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
-            >>> workflow.description = "Updated description for RNA analysis"
-            >>> workflow.workflow_type = "python_script"
-            >>> print(workflow.description)
+            >>> workflow.description = "Updated description for RNA analysis"  # doctest: +SKIP
+            >>> workflow.workflow_type = "python_script"  # doctest: +SKIP
+            >>> print(workflow.description)  # doctest: +SKIP
             Updated description for RNA analysis
 
         Look up by URL and update::
 
             >>> url = "https://github.com/org/repo/blob/abc123/analysis.py"  # doctest: +SKIP
-            >>> workflow = ml.lookup_workflow_by_url(url)
-            >>> workflow.description = "New description"
+            >>> workflow = ml.lookup_workflow_by_url(url)  # doctest: +SKIP
+            >>> workflow.description = "New description"  # doctest: +SKIP
 
         Attempting to update on a read-only catalog raises an error::
 
             >>> snapshot_ml = ml.catalog_snapshot("2023-01-15T10:30:00")  # doctest: +SKIP
-            >>> workflow = snapshot_ml.lookup_workflow("2-ABC1")
-            >>> workflow.description = "New description"  # Raises DerivaMLException
+            >>> workflow = snapshot_ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
+            >>> workflow.description = "New description"  # Raises DerivaMLException  # doctest: +SKIP
     """
 
     # extra="forbid" guards against the silent kwarg-drop that masked the
@@ -160,12 +160,12 @@ class Workflow(BaseModel):
             Update description::
 
                 >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
-                >>> workflow.description = "Updated description"
+                >>> workflow.description = "Updated description"  # doctest: +SKIP
 
             Update workflow type::
 
                 >>> workflow = ml.lookup_workflow("2-ABC1")  # doctest: +SKIP
-                >>> workflow.workflow_type = "python_notebook"
+                >>> workflow.workflow_type = "python_notebook"  # doctest: +SKIP
         """
         # Only intercept updates after full initialization
         # Use __dict__ check to avoid recursion during Pydantic model construction
@@ -478,8 +478,8 @@ class Workflow(BaseModel):
 
         Example:
             >>> url, checksum = Workflow.get_url_and_checksum(Path("analysis.ipynb"))  # doctest: +SKIP
-            >>> print(f"URL: {url}")
-            >>> print(f"Checksum: {checksum}")
+            >>> print(f"URL: {url}")  # doctest: +SKIP
+            >>> print(f"Checksum: {checksum}")  # doctest: +SKIP
         """
         # The "must be inside a git checkout" guard is a precondition
         # for honest provenance. But ``allow_dirty=True`` is the

@@ -74,8 +74,8 @@ class PendingSummary:
             `error` column of failed pending_rows.
 
     Example:
-        >>> summary = exe.pending_summary()
-        >>> if summary.has_pending:
+        >>> summary = exe.pending_summary()  # doctest: +SKIP
+        >>> if summary.has_pending:  # doctest: +SKIP
         ...     print(summary.render())
     """
 
@@ -122,7 +122,7 @@ class PendingSummary:
             Multi-line string; caller prints or logs.
 
         Example:
-            >>> print(summary.render())
+            >>> print(summary.render())  # doctest: +SKIP
             Execution EXE-A pending state:
               rows:    Subject (2 pending, 0 failed)
         """
