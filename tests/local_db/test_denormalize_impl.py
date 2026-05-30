@@ -407,6 +407,12 @@ class TestRowCompletenessInvariant:
             cls_cls = ls.get_orm_class("Image_Classification")
             session.add(cls_cls(RID=cls_rid, Name="cat"))
 
+            # Feature_Name is now an FK to deriva-ml.Feature_Name.Name
+            # (the real 4-FK feature shape), so the term must exist
+            # before the feature rows reference it.
+            fn_cls = ls.get_orm_class("Feature_Name")
+            session.add(fn_cls(RID="FN-default", Name="default"))
+
             feat_cls = ls.get_orm_class("Execution_Image_Image_Classification")
             for img in path_b_image_rids:
                 session.add(

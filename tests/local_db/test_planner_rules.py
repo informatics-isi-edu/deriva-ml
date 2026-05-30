@@ -194,6 +194,92 @@ class TestPrepareWideTableIntegration:
         assert "Image" in element_tables
 
 
+class TestFeatureBridgeDiamond:
+    """Rule 6 over the diamond-with-feature-bridge shape (finding 09 §7.1).
+
+    This pins the one *intentional behavior change* of the Option E2
+    predicate fix. When a target and a value table are connected by
+    BOTH a transparent feature bridge AND a second independent FK path,
+    the now-transparent bridge hops in ``_is_downstream_chain`` and
+    registers as a competing downstream chain. Rule 6 must therefore
+    raise ``DerivaMLDenormalizeAmbiguousPath`` — behavior that did NOT
+    fire under the old predicate (the bridge was opaque, so Rule 6 saw
+    only the direct path and planned silently). Raising here is the
+    *correct* outcome: there really are two ways to relate the tables,
+    so the planner asks the caller to pick.
+    """
+
+    def test_feature_bridge_is_transparent(self, denorm_feature_diamond_deriva_model) -> None:
+        """Precondition: the 4-FK feature bridge is transparent under E2.
+
+        This is the property that turns the second path into a genuine
+        competing downstream chain. If this regresses, the ambiguity
+        below would silently disappear (the bug we're guarding against).
+        """
+        model = denorm_feature_diamond_deriva_model
+        assert model._planner._is_feature_association("Execution_Image_Image_Classification")
+        # Image reaches Image_Classification through the bridge hop.
+        assert model._planner._outbound_reachable(
+            "Image",
+            {"Image", "Image_Classification"},
+        ) == {"Image_Classification"}
+
+    def test_diamond_with_feature_bridge_raises_ambiguity(self, denorm_feature_diamond_deriva_model) -> None:
+        """Two downstream chains (direct FK + feature bridge) → ambiguity."""
+        model = denorm_feature_diamond_deriva_model
+        result = model._planner._find_path_ambiguities(
+            row_per="Image",
+            include_tables=["Image", "Image_Classification"],
+            via=[],
+        )
+        assert len(result) == 1, f"expected exactly one ambiguity, got {result}"
+        amb = result[0]
+        assert amb["from_table"] == "Image"
+        assert amb["to_table"] == "Image_Classification"
+        # Both competing paths must be present: the direct FK and the
+        # one that hops the feature bridge.
+        path_sigs = {tuple(p) for p in amb["paths"]}
+        assert ("Image", "Image_Classification") in path_sigs, (
+            f"direct FK path missing from ambiguity, got {amb['paths']}"
+        )
+        assert (
+            "Image",
+            "Execution_Image_Image_Classification",
+            "Image_Classification",
+        ) in path_sigs, f"feature-bridge path missing from ambiguity, got {amb['paths']}"
+
+    def test_prepare_wide_table_raises_on_feature_bridge_diamond(self, denorm_feature_diamond_deriva_model) -> None:
+        """The public planner entry point raises AmbiguousPath on the diamond."""
+        model = denorm_feature_diamond_deriva_model
+        with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
+            model._planner._prepare_wide_table(
+                dataset=None,
+                dataset_rid="DS-001",
+                include_tables=["Image", "Image_Classification"],
+            )
+
+    def test_via_bridge_does_not_disambiguate(self, denorm_feature_diamond_deriva_model) -> None:
+        """Naming the *transparent* bridge in via= does NOT resolve the diamond.
+
+        ``_is_signaled`` deliberately excludes transparent intermediates
+        (feature-assoc and pure-association tables) from counting as a
+        user path-signal — the user shouldn't have to name plumbing.
+        Consequently the feature bridge cannot be used to pick the
+        bridged path: the ambiguity stands, and the caller must instead
+        narrow ``include_tables`` (drop one endpoint). This pins the
+        interaction between transparency and Rule 6's signaling rule.
+        """
+        model = denorm_feature_diamond_deriva_model
+        result = model._planner._find_path_ambiguities(
+            row_per="Image",
+            include_tables=["Image", "Image_Classification"],
+            via=["Execution_Image_Image_Classification"],
+        )
+        assert len(result) == 1, (
+            f"transparent bridge in via= must not signal a path, so the diamond stays ambiguous, got {result}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Transparency predicates (issue #174)
 # ---------------------------------------------------------------------------
@@ -207,8 +293,11 @@ class TestTransparencyPredicates:
     or ``via``. The original predicate (:meth:`_is_topological_association`)
     only recognized pure 2-FK association tables. Issue #174 widens
     the rule to also include DerivaML feature-association tables —
-    3-FK tables whose third FK is the audit edge to the ML schema's
-    ``Execution`` table.
+    the (≥4)-FK tables ``create_feature`` builds, marked by an FK to
+    the ML schema's ``Feature_Name`` vocab AND an FK to the ML schema's
+    ``Execution`` table (finding 09: the predicate originally keyed off
+    a 3-FK count and so rejected every real feature, which has at least
+    target + value + Feature_Name + Execution = 4 domain FKs).
 
     See the module-level "Transparency model" section in
     ``denormalize_planner.py`` for the conceptual contract.
@@ -224,10 +313,12 @@ class TestTransparencyPredicates:
         assert not model._planner._is_feature_association("Dataset_Image")
 
     def test_feature_assoc_recognized(self, denorm_feature_deriva_model) -> None:
-        """3-FK feature-assoc with FK to Execution is a feature-assoc."""
+        """Real 4-FK feature-assoc (Feature_Name FK + Execution FK) is recognized."""
         model = denorm_feature_deriva_model
-        # Execution_Image_Image_Classification: 3 FKs (Image, Execution,
-        # Image_Classification). Has an FK to Execution → feature-assoc.
+        # Execution_Image_Image_Classification: 4 domain FKs (Image,
+        # Image_Classification, Feature_Name, Execution) — the canonical
+        # shape create_feature produces. The Feature_Name FK + Execution
+        # FK are the two markers _is_feature_association keys off.
         assert model._planner._is_feature_association("Execution_Image_Image_Classification")
         # Strictly NOT a 2-FK topological association.
         assert not model._planner._is_topological_association("Execution_Image_Image_Classification")
@@ -236,12 +327,12 @@ class TestTransparencyPredicates:
         assert model._planner._is_transparent_intermediate("Execution_Image_Image_Classification")
 
     def test_three_fk_without_execution_is_not_feature(self, denorm_feature_deriva_model) -> None:
-        """3-FK table without FK to Execution is NOT a feature-assoc.
+        """3-FK table without the feature marker FKs is NOT a feature-assoc.
 
         ``Image_Subject_UnrelatedThing`` has three domain FKs but none
-        points at ``Execution`` — it's a genuine 3-way domain
-        association, which the caller must name explicitly to route
-        through.
+        points at ``Execution`` or ``Feature_Name`` — it's a genuine
+        3-way domain association, which the caller must name explicitly
+        to route through.
         """
         model = denorm_feature_deriva_model
         assert not model._planner._is_feature_association("Image_Subject_UnrelatedThing")
@@ -249,11 +340,18 @@ class TestTransparencyPredicates:
         assert not model._planner._is_transparent_intermediate("Image_Subject_UnrelatedThing")
 
     def test_four_fk_assoc_is_not_transparent(self, denorm_feature_deriva_model) -> None:
-        """4+ FK tables are not transparent even with an FK to Execution.
+        """A 4-FK association WITHOUT a Feature_Name FK is not a feature.
 
-        Multi-way associations have an arbitrary number of domain
-        edges, so the caller has to disambiguate which edge they
-        want — they can't be silently hopped.
+        ``FourWayAssoc`` has four domain FKs (Image, Subject,
+        UnrelatedThing, Execution) — including an ``Execution``
+        provenance edge — but **no** FK to ``Feature_Name``. Since the
+        predicate keys off the Feature_Name FK + Execution FK pair (not
+        the FK count), this multi-way domain association is correctly
+        rejected: it has an arbitrary number of domain edges the caller
+        must disambiguate, so it can't be silently hopped. This is the
+        negative guard that distinguishes Option E2 (key off marker
+        FKs) from the rejected Option E1 (``>=3`` count, which would
+        wrongly accept this).
         """
         model = denorm_feature_deriva_model
         assert not model._planner._is_feature_association("FourWayAssoc")

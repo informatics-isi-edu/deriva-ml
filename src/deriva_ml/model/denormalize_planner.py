@@ -25,17 +25,20 @@ planner treats two kinds of tables as transparent:
    them in both directions so ``A → assoc → B`` discovers B from A.
 
 2. **Feature association tables** (DerivaML feature value tables):
-   :meth:`DenormalizePlanner._is_feature_association`. Three domain
-   FKs, exactly one of which targets the ML schema's ``Execution``
-   table; the other two are the feature's target domain table and a
-   vocabulary / value table. Examples:
+   :meth:`DenormalizePlanner._is_feature_association`. The association
+   ``create_feature`` builds — at least four domain FKs: the feature's
+   target domain table, one or more value FKs (vocabulary term / asset
+   / metadata), an FK to the ML schema's ``Feature_Name`` vocab, and an
+   FK to the ML schema's ``Execution`` table. The ``Feature_Name`` and
+   ``Execution`` FKs are the two reliable structural markers (the
+   predicate keys off them, not the FK count). Examples:
    ``Execution_Image_Image_Classification``,
    ``Execution_Subject_Diagnosis``. These exist to record one
    feature value per (target, execution) — the Execution FK is an
-   audit / provenance edge, *not* a domain edge that callers ever
-   want to filter on. From the planner's denormalization perspective
-   they behave like a pure 2-FK bridge between the target and the
-   value table.
+   audit / provenance edge and the Feature_Name FK identifies the
+   feature, *not* domain edges that callers ever want to filter on.
+   From the planner's denormalization perspective they behave like a
+   pure 2-FK bridge between the target and the value table.
 
 In both cases, transparency means:
 
@@ -52,11 +55,12 @@ In both cases, transparency means:
 
 What is intentionally **not** transparent:
 
-- 4+ FK tables (multi-way associations the caller has to disambiguate
-  by hand).
-- 3-FK domain-only tables that don't reference ``Execution`` (these
-  are genuine 3-way associations whose third FK is a domain
-  semantic, not provenance, and the caller should signal intent).
+- Multi-way domain associations that lack the feature marker FKs
+  (no FK to ``Feature_Name`` and/or ``Execution``) — even when they
+  carry an ``Execution`` provenance edge, an association without a
+  ``Feature_Name`` FK is a genuine multi-way join whose extra edges
+  are domain semantics, not feature plumbing, and the caller should
+  signal intent.
 - Tables that satisfy neither predicate. The planner treats anything
   not in ``include_tables`` / ``via`` and not transparent as a dead
   end during reachability — that's how it stops itself from sliding
@@ -125,9 +129,9 @@ The methods compose in three layers, lowest first:
   with cycle detection and vocab termination.
 - :meth:`DenormalizePlanner._is_topological_association` — 2-FK
   predicate (pure M:N bridges).
-- :meth:`DenormalizePlanner._is_feature_association` — 3-FK predicate
-  (one FK targets the ML schema's ``Execution`` table; the other two
-  are domain/value edges).
+- :meth:`DenormalizePlanner._is_feature_association` — feature predicate
+  (one FK targets the ML schema's ``Feature_Name`` vocab and one targets
+  the ML schema's ``Execution`` table; the rest are domain/value edges).
 - :meth:`DenormalizePlanner._is_transparent_intermediate` — union of
   the two predicates; this is what the reachability primitives consult.
 - :meth:`DenormalizePlanner._table_relationship` — column-pair
@@ -388,34 +392,51 @@ class DenormalizePlanner:
     def _is_feature_association(self, name_or_table: str | Table) -> bool:
         """Predicate for DerivaML feature-association transparency.
 
-        A feature-association table is a 3-FK association whose third
-        FK is the DerivaML ``Execution`` provenance edge — the other
-        two FKs are the feature's *target* domain table (the entity
-        the feature is attached to) and a *value* table (a vocabulary
-        term, an asset, or a metadata table). Concrete example::
+        A feature-association table is the association
+        :meth:`~deriva_ml.core.mixins.feature.FeatureMixin.create_feature`
+        builds for every feature. Its canonical FK set is::
 
             Execution_Image_Image_Classification
                 -> Image                    (feature target)
-                -> Image_Classification     (value: vocab term)
-                -> Execution                (provenance / audit)
+                -> Image_Class              (value: vocab term, asset, or metadata)
+                -> Feature_Name             (-> ML Feature_Name vocab)
+                -> Execution                (-> ML Execution, provenance / audit)
 
-        The Execution FK is structurally an audit edge, not a domain
-        edge — it records *which run* asserted the value, not a
-        semantic relationship a caller would ever join through. The
-        denormalization planner therefore treats feature-association
-        tables as transparent in the same sense as topological 2-FK
-        associations: the planner hops through them in both directions
-        during reachability, and they don't count as interior tables
-        when checking for diamond ambiguity.
+        That is **four or more domain FKs**: the target domain table,
+        one or more value FKs (a vocabulary term, an asset, or a
+        metadata table), the ``Feature_Name`` vocabulary FK, and the
+        ``Execution`` provenance FK. ``create_feature`` always emits
+        the ``Feature_Name`` and ``Execution`` FKs, so they are the two
+        reliable structural markers of a feature; the target and value
+        FKs vary per feature, so their *count* is not a usable
+        discriminator.
+
+        The ``Execution`` FK is an audit edge (it records *which run*
+        asserted the value), and the ``Feature_Name`` FK identifies the
+        feature — neither is a semantic relationship a caller would
+        ever join through. The denormalization planner therefore treats
+        feature-association tables as transparent in the same sense as
+        topological 2-FK associations: the planner hops through them in
+        both directions during reachability, and they don't count as
+        interior tables when checking for diamond ambiguity.
+
+        **Keyed off the marker FKs, not the FK count.** This predicate
+        deliberately mirrors ``DerivaModel.find_features``'s
+        ``is_feature`` column-presence test (``model/catalog.py``) —
+        the DerivaML-native definition of a feature — by requiring an
+        FK to the ML schema's ``Feature_Name`` vocab AND an FK to the
+        ML schema's ``Execution`` table. An FK-count equality check is
+        wrong: the value FKs make every real feature ≥4 domain FKs, and
+        ``create_feature`` cannot produce a 3-FK feature.
 
         **Why we don't widen** :meth:`_is_topological_association` **instead**:
         the 2-FK predicate is intentionally strict because the diamond
         rule (Rule 6) uses it. Conflating "transparent bridge" with
-        "feature with audit edge" inside a single predicate makes the
-        rule docs harder to read and risks accidentally treating other
-        3-FK shapes as transparent in the future. The two predicates
-        compose at the call sites (mostly
-        :meth:`_outbound_reachable`) where transparency is consulted.
+        "feature" inside a single predicate makes the rule docs harder
+        to read and risks accidentally treating other multi-FK shapes
+        as transparent in the future. The two predicates compose at the
+        call sites (mostly :meth:`_outbound_reachable`) where
+        transparency is consulted.
 
         **Structural, not naming.** The predicate ignores the table
         name (``Execution_*`` is a convention, not a contract) and
@@ -428,17 +449,21 @@ class DenormalizePlanner:
                 instance.
 
         Returns:
-            ``True`` if the table has exactly 3 domain FKs and exactly
-            one of them targets the ML schema's ``Execution`` table.
+            ``True`` if the table has exactly one FK to the ML schema's
+            ``Feature_Name`` vocab AND exactly one FK to the ML schema's
+            ``Execution`` table.
 
         Example::
 
+            # Real 4-FK feature: target + value + Feature_Name + Execution.
             planner._is_feature_association(
                 "Execution_Image_Image_Classification"
             )                                                          # True
-            planner._is_feature_association("Dataset_Image")           # False (2 FKs)
-            planner._is_feature_association("Image")                   # False (no Execution FK)
-            planner._is_feature_association("Three_Way_Domain_Assoc")  # False (no FK to Execution)
+            planner._is_feature_association("Dataset_Image")           # False (2-FK assoc)
+            planner._is_feature_association("Image")                   # False (no marker FKs)
+            # 4-FK domain association WITHOUT a Feature_Name FK
+            # (e.g. an Execution-stamped multi-way join) is not a feature.
+            planner._is_feature_association("FourWayAssoc")            # False (no Feature_Name FK)
         """
         # Same narrowing as ``_is_topological_association``: only
         # ``DerivaMLException`` from ``name_to_table`` is the
@@ -452,13 +477,23 @@ class DenormalizePlanner:
         # Domain FKs exclude the system FKs to ERMrest_Client /
         # ERMrest_Group that every table carries (for RCB/RMB).
         domain_fks = [fk for fk in fks if fk.pk_table.name not in ("ERMrest_Client", "ERMrest_Group")]
-        if len(domain_fks) != 3:
-            return False
+        # Key off the two defining markers of a DerivaML feature, NOT
+        # the FK count: an FK to the ML schema's ``Feature_Name`` vocab
+        # AND an FK to the ML schema's ``Execution`` table. This mirrors
+        # ``DerivaModel.find_features``'s ``is_feature`` column-presence
+        # test (see model/catalog.py) so the planner and the rest of
+        # deriva-ml agree on what a feature is. A real feature carries
+        # ``target + value(s) + Feature_Name + Execution`` — at least 4
+        # domain FKs — so an FK-count equality check (the original
+        # ``!= 3`` guard) rejected every real feature table.
         ml_schema = self.model.ml_schema
         execution_fks = [
             fk for fk in domain_fks if fk.pk_table.name == "Execution" and fk.pk_table.schema.name == ml_schema
         ]
-        return len(execution_fks) == 1
+        feature_name_fks = [
+            fk for fk in domain_fks if fk.pk_table.name == "Feature_Name" and fk.pk_table.schema.name == ml_schema
+        ]
+        return len(execution_fks) == 1 and len(feature_name_fks) == 1
 
     def _is_transparent_intermediate(self, name_or_table: str | Table) -> bool:
         """Return ``True`` if the table is transparent (assoc or feature-assoc).
@@ -482,7 +517,7 @@ class DenormalizePlanner:
             planner._is_transparent_intermediate(
                 "Execution_Image_Image_Classification"
             )
-            # True — 3-FK feature association.
+            # True — feature association (Feature_Name + Execution FKs).
 
             planner._is_transparent_intermediate("Image")
             # False — domain table, not a bridge.
@@ -616,9 +651,10 @@ class DenormalizePlanner:
         table) wouldn't be traversable.
 
         Both topological 2-FK associations (e.g. ``Dataset_Image``)
-        and 3-FK feature associations (e.g.
-        ``Execution_Image_Image_Classification``, where the third FK
-        is the audit edge to ``Execution``) count as transparent —
+        and feature associations (e.g.
+        ``Execution_Image_Image_Classification``, marked by FKs to the
+        ML schema's ``Feature_Name`` vocab and ``Execution`` table)
+        count as transparent —
         see the module docstring's "Transparency model" section.
 
         **Direction matters**: with ``Image.Subject → Subject.RID``:
@@ -835,13 +871,9 @@ class DenormalizePlanner:
 
         # Resolve defaults.
         exclude_names = exclude_tables or set()
-        skip_names = (
-            skip_tables if skip_tables is not None else _DEFAULT_SKIP_TABLES
-        )
+        skip_names = skip_tables if skip_tables is not None else _DEFAULT_SKIP_TABLES
         if root is None:
-            root = self.model.model.schemas[self.model.ml_schema].tables[
-                "Dataset"
-            ]
+            root = self.model.model.schemas[self.model.ml_schema].tables["Dataset"]
 
         # Scope to the domain schemas plus the ML schema — the same
         # filter the legacy ``_fk_neighbors`` enforced.
@@ -851,9 +883,7 @@ class DenormalizePlanner:
         # rules: skip-table exclusion (Dataset_Dataset / Execution by
         # default), caller-supplied exclude_tables, and nested-dataset
         # loopback prevention.
-        dataset_table = (
-            self.model.model.schemas[self.model.ml_schema].tables["Dataset"]
-        )
+        dataset_table = self.model.model.schemas[self.model.ml_schema].tables["Dataset"]
 
         def edge_filter(src: Table, tgt: Table) -> bool:
             # Schema scope is handled by the walker (via policy.schemas),
@@ -868,10 +898,7 @@ class DenormalizePlanner:
             # ``Dataset → Dataset_X → ...`` (the intended outbound
             # direction) but prevents the inverse walk back to the
             # root through an element association.
-            if (
-                src is not dataset_table
-                and self._is_topological_association(tgt)
-            ):
+            if src is not dataset_table and self._is_topological_association(tgt):
                 for fk in tgt.foreign_keys:
                     if fk.pk_table is dataset_table:
                         return False
@@ -884,9 +911,7 @@ class DenormalizePlanner:
             edge_filter=edge_filter,
         )
 
-        prefixes = walker.walk_all_prefixes(
-            root=root, max_depth=max_depth, stop_at=stop_at
-        )
+        prefixes = walker.walk_all_prefixes(root=root, max_depth=max_depth, stop_at=stop_at)
 
         # Convert tuples to lists for compatibility with existing
         # callers (they iterate and slice freely).
@@ -1473,7 +1498,7 @@ class DenormalizePlanner:
             #
             # We detect transparent intermediates via
             # ``self._is_transparent_intermediate`` (the union of the
-            # 2-FK topological-association predicate and the 3-FK
+            # 2-FK topological-association predicate and the
             # feature-association predicate; both ignore ERMrest system FKs).
 
             def _intermediates_covered(sp: list[Table], ints: tuple[str, ...]) -> bool:
