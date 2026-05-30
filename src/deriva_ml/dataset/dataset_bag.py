@@ -1365,8 +1365,9 @@ class DatasetBag:
             targets: Source of label data. Three shapes are accepted:
 
                 - ``None`` (default) — unlabeled dataset. Each element is
-                  just the sample (not a tuple). Useful for inference loops
-                  and self-supervised pretext tasks.
+                  the 2-tuple ``(sample, rid)`` (the trailing RID lets you
+                  trace a sample back to its catalog row). Useful for
+                  inference loops and self-supervised pretext tasks.
                 - ``list[str]`` — feature names read via
                   ``bag.feature_values(element_type, name)`` with no
                   selector. One ``FeatureRecord`` is resolved per element.

@@ -1993,12 +1993,12 @@ class Execution:
         Examples:
             Add a single file type:
                 >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]  # doctest: +SKIP
-                >>> rids = exe.add_files(files, file_types="text")  # doctest: +SKIP
+                >>> rids = exe.add_files(files, dataset_types="text")  # doctest: +SKIP
 
             Add multiple file types:
                 >>> rids = exe.add_files(  # doctest: +SKIP
                 ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],  # doctest: +SKIP
-                ...     file_types=["image", "png"],  # doctest: +SKIP
+                ...     dataset_types=["image", "png"],  # doctest: +SKIP
                 ... )  # doctest: +SKIP
         """
         return self._ml_object.add_files(

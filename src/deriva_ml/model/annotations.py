@@ -16,26 +16,34 @@ https://docs.derivacloud.org/chaise/annotation/
 
 Quick Start
 -----------
-Basic usage with a TableHandle::
+Build an annotation with one of the builder classes, assign its
+``to_dict()`` payload to ``table.annotations[Builder.tag]``, then push
+all staged changes to the catalog with ``ml.apply_annotations()`` (see
+ADR-0007 for the public-API contract)::
 
-    from deriva_ml.model import TableHandle, Display, VisibleColumns, TableDisplay
+    from deriva_ml import DerivaML
+    from deriva_ml.model import Display, VisibleColumns, TableDisplay
 
-    # Get a table handle
-    handle = TableHandle(table)
+    ml = DerivaML("localhost", "9")
+    table = ml.model.schemas["my-domain"].tables["Subject"]
 
     # Set display name
-    handle.set_annotation(Display(name="Research Subjects"))
+    display = Display(name="Research Subjects")
+    table.annotations[Display.tag] = display.to_dict()
 
     # Configure visible columns
     vc = VisibleColumns()
     vc.compact(["RID", "Name", "Status"])
     vc.detailed(["RID", "Name", "Status", "Description", "Created"])
-    handle.set_annotation(vc)
+    table.annotations[VisibleColumns.tag] = vc.to_dict()
 
     # Set row name pattern
     td = TableDisplay()
     td.row_name("{{{Name}}} ({{{RID}}})")
-    handle.set_annotation(td)
+    table.annotations[TableDisplay.tag] = td.to_dict()
+
+    # Push every staged annotation change to the catalog
+    ml.apply_annotations()
 
 Available Builders
 ------------------
@@ -353,10 +361,14 @@ class Display(AnnotationBuilder):
         ValueError: If both name and markdown_name are provided
 
     Example:
-        Basic display name::
+        Build the annotation, then stage it on the table and push to
+        the catalog (the apply path is the same for every builder —
+        ``table.annotations[Builder.tag] = builder.to_dict()`` followed
+        by ``ml.apply_annotations()``)::
 
             >>> display = Display(name="Research Subjects")  # doctest: +SKIP
-            >>> handle.set_annotation(display)
+            >>> table.annotations[Display.tag] = display.to_dict()  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
 
         With description/tooltip::
 
@@ -759,13 +771,16 @@ class VisibleColumns(AnnotationBuilder):
     - ``*``: Default for all contexts
 
     Example:
-        Basic column lists for different contexts::
+        Basic column lists for different contexts, then stage and apply
+        (same ``table.annotations[VisibleColumns.tag] = vc.to_dict();
+        ml.apply_annotations()`` path as every builder)::
 
-            >>> vc = VisibleColumns()
-            >>> vc.compact(["RID", "Name", "Status"])
-            >>> vc.detailed(["RID", "Name", "Status", "Description", "Created"])
-            >>> vc.entry(["Name", "Status", "Description"])
-            >>> handle.set_annotation(vc)
+            >>> vc = VisibleColumns()  # doctest: +SKIP
+            >>> vc.compact(["RID", "Name", "Status"])  # doctest: +SKIP
+            >>> vc.detailed(["RID", "Name", "Status", "Description", "Created"])  # doctest: +SKIP
+            >>> vc.entry(["Name", "Status", "Description"])  # doctest: +SKIP
+            >>> table.annotations[VisibleColumns.tag] = vc.to_dict()  # doctest: +SKIP
+            >>> ml.apply_annotations()  # doctest: +SKIP
 
         Method chaining::
 

@@ -1617,9 +1617,10 @@ class Dataset:
             DerivaMLException: If dataset_rid is invalid.
 
         Example:
-            >>> members = ml.list_dataset_members("1-abc123", recurse=True)  # doctest: +SKIP
+            >>> dataset = ml.lookup_dataset("1-abc123")  # doctest: +SKIP
+            >>> members = dataset.list_dataset_members(recurse=True)  # doctest: +SKIP
             >>> for type_name, records in members.items():  # doctest: +SKIP
-            ...     print(f"{type_name}: {len(records)} records")
+            ...     print(f"{type_name}: {len(records)} records")  # doctest: +SKIP
         """
         # Initialize visited set for recursion guard
         if _visited is None:
