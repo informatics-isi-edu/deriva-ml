@@ -99,7 +99,7 @@ Named multiruns create a parent-child execution structure in the catalog:
 - **Parent execution**: Contains the markdown description and links to all children
 - **Child executions**: One per parameter combination, each with full provenance
 
-Use `list_parent_executions()` and `list_nested_executions()` to navigate this
+Use `list_execution_parents()` and `list_execution_children()` to navigate this
 hierarchy.
 
 ## Code Provenance

@@ -8,7 +8,9 @@ computational workflow in a Deriva catalog. Key responsibilities:
   kernel path, or local file path) when ``url`` is not provided explicitly.
 - Supports catalog write-back for ``description`` and ``workflow_type`` when
   the workflow is bound to a live catalog instance.
-- Deduplicates workflows by checksum via ``DerivaML.add_workflow()``.
+- Deduplicates workflows by checksum on insert (the private
+  ``DerivaML._add_workflow()`` dedup path; create workflows via the
+  public ``DerivaML.create_workflow()``).
 """
 
 from __future__ import annotations
@@ -368,11 +370,17 @@ class Workflow(BaseModel):
 
         - ``url`` — set to the resolved source URL of the calling
           script/notebook. Resolution prefers a Docker image
-          identifier (when ``DERIVA_MCP_IN_DOCKER=true``), then falls
-          back to git remote + commit + path, then to a file:// path.
+          identifier (when ``DERIVA_MCP_IN_DOCKER=true``), otherwise a
+          GitHub ``/blob/<commit>/<path>`` URL from the local git
+          checkout. When the script is not in a git repo and
+          ``allow_dirty=True``, ``url`` is left empty (``""``) — there
+          is no ``file://`` fallback.
         - ``checksum`` — set to the git commit SHA of the calling
           script (or the Docker image digest when running in Docker).
-        - ``version`` — set from ``DERIVA_MCP_VERSION`` when present.
+        - ``version`` — in the local-git path (the common case) it is
+          set from ``get_dynamic_version()`` (the version derived from
+          the local git checkout); in the Docker path it is set from
+          ``DERIVA_MCP_VERSION`` instead.
 
         Caller-supplied values are never overwritten — this is a
         "fill in the blanks" validator, not a re-derivation.

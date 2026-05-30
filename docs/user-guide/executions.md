@@ -634,7 +634,7 @@ inputs, it appears once in the tree and subsequent encounters are marked
 produced this Execution's consumed inputs). It does **not** walk
 `Execution_Execution` (orchestration parent-child links — the "this Execution called
 that Execution" relationship). For the orchestration view, use
-`list_nested_executions` instead. The two views answer different questions and are
+`list_execution_children` instead. The two views answer different questions and are
 kept separate by design (see ADR-0001 in `docs/adr/`).
 
 **No producer.** If the artifact has no producing-execution link (manually-inserted
