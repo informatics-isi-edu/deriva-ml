@@ -93,7 +93,7 @@ def test_validate_execution_configuration_live_full(test_ml):
         workflow_type="Validate Test",
         description="composite smoke",
     )
-    wf = wf.model_copy(update={"rid": test_ml._add_workflow(wf)})
+    wf = wf.model_copy(update={"workflow_rid": test_ml._add_workflow(wf)})
     config = ExecutionConfiguration(
         workflow=wf,
         datasets=[DatasetSpec(rid=rid, version=version)],
@@ -157,10 +157,10 @@ def test_validate_execution_configuration_live_assets(test_ml):
         workflow_type="Validate Test",
         description="asset smoke",
     )
-    wf = wf.model_copy(update={"rid": test_ml._add_workflow(wf)})
+    wf = wf.model_copy(update={"workflow_rid": test_ml._add_workflow(wf)})
     config = ExecutionConfiguration(
         workflow=wf,
-        assets=[AssetSpec(rid=wf.rid)],
+        assets=[AssetSpec(rid=wf.workflow_rid)],
     )
     report = test_ml.validate_execution_configuration(config)
     assert report.all_valid is False

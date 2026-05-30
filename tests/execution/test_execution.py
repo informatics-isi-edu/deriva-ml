@@ -238,7 +238,7 @@ class TestWorkflow:
         workflows = list(ml.find_workflows())
         assert len(workflows) >= 1
         # Verify our workflow RID is in the catalog
-        assert workflow_rid in [w.rid for w in workflows]
+        assert workflow_rid in [w.workflow_rid for w in workflows]
 
     def test_workflow_multiple_types(self, test_ml):
         """Test creating a workflow with multiple types."""

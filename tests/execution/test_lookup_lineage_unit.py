@@ -51,7 +51,7 @@ class _StubResolved:
 
 @dataclass
 class _StubWorkflow:
-    rid: str
+    workflow_rid: str
     name: str
 
 
@@ -246,7 +246,7 @@ def test_lineage_dataset_one_level_chain():
     ml.add_execution(
         "2-EXAA",
         description="train",
-        workflow=_StubWorkflow(rid="3-WFAB", name="trainer"),
+        workflow=_StubWorkflow(workflow_rid="3-WFAB", name="trainer"),
         input_datasets=[_StubDataset("1-DSAA", "root data", "0.1.0")],
     )
     ml.add_dataset("1-DSAB", description="trained set", producer="2-EXAA")

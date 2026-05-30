@@ -193,7 +193,7 @@ def feature_symmetry_fixture(catalog_manager, tmp_path_factory):
         f"Expected exactly one workflow after test catalog setup (workflow dedup by "
         f"checksum), but found {len(all_workflows)}: {[w.name for w in all_workflows]}"
     )
-    feature_workflow_rid = all_workflows[0].rid
+    feature_workflow_rid = all_workflows[0].workflow_rid
     assert feature_workflow_rid, "Workflow must have a RID"
 
     # Create a new dataset that contains ALL image RIDs so that the dataset-scoped

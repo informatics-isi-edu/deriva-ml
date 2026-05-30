@@ -151,7 +151,7 @@ def _make_workflow(rid: str = "2-WFAA") -> Workflow:
         name="test wf",
         url="https://example.org/wf.py",
         workflow_type="python_script",
-        rid=rid,
+        workflow_rid=rid,
         checksum="abc123",
     )
 

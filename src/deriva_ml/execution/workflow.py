@@ -109,7 +109,15 @@ class Workflow(BaseModel):
             >>> workflow.description = "New description"  # Raises DerivaMLException
     """
 
-    model_config = VALIDATION_CONFIG
+    # extra="forbid" guards against the silent kwarg-drop that masked the
+    # rid -> workflow_rid rename regression (#226): the renamed field was
+    # passed under its old name, Pydantic dropped the unknown kwarg without
+    # error, and every find_workflows()/lookup_workflow() result silently
+    # carried workflow_rid=None. Forbidding extra fields turns that class of
+    # mistake into a loud ValidationError at construction time. Scoped to
+    # Workflow only (mirrors the existing STRICT_VALIDATION_CONFIG idiom in
+    # core/validation.py) rather than widening the shared VALIDATION_CONFIG.
+    model_config = {**VALIDATION_CONFIG, "extra": "forbid"}
 
     name: str
     workflow_type: str | list[str]

@@ -61,7 +61,7 @@ def test_find_workflows_sort_true_returns_newest_first(catalog_with_workflows):
     """
     ml = catalog_with_workflows
     workflows = list(ml.find_workflows(sort=True))
-    rids = [w.rid for w in workflows]
+    rids = [w.workflow_rid for w in workflows]
     assert rids == sorted(rids, reverse=True), f"workflows should be newest-first (RID-desc proxy); got rids={rids}"
 
 
@@ -74,7 +74,7 @@ def test_find_workflows_sort_callable_applies_user_keys(catalog_with_workflows):
         return path.RID
 
     workflows = list(ml.find_workflows(sort=by_rid_asc))
-    rids = [w.rid for w in workflows]
+    rids = [w.workflow_rid for w in workflows]
     assert rids == sorted(rids), f"workflows should be RID-ascending; got {rids}"
 
 
