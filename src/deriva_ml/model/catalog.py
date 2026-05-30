@@ -481,7 +481,7 @@ class DerivaModel:
         table = self.name_to_table(table)
         return table.is_association(unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity)
 
-    def find_association(self, table1: TableInput, table2: TableInput) -> tuple[Table, Column, Column]:
+    def find_association(self, table1: TableInput, table2: TableInput) -> tuple[Table, str, str]:
         """Return the unique association table linking ``table1`` and ``table2``.
 
         Searches all associations on ``table1`` for one whose other-side
@@ -495,8 +495,11 @@ class DerivaModel:
 
         Returns:
             ``(assoc_table, table1_link_column, table2_link_column)``
-            — the association table itself plus the two FK columns on it
-            (one referencing ``table1``, one referencing ``table2``).
+            — the association :class:`Table` itself plus the *names* (as
+            ``str``) of the two FK columns on it (one referencing
+            ``table1``, one referencing ``table2``). The column names are
+            returned as strings because every caller uses them directly
+            as ``datapath`` ``.columns[...]`` keys or insert-row dict keys.
 
         Raises:
             NoAssociationException: If no association table connects the
