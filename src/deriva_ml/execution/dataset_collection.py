@@ -12,7 +12,7 @@ Why not :class:`collections.abc.Mapping`?
     ``__iter__`` yields keys, and any caller that types a
     parameter ``Mapping[str, DatasetBag]`` then writes
     ``for k in m: m[k]`` would break. The audit at
-    ``docs/design/deriva-ml-audit-2026-05-phase3-execution.md``
+    ``docs/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-execution.md``
     §4.7 flagged the violation. We chose the value-iteration
     ergonomics (overwhelmingly what callers want), so we drop
     the ``Mapping`` advertisement instead of restoring the

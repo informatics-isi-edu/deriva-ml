@@ -67,6 +67,14 @@ class Workflow(BaseModel):
         workflow_rid (RID | None): Resource Identifier if registered in catalog.
         checksum (str | None): Git hash of workflow source code.
         is_notebook (bool): Whether workflow is a Jupyter notebook.
+        git_root (Path | None): Filesystem root of the git checkout the source
+            was resolved from, when known. Used to scope dynamic-version
+            resolution; ``None`` when no git checkout was detected.
+        allow_dirty (bool): When True, uncommitted changes in the source's git
+            worktree are downgraded from a hard error to a warning (set by the
+            ``--allow-dirty`` CLI flag, dry-run mode, or
+            ``DERIVA_ML_ALLOW_DIRTY``). Defaults to False, which keeps the
+            clean-checkout precondition that makes provenance reproducible.
 
     Note:
         The recommended way to create a Workflow is via :meth:`DerivaML.create_workflow()

@@ -179,6 +179,12 @@ class DerivaModel:
         Returns:
             A ``DerivaModel`` wrapping a deriva-py ``Model``
             reconstructed from the dict.
+
+        Example:
+            >>> cached = schema_cache.load(hostname, catalog_id)  # doctest: +SKIP
+            >>> model = DerivaModel.from_cached(  # doctest: +SKIP
+            ...     cached, catalog=catalog_stub, ml_schema="deriva-ml"
+            ... )
         """
         # Model.__init__(catalog, model_doc) stores catalog as
         # self._catalog and exposes it via the .catalog property;
@@ -199,6 +205,12 @@ class DerivaModel:
 
         Returns:
             True if the schema is a system or ML schema.
+
+        Example:
+            >>> model.is_system_schema("public")  # doctest: +SKIP
+            True
+            >>> model.is_system_schema("my_domain")  # doctest: +SKIP
+            False
         """
         return _is_system_schema(schema_name, self.ml_schema)
 
@@ -210,6 +222,12 @@ class DerivaModel:
 
         Returns:
             True if the schema is a domain schema.
+
+        Example:
+            >>> model.is_domain_schema("my_domain")  # doctest: +SKIP
+            True
+            >>> model.is_domain_schema("deriva-ml")  # doctest: +SKIP
+            False
         """
         return schema_name in self.domain_schemas
 
@@ -231,11 +249,42 @@ class DerivaModel:
         return self.default_schema
 
     def refresh_model(self) -> None:
+        """Re-fetch the catalog model and replace ``self.model`` in place.
+
+        Calls ``catalog.getCatalogModel()`` and rebinds the result to
+        ``self.model``. Use this after a schema change (new table, column,
+        or annotation) so subsequent introspection sees the current model.
+
+        Caching note: the asset-execution-table cache
+        (``_asset_execution_tables_cache``) is keyed on the *identity* of
+        ``self.model``, so swapping the model out automatically invalidates it
+        — the next call recomputes. The denormalize-planner cache
+        (``_planner_cache``), if already built, keeps a reference to the
+        previous model; if you depend on the planner reflecting a just-applied
+        schema change, rebuild the instance rather than relying on
+        ``refresh_model`` alone.
+
+        Returns:
+            None. Mutates ``self.model`` as a side effect.
+
+        Example:
+            >>> ml.create_vocabulary("Severity", "Lesion grade")  # doctest: +SKIP
+            >>> ml.refresh_model()  # pick up the new table  # doctest: +SKIP
+        """
         self.model = self.catalog.getCatalogModel()
 
     @property
     def chaise_config(self) -> dict[str, Any]:
-        """Return the chaise configuration."""
+        """Return the chaise configuration.
+
+        Returns:
+            The catalog-level Chaise display configuration annotation as a dict.
+
+        Example:
+            >>> cfg = model.chaise_config  # doctest: +SKIP
+            >>> "navbarBrandText" in cfg  # doctest: +SKIP
+            True
+        """
         return self.model.chaise_config
 
     def get_schema_description(self, include_system_columns: bool = False) -> dict[str, Any]:
@@ -271,6 +320,13 @@ class DerivaModel:
                     }
                 }
             }
+
+        Example:
+            >>> desc = model.get_schema_description()  # doctest: +SKIP
+            >>> sorted(desc["schemas"])  # doctest: +SKIP
+            ['deriva-ml', 'my_domain']
+            >>> desc["schemas"]["my_domain"]["tables"]["Image"]["is_asset"]  # doctest: +SKIP
+            True
         """
         system_columns = {"RID", "RCT", "RMT", "RCB", "RMB"}
         result = {
@@ -379,6 +435,11 @@ class DerivaModel:
 
         Raises:
           DerivaMLTableNotFound: If the table doesn't exist in any searchable schema.
+
+        Example:
+            >>> image = model.name_to_table("Image")  # doctest: +SKIP
+            >>> image.name  # doctest: +SKIP
+            'Image'
         """
         if isinstance(table, Table):
             return table
@@ -415,6 +476,12 @@ class DerivaModel:
         Raises:
             DerivaMLTableNotFound: If the table doesn't exist in any searchable
                 schema (raised by :meth:`name_to_table`).
+
+        Example:
+            >>> model.is_vocabulary("Image_Class")  # doctest: +SKIP
+            True
+            >>> model.is_vocabulary("Image")  # doctest: +SKIP
+            False
         """
         table = self.name_to_table(table)
         return table.is_vocabulary()
@@ -437,6 +504,10 @@ class DerivaModel:
         Raises:
             DerivaMLTableNotFound: If the table doesn't exist (raised by
                 :meth:`name_to_table`).
+
+        Example:
+            >>> model.vocab_columns("Image_Class")  # doctest: +SKIP
+            {'Name': 'Name', 'ID': 'ID', 'URI': 'URI', 'Description': 'Description', 'Synonyms': 'Synonyms'}
         """
         table = self.name_to_table(table)
         col_map = {c.name.upper(): c.name for c in table.columns}
@@ -478,6 +549,12 @@ class DerivaModel:
         Raises:
             DerivaMLTableNotFound: If ``table`` doesn't exist in any searchable
                 schema (raised by :meth:`name_to_table`).
+
+        Example:
+            >>> bool(model.is_association("Dataset_Image"))  # doctest: +SKIP
+            True
+            >>> bool(model.is_association("Image"))  # doctest: +SKIP
+            False
         """
         table = self.name_to_table(table)
         return table.is_association(unqualified=unqualified, pure=pure, min_arity=min_arity, max_arity=max_arity)
@@ -511,6 +588,11 @@ class DerivaModel:
             AmbiguousAssociationException: If multiple association tables
                 connect the two tables. The caller must disambiguate by
                 naming the desired association table directly.
+
+        Example:
+            >>> assoc, c1, c2 = model.find_association("Dataset", "Image")  # doctest: +SKIP
+            >>> assoc.name, c1, c2  # doctest: +SKIP
+            ('Dataset_Image', 'Dataset', 'Image')
         """
         table1 = self.name_to_table(table1)
         table2 = self.name_to_table(table2)
@@ -546,6 +628,12 @@ class DerivaModel:
         Raises:
             DerivaMLTableNotFound: If ``table`` doesn't exist in any searchable
                 schema (raised by :meth:`name_to_table`).
+
+        Example:
+            >>> model.is_asset("Image")  # doctest: +SKIP
+            True
+            >>> model.is_asset("Subject")  # doctest: +SKIP
+            False
         """
         table = self.name_to_table(table)
         return table.is_asset()
@@ -619,11 +707,28 @@ class DerivaModel:
         return result
 
     def find_assets(self) -> list[Table]:
-        """Return the list of asset tables in the current model."""
+        """Return the list of asset tables in the current model.
+
+        Returns:
+            All tables across every schema that satisfy :meth:`is_asset`.
+
+        Example:
+            >>> [t.name for t in model.find_assets()]  # doctest: +SKIP
+            ['Image', 'Execution_Asset']
+        """
         return [t for s in self.model.schemas.values() for t in s.tables.values() if self.is_asset(t)]
 
     def find_vocabularies(self) -> list[Table]:
-        """Return a list of all controlled vocabulary tables in domain and ML schemas."""
+        """Return a list of all controlled vocabulary tables in domain and ML schemas.
+
+        Returns:
+            All tables in the domain and ML schemas that satisfy
+            :meth:`is_vocabulary`.
+
+        Example:
+            >>> [t.name for t in model.find_vocabularies()]  # doctest: +SKIP
+            ['Image_Class', 'Workflow_Type']
+        """
         tables = []
         for schema_name in [*self.domain_schemas, self.ml_schema]:
             schema = self.model.schemas.get(schema_name)
@@ -644,6 +749,11 @@ class DerivaModel:
 
         Returns:
             An iterable of Feature instances describing the features.
+
+        Example:
+            >>> [f.feature_name for f in model.find_features("Image")]  # doctest: +SKIP
+            ['BoundingBox', 'Quality']
+            >>> all_features = list(model.find_features())  # doctest: +SKIP
         """
 
         def is_feature(a: FindAssociationResult) -> bool:
@@ -753,6 +863,11 @@ class DerivaModel:
             DerivaMLTableNotFound: If ``table`` doesn't exist.
             DerivaMLFeatureNotFound: If no feature with
                 ``feature_name`` is defined on ``table``.
+
+        Example:
+            >>> feature = model.lookup_feature("Image", "Quality")  # doctest: +SKIP
+            >>> feature.feature_name  # doctest: +SKIP
+            'Quality'
         """
         table = self.name_to_table(table)
         try:
@@ -781,6 +896,10 @@ class DerivaModel:
             DerivaMLTableTypeError: If ``table`` is not an asset table.
             DerivaMLTableNotFound: If ``table`` doesn't exist (raised by
                 :meth:`name_to_table`).
+
+        Example:
+            >>> sorted(model.asset_metadata("Image"))  # doctest: +SKIP
+            ['Description', 'Image_Class']
         """
         table = self.name_to_table(table)
 
@@ -804,6 +923,10 @@ class DerivaModel:
 
         Raises:
             DerivaMLTableTypeError: If ``table`` is not an asset table.
+
+        Example:
+            >>> [c.name for c in model.asset_metadata_columns("Image")]  # doctest: +SKIP
+            ['Description', 'Image_Class']
         """
         table = self.name_to_table(table)
         if not self.is_asset(table):
@@ -867,6 +990,10 @@ class DerivaModel:
         Raises:
             DerivaMLReadOnlyError: If this DerivaML instance is in offline
                 mode (``self.catalog`` is a ``CatalogStub``).
+
+        Example:
+            >>> table.annotations[Display.tag] = display.to_dict()  # doctest: +SKIP
+            >>> model.apply()  # commit the staged annotation  # doctest: +SKIP
         """
         if isinstance(self.catalog, CatalogStub):
             raise DerivaMLReadOnlyError(
@@ -895,6 +1022,12 @@ class DerivaModel:
         Raises:
             DerivaMLException: If ``rid`` doesn't resolve in the catalog
                 at all (typically an invalid or fabricated RID).
+
+        Example:
+            >>> model.is_dataset_rid("1-abc123")  # doctest: +SKIP
+            True
+            >>> model.is_dataset_rid("1-image01")  # an Image RID  # doctest: +SKIP
+            False
         """
         try:
             rid_info = self.model.catalog.resolve_rid(rid, self.model)
@@ -920,6 +1053,10 @@ class DerivaModel:
         Returns:
             A list of :class:`~deriva.core.ermrest_model.Table`
             objects — one per valid member type.
+
+        Example:
+            >>> [t.name for t in model.list_dataset_element_types()]  # doctest: +SKIP
+            ['Image', 'Subject', 'Dataset']
         """
 
         dataset_table = self.name_to_table("Dataset")
@@ -985,6 +1122,14 @@ class DerivaModel:
 
         Note: @validate_call removed because TableDefinition is now a dataclass from
         deriva.core.typed and Pydantic validation doesn't work well with dataclass fields.
+
+        Example:
+            >>> from deriva_ml.core.definitions import TableDefinition, ColumnDefinition  # doctest: +SKIP
+            >>> table_def = TableDefinition(  # doctest: +SKIP
+            ...     name="Observation",
+            ...     column_defs=[ColumnDefinition(name="Note", type="text")],
+            ... )
+            >>> new_table = model.create_table(table_def, schema="my_domain")  # doctest: +SKIP
         """
         schema = schema or self._require_default_schema()
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts

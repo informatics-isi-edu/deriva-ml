@@ -432,13 +432,13 @@ class DatasetLike(Protocol):
             via: Optional path-only intermediates.
 
         Returns:
-            12-key planning dict (see
+            13-key planning dict (see
             :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe`
             for the detailed shape): ``row_per``, ``row_per_source``,
             ``row_per_candidates``, ``columns``, ``include_tables``,
             ``via``, ``join_path``, ``transparent_intermediates``,
             ``ambiguities``, ``estimated_row_count``, ``anchors``,
-            ``source``.
+            ``source``, ``warnings``.
 
         See Also:
             get_denormalized_as_dataframe: Execute the plan and return a

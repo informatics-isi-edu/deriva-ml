@@ -68,7 +68,8 @@ class Denormalizer:
       (see the method's own docstring and audit finding SC-07).
     - :meth:`columns` — preview ``(column_name, column_type)`` pairs
       without fetching data (model-only).
-    - :meth:`describe` — dry-run: returns a 12-key plan dict (spec §5);
+    - :meth:`describe` — dry-run: returns a 13-key plan dict
+      (``docs/user-guide/denormalization.md`` §8.3.2);
       reports ambiguities rather than raising.
     - :meth:`list_paths` — describe the reachable FK graph from the
       anchor set (useful for discovering what can go into
@@ -813,7 +814,8 @@ class Denormalizer:
             via: Optional path-only intermediates.
 
         Returns:
-            A dict with these 12 keys (see design spec §5):
+            A dict with these 13 keys (see
+            ``docs/user-guide/denormalization.md`` §8.3.2):
 
             - ``row_per``: resolved leaf table name, or ``None`` if the
               planner couldn't resolve one (e.g., multi-leaf or bad

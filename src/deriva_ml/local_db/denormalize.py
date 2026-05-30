@@ -109,7 +109,7 @@ class DenormalizeResult:
             between the start of this denormalize call and the *earliest*
             catalog fetch that participated in the SQL JOIN that built this
             result. ``None`` when no live catalog fetch happened
-            (``source='bag'`` / ``source='local'`` / ``source='slice'``, or
+            (``source='local'`` — including bags — or ``source='slice'``, or
             ``source='catalog'`` with all keys already deduped against
             cache — though in practice the dataset-row fetch always
             stamps the ledger). A user re-running denormalize in a

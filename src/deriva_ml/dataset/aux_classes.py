@@ -208,11 +208,17 @@ class DatasetHistory(BaseModel):
     Class representing a dataset history.
 
     Attributes:
-        dataset_version (DatasetVersion): A DatasetVersion object which captures the semantic versioning of the dataset.
+        dataset_version (DatasetVersion): A DatasetVersion object which captures the PEP 440 version of the dataset.
         dataset_rid (RID): The RID of the dataset.
         version_rid (RID): The RID of the version record for the dataset in the Dataset_Version table.
+        execution_rid (RID | None): RID of the execution that created this
+            version, or None when the version was created outside an execution.
+        description (str | None): Human-readable description recorded with this
+            version (empty string when none was supplied).
         minid (str): The URL that represents the handle of the dataset bag.  This will be None if a MINID has not
                      been created yet.
+        spec_hash (str | None): Hash of the dataset spec used to build this
+            version, or None when not recorded. Used to detect cache hits.
         snapshot (str): Catalog snapshot ID of when the version record was created.
     """
 
@@ -241,7 +247,7 @@ class DatasetMinid(BaseModel):
     """Represent information about a MINID that refers to a dataset
 
     Attributes:
-        dataset_version (DatasetVersion): A DatasetVersion object which captures the semantic versioning of the dataset.
+        dataset_version (DatasetVersion): A DatasetVersion object which captures the PEP 440 version of the dataset.
         metadata (dict): A dictionary containing metadata from the MINID landing page.
         minid (str): The URL that represents the handle of the MINID associated with the dataset.
         bag_url (str): The URL to the dataset bag
@@ -309,13 +315,17 @@ class DatasetSpec(BaseModel):
     Attributes:
         rid (RID): A dataset_table RID
         materialize (bool): If False do not materialize datasets, only download table data, no assets.  Defaults to True
-        version (DatasetVersion): The version of the dataset.  Should follow semantic versioning.
+        version (DatasetVersion): The version of the dataset.  Should follow PEP 440 (see ADR-0004).
+        description (str): Optional human-readable note describing this spec's
+            role in the configuration. Defaults to the empty string.
         exclude_tables (set[str] | None): Optional set of table names to exclude from FK path
             traversal during bag export. Tables in this set will not be visited, pruning branches
             of the FK graph. Useful for avoiding query timeouts on large tables.
         timeout (tuple[int, int] | None): Optional (connect_timeout, read_timeout) in seconds
             for network requests during bag download. Defaults to (10, 610) if not specified.
             Increase read_timeout for large datasets with deep FK joins.
+        fetch_concurrency (int): Number of concurrent fetch threads for asset
+            download during materialization. Defaults to 8.
     """
 
     rid: RID

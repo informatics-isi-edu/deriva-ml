@@ -669,9 +669,10 @@ authoritative; file an issue against the user-facing prose.
 This section is the single design reference for engineers
 working on `deriva_ml.local_db.denormalize`,
 `local_db.denormalizer`, `local_db.paged_fetcher`, and
-`model.denormalize_planner`. Audit findings are referenced
-inline using their SC-NN / TC-NN / RB-NN identifiers from
-`docs/audits/2026-05-26-denormalize-audit.md`.
+`model.denormalize_planner`. Findings are tagged inline with
+stable SC-NN / TC-NN / RB-NN identifiers used as internal
+labels within this document (the original standalone audit
+report they came from is no longer maintained separately).
 
 ---
 

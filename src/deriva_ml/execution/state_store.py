@@ -9,7 +9,7 @@ also defined ``execution_state__pending_rows`` and
 ``execution_state__directory_rules`` tables for an upload-engine
 that was superseded by the bag-commit path before its writer
 shipped. That surface was retired in the Phase 3 cleanup
-(audit ``docs/design/deriva-ml-audit-2026-05-phase3-execution.md``
+(audit ``docs/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase3-execution.md``
 §1.5). Three reader methods —
 :meth:`ExecutionStateStore.count_pending_rows`,
 :meth:`~ExecutionStateStore.count_pending_by_kind`,
