@@ -63,8 +63,8 @@ Example:
         result = split_dataset(
             ml, "28D0", exe,
             test_size=0.2,
-            stratify_by_column="Image_Classification.Image_Class",
-            include_tables=["Image", "Image_Classification"],
+            stratify_by_column="Image_Class.Name",
+            include_tables=["Image", "Image_Class"],
         )
 
     Custom selection function::
@@ -153,8 +153,8 @@ class SelectionFunction(Protocol):
 
     Args:
         df: Denormalized DataFrame from ``dataset.get_denormalized_as_dataframe()``.
-            Columns are prefixed with table names (e.g., ``Image_RID``,
-            ``Image_Classification_Image_Class``).
+            Columns use dot notation ``Table.column`` (e.g., ``Image.RID``,
+            ``Image_Class.Name``) — see :func:`denormalize_column_name`.
         partition_sizes: Dict mapping partition names (e.g., "Training",
             "Testing", "Validation") to the number of records for each.
         seed: Random seed for reproducibility.
@@ -164,7 +164,7 @@ class SelectionFunction(Protocol):
         into the DataFrame.
 
     Example:
-        >>> def balanced_selector(df, partition_sizes, seed):
+        >>> def balanced_selector(df, partition_sizes, seed):  # doctest: +SKIP
         ...     rng = np.random.default_rng(seed)
         ...     # ... balance classes ...
         ...     return {"Training": train_indices, "Testing": test_indices}
@@ -225,7 +225,7 @@ def stratified_split(
 
     Args:
         stratify_column: Column name in the denormalized DataFrame to
-            stratify by (e.g., ``Image_Classification_Image_Class``).
+            stratify by, in dot notation (e.g., ``Image_Class.Name``).
         missing: Policy for handling null/NaN values in the stratify column.
             - ``"error"`` (default): Raise ``ValueError`` if any values
               are missing. Reports the count and percentage of nulls.
@@ -244,12 +244,12 @@ def stratified_split(
             contains null values.
 
     Example:
-        >>> selector = stratified_split("Image_Classification_Image_Class")
-        >>> partitions = selector(df, {"Training": 400, "Testing": 100}, seed=42)
+        >>> selector = stratified_split("Image_Class.Name")  # doctest: +SKIP
+        >>> partitions = selector(df, {"Training": 400, "Testing": 100}, seed=42)  # doctest: +SKIP
 
         >>> # Drop rows with missing labels
-        >>> selector = stratified_split("Diagnosis_Label", missing="drop")
-        >>> partitions = selector(df, {"Training": 300, "Testing": 100}, seed=42)
+        >>> selector = stratified_split("Image_Class.Name", missing="drop")  # doctest: +SKIP
+        >>> partitions = selector(df, {"Training": 300, "Testing": 100}, seed=42)  # doctest: +SKIP
     """
     if missing not in ("error", "drop", "include"):
         raise ValueError(f"missing must be 'error', 'drop', or 'include', got '{missing}'")
@@ -549,7 +549,7 @@ def _validate_split_inputs(
         raise ValueError(
             "include_tables is required when using stratify_by_column. "
             "Specify the tables needed for denormalization "
-            "(e.g., include_tables=['Image', 'Image_Classification'])."
+            "(e.g., include_tables=['Image', 'Image_Class'])."
         )
 
     if selection_fn and not include_tables:
@@ -1185,7 +1185,7 @@ def split_dataset(
         seed: Random seed for reproducibility. Default: 42.
         stratify_by_column: Column name for stratified splitting.
             Must be a column in the denormalized DataFrame using dot notation
-            (e.g., ``Image_Classification.Image_Class``). Use
+            (e.g., ``Image_Class.Name``). Use
             :meth:`Dataset.list_denormalized_columns` to discover available columns.
             Mutually exclusive with ``selection_fn``.
         stratify_missing: Policy for null values in the stratify column.
@@ -1310,20 +1310,32 @@ def split_dataset(
             parameters conflict.
 
     Example:
-        Simple random 80/20 split::
+        ``split_dataset`` always runs inside an Execution the caller has
+        already opened — the ``execution`` argument is required. Every
+        example below assumes ``exe`` is the live execution from::
 
             from deriva_ml import DerivaML
             from deriva_ml.dataset.split import split_dataset
+            from deriva_ml.execution import ExecutionConfiguration
 
             ml = DerivaML("localhost", "9")
-            result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
+            workflow = ml.create_workflow(
+                name="My splitting script",
+                workflow_type="Dataset_Split",
+            )
+            config = ExecutionConfiguration(workflow=workflow)
+
+        Simple random 80/20 split::
+
+            with ml.create_execution(config) as exe:
+                result = split_dataset(ml, "28D0", exe, test_size=0.2, seed=42)
             print(f"Training: {result.training.rid} ({result.training.count} samples)")
             print(f"Testing:  {result.testing.rid} ({result.testing.count} samples)")
 
         Three-way train/val/test split::
 
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=0.2,
                 val_size=0.1,
                 seed=42,
@@ -1333,7 +1345,7 @@ def split_dataset(
         Fixed-count split with labeled types::
 
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=100,
                 train_size=400,
                 seed=42,
@@ -1355,7 +1367,7 @@ def split_dataset(
             # ``row_per="Image"``. Stratify on the dotted column
             # against the vocab table.
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=0.2,
                 stratify_by_column="Image_Class.Name",
                 include_tables=["Image", "Image_Class"],
@@ -1383,7 +1395,7 @@ def split_dataset(
             # the join when the shorthand is used with an explicit
             # feature-assoc ``row_per``).
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=0.2,
                 stratify_by_column="Execution_Image_Image_Classification.Image_Class",
                 include_tables=["Image", "Image_Classification"],
@@ -1407,7 +1419,7 @@ def split_dataset(
         Stratified split dropping rows with missing labels::
 
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=0.2,
                 stratify_by_column="Image_Class.Name",
                 stratify_missing="drop",
@@ -1422,7 +1434,7 @@ def split_dataset(
 
             def balanced_selector(df, partition_sizes, seed):
                 rng = np.random.default_rng(seed)
-                label_col = "Image_Class_Name"
+                label_col = "Image_Class.Name"
                 classes = df[label_col].unique()
                 result = {name: [] for name in partition_sizes}
                 for cls in classes:
@@ -1436,7 +1448,7 @@ def split_dataset(
                 return {name: np.array(idx) for name, idx in result.items()}
 
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=100,
                 selection_fn=balanced_selector,
                 include_tables=["Image", "Image_Class"],
@@ -1447,7 +1459,7 @@ def split_dataset(
         Dry run to preview the split plan without modifying the catalog::
 
             result = split_dataset(
-                ml, "28D0",
+                ml, "28D0", exe,
                 test_size=0.2,
                 dry_run=True,
             )
@@ -1458,7 +1470,7 @@ def split_dataset(
 
             from deriva_ml.dataset import DatasetSpecConfig
 
-            result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
+            result = split_dataset(ml, "28D0", exe, test_size=0.2, seed=42)
             split_config = DatasetSpecConfig(
                 rid=result.split.rid,
                 version=result.split.version,
@@ -1467,7 +1479,7 @@ def split_dataset(
         Train directly from the split partitions (composition with
         framework adapters)::
 
-            result = split_dataset(ml, "28D0", test_size=0.2, seed=42)
+            result = split_dataset(ml, "28D0", exe, test_size=0.2, seed=42)
             train_bag = ml.lookup_dataset(result.training.rid).download_dataset_bag(
                 version=result.training.version
             )
@@ -1641,11 +1653,13 @@ def main() -> int:
             deriva-ml-split-dataset --hostname localhost --catalog-id 9 \\
                 --dataset-rid 28D0 --val-size 0.1
 
-            # Stratified split by class label
+            # Stratified split by class label (stratify on the vocab
+            # table's Name column, reached transparently through the
+            # Image_Classification feature)
             deriva-ml-split-dataset --hostname localhost --catalog-id 9 \\
                 --dataset-rid 28D0 \\
-                --stratify-by-column Image_Classification_Image_Class \\
-                --include-tables Image,Image_Classification
+                --stratify-by-column Image_Class.Name \\
+                --include-tables Image,Image_Class
 
             # Fixed-count split
             deriva-ml-split-dataset --hostname localhost --catalog-id 9 \\
@@ -1715,8 +1729,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--stratify-by-column",
-        help="Column name in denormalized DataFrame for stratified splitting "
-        "(e.g., Image_Classification_Image_Class). Requires --include-tables.",
+        help="Column name in denormalized DataFrame (dot notation) for stratified "
+        "splitting (e.g., Image_Class.Name). Requires --include-tables.",
     )
     parser.add_argument(
         "--stratify-missing",
@@ -1734,8 +1748,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--include-tables",
-        help="Comma-separated tables for denormalization "
-        "(e.g., Image,Image_Classification). Required for stratified splitting.",
+        help="Comma-separated tables for denormalization (e.g., Image,Image_Class). Required for stratified splitting.",
     )
     parser.add_argument(
         "--row-per",
