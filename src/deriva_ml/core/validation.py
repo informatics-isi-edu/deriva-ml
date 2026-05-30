@@ -373,26 +373,21 @@ def validate_execution_config(
     It catches configuration errors (typos in RIDs, wrong catalog, missing versions)
     early with clear messages.
 
-    Parameters
-    ----------
-    ml : DerivaML
-        Connected DerivaML instance.
-    datasets : list
-        Resolved dataset specifications (DatasetSpec objects or dicts with rid/version).
-    assets : list
-        Resolved asset specifications (AssetSpec objects, dicts, or bare RID strings).
+    Args:
+        ml: Connected DerivaML instance.
+        datasets: Resolved dataset specifications (``DatasetSpec`` objects or
+            dicts with ``rid``/``version``).
+        assets: Resolved asset specifications (``AssetSpec`` objects, dicts, or
+            bare RID strings).
 
-    Returns
-    -------
-    ValidationResult
-        Validation result with errors for missing RIDs or versions, and warnings
-        for stale versions.
+    Returns:
+        ValidationResult: Validation result with errors for missing RIDs or
+        versions, and warnings for stale versions.
 
-    Example
-    -------
-    >>> result = validate_execution_config(ml, datasets, assets)  # doctest: +SKIP
-    >>> if not result.is_valid:  # doctest: +SKIP
-    ...     raise DerivaMLException(f"Config validation failed:\\n{result}")
+    Example:
+        >>> result = validate_execution_config(ml, datasets, assets)  # doctest: +SKIP
+        >>> if not result.is_valid:  # doctest: +SKIP
+        ...     raise DerivaMLException(f"Config validation failed:\\n{result}")
     """
     # Extract dataset RIDs and versions
     dataset_rids: list[str] = []

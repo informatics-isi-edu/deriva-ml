@@ -227,7 +227,8 @@ class Execution:
 
     Attributes:
         dataset_rids (list[RID]): RIDs of datasets used in the execution.
-        datasets (list[DatasetBag]): Materialized dataset objects.
+        datasets (DatasetCollection): Collection wrapping the materialized
+            ``DatasetBag`` objects (iterable, indexable; not a plain list).
         configuration (ExecutionConfiguration): Execution settings and parameters.
         workflow_rid (RID): RID of the associated workflow.
         status (ExecutionStatus): Current execution status (read-through from SQLite).
@@ -1213,10 +1214,10 @@ class Execution:
                 materialization options.
 
         Returns:
-            DatasetBag: Object containing:
-                - path: Local filesystem path to downloaded dataset
-                - rid: Dataset's Resource Identifier
-                - minid: Dataset's Minimal Viable Identifier
+            DatasetBag: Object exposing, among others:
+                - ``path``: local filesystem path to the materialized bag
+                - ``dataset_rid``: the dataset's Resource Identifier
+                - ``current_version``: the resolved dataset version
 
         Raises:
             DerivaMLException: If download or materialization fails.
@@ -1224,7 +1225,7 @@ class Execution:
         Example:
             >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")  # doctest: +SKIP
             >>> bag = execution.download_dataset_bag(spec)  # doctest: +SKIP
-            >>> print(f"Downloaded to {bag.path}")  # doctest: +SKIP
+            >>> print(f"Downloaded {bag.dataset_rid} to {bag.path}")  # doctest: +SKIP
         """
         return self._ml_object.download_dataset_bag(dataset)
 

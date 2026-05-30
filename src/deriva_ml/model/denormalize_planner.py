@@ -179,8 +179,8 @@ The planner is ~1100 LoC of algorithmic code with a narrow consumer
 set (four call sites in total). ``DerivaModel`` is a wide-fan-out
 class touched by every mixin in the codebase, and bundling the
 planner in there muddied its responsibility. Phase 3 (audit §5.2 in
-``docs/design/deriva-ml-audit-2026-05-phase2-model.md``) extracted
-the planner into this module so:
+``docs/archive/2026-05-audit-working-drafts/deriva-ml-audit-2026-05-phase2-model.md``)
+extracted the planner into this module so:
 
 * ``DerivaModel`` becomes a pure introspection class (~1100 LoC,
   consumed everywhere).

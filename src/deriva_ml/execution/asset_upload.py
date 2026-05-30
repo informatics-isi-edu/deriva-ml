@@ -200,6 +200,14 @@ def set_asset_descriptions(
         on a localhost SSD that meant ~10K SQL round-trips
         (~19 minutes). The single-read pattern is preserved
         here.
+
+    Example:
+        >>> set_asset_descriptions(  # doctest: +SKIP
+        ...     execution,
+        ...     uploaded_assets,
+        ...     metadata_descriptions={"uv.lock": "Locked dependencies"},
+        ...     env_snapshot_description="Runtime environment snapshot",
+        ... )
     """
     manifest = execution._get_manifest()
     pb = execution._ml_object.pathBuilder()
@@ -264,6 +272,14 @@ def save_runtime_environment(
             ``ExecMetadataType`` enum import.
         env_snapshot_description: The description string for
             the staged metadata asset.
+
+    Example:
+        >>> from deriva_ml.core.enums import ExecMetadataType  # doctest: +SKIP
+        >>> save_runtime_environment(  # doctest: +SKIP
+        ...     execution,
+        ...     runtime_env_asset_type=ExecMetadataType.runtime_env.value,
+        ...     env_snapshot_description="Runtime environment snapshot",
+        ... )
     """
     runtime_env_path = execution.asset_file_path(
         asset_name="Execution_Metadata",
@@ -323,6 +339,16 @@ def upload_hydra_config_assets(
         execution_metadata_asset_name: ``MLAsset.execution_metadata``
             — passed in as a value, not imported, so the helper
             stays decoupled from the ``MLAsset`` enum import.
+
+    Example:
+        >>> from deriva_ml.core.enums import ExecMetadataType, MLAsset  # doctest: +SKIP
+        >>> upload_hydra_config_assets(  # doctest: +SKIP
+        ...     execution,
+        ...     hydra_config_asset_type=ExecMetadataType.hydra_config.value,
+        ...     metadata_descriptions={},
+        ...     env_snapshot_description="Runtime environment snapshot",
+        ...     execution_metadata_asset_name=MLAsset.execution_metadata,
+        ... )
     """
     hydra_runtime_output_dir = execution._ml_object.hydra_runtime_output_dir
     if not hydra_runtime_output_dir:
@@ -373,6 +399,10 @@ def clean_folder_contents(folder_path: Path, remove_folder: bool = True, *, logg
         they're never tuned at the call site (and over-
         parameterizing would just add an arg that's always
         passed the same way).
+
+    Example:
+        >>> from pathlib import Path  # doctest: +SKIP
+        >>> clean_folder_contents(Path("/tmp/staging"), remove_folder=False)  # doctest: +SKIP
     """
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -500,6 +530,19 @@ def update_asset_execution_table(
         asset_type_path_fn: The ``asset_type_path`` function
             from ``core.upload_layout`` — passed in to keep
             the helper free of that import.
+
+    Example:
+        >>> from deriva_ml.core.definitions import MLVocab, ExecAssetType  # doctest: +SKIP
+        >>> from deriva_ml.core.upload_layout import asset_type_path  # doctest: +SKIP
+        >>> update_asset_execution_table(  # doctest: +SKIP
+        ...     execution,
+        ...     uploaded_assets,
+        ...     asset_role="Input",
+        ...     asset_role_vocab_term=MLVocab.asset_role,
+        ...     input_file_tag=ExecAssetType.input_file.value,
+        ...     output_file_tag=ExecAssetType.output_file.value,
+        ...     asset_type_path_fn=asset_type_path,
+        ... )
     """
     if execution._dry_run:
         # Don't do any updates if we are doing a dry run.

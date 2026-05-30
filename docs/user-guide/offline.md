@@ -6,7 +6,7 @@ This chapter builds on Chapter 2 (datasets), Chapter 3 (features), and Chapter 4
 
 ## Bags and live catalogs
 
-A live `Dataset` object talks to the server on every operation. A `DatasetBag` wraps the same data stored locally as a BDBag — a directory of CSV files, asset files, a SQLite database, and integrity manifests. The two classes implement the same `DatasetLike` protocol, so most read operations use identical method calls on either object.
+A live `Dataset` object talks to the server on every operation. A `DatasetBag` wraps the same data stored locally as a BDBag — a directory of CSV files, asset files, and integrity manifests — plus a SQLite mirror, built in a separate cache subtree, that backs queries. The two classes implement the same `DatasetLike` protocol, so most read operations use identical method calls on either object.
 
 The key differences are scope and direction. A bag is a point-in-time snapshot: it reflects exactly the rows and files that existed when it was downloaded at a specific version. You cannot add members, increment the version, or write feature values into the bag itself. Writes go back through a live `Execution` object after you reconnect.
 
@@ -42,7 +42,7 @@ Inside an execution the same `DatasetSpec` object works via `exe.download_datase
 
 ```python
 print(bag.path)
-# /home/user/.deriva/bags/1-ABC1/2.0.0/
+# /home/user/.deriva/cache/bags/<checksum>/Dataset_1-ABC1/
 
 # Integrity manifest
 manifest = (bag.path / "manifest-md5.txt").read_text()
@@ -54,22 +54,33 @@ images_csv = bag.path / "data" / "domain" / "Image.csv"
 asset_dir = bag.path / "data" / "asset"
 ```
 
-The directory layout after materialization:
+The cache is content-addressed by the BDBag checksum (ADR-0006). The
+bag directory and the SQLite database that backs bag queries live in
+*separate* subtrees under the cache root:
 
 ```
-<bag-root>/
-  manifest-md5.txt          # BDBag integrity manifest
-  bag-info.txt              # bag metadata
-  data/
-    deriva-ml/              # core ML schema tables (CSV)
-    domain/                 # domain-schema tables (CSV)
-    asset/
-      <RID>/
-        <Table>/
-          <filename>        # materialized asset files
-  *.db                      # SQLite database (bag queries go here)
-  schema.json               # catalog schema snapshot
+<cache-root>/
+  index.sqlite                # per host/catalog cache index
+  bags/
+    <checksum>/
+      Dataset_<RID>/          # the bag directory — this is bag.path
+        manifest-md5.txt      # BDBag integrity manifest
+        bag-info.txt          # bag metadata
+        data/
+          deriva-ml/          # core ML schema tables (CSV)
+          domain/             # domain-schema tables (CSV)
+          asset/
+            <RID>/
+              <Table>/
+                <filename>    # materialized asset files
+          schema.json         # catalog schema snapshot
+  databases/                  # SQLite mirrors (bag queries go here),
+    ...                       # NOT inside the bag directory
 ```
+
+`bag.path` points at the `Dataset_<RID>/` bag directory only. The
+SQLite database it queries is built under the sibling `databases/`
+subtree, so you will not find a `.db` file inside `bag.path`.
 
 The `bag.path` property was added in PR #64 and is available on the current branch. Treat the directory contents as read-only — bags are immutable by contract.
 
@@ -110,7 +121,7 @@ feat = bag.lookup_feature("Image", "Glaucoma")
 
 - `bag.list_dataset_members()` returns members of this dataset only. Pass `recurse=True` to include nested datasets.
 - `bag.get_table_as_dataframe("Subject")` returns all rows in that table, not just those belonging to the dataset. For dataset-scoped rows, combine with `list_dataset_members()`.
-- Feature cache: the first call to `bag.feature_values()` for a given `(table, feature)` pair populates a per-bag cache. Subsequent calls are fast. The cache avoids re-scanning the source CSV on subsequent calls, but every call loads all matching records into memory before yielding the first one — this is not a streaming iterator, same as the live-catalog `feature_values`.
+- Feature reads are not cached: each call to `bag.feature_values()` runs the full denormalize join fresh through the `Denormalizer` (the per-bag `BagFeatureCache` was removed in favor of this single path). Every call loads all matching records into memory before yielding the first one — this is not a streaming iterator, same as the live-catalog `feature_values`.
 - `bag.list_workflow_executions(workflow)` may return an empty list if the `Execution` rows were not exported into the bag. This is a known bag-export limitation; see "What bags can't do" below.
 
 ## What bags can't do
@@ -255,7 +266,7 @@ Top-level subdirectories come from dataset types (`Training` → `training`, `Te
 
 ### Using features as targets
 
-If a name in `targets` matches a feature defined on the asset table (or a table it references via FK), `restructure_assets` reads the feature values from the bag's SQLite cache and uses the vocabulary term as the directory name.
+If a name in `targets` matches a feature defined on the asset table (or a table it references via FK), `restructure_assets` reads the feature values through the `Denormalizer` (a fresh denormalize join over the bag, the same path `bag.feature_values()` uses) and uses the vocabulary term as the directory name.
 
 ```python
 # Group by a feature defined on Image
@@ -330,7 +341,7 @@ def dicom_to_png(src: Path, dest: Path) -> Path:
 
 manifest = bag.restructure_assets(
     output_dir="./ml_data",
-    group_by=["Diagnosis"],
+    targets=["Diagnosis"],
     file_transformer=dicom_to_png,
 )
 # manifest maps: Path(".../bag/.../scan.dcm") -> Path("./ml_data/training/Normal/scan.png")
@@ -385,13 +396,14 @@ ds = bag.as_torch_dataset(
 
 loader = DataLoader(ds, batch_size=32, shuffle=True, num_workers=4)
 
-for images, labels in loader:
-    # images: (B, 3, 224, 224) tensor; labels: (B,) int tensor
+for images, labels, rids in loader:
+    # images: (B, 3, 224, 224) tensor; labels: (B,) int tensor;
+    # rids: tuple of B element RIDs (the trailing item is always the RID)
     loss = criterion(model(images), labels)
     loss.backward()
 ```
 
-Labels come from features. `targets=["Glaucoma"]` tells the adapter to look up the `Glaucoma` feature for each `Image` row via `bag.feature_values("Image", "Glaucoma")`. The `target_transform` receives a `FeatureRecord` and must return whatever your loss function expects — typically an integer class index. The adapter never builds its own encoder; that decision stays in your code where train/val/test consistency is your responsibility.
+Each `__getitem__` returns `(sample, target, rid)` when `targets` is set and `(sample, rid)` when `targets=None` — the element's RID is always the trailing item, so unpack it (or slice it off) in your training loop. Labels come from features. `targets=["Glaucoma"]` tells the adapter to look up the `Glaucoma` feature for each `Image` row via `bag.feature_values("Image", "Glaucoma")`. The `target_transform` receives a `FeatureRecord` and must return whatever your loss function expects — typically an integer class index. The adapter never builds its own encoder; that decision stays in your code where train/val/test consistency is your responsibility.
 
 `sample_loader` is required for asset tables. It receives the absolute `Path` to the materialized file and the raw row dict; return whatever your model consumes. The error message at construction time names common loaders (`PIL.Image.open`, `nibabel.load`, `h5py.File`) if you forget to supply one.
 
@@ -412,7 +424,7 @@ ds = bag.as_torch_dataset(
 )
 ```
 
-Non-asset element types default to returning the raw row dict as the sample; no `sample_loader` is needed. Each `__getitem__` returns `(row_dict, target)`.
+Non-asset element types default to returning the raw row dict as the sample; no `sample_loader` is needed. Each `__getitem__` returns `(row_dict, target, rid)` — the element's RID is always the trailing item.
 
 *Multi-target — two features become a dict target:*
 
@@ -428,7 +440,7 @@ ds = bag.as_torch_dataset(
         "cdr":   float(recs["Cup_Disc_Ratio"].Cup_Disc_Ratio),
     },
 )
-# __getitem__ returns (image_tensor, {"grade": int, "cdr": float})
+# __getitem__ returns (image_tensor, {"grade": int, "cdr": float}, rid)
 ```
 
 When `targets` lists more than one feature name, `target_transform` receives `dict[str, FeatureRecord]` keyed by feature name.
@@ -478,7 +490,9 @@ ds = bag.as_tf_dataset(
     target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
 )
 
-# Standard tf.data pipeline
+# Each element is (sample, target, rid). Keras model.fit expects (x, y),
+# so drop the trailing RID before batching.
+ds = ds.map(lambda sample, target, rid: (sample, target))
 ds = ds.batch(32).prefetch(tf.data.AUTOTUNE)
 
 model.compile(optimizer="adam", loss="sparse_categorical_crossentropy")
@@ -487,17 +501,20 @@ model.fit(ds, epochs=10)
 
 **`output_signature` — when to let it infer, when to set it explicitly**
 
-`as_tf_dataset` builds its generator via `tf.data.Dataset.from_generator`, which requires a type/shape signature. By default (`output_signature=None`) the adapter eagerly reads the first `(sample, target)` pair at construction time, derives a `tf.TensorSpec` from it via `tf.type_spec_from_value`, and re-wraps the generator so that first sample is not skipped during iteration. This adds one extra sample load at startup — acceptable for research workflows.
+`as_tf_dataset` builds its generator via `tf.data.Dataset.from_generator`, which requires a type/shape signature. By default (`output_signature=None`) the adapter eagerly reads the first yielded element at construction time — a `(sample, target, rid)` 3-tuple (`(sample, rid)` when `targets=None`) — derives a `tf.TensorSpec` from it via `tf.type_spec_from_value`, and re-wraps the generator so that first sample is not skipped during iteration. This adds one extra sample load at startup — acceptable for research workflows.
 
 Pass `output_signature` explicitly in two situations:
+
+The signature must match the full yielded element: `(sample, target, rid)` when `targets` is set, `(sample, rid)` when `targets=None`. The RID is yielded as a Python `str`, so its spec is `tf.TensorSpec(shape=(), dtype=tf.string)`.
 
 1. **Production pipelines** where you want deterministic startup with no eager reads:
    ```python
    # doctest: +SKIP
    import tensorflow as tf
    sig = (
-       tf.TensorSpec(shape=(224, 224, 3), dtype=tf.float32),
-       tf.TensorSpec(shape=(),            dtype=tf.int32),
+       tf.TensorSpec(shape=(224, 224, 3), dtype=tf.float32),  # sample
+       tf.TensorSpec(shape=(),            dtype=tf.int32),     # target
+       tf.TensorSpec(shape=(),            dtype=tf.string),    # rid
    )
    ds = bag.as_tf_dataset("Image", ..., output_signature=sig)
    ```
@@ -507,7 +524,8 @@ Pass `output_signature` explicitly in two situations:
    # doctest: +SKIP
    sig = (
        tf.TensorSpec(shape=(None, None, 3), dtype=tf.float32),  # variable H x W
-       tf.TensorSpec(shape=(),              dtype=tf.int32),
+       tf.TensorSpec(shape=(),              dtype=tf.int32),     # target
+       tf.TensorSpec(shape=(),              dtype=tf.string),    # rid
    )
    ds = bag.as_tf_dataset("Image", ..., output_signature=sig)
    ```
@@ -601,19 +619,27 @@ os.environ["KERAS_BACKEND"] = "tensorflow"
 import keras
 import tensorflow as tf
 
-ds = bag.as_tf_dataset(
-    "Image",
-    sample_loader=load_image,
-    targets=["Glaucoma"],
-    target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
-).batch(32).prefetch(tf.data.AUTOTUNE)
+ds = (
+    bag.as_tf_dataset(
+        "Image",
+        sample_loader=load_image,
+        targets=["Glaucoma"],
+        target_transform=lambda rec: CLASS_TO_IDX[rec.Glaucoma],
+    )
+    # Elements are (sample, target, rid); model.fit wants (x, y), so drop the RID.
+    .map(lambda sample, target, rid: (sample, target))
+    .batch(32)
+    .prefetch(tf.data.AUTOTUNE)
+)
 
 model = keras.applications.ResNet50(weights=None, classes=4)
 model.compile(optimizer="adam", loss="sparse_categorical_crossentropy")
 model.fit(ds, epochs=10)
 ```
 
-**JAX backend** — either adapter works. Keras 3 on JAX accepts any Python iterable of `(x, y)` tuples. Pass a `DataLoader` wrapping `as_torch_dataset`, or chain `as_tf_dataset` through a generator, or materialize to NumPy arrays directly. The JAX backend does not add requirements beyond what Keras itself needs.
+The torch-backend example above feeds a `DataLoader` whose batches are `(sample, target, rid)`; Keras reads the first two positional items as `(x, y)` and ignores the trailing RID, so no `.map()` is needed there.
+
+**JAX backend** — either adapter works. Keras 3 on JAX accepts any Python iterable of `(x, y)` tuples; drop the trailing RID (`.map()` for `tf.data`, or slice it off in a wrapper for the `DataLoader`) before passing the data in. Pass a `DataLoader` wrapping `as_torch_dataset`, or chain `as_tf_dataset` through a generator, or materialize to NumPy arrays directly. The JAX backend does not add requirements beyond what Keras itself needs.
 
 **Note:** Set `KERAS_BACKEND` before importing Keras — the backend is selected at import time and cannot change in the same process.
 

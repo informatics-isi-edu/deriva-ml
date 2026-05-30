@@ -726,7 +726,7 @@ class DatasetBagBuilder:
         The dataset's root row is the primary anchor; each nested
         child dataset becomes an additional :class:`RIDAnchor`.
         The traversal depth is bounded by
-        :meth:`DatasetLike.dataset_children` chains.
+        :meth:`DatasetLike.list_dataset_children` chains.
 
         This is the bag-pipeline-shaped representation of "what
         rows does the walker start from for this dataset?". When

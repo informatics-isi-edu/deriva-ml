@@ -445,8 +445,9 @@ class DatasetMixin:
         committing to a bag export.
 
         The return shape is aligned with :meth:`estimate_bag_size` and
-        is **NOT the same** as the dataset-scoped 12-key plan dict from
-        :meth:`Dataset.describe_denormalized` (spec §5). Do not confuse
+        is **NOT the same** as the dataset-scoped 13-key plan dict from
+        :meth:`Dataset.describe_denormalized`
+        (``docs/user-guide/denormalization.md`` §8.3.2). Do not confuse
         the two.
 
         Args:

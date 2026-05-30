@@ -395,76 +395,67 @@ def run_model(
     ml_class: type["DerivaML"] | None = None,
     script_config: Any = None,
 ) -> None:
-    """
-    Execute a machine learning model within a DerivaML execution context.
+    """Execute a machine learning model within a DerivaML execution context.
 
     This function serves as the main entry point called by hydra-zen after
     configuration resolution. It orchestrates the complete execution lifecycle:
     connecting to Deriva, creating an execution record, running the model,
-    and uploading results.
+    and (when not a dry run) uploading results.
 
     In multirun mode, this function also:
     - Creates a parent execution on the first job to group all sweep jobs
     - Links each child execution to the parent with sequence ordering
 
-    Parameters
-    ----------
-    deriva_ml : DerivaMLConfig
-        Configuration for the DerivaML connection. Contains server URL,
-        catalog ID, credentials, and other connection parameters.
+    Args:
+        deriva_ml: Configuration for the DerivaML connection. Contains server
+            URL, catalog ID, credentials, and other connection parameters.
+        datasets: Specifications for datasets to use in this execution. Each
+            ``DatasetSpec`` identifies a dataset in the Deriva catalog to be
+            made available to the model.
+        assets: Resource IDs (RIDs) of assets to include in the execution.
+            Typically model weight files, pretrained checkpoints, or other
+            artifacts needed by the model.
+        description: Human-readable description of this execution run. Stored
+            in the Deriva catalog for provenance tracking. In multirun mode,
+            this is also used for the parent execution if running via
+            ``multirun_config``.
+        workflow: The workflow definition to associate with this execution.
+            Defines the computational pipeline and its metadata.
+        model_config: A hydra-zen callable that wraps the actual model code.
+            When called with ``ml_instance`` and ``execution`` arguments, it
+            runs the model training or inference logic.
+        dry_run: If True, create the execution record but skip the model run
+            and the result upload. When ``script_config`` is set, the script
+            is still invoked once with ``execution=None`` to print a preview;
+            a plain ``model_config`` is skipped entirely (it may not handle
+            ``execution=None``). Useful for testing configuration without
+            running expensive computations. Defaults to False.
+        ml_class: The DerivaML class (or subclass) to instantiate. If None,
+            uses the base DerivaML class. Use this to instantiate
+            domain-specific classes like EyeAI or GUDMAP.
+        script_config: Optional alternate hydra-zen callable that, when
+            provided, **takes precedence over** ``model_config`` as the code
+            to invoke. Lets skill-generated scripts share this runner while
+            living in their own config group. It is also the only path that
+            runs during a dry run (see ``dry_run``).
 
-    datasets : list[DatasetSpec]
-        Specifications for datasets to use in this execution. Each DatasetSpec
-        identifies a dataset in the Deriva catalog to be made available to
-        the model.
+    Returns:
+        None. On a non-dry run, results are committed to the Deriva catalog as
+        execution output assets; on a dry run, nothing is uploaded.
 
-    assets : list[RID]
-        Resource IDs (RIDs) of assets to include in the execution. Typically
-        used for model weight files, pretrained checkpoints, or other
-        artifacts needed by the model.
+    Example:
+        This function is typically not called directly, but through hydra::
 
-    description : str
-        Human-readable description of this execution run. Stored in the
-        Deriva catalog for provenance tracking. In multirun mode, this is
-        also used for the parent execution if running via multirun_config.
+            # From the command line:
+            # python deriva_run.py +experiment=cifar10_cnn dry_run=True
 
-    workflow : Workflow
-        The workflow definition to associate with this execution. Defines
-        the computational pipeline and its metadata.
+            # Multirun (creates parent + child executions):
+            # python deriva_run.py --multirun \
+            #     +experiment=cifar10_quick,cifar10_extended
 
-    model_config : Any
-        A hydra-zen callable that wraps the actual model code. When called
-        with `ml_instance` and `execution` arguments, it runs the model
-        training or inference logic.
-
-    dry_run : bool, optional
-        If True, create the execution record but skip actual model execution.
-        Useful for testing configuration without running expensive computations.
-        Default is False.
-
-    ml_class : type[DerivaML], optional
-        The DerivaML class (or subclass) to instantiate. If None, uses the
-        base DerivaML class. Use this to instantiate domain-specific classes
-        like EyeAI or GUDMAP.
-
-    Returns
-    -------
-    None
-        Results are uploaded to the Deriva catalog as execution outputs.
-
-    Examples
-    --------
-    This function is typically not called directly, but through hydra:
-
-        # From command line:
-        python deriva_run.py +experiment=cifar10_cnn dry_run=True
-
-        # Multirun (creates parent + child executions):
-        python deriva_run.py --multirun +experiment=cifar10_quick,cifar10_extended
-
-        # With a custom DerivaML subclass (in your script):
-        from functools import partial
-        run_model_eyeai = partial(run_model, ml_class=EyeAI)
+            # With a custom DerivaML subclass (in your script):
+            >>> from functools import partial  # doctest: +SKIP
+            >>> run_model_eyeai = partial(run_model, ml_class=EyeAI)  # doctest: +SKIP
     """
     global _multirun_state
 

@@ -432,13 +432,13 @@ class DatasetLike(Protocol):
             via: Optional path-only intermediates.
 
         Returns:
-            12-key planning dict (see
+            13-key planning dict (see
             :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.describe`
             for the detailed shape): ``row_per``, ``row_per_source``,
             ``row_per_candidates``, ``columns``, ``include_tables``,
             ``via``, ``join_path``, ``transparent_intermediates``,
             ``ambiguities``, ``estimated_row_count``, ``anchors``,
-            ``source``.
+            ``source``, ``warnings``.
 
         See Also:
             get_denormalized_as_dataframe: Execute the plan and return a
@@ -610,14 +610,15 @@ class AssetLike(Protocol):
     description: str
     execution_rid: RID | None
 
-    def list_executions(self, asset_role: str | None = None) -> list[dict[str, Any]]:
+    def list_executions(self, asset_role: str | None = None) -> list["ExecutionRecord"]:
         """List all executions associated with this asset.
 
         Args:
             asset_role: Optional filter for asset role ('Input' or 'Output').
 
         Returns:
-            List of records with Execution RID and Asset_Role.
+            List of ExecutionRecord objects for the executions associated with
+            this asset.
         """
         ...
 
@@ -984,16 +985,30 @@ class DerivaMLCatalog(DerivaMLCatalogReader, Protocol):
         ...
 
     def add_features(self, features: list[FeatureRecord]) -> int:
-        """Add feature values to the catalog in batch.
+        """Retired — use ``exe.add_features(records)`` inside an execution context.
 
-        Inserts a list of FeatureRecord instances into the appropriate feature table.
-        All records must be from the same feature.
+        ``DerivaML.add_features`` has been retired so that all feature writes go
+        through the execution context, where provenance is tracked and values are
+        staged for atomic upload. The concrete implementation
+        (:meth:`FeatureMixin.add_features`) raises unconditionally; this method is
+        kept on the protocol only to document the replacement.
 
         Args:
-            features: List of FeatureRecord instances to insert.
+            features: List of FeatureRecord instances. Unused — the call always
+                raises before inserting anything.
 
         Returns:
-            Number of feature records inserted.
+            Never returns; the return annotation is retained for historical
+            compatibility with the protocol surface.
+
+        Raises:
+            DerivaMLException: Always. Points at the replacement API.
+
+        Example:
+            Write features through an execution context instead::
+
+                >>> with ml.create_execution(config).execute() as exe:  # doctest: +SKIP
+                ...     exe.add_features(records)
         """
         ...
 

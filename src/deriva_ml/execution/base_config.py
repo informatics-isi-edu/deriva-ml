@@ -101,6 +101,10 @@ class BaseConfig:
             This is automatically populated by get_notebook_configuration() with the
             Hydra runtime choices (e.g., {"model_config": "cifar10_quick", "assets": "roc_quick"}).
             Useful for tracking which configurations were used in an execution.
+        script_config: Optional alternate hydra-zen callable for the code to
+            run. When set, ``run_model`` invokes it instead of ``model_config``
+            (it takes precedence) and it is the only callable exercised during a
+            dry run. Defaults to ``None`` (use ``model_config``).
 
     Example:
         >>> from dataclasses import dataclass
