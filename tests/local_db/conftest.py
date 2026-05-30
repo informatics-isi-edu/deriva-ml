@@ -805,6 +805,277 @@ def denorm_local_schema_feature(denorm_feature_model: Model, tmp_path: Path) -> 
 
 
 # ---------------------------------------------------------------------------
+# Key-qualified feature fixture (findings 10 + 12)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def denorm_schema_qualified_feature(tmp_path: Path) -> Path:
+    """Canned schema with a *key-qualified* multi-value feature.
+
+    This is the structural shape that no prior fixture modeled — and the
+    gap that hid two coupled bugs (findings 10 + 12). It mirrors eye-ai's
+    real ``Execution_Subject_Chart_Label`` feature: a feature-association
+    table whose **compound uniqueness key includes a qualifier FK** beyond
+    ``{target, Feature_Name, Execution}``. The same target (Subject) can
+    therefore have two rows distinguished only by the qualifier.
+
+    Tables added on top of :func:`_base_schema_doc`:
+
+    - ``Execution`` and ``Feature_Name`` (``deriva-ml`` schema) — the two
+      structural feature markers.
+    - ``Image_Side`` vocabulary (``isa`` schema) — the qualifier's target
+      (terms: ``Left`` / ``Right``).
+    - ``Condition_Label`` vocabulary (``isa`` schema) — an ordinary value
+      term (NOT in the key).
+    - ``Execution_Subject_Chart_Label`` feature-association table with FKs
+      to ``Subject`` (target), ``Execution``, ``Feature_Name``,
+      ``Image_Side`` (qualifier), and ``Condition_Label`` (value). Its
+      compound key is
+      ``[Execution, Subject, Feature_Name, Image_Side]`` — exactly the
+      eye-ai shape. The ``Image_Side`` FK is *in the key* (a qualifier);
+      ``Condition_Label`` is *not* (a value).
+
+    Because the key-FK arity is 4, ``find_associations(max_arity=3)`` —
+    the former ``find_features`` cap — silently excludes this table.
+    ``find_associations(max_arity=None)`` discovers it. The fixture thus
+    fails the old code and passes the new code, which is the whole point.
+    """
+    doc = _base_schema_doc()
+
+    # Execution (deriva-ml).
+    doc["schemas"]["deriva-ml"]["tables"]["Execution"] = {
+        "table_name": "Execution",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}],
+        "foreign_keys": [],
+    }
+
+    # Feature_Name vocabulary (deriva-ml).
+    doc["schemas"]["deriva-ml"]["tables"]["Feature_Name"] = {
+        "table_name": "Feature_Name",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # Image_Side vocabulary (isa) — the QUALIFIER's target (Left/Right).
+    doc["schemas"]["isa"]["tables"]["Image_Side"] = {
+        "table_name": "Image_Side",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # Condition_Label vocabulary (isa) — an ordinary VALUE term (NOT in key).
+    doc["schemas"]["isa"]["tables"]["Condition_Label"] = {
+        "table_name": "Condition_Label",
+        "schema_name": "isa",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Name", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Description", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [{"unique_columns": ["RID"]}, {"unique_columns": ["Name"]}],
+        "foreign_keys": [],
+    }
+
+    # The key-qualified feature-association table. Its compound key
+    # includes Image_Side (the qualifier), giving key-FK arity 4.
+    doc["schemas"]["deriva-ml"]["tables"]["Execution_Subject_Chart_Label"] = {
+        "table_name": "Execution_Subject_Chart_Label",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            # Default on Feature_Name is what Feature.feature_name reads.
+            {
+                "name": "Feature_Name",
+                "type": {"typename": "text"},
+                "nullok": False,
+                "default": "Chart_Label",
+            },
+            {"name": "Subject", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Image_Side", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Condition_Label", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # The compound IDENTITY key — Image_Side IN the key makes it a
+            # qualifier (key-FK arity 4, the eye-ai Chart_Label shape).
+            {"unique_columns": ["Execution", "Subject", "Feature_Name", "Image_Side"]},
+        ],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Subject",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Subject", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Execution",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Feature_Name",
+                    }
+                ],
+                "referenced_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Feature_Name", "column_name": "Name"}
+                ],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Image_Side",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image_Side", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Subject_Chart_Label",
+                        "column_name": "Condition_Label",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Condition_Label", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    # An ORDINARY (unqualified) feature alongside the qualified one, so a
+    # single fixture proves both the fix AND the backward-compat invariant
+    # via the same ``find_features`` path. Compound key is
+    # ``[Execution, Image, Feature_Name]`` (key-FK arity 3, no qualifier),
+    # so ``Feature.qualifier_columns`` must be empty and a selector must
+    # reduce to one-per-Image — unchanged from before the fix.
+    doc["schemas"]["deriva-ml"]["tables"]["Execution_Image_Quality"] = {
+        "table_name": "Execution_Image_Quality",
+        "schema_name": "deriva-ml",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "text"}, "nullok": False},
+            {"name": "RCT", "type": {"typename": "timestamptz"}},
+            {"name": "RMT", "type": {"typename": "timestamptz"}},
+            {"name": "RCB", "type": {"typename": "text"}},
+            {"name": "RMB", "type": {"typename": "text"}},
+            {"name": "Feature_Name", "type": {"typename": "text"}, "nullok": False, "default": "Quality"},
+            {"name": "Image", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Execution", "type": {"typename": "text"}, "nullok": False},
+            {"name": "Condition_Label", "type": {"typename": "text"}, "nullok": True},
+        ],
+        "keys": [
+            {"unique_columns": ["RID"]},
+            # No qualifier in the key — the target (Image) alone is identity.
+            {"unique_columns": ["Execution", "Image", "Feature_Name"]},
+        ],
+        "foreign_keys": [
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Execution_Image_Quality", "column_name": "Image"}
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Image", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Execution_Image_Quality", "column_name": "Execution"}
+                ],
+                "referenced_columns": [{"schema_name": "deriva-ml", "table_name": "Execution", "column_name": "RID"}],
+            },
+            {
+                "foreign_key_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Execution_Image_Quality", "column_name": "Feature_Name"}
+                ],
+                "referenced_columns": [
+                    {"schema_name": "deriva-ml", "table_name": "Feature_Name", "column_name": "Name"}
+                ],
+            },
+            {
+                "foreign_key_columns": [
+                    {
+                        "schema_name": "deriva-ml",
+                        "table_name": "Execution_Image_Quality",
+                        "column_name": "Condition_Label",
+                    }
+                ],
+                "referenced_columns": [{"schema_name": "isa", "table_name": "Condition_Label", "column_name": "RID"}],
+            },
+        ],
+    }
+
+    out = tmp_path / "schema_qualified_feature.json"
+    out.write_text(json.dumps(doc))
+    return out
+
+
+@pytest.fixture
+def denorm_qualified_feature_model(denorm_schema_qualified_feature: Path) -> Model:
+    """ERMrest Model with a key-qualified feature-association table."""
+    return Model.fromfile("file-system", denorm_schema_qualified_feature)
+
+
+@pytest.fixture
+def denorm_qualified_feature_deriva_model(denorm_qualified_feature_model: Model) -> DerivaModel:
+    """DerivaModel for the key-qualified feature fixture."""
+    return DerivaModel(
+        model=denorm_qualified_feature_model,
+        ml_schema="deriva-ml",
+        domain_schemas={"isa"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
