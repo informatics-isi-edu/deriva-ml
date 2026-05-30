@@ -196,8 +196,12 @@ class DatasetBag:
         """Filesystem path to this bag's root directory.
 
         The bag is a self-contained, immutable snapshot on disk. ``path``
-        is the directory containing ``data/``, ``manifest-md5.txt``, and
-        the bag's SQLite database. Use it to:
+        is the BDBag directory containing ``data/`` (the CSV tables and
+        materialized asset files) and ``manifest-md5.txt``. The SQLite
+        database that backs queries is **not** inside this directory — it
+        lives in a separate ``databases/`` subtree of the cache root
+        (the cache is content-addressed by BDBag checksum per ADR-0006).
+        Use ``path`` to:
 
         - Read materialized asset files relative to the bag.
         - Diagnose "which bag is this?" errors in logs.
@@ -207,7 +211,9 @@ class DatasetBag:
         mutate anything inside it — bags are immutable by contract.
 
         Returns:
-            Path: Root directory of the materialized bag on disk.
+            Path: Root directory of the materialized BDBag on disk
+            (parent of ``data/``). The SQLite mirror is stored
+            elsewhere, under the cache's ``databases/`` subtree.
 
         Example:
             >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")  # doctest: +SKIP
