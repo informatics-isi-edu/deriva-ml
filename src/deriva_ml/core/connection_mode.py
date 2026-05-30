@@ -23,10 +23,10 @@ class ConnectionMode(StrEnum):
             and the final upload.
 
     Example:
-        >>> from deriva_ml import ConnectionMode, DerivaML
-        >>> ml = DerivaML(hostname="example.org", catalog_id="42",
+        >>> from deriva_ml import ConnectionMode, DerivaML  # doctest: +SKIP
+        >>> ml = DerivaML(hostname="example.org", catalog_id="42",  # doctest: +SKIP
         ...               mode=ConnectionMode.offline)
-        >>> ml.mode is ConnectionMode.offline
+        >>> ml.mode is ConnectionMode.offline  # doctest: +SKIP
         True
     """
 

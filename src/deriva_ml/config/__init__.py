@@ -37,7 +37,7 @@ existing :meth:`DerivaML.validate_dataset_specs` and
 Example:
     Parse a config file without touching the catalog::
 
-        >>> from deriva_ml.config import parse_config_file
+        >>> from deriva_ml.config import parse_config_file  # doctest: +SKIP
         >>> entries, parse_errors = parse_config_file("src/configs/datasets.py")  # doctest: +SKIP
         >>> for e in entries:  # doctest: +SKIP
         ...     print(e.line, e.entry_kind, e.rid, e.version)

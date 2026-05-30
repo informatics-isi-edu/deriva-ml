@@ -319,7 +319,7 @@ def clone_via_bag(
         Clone a slice rooted at a Dataset RID, using the default
         policy (UPLOAD_IF_MISSING for assets, FAIL on orphans)::
 
-            >>> from deriva_ml.catalog.clone_via_bag import clone_via_bag
+            >>> from deriva_ml.catalog.clone_via_bag import clone_via_bag  # doctest: +SKIP
             >>> result = clone_via_bag(  # doctest: +SKIP
             ...     source_hostname="src.example.org",
             ...     source_catalog_id="1",

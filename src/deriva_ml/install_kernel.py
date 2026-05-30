@@ -147,7 +147,7 @@ def _name_for_this_venv() -> str:
 
     Example:
         >>> # In a venv created with: uv venv --prompt my-project
-        >>> _name_for_this_venv()
+        >>> _name_for_this_venv()  # doctest: +SKIP
         'my-project'
     """
     config_path = Path(sys.prefix) / "pyvenv.cfg"
@@ -173,7 +173,7 @@ def main() -> None:
     Example:
         >>> # Typically called via command line:
         >>> # $ deriva-ml-install-kernel
-        >>> main()
+        >>> main()  # doctest: +SKIP
         Installed Jupyter kernel 'my-project' with display name 'Python (my-project)'
     """
     parser = ArgumentParser(description="Install a Jupyter kernel for the current virtual environment.")

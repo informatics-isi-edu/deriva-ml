@@ -225,11 +225,11 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         parser: ArgumentParser instance with configured arguments.
 
     Example:
-        >>> cli = DerivaMLRunNotebookCLI(
+        >>> cli = DerivaMLRunNotebookCLI(  # doctest: +SKIP
         ...     description="Run ML notebook",
         ...     epilog="See documentation for more details"
         ... )
-        >>> cli.main()  # Parses args and runs notebook
+        >>> cli.main()  # doctest: +SKIP
     """
 
     def __init__(self, description: str, epilog: str, **kwargs) -> None:
@@ -545,7 +545,7 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
         Example:
             >>> # With VIRTUAL_ENV=/path/to/myenv and kernel 'myenv' installed
-            >>> DerivaMLRunNotebookCLI._find_kernel_for_venv()
+            >>> DerivaMLRunNotebookCLI._find_kernel_for_venv()  # doctest: +SKIP
             'myenv'
         """
         venv = os.environ.get("VIRTUAL_ENV")

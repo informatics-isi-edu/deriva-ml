@@ -802,7 +802,7 @@ class DerivaMLCatalogReader(Protocol):
 
         Example:
             >>> workflow = catalog.lookup_workflow("2-ABC1")  # doctest: +SKIP
-            >>> print(f"{workflow.name}: {workflow.description}")
+            >>> print(f"{workflow.name}: {workflow.description}")  # doctest: +SKIP
         """
         ...
 
@@ -844,8 +844,8 @@ class DerivaMLCatalogReader(Protocol):
 
         Example:
             >>> url = "https://github.com/org/repo/blob/abc123/workflow.py"  # doctest: +SKIP
-            >>> workflow = catalog.lookup_workflow_by_url(url)
-            >>> print(f"{workflow.name}: {workflow.description}")
+            >>> workflow = catalog.lookup_workflow_by_url(url)  # doctest: +SKIP
+            >>> print(f"{workflow.name}: {workflow.description}")  # doctest: +SKIP
         """
         ...
 
@@ -865,7 +865,7 @@ class DerivaMLCatalogReader(Protocol):
 
         Example:
             >>> record = catalog.lookup_execution("2-ABC1")  # doctest: +SKIP
-            >>> print(f"{record.status}: {record.description}")
+            >>> print(f"{record.status}: {record.description}")  # doctest: +SKIP
         """
         ...
 

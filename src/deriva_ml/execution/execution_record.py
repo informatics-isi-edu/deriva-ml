@@ -12,16 +12,16 @@ execution environment.
 Example:
     Look up an execution record and update its description::
 
-        >>> record = ml.lookup_execution("2-ABC1")
-        >>> print(record.status)
+        >>> record = ml.lookup_execution("2-ABC1")  # doctest: +SKIP
+        >>> print(record.status)  # doctest: +SKIP
         ExecutionStatus.Running
-        >>> record.description = "Updated analysis description"
+        >>> record.description = "Updated analysis description"  # doctest: +SKIP
         >>> # The change is immediately written to the catalog
 
     Query nested executions::
 
-        >>> children = record.list_execution_children()
-        >>> for child in children:
+        >>> children = record.list_execution_children()  # doctest: +SKIP
+        >>> for child in children:  # doctest: +SKIP
         ...     print(f"{child.execution_rid}: {child.status}")
 """
 
@@ -99,30 +99,30 @@ class ExecutionRecord(BaseModel):
     Example:
         Look up an execution and query its state::
 
-            >>> record = ml.lookup_execution("2-ABC1")
-            >>> print(f"Status: {record.status}")
-            >>> print(f"Workflow: {record.workflow.name}")
-            >>> print(f"Started: {record.start_time}")
+            >>> record = ml.lookup_execution("2-ABC1")  # doctest: +SKIP
+            >>> print(f"Status: {record.status}")  # doctest: +SKIP
+            >>> print(f"Workflow: {record.workflow.name}")  # doctest: +SKIP
+            >>> print(f"Started: {record.start_time}")  # doctest: +SKIP
 
         Update mutable properties::
 
-            >>> record.status = ExecutionStatus.Uploaded
-            >>> record.description = "Analysis completed successfully"
+            >>> record.status = ExecutionStatus.Uploaded  # doctest: +SKIP
+            >>> record.description = "Analysis completed successfully"  # doctest: +SKIP
 
         Query relationships::
 
             >>> # Get child executions
-            >>> children = record.list_execution_children()
+            >>> children = record.list_execution_children()  # doctest: +SKIP
             >>> # Get parent executions
-            >>> parents = record.list_execution_parents()
+            >>> parents = record.list_execution_parents()  # doctest: +SKIP
             >>> # Get input datasets
-            >>> datasets = record.list_input_datasets()
+            >>> datasets = record.list_input_datasets()  # doctest: +SKIP
 
         Attempting to update on a read-only catalog raises an error::
 
-            >>> snapshot = ml.catalog_snapshot("2023-01-15T10:30:00")
-            >>> record = snapshot.lookup_execution("2-ABC1")
-            >>> record.status = ExecutionStatus.Uploaded  # Raises DerivaMLException
+            >>> snapshot = ml.catalog_snapshot("2023-01-15T10:30:00")  # doctest: +SKIP
+            >>> record = snapshot.lookup_execution("2-ABC1")  # doctest: +SKIP
+            >>> record.status = ExecutionStatus.Uploaded  # Raises DerivaMLException  # doctest: +SKIP
     """
 
     model_config = VALIDATION_CONFIG
@@ -333,7 +333,7 @@ class ExecutionRecord(BaseModel):
             DerivaMLException: If the catalog is read-only or not connected.
 
         Example:
-            >>> record.update_status(ExecutionStatus.Failed, "Network timeout during data transfer")
+            >>> record.update_status(ExecutionStatus.Failed, "Network timeout during data transfer")  # doctest: +SKIP
         """
         if self._ml_instance is not None:
             self._update_status_in_catalog(status, status_detail)
@@ -346,7 +346,7 @@ class ExecutionRecord(BaseModel):
             True if this execution is nested under another execution.
 
         Example:
-            >>> if record.is_nested():
+            >>> if record.is_nested():  # doctest: +SKIP
             ...     print("This is a child execution")
         """
         return len(list(self.list_execution_parents())) > 0
@@ -358,7 +358,7 @@ class ExecutionRecord(BaseModel):
             True if this execution has nested child executions.
 
         Example:
-            >>> if record.is_parent():
+            >>> if record.is_parent():  # doctest: +SKIP
             ...     print("This execution has children")
         """
         return len(list(self.list_execution_children())) > 0
@@ -394,12 +394,12 @@ class ExecutionRecord(BaseModel):
         Example:
             Direct children only::
 
-                >>> for child in record.list_execution_children():
+                >>> for child in record.list_execution_children():  # doctest: +SKIP
                 ...     print(f"Child: {child.execution_rid}")
 
             All descendants::
 
-                >>> for desc in record.list_execution_children(recurse=True):
+                >>> for desc in record.list_execution_children(recurse=True):  # doctest: +SKIP
                 ...     print(f"Descendant: {desc.execution_rid}")
         """
         if self._ml_instance is None:
@@ -477,12 +477,12 @@ class ExecutionRecord(BaseModel):
         Example:
             Direct parents only::
 
-                >>> for parent in record.list_execution_parents():
+                >>> for parent in record.list_execution_parents():  # doctest: +SKIP
                 ...     print(f"Parent: {parent.execution_rid}")
 
             All ancestors::
 
-                >>> for anc in record.list_execution_parents(recurse=True):
+                >>> for anc in record.list_execution_parents(recurse=True):  # doctest: +SKIP
                 ...     print(f"Ancestor: {anc.execution_rid}")
         """
         if self._ml_instance is None:
@@ -540,9 +540,9 @@ class ExecutionRecord(BaseModel):
             DerivaMLException: If the catalog is read-only or not connected.
 
         Example:
-            >>> parent_record.add_nested_execution(child_record)
+            >>> parent_record.add_nested_execution(child_record)  # doctest: +SKIP
             >>> # Or by RID
-            >>> parent_record.add_nested_execution("3-XYZ9", sequence=1)
+            >>> parent_record.add_nested_execution("3-XYZ9", sequence=1)  # doctest: +SKIP
         """
         from deriva_ml.execution._helpers import insert_nested_execution_link
 
@@ -571,7 +571,7 @@ class ExecutionRecord(BaseModel):
             DerivaMLException: If not bound to a catalog.
 
         Example:
-            >>> for ds in record.list_input_datasets():
+            >>> for ds in record.list_input_datasets():  # doctest: +SKIP
             ...     print(f"Dataset: {ds.dataset_rid} version {ds.current_version}")
         """
         if self._ml_instance is None:
@@ -599,10 +599,10 @@ class ExecutionRecord(BaseModel):
 
         Example:
             >>> # Get all input assets
-            >>> for asset in record.list_assets(asset_role="Input"):
+            >>> for asset in record.list_assets(asset_role="Input"):  # doctest: +SKIP
             ...     print(f"Input Asset: {asset.asset_rid} - {asset.filename}")
             >>> # Get all output assets
-            >>> for asset in record.list_assets(asset_role="Output"):
+            >>> for asset in record.list_assets(asset_role="Output"):  # doctest: +SKIP
             ...     print(f"Output Asset: {asset.asset_rid}")
         """
 

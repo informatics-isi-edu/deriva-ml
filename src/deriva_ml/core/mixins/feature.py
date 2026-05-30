@@ -115,7 +115,7 @@ class FeatureMixin:
                 ...     comment="Clinical diagnosis label"
                 ... )
                 >>> # Use the returned class to create validated feature instances
-                >>> record = DiagnosisFeature(
+                >>> record = DiagnosisFeature(  # doctest: +SKIP
                 ...     Image="1-ABC",  # Target record RID
                 ...     Diagnosis_Type="Normal",  # Vocabulary term
                 ...     confidence=0.95,
@@ -231,7 +231,7 @@ class FeatureMixin:
             >>> DiagnosisFeature = ml.feature_record_class("Image", "Diagnosis")  # doctest: +SKIP
             >>>
             >>> # Create a validated feature record
-            >>> record = DiagnosisFeature(
+            >>> record = DiagnosisFeature(  # doctest: +SKIP
             ...     Image="1-ABC",           # Target record RID
             ...     Diagnosis_Type="Normal", # Vocabulary term
             ...     confidence=0.95,         # Metadata column
@@ -239,7 +239,7 @@ class FeatureMixin:
             ... )
             >>>
             >>> # Convert to dict for insertion
-            >>> record.model_dump()
+            >>> record.model_dump()  # doctest: +SKIP
             {'Image': '1-ABC', 'Diagnosis_Type': 'Normal', 'confidence': 0.95, ...}
         """
         # Look up a feature and return its record class
@@ -263,7 +263,7 @@ class FeatureMixin:
 
         Example:
             >>> success = ml.delete_feature("samples", "obsolete_feature")  # doctest: +SKIP
-            >>> print("Deleted" if success else "Not found")
+            >>> print("Deleted" if success else "Not found")  # doctest: +SKIP
         """
         # Get table reference and find feature
         table = self.model.name_to_table(table)
@@ -317,10 +317,10 @@ class FeatureMixin:
 
         Example:
             >>> feature = ml.lookup_feature("Image", "Classification")  # doctest: +SKIP
-            >>> print(f"Feature: {feature.feature_name}")
-            >>> print(f"Stored in: {feature.feature_table.name}")
-            >>> print(f"Term columns: {[c.name for c in feature.term_columns]}")
-            >>> print(f"Value columns: {[c.name for c in feature.value_columns]}")
+            >>> print(f"Feature: {feature.feature_name}")  # doctest: +SKIP
+            >>> print(f"Stored in: {feature.feature_table.name}")  # doctest: +SKIP
+            >>> print(f"Term columns: {[c.name for c in feature.term_columns]}")  # doctest: +SKIP
+            >>> print(f"Value columns: {[c.name for c in feature.value_columns]}")  # doctest: +SKIP
         """
         return self.model.lookup_feature(table, feature_name)
 
@@ -344,12 +344,12 @@ class FeatureMixin:
         Examples:
             Find all feature definitions:
                 >>> all_features = ml.find_features()  # doctest: +SKIP
-                >>> for f in all_features:
+                >>> for f in all_features:  # doctest: +SKIP
                 ...     print(f"{f.target_table.name}.{f.feature_name}")
 
             Find features defined on a specific table:
                 >>> image_features = ml.find_features("Image")  # doctest: +SKIP
-                >>> print([f.feature_name for f in image_features])
+                >>> print([f.feature_name for f in image_features])  # doctest: +SKIP
         """
         return list(self.model.find_features(table))
 

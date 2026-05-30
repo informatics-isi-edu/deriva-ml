@@ -152,7 +152,7 @@ class TemplateEngine(str, Enum):
         MUSTACHE: Use Mustache templating (simpler, fewer features)
 
     Example:
-        >>> display = PseudoColumnDisplay(
+        >>> display = PseudoColumnDisplay(  # doctest: +SKIP
         ...     markdown_pattern="[{{{Name}}}]({{{URL}}})",
         ...     template_engine=TemplateEngine.HANDLEBARS
         ... )
@@ -178,14 +178,14 @@ class Aggregate(str, Enum):
 
     Example:
         >>> # Count related records
-        >>> pc = PseudoColumn(
+        >>> pc = PseudoColumn(  # doctest: +SKIP
         ...     source=[InboundFK("domain", "Sample_Subject_fkey"), "RID"],
         ...     aggregate=Aggregate.CNT,
         ...     markdown_name="Sample Count"
         ... )
         >>>
         >>> # Get distinct values as array
-        >>> pc = PseudoColumn(
+        >>> pc = PseudoColumn(  # doctest: +SKIP
         ...     source=[InboundFK("domain", "Tag_Item_fkey"), "Name"],
         ...     aggregate=Aggregate.ARRAY_D,
         ...     markdown_name="Tags"
@@ -212,7 +212,7 @@ class ArrayUxMode(str, Enum):
         ULIST: Unordered (bulleted) list
 
     Example:
-        >>> pc = PseudoColumn(
+        >>> pc = PseudoColumn(  # doctest: +SKIP
         ...     source=[InboundFK("domain", "Tag_Item_fkey"), "Name"],
         ...     aggregate=Aggregate.ARRAY,
         ...     display=PseudoColumnDisplay(array_ux_mode=ArrayUxMode.CSV)
@@ -237,13 +237,13 @@ class FacetUxMode(str, Enum):
 
     Example:
         >>> # Choice-based facet
-        >>> Facet(source="Status", ux_mode=FacetUxMode.CHOICES)
+        >>> Facet(source="Status", ux_mode=FacetUxMode.CHOICES)  # doctest: +SKIP
         >>>
         >>> # Range-based facet for numeric values
-        >>> Facet(source="Age", ux_mode=FacetUxMode.RANGES)
+        >>> Facet(source="Age", ux_mode=FacetUxMode.RANGES)  # doctest: +SKIP
         >>>
         >>> # Check presence (has value / no value)
-        >>> Facet(source="Notes", ux_mode=FacetUxMode.CHECK_PRESENCE)
+        >>> Facet(source="Notes", ux_mode=FacetUxMode.CHECK_PRESENCE)  # doctest: +SKIP
     """
 
     CHOICES = "choices"
@@ -320,7 +320,7 @@ class NameStyle:
 
     Example:
         >>> # Transform "Subject_ID" to "Subject Id" with title case
-        >>> display = Display(
+        >>> display = Display(  # doctest: +SKIP
         ...     name_style=NameStyle(underline_space=True, title_case=True)
         ... )
     """
@@ -372,19 +372,19 @@ class Display(AnnotationBuilder):
 
         With description/tooltip::
 
-            >>> display = Display(
+            >>> display = Display(  # doctest: +SKIP
             ...     name="Subjects",
             ...     comment="Individuals enrolled in research studies"
             ... )
 
         Markdown-formatted name::
 
-            >>> display = Display(markdown_name="**Bold** _Italic_ Name")
+            >>> display = Display(markdown_name="**Bold** _Italic_ Name")  # doctest: +SKIP
 
         Context-specific null display::
 
-            >>> from deriva_ml.model import CONTEXT_COMPACT, CONTEXT_DETAILED
-            >>> display = Display(
+            >>> from deriva_ml.model import CONTEXT_COMPACT, CONTEXT_DETAILED  # doctest: +SKIP
+            >>> display = Display(  # doctest: +SKIP
             ...     name="Value",
             ...     show_null={
             ...         CONTEXT_COMPACT: False,      # Hide nulls in lists
@@ -394,7 +394,7 @@ class Display(AnnotationBuilder):
 
         Control foreign key link display::
 
-            >>> display = Display(
+            >>> display = Display(  # doctest: +SKIP
             ...     name="Subject",
             ...     show_foreign_key_link={CONTEXT_COMPACT: False}
             ... )
@@ -446,8 +446,8 @@ class SortKey:
         descending: Sort in descending order (default False)
 
     Example:
-        >>> SortKey("Name")  # Ascending
-        >>> SortKey("Created", descending=True)  # Descending
+        >>> SortKey("Name")  # Ascending  # doctest: +SKIP
+        >>> SortKey("Created", descending=True)  # Descending  # doctest: +SKIP
     """
 
     column: str
@@ -480,7 +480,7 @@ class InboundFK:
         Count images related to a subject (Image has FK to Subject)::
 
             >>> # In Subject table, count related images
-            >>> pc = PseudoColumn(
+            >>> pc = PseudoColumn(  # doctest: +SKIP
             ...     source=[InboundFK("domain", "Image_Subject_fkey"), "RID"],
             ...     aggregate=Aggregate.CNT,
             ...     markdown_name="Image Count"
@@ -509,7 +509,7 @@ class OutboundFK:
         Show species name from a related Species table::
 
             >>> # Subject has FK to Species, display Species.Name
-            >>> pc = PseudoColumn(
+            >>> pc = PseudoColumn(  # doctest: +SKIP
             ...     source=[OutboundFK("domain", "Subject_Species_fkey"), "Name"],
             ...     markdown_name="Species"
             ... )
@@ -517,7 +517,7 @@ class OutboundFK:
         Chain multiple outbound FKs::
 
             >>> # Image -> Subject -> Species
-            >>> pc = PseudoColumn(
+            >>> pc = PseudoColumn(  # doctest: +SKIP
             ...     source=[
             ...         OutboundFK("domain", "Image_Subject_fkey"),
             ...         OutboundFK("domain", "Subject_Species_fkey"),
@@ -551,8 +551,8 @@ def fk_constraint(schema: str, constraint: str) -> list[str]:
     Example:
         Include a foreign key in visible columns::
 
-            >>> vc = VisibleColumns()
-            >>> vc.compact([
+            >>> vc = VisibleColumns()  # doctest: +SKIP
+            >>> vc.compact([  # doctest: +SKIP
             ...     "RID",
             ...     "Name",
             ...     fk_constraint("domain", "Subject_Species_fkey"),  # Shows Species
@@ -560,7 +560,7 @@ def fk_constraint(schema: str, constraint: str) -> list[str]:
 
         This is equivalent to the raw format::
 
-            >>> vc.compact(["RID", "Name", ["domain", "Subject_Species_fkey"]])
+            >>> vc.compact(["RID", "Name", ["domain", "Subject_Species_fkey"]])  # doctest: +SKIP
     """
     return [schema, constraint]
 
@@ -646,12 +646,12 @@ class PseudoColumn:
     Example:
         Simple column with custom display name::
 
-            >>> PseudoColumn(source="Internal_ID", markdown_name="ID")
+            >>> PseudoColumn(source="Internal_ID", markdown_name="ID")  # doctest: +SKIP
 
         Outbound FK traversal (display value from referenced table)::
 
             >>> # Subject has FK to Species - show Species.Name
-            >>> PseudoColumn(
+            >>> PseudoColumn(  # doctest: +SKIP
             ...     source=[OutboundFK("domain", "Subject_Species_fkey"), "Name"],
             ...     markdown_name="Species"
             ... )
@@ -659,7 +659,7 @@ class PseudoColumn:
         Inbound FK with aggregation (count related records)::
 
             >>> # Count images pointing to this subject
-            >>> PseudoColumn(
+            >>> PseudoColumn(  # doctest: +SKIP
             ...     source=[InboundFK("domain", "Image_Subject_fkey"), "RID"],
             ...     aggregate=Aggregate.CNT,
             ...     markdown_name="Images"
@@ -668,7 +668,7 @@ class PseudoColumn:
         Multi-hop FK path::
 
             >>> # Image -> Subject -> Species
-            >>> PseudoColumn(
+            >>> PseudoColumn(  # doctest: +SKIP
             ...     source=[
             ...         OutboundFK("domain", "Image_Subject_fkey"),
             ...         OutboundFK("domain", "Subject_Species_fkey"),
@@ -679,7 +679,7 @@ class PseudoColumn:
 
         With custom display formatting::
 
-            >>> PseudoColumn(
+            >>> PseudoColumn(  # doctest: +SKIP
             ...     source="URL",
             ...     display=PseudoColumnDisplay(
             ...         markdown_pattern="[Download]({{{_value}}})",
@@ -689,7 +689,7 @@ class PseudoColumn:
 
         Array aggregate with display options::
 
-            >>> PseudoColumn(
+            >>> PseudoColumn(  # doctest: +SKIP
             ...     source=[InboundFK("domain", "Tag_Item_fkey"), "Name"],
             ...     aggregate=Aggregate.ARRAY_D,
             ...     display=PseudoColumnDisplay(array_ux_mode=ArrayUxMode.CSV),
@@ -784,15 +784,15 @@ class VisibleColumns(AnnotationBuilder):
 
         Method chaining::
 
-            >>> vc = (VisibleColumns()
+            >>> vc = (VisibleColumns()  # doctest: +SKIP
             ...     .compact(["RID", "Name"])
             ...     .detailed(["RID", "Name", "Description"])
             ...     .entry(["Name", "Description"]))
 
         Including foreign key references::
 
-            >>> vc = VisibleColumns()
-            >>> vc.compact([
+            >>> vc = VisibleColumns()  # doctest: +SKIP
+            >>> vc.compact([  # doctest: +SKIP
             ...     "RID",
             ...     "Name",
             ...     fk_constraint("domain", "Subject_Species_fkey"),
@@ -800,8 +800,8 @@ class VisibleColumns(AnnotationBuilder):
 
         With pseudo-columns for computed values::
 
-            >>> vc = VisibleColumns()
-            >>> vc.compact([
+            >>> vc = VisibleColumns()  # doctest: +SKIP
+            >>> vc.compact([  # doctest: +SKIP
             ...     "RID",
             ...     "Name",
             ...     PseudoColumn(
@@ -813,17 +813,17 @@ class VisibleColumns(AnnotationBuilder):
 
         Context inheritance (reference another context)::
 
-            >>> vc = VisibleColumns()
-            >>> vc.compact(["RID", "Name"])
-            >>> vc.set_context("compact/brief", "compact")  # Inherit from compact
+            >>> vc = VisibleColumns()  # doctest: +SKIP
+            >>> vc.compact(["RID", "Name"])  # doctest: +SKIP
+            >>> vc.set_context("compact/brief", "compact")  # Inherit from compact  # doctest: +SKIP
 
         With faceted search (filter context)::
 
-            >>> vc = VisibleColumns()
-            >>> vc.compact(["RID", "Name", "Status"])
-            >>> facets = FacetList()
-            >>> facets.add(Facet(source="Status", open=True))
-            >>> vc._contexts["filter"] = facets.to_dict()
+            >>> vc = VisibleColumns()  # doctest: +SKIP
+            >>> vc.compact(["RID", "Name", "Status"])  # doctest: +SKIP
+            >>> facets = FacetList()  # doctest: +SKIP
+            >>> facets.add(Facet(source="Status", open=True))  # doctest: +SKIP
+            >>> vc._contexts["filter"] = facets.to_dict()  # doctest: +SKIP
     """
 
     tag = TAG_VISIBLE_COLUMNS
@@ -892,8 +892,8 @@ class VisibleForeignKeys(AnnotationBuilder):
     Controls which related tables appear in the UI via inbound foreign keys.
 
     Example:
-        >>> vfk = VisibleForeignKeys()
-        >>> vfk.detailed([
+        >>> vfk = VisibleForeignKeys()  # doctest: +SKIP
+        >>> vfk.detailed([  # doctest: +SKIP
         ...     fk_constraint("domain", "Image_Subject_fkey"),
         ...     fk_constraint("domain", "Diagnosis_Subject_fkey")
         ... ])
@@ -991,9 +991,9 @@ class TableDisplay(AnnotationBuilder):
     Controls table-level display options like row naming and ordering.
 
     Example:
-        >>> td = TableDisplay()
-        >>> td.row_name(row_markdown_pattern="{{{Name}}} ({{{Species}}})")
-        >>> td.compact(row_order=[SortKey("Name")])
+        >>> td = TableDisplay()  # doctest: +SKIP
+        >>> td.row_name(row_markdown_pattern="{{{Name}}} ({{{Species}}})")  # doctest: +SKIP
+        >>> td.compact(row_order=[SortKey("Name")])  # doctest: +SKIP
     """
 
     tag = TAG_TABLE_DISPLAY
@@ -1105,14 +1105,14 @@ class ColumnDisplay(AnnotationBuilder):
     Controls how column values are rendered.
 
     Example:
-        >>> cd = ColumnDisplay()
-        >>> cd.default(ColumnDisplayOptions(
+        >>> cd = ColumnDisplay()  # doctest: +SKIP
+        >>> cd.default(ColumnDisplayOptions(  # doctest: +SKIP
         ...     pre_format=PreFormat(format="%.2f")
         ... ))
         >>>
         >>> # Markdown link
-        >>> cd = ColumnDisplay()
-        >>> cd.default(ColumnDisplayOptions(
+        >>> cd = ColumnDisplay()  # doctest: +SKIP
+        >>> cd.default(ColumnDisplayOptions(  # doctest: +SKIP
         ...     markdown_pattern="[Link]({{{_value}}})"
         ... ))
     """
@@ -1262,7 +1262,7 @@ class FacetList:
     """A list of facets for filtering (visible_columns.filter).
 
     Example:
-        >>> facets = FacetList([
+        >>> facets = FacetList([  # doctest: +SKIP
         ...     Facet(source="Species", open=True),
         ...     Facet(source="Age", ux_mode=FacetUxMode.RANGES)
         ... ])

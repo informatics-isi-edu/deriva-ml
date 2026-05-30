@@ -630,7 +630,7 @@ class DatasetMixin:
         Example:
             Validate two specs, one good and one with a typo'd version::
 
-                >>> from deriva_ml.dataset.aux_classes import DatasetSpec
+                >>> from deriva_ml.dataset.aux_classes import DatasetSpec  # doctest: +SKIP
                 >>> report = ml.validate_dataset_specs(specs=[  # doctest: +SKIP
                 ...     DatasetSpec(rid="2-B4C8", version="0.4.0"),
                 ...     DatasetSpec(rid="2-B4C8", version="9.9.9"),
@@ -701,9 +701,9 @@ class DatasetMixin:
         Example:
             Validate a config before invoking ``deriva-ml-run``::
 
-                >>> from deriva_ml.execution import ExecutionConfiguration
-                >>> from deriva_ml.dataset.aux_classes import DatasetSpec
-                >>> from deriva_ml.asset.aux_classes import AssetSpec
+                >>> from deriva_ml.execution import ExecutionConfiguration  # doctest: +SKIP
+                >>> from deriva_ml.dataset.aux_classes import DatasetSpec  # doctest: +SKIP
+                >>> from deriva_ml.asset.aux_classes import AssetSpec  # doctest: +SKIP
                 >>> config = ExecutionConfiguration(  # doctest: +SKIP
                 ...     workflow=workflow,
                 ...     datasets=[DatasetSpec(rid="2-B4C8", version="0.4.0")],

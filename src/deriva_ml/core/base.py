@@ -6,9 +6,9 @@ functionality for managing features, vocabularies, and other ML-related operatio
 The module requires a catalog that implements a 'deriva-ml' schema with specific tables and relationships.
 
 Typical usage example:
-    >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-    >>> ml.create_feature('my_table', 'new_feature')
-    >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')
+    >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+    >>> ml.create_feature('my_table', 'new_feature')  # doctest: +SKIP
+    >>> ml.add_term('vocabulary_table', 'new_term', description='Description of term')  # doctest: +SKIP
 """
 
 from __future__ import annotations  # noqa: I001
@@ -156,25 +156,25 @@ class DerivaML(
         This pattern allows hydra-zen's `instantiate()` to work with DerivaML:
 
         Example with hydra-zen:
-            >>> from hydra_zen import builds, instantiate
-            >>> from deriva_ml import DerivaML
-            >>> from deriva_ml.core.config import DerivaMLConfig
+            >>> from hydra_zen import builds, instantiate  # doctest: +SKIP
+            >>> from deriva_ml import DerivaML  # doctest: +SKIP
+            >>> from deriva_ml.core.config import DerivaMLConfig  # doctest: +SKIP
             >>>
             >>> # Create a structured config using hydra-zen
-            >>> DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)
+            >>> DerivaMLConf = builds(DerivaMLConfig, populate_full_signature=True)  # doctest: +SKIP
             >>>
             >>> # Configure for your environment
-            >>> conf = DerivaMLConf(
+            >>> conf = DerivaMLConf(  # doctest: +SKIP
             ...     hostname='deriva.example.org',
             ...     catalog_id='42',
             ...     domain_schemas={'my_domain'},
             ... )
             >>>
             >>> # Instantiate the config to get a DerivaMLConfig object
-            >>> config = instantiate(conf)
+            >>> config = instantiate(conf)  # doctest: +SKIP
             >>>
             >>> # Create the DerivaML instance
-            >>> ml = DerivaML.instantiate(config)
+            >>> ml = DerivaML.instantiate(config)  # doctest: +SKIP
 
         Args:
             config: A DerivaMLConfig object containing all configuration parameters.
@@ -727,7 +727,8 @@ class DerivaML(
 
         Example:
             >>> config = DerivaML._get_session_config()
-            >>> print(config['retry_read']) # 8
+            >>> config['retry_read']
+            8
         """
         # Start with a default configuration
         session_config = DEFAULT_SESSION_CONFIG.copy()
@@ -809,7 +810,7 @@ class DerivaML(
             or stage in SQLite for later upload (offline). See spec §2.1.
 
         Example:
-            >>> ml.mode is ConnectionMode.online
+            >>> ml.mode is ConnectionMode.online  # doctest: +SKIP
             True
         """
         return self._mode
@@ -832,8 +833,8 @@ class DerivaML(
             Path: Directory path where downloaded files should be stored.
 
         Example:
-            >>> cache_dir = ml.download_dir(cached=True)
-            >>> work_dir = ml.download_dir(cached=False)
+            >>> cache_dir = ml.download_dir(cached=True)  # doctest: +SKIP
+            >>> work_dir = ml.download_dir(cached=False)  # doctest: +SKIP
         """
         # Return cache directory if cached=True, otherwise working directory
         return self.cache_dir if cached else self.working_dir
@@ -1003,11 +1004,11 @@ class DerivaML(
 
         Examples:
             Using table name:
-                >>> ml.chaise_url("experiment_table")
+                >>> ml.chaise_url("experiment_table")  # doctest: +SKIP
                 'https://deriva.org/chaise/recordset/#1/schema:experiment_table'
 
             Using RID:
-                >>> ml.chaise_url("1-abc123")
+                >>> ml.chaise_url("1-abc123")  # doctest: +SKIP
         """
         # Get the table object and build base URI
         table_obj = self.model.name_to_table(table)
@@ -1040,21 +1041,21 @@ class DerivaML(
 
         Examples:
             Permanent citation (default):
-                >>> url = ml.cite("1-abc123")
-                >>> print(url)
+                >>> url = ml.cite("1-abc123")  # doctest: +SKIP
+                >>> print(url)  # doctest: +SKIP
                 'https://deriva.org/id/1/1-abc123@2024-01-01T12:00:00'
 
             Current catalog URL:
-                >>> url = ml.cite("1-abc123", current=True)
-                >>> print(url)
+                >>> url = ml.cite("1-abc123", current=True)  # doctest: +SKIP
+                >>> print(url)  # doctest: +SKIP
                 'https://deriva.org/id/1/1-abc123'
 
             Using a dictionary:
-                >>> url = ml.cite({"RID": "1-abc123"})
+                >>> url = ml.cite({"RID": "1-abc123"})  # doctest: +SKIP
 
             Dry-run sentinel — no catalog round-trip, no clickable link:
-                >>> url = ml.cite("0000")
-                >>> print(url)
+                >>> url = ml.cite("0000")  # doctest: +SKIP
+                >>> print(url)  # doctest: +SKIP
                 'dry-run (rid=0000)'
         """
         # Dry-run sentinel: ``run_notebook(dry_run=True)`` and friends
@@ -1156,11 +1157,11 @@ class DerivaML(
             head_title: Title displayed in the browser tab.
 
         Example:
-            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
             >>> # After creating domain schema and tables...
-            >>> ml.apply_catalog_annotations()
+            >>> ml.apply_catalog_annotations()  # doctest: +SKIP
             >>> # Or with custom branding:
-            >>> ml.apply_catalog_annotations("My Project Browser", "My ML Project")
+            >>> ml.apply_catalog_annotations("My Project Browser", "My ML Project")  # doctest: +SKIP
         """
         # Single source of truth lives in
         # :mod:`deriva_ml.schema.annotations`. Delegate to it.
@@ -1197,7 +1198,7 @@ class DerivaML(
         Examples:
             Create a vocabulary for tissue types:
 
-                >>> table = ml.create_vocabulary(
+                >>> table = ml.create_vocabulary(  # doctest: +SKIP
                 ...     vocab_name="tissue_types",
                 ...     comment="Standard tissue classifications",
                 ...     schema="bio_schema"
@@ -1205,9 +1206,9 @@ class DerivaML(
 
             Create multiple vocabularies without updating navbar until the end:
 
-                >>> ml.create_vocabulary("Species", update_navbar=False)
-                >>> ml.create_vocabulary("Tissue_Type", update_navbar=False)
-                >>> ml.apply_catalog_annotations()  # Update navbar once
+                >>> ml.create_vocabulary("Species", update_navbar=False)  # doctest: +SKIP
+                >>> ml.create_vocabulary("Tissue_Type", update_navbar=False)  # doctest: +SKIP
+                >>> ml.apply_catalog_annotations()  # Update navbar once  # doctest: +SKIP
         """
         # Use default schema if none specified
         schema = schema or self.model._require_default_schema()
@@ -1267,9 +1268,9 @@ class DerivaML(
         Examples:
             **Simple table with basic columns**:
 
-                >>> from deriva_ml import TableDefinition, ColumnDefinition, BuiltinTypes
+                >>> from deriva_ml import TableDefinition, ColumnDefinition, BuiltinTypes  # doctest: +SKIP
                 >>>
-                >>> table_def = TableDefinition(
+                >>> table_def = TableDefinition(  # doctest: +SKIP
                 ...     name="Experiment",
                 ...     column_defs=[
                 ...         ColumnDefinition(name="Name", type=BuiltinTypes.text, nullok=False),
@@ -1279,16 +1280,16 @@ class DerivaML(
                 ...     ],
                 ...     comment="Records of experimental runs"
                 ... )
-                >>> experiment_table = ml.create_table(table_def)
+                >>> experiment_table = ml.create_table(table_def)  # doctest: +SKIP
 
             **Table with foreign key to another table**:
 
-                >>> from deriva_ml import (
+                >>> from deriva_ml import (  # doctest: +SKIP
                 ...     TableDefinition, ColumnDefinition, ForeignKeyDefinition, BuiltinTypes
                 ... )
                 >>>
                 >>> # Create a Sample table that references Subject
-                >>> sample_def = TableDefinition(
+                >>> sample_def = TableDefinition(  # doctest: +SKIP
                 ...     name="Sample",
                 ...     column_defs=[
                 ...         ColumnDefinition(name="Name", type=BuiltinTypes.text, nullok=False),
@@ -1306,15 +1307,15 @@ class DerivaML(
                 ...     ],
                 ...     comment="Biological samples collected from subjects"
                 ... )
-                >>> sample_table = ml.create_table(sample_def)
+                >>> sample_table = ml.create_table(sample_def)  # doctest: +SKIP
 
             **Table with unique key constraint**:
 
-                >>> from deriva_ml import (
+                >>> from deriva_ml import (  # doctest: +SKIP
                 ...     TableDefinition, ColumnDefinition, KeyDefinition, BuiltinTypes
                 ... )
                 >>>
-                >>> protocol_def = TableDefinition(
+                >>> protocol_def = TableDefinition(  # doctest: +SKIP
                 ...     name="Protocol",
                 ...     column_defs=[
                 ...         ColumnDefinition(name="Name", type=BuiltinTypes.text, nullok=False),
@@ -1330,14 +1331,14 @@ class DerivaML(
                 ...     ],
                 ...     comment="Experimental protocols with versioning"
                 ... )
-                >>> protocol_table = ml.create_table(protocol_def)
+                >>> protocol_table = ml.create_table(protocol_def)  # doctest: +SKIP
 
             **Batch creation without navbar updates**:
 
-                >>> ml.create_table(table1_def, update_navbar=False)
-                >>> ml.create_table(table2_def, update_navbar=False)
-                >>> ml.create_table(table3_def, update_navbar=False)
-                >>> ml.apply_catalog_annotations()  # Update navbar once at the end
+                >>> ml.create_table(table1_def, update_navbar=False)  # doctest: +SKIP
+                >>> ml.create_table(table2_def, update_navbar=False)  # doctest: +SKIP
+                >>> ml.create_table(table3_def, update_navbar=False)  # doctest: +SKIP
+                >>> ml.apply_catalog_annotations()  # Update navbar once at the end  # doctest: +SKIP
         """
         # Use default schema if none specified
         schema = schema or self.model._require_default_schema()
@@ -1424,13 +1425,13 @@ class DerivaML(
                 - 'errors': Number of removal errors
 
         Example:
-            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
             >>> # Clear all cache
-            >>> result = ml.clear_cache()
-            >>> print(f"Freed {result['bytes_freed'] / 1e6:.1f} MB")
+            >>> result = ml.clear_cache()  # doctest: +SKIP
+            >>> print(f"Freed {result['bytes_freed'] / 1e6:.1f} MB")  # doctest: +SKIP
             >>>
             >>> # Clear cache older than 7 days
-            >>> result = ml.clear_cache(older_than_days=7)
+            >>> result = ml.clear_cache(older_than_days=7)  # doctest: +SKIP
         """
         import shutil
         import time
@@ -1485,9 +1486,9 @@ class DerivaML(
                 - 'dir_count': Number of directories
 
         Example:
-            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-            >>> size = ml.get_cache_size()
-            >>> print(f"Cache size: {size['total_mb']:.1f} MB ({size['file_count']} files)")
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> size = ml.get_cache_size()  # doctest: +SKIP
+            >>> print(f"Cache size: {size['total_mb']:.1f} MB ({size['file_count']} files)")  # doctest: +SKIP
         """
         stats = {"total_bytes": 0, "total_mb": 0.0, "file_count": 0, "dir_count": 0}
 
@@ -1520,9 +1521,9 @@ class DerivaML(
                 - 'file_count': Number of files
 
         Example:
-            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-            >>> dirs = ml.list_execution_dirs()
-            >>> for d in dirs:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> dirs = ml.list_execution_dirs()  # doctest: +SKIP
+            >>> for d in dirs:  # doctest: +SKIP
             ...     print(f"{d['execution_rid']}: {d['size_mb']:.1f} MB")
         """
         from datetime import datetime
@@ -1576,13 +1577,13 @@ class DerivaML(
                 - 'errors': Number of removal errors
 
         Example:
-            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
             >>> # Clean all execution dirs older than 30 days
-            >>> result = ml.clean_execution_dirs(older_than_days=30)
-            >>> print(f"Freed {result['bytes_freed'] / 1e9:.2f} GB")
+            >>> result = ml.clean_execution_dirs(older_than_days=30)  # doctest: +SKIP
+            >>> print(f"Freed {result['bytes_freed'] / 1e9:.2f} GB")  # doctest: +SKIP
             >>>
             >>> # Clean all except specific executions
-            >>> result = ml.clean_execution_dirs(exclude_rids=['1-ABC', '1-DEF'])
+            >>> result = ml.clean_execution_dirs(exclude_rids=['1-ABC', '1-DEF'])  # doctest: +SKIP
         """
         import shutil
         import time
@@ -1641,11 +1642,11 @@ class DerivaML(
                 - 'total_size_mb': Combined size in MB
 
         Example:
-            >>> ml = DerivaML('deriva.example.org', 'my_catalog')
-            >>> summary = ml.get_storage_summary()
-            >>> print(f"Total storage: {summary['total_size_mb']:.1f} MB")
-            >>> print(f"  Cache: {summary['cache_size_mb']:.1f} MB")
-            >>> print(f"  Executions: {summary['execution_size_mb']:.1f} MB")
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> summary = ml.get_storage_summary()  # doctest: +SKIP
+            >>> print(f"Total storage: {summary['total_size_mb']:.1f} MB")  # doctest: +SKIP
+            >>> print(f"  Cache: {summary['cache_size_mb']:.1f} MB")  # doctest: +SKIP
+            >>> print(f"  Executions: {summary['execution_size_mb']:.1f} MB")  # doctest: +SKIP
         """
         cache_stats = self.get_cache_size()
         exec_dirs = self.list_execution_dirs()

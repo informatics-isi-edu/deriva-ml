@@ -145,8 +145,8 @@ class VocabularyMixin:
                 ...     synonyms=["epithelium"]
                 ... )
                 >>> # Modify the term
-                >>> term.description = "Updated description"
-                >>> term.synonyms = ("epithelium", "epithelial_tissue")
+                >>> term.description = "Updated description"  # doctest: +SKIP
+                >>> term.synonyms = ("epithelium", "epithelial_tissue")  # doctest: +SKIP
 
             Attempt to add an existing term:
                 >>> term = ml.add_term("tissue_types", "epithelial", "...", exists_ok=True)  # doctest: +SKIP
@@ -221,15 +221,15 @@ class VocabularyMixin:
         Examples:
             Look up by primary name:
                 >>> term = ml.lookup_term("tissue_types", "epithelial")  # doctest: +SKIP
-                >>> print(term.description)
+                >>> print(term.description)  # doctest: +SKIP
 
             Look up by synonym:
                 >>> term = ml.lookup_term("tissue_types", "epithelium")  # doctest: +SKIP
 
             Modify the term:
                 >>> term = ml.lookup_term("tissue_types", "epithelial")  # doctest: +SKIP
-                >>> term.description = "Updated description"
-                >>> term.synonyms = ("epithelium", "epithelial_tissue")
+                >>> term.description = "Updated description"  # doctest: +SKIP
+                >>> term.synonyms = ("epithelium", "epithelial_tissue")  # doctest: +SKIP
         """
         # Get and validate vocabulary table reference. Mirror
         # add_term's typed guard so all three "not a vocabulary
@@ -318,7 +318,7 @@ class VocabularyMixin:
 
         Examples:
             >>> terms = ml.list_vocabulary_terms("tissue_types")  # doctest: +SKIP
-            >>> for term in terms:
+            >>> for term in terms:  # doctest: +SKIP
             ...     print(f"{term.name}: {term.description}")
             ...     if term.synonyms:
             ...         print(f"  Synonyms: {', '.join(term.synonyms)}")

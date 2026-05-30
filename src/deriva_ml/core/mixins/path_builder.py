@@ -89,10 +89,10 @@ class PathBuilderMixin:
             DerivaMLException: If no schema specified and default_schema is not set.
 
         Example:
-            >>> domain = ml._domain_path()  # Uses default schema
-            >>> results = domain.my_table.entities().fetch()
+            >>> domain = ml._domain_path()  # Uses default schema  # doctest: +SKIP
+            >>> results = domain.my_table.entities().fetch()  # doctest: +SKIP
             >>> # Or with explicit schema:
-            >>> domain = ml._domain_path("my_schema")
+            >>> domain = ml._domain_path("my_schema")  # doctest: +SKIP
         """
         schema = schema or self.model._require_default_schema()
         return self.pathBuilder().schemas[schema]

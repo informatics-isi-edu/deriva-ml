@@ -42,7 +42,7 @@ class AssetFilePath(Path):
 
     Example:
         >>> path = exe.asset_file_path("Image", "scan.jpg")  # doctest: +SKIP
-        >>> # Set typed metadata via AssetRecord  # doctest: +SKIP
+        >>> # Set typed metadata via AssetRecord
         >>> ImageAsset = ml.asset_record_class("Image")  # doctest: +SKIP
         >>> path.metadata = ImageAsset(Subject="2-DEF", Acquisition_Date="2026-01-15")  # doctest: +SKIP
         >>> path.set_asset_types(["Training_Data"])  # doctest: +SKIP

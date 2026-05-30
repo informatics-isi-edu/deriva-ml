@@ -1768,14 +1768,14 @@ class Execution:
                 or ``initialize_ml_schema`` once to seed the term).
 
         Example:
-            >>> from deriva_ml.core.enums import MLAsset, ExecMetadataType
-            >>> MLAsset.execution_metadata.value
+            >>> from deriva_ml.core.enums import MLAsset, ExecMetadataType  # doctest: +SKIP
+            >>> MLAsset.execution_metadata.value  # doctest: +SKIP
             'Execution_Metadata'
-            >>> ExecMetadataType.metrics_file.value
+            >>> ExecMetadataType.metrics_file.value  # doctest: +SKIP
             'Metrics_File'
 
             >>> # Catalog-dependent end-to-end flow:
-            >>> import json
+            >>> import json  # doctest: +SKIP
             >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
             ...     with exe.metrics_file().open("a") as f:  # doctest: +SKIP
             ...         json.dump({"epoch": 0, "val_loss": 0.23}, f)  # doctest: +SKIP

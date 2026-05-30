@@ -234,7 +234,7 @@ class FileMixin:
         Examples:
             List all files:
                 >>> files = ml.list_files()  # doctest: +SKIP
-                >>> for f in files:
+                >>> for f in files:  # doctest: +SKIP
                 ...     print(f"{f['RID']}: {f['URL']}")
 
             Filter by file type:

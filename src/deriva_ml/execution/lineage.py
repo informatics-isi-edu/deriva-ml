@@ -16,8 +16,8 @@ Example:
     Inspect the producer of the immediate node::
 
         >>> result = ml.lookup_lineage("3-XYZ", depth=0)  # doctest: +SKIP
-        >>> producer = result.lineage.execution
-        >>> print(producer.rid, producer.workflow.name if producer.workflow else None)
+        >>> producer = result.lineage.execution  # doctest: +SKIP
+        >>> print(producer.rid, producer.workflow.name if producer.workflow else None)  # doctest: +SKIP
 """
 
 from __future__ import annotations
@@ -192,8 +192,8 @@ class LineageResult(BaseModel):
         Walk lineage of an output asset and pretty-print the chain::
 
             >>> result = ml.lookup_lineage("3JSE")  # doctest: +SKIP
-            >>> assert result.walked_complete
-            >>> print(f"visited {result.executions_visited} executions")
+            >>> assert result.walked_complete  # doctest: +SKIP
+            >>> print(f"visited {result.executions_visited} executions")  # doctest: +SKIP
     """
 
     model_config = ConfigDict(extra="forbid")

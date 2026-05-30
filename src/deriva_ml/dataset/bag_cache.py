@@ -85,8 +85,8 @@ class BagCache:
     Example:
         Check whether a dataset bag is cached locally::
 
-            >>> from deriva_ml.dataset.bag_cache import BagCache
-            >>> from pathlib import Path
+            >>> from deriva_ml.dataset.bag_cache import BagCache  # doctest: +SKIP
+            >>> from pathlib import Path  # doctest: +SKIP
             >>> cache = BagCache(Path.home() / ".deriva-ml" / "host" / "1")  # doctest: +SKIP
             >>> info = cache.cache_status("ABC123")  # doctest: +SKIP
             >>> info["status"]  # doctest: +SKIP

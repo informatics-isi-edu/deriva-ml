@@ -315,8 +315,8 @@ class Workspace:
 
         Example:
             >>> ws = Workspace(working_dir=".", hostname="h", catalog_id="1")  # doctest: +SKIP
-            >>> store = ws.execution_state_store()
-            >>> store.executions   # the sqlalchemy.Table
+            >>> store = ws.execution_state_store()  # doctest: +SKIP
+            >>> store.executions   # the sqlalchemy.Table  # doctest: +SKIP
         """
         if self._execution_state_store is None:
             # Lazy import to avoid import cycle between workspace.py and

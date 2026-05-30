@@ -609,7 +609,7 @@ def create_catalog_execution(
         ...     workflow_rid="WFL-1",
         ...     description="first training run",
         ... )
-        >>> rid
+        >>> rid  # doctest: +SKIP
         'EXE-NEW'
     """
     body = [

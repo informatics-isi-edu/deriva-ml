@@ -168,40 +168,40 @@ def get_notebook_configuration(
     Example:
         In your notebook's configuration module (e.g., `configs/roc_analysis.py`):
 
-        >>> from dataclasses import dataclass, field
-        >>> from hydra_zen import builds, store
-        >>> from deriva_ml.execution import BaseConfig
+        >>> from dataclasses import dataclass, field  # doctest: +SKIP
+        >>> from hydra_zen import builds, store  # doctest: +SKIP
+        >>> from deriva_ml.execution import BaseConfig  # doctest: +SKIP
         >>>
-        >>> @dataclass
+        >>> @dataclass  # doctest: +SKIP
         ... class ROCAnalysisConfig(BaseConfig):
         ...     execution_rids: list[str] = field(default_factory=list)
         >>>
-        >>> ROCAnalysisConfigBuilds = builds(
+        >>> ROCAnalysisConfigBuilds = builds(  # doctest: +SKIP
         ...     ROCAnalysisConfig,
         ...     populate_full_signature=True,
         ...     hydra_defaults=["_self_", {"deriva_ml": "default_deriva"}],
         ... )
-        >>> store(ROCAnalysisConfigBuilds, name="roc_analysis")
+        >>> store(ROCAnalysisConfigBuilds, name="roc_analysis")  # doctest: +SKIP
 
         In your notebook:
 
-        >>> from configs import load_all_configs
-        >>> from configs.roc_analysis import ROCAnalysisConfigBuilds
-        >>> from deriva_ml.execution import get_notebook_configuration
+        >>> from configs import load_all_configs  # doctest: +SKIP
+        >>> from configs.roc_analysis import ROCAnalysisConfigBuilds  # doctest: +SKIP
+        >>> from deriva_ml.execution import get_notebook_configuration  # doctest: +SKIP
         >>>
         >>> # Load all project configs into hydra store
-        >>> load_all_configs()
+        >>> load_all_configs()  # doctest: +SKIP
         >>>
         >>> # Get resolved configuration
-        >>> config = get_notebook_configuration(
+        >>> config = get_notebook_configuration(  # doctest: +SKIP
         ...     ROCAnalysisConfigBuilds,
         ...     config_name="roc_analysis",
         ...     overrides=["execution_rids=[3JRC,3KT0]"],
         ... )
         >>>
         >>> # Use the configuration
-        >>> print(config.execution_rids)  # ['3JRC', '3KT0']
-        >>> print(config.deriva_ml.hostname)  # From default_deriva config
+        >>> print(config.execution_rids)  # ['3JRC', '3KT0']  # doctest: +SKIP
+        >>> print(config.deriva_ml.hostname)  # From default_deriva config  # doctest: +SKIP
 
     Environment Variables:
         DERIVA_ML_HYDRA_OVERRIDES: JSON-encoded list of override strings.
@@ -751,11 +751,11 @@ class DescribedList(list):
         description: Human-readable description of this configuration.
 
     Example:
-        >>> from hydra_zen import store
-        >>> from deriva_ml.execution import with_description
+        >>> from hydra_zen import store  # doctest: +SKIP
+        >>> from deriva_ml.execution import with_description  # doctest: +SKIP
         >>>
-        >>> asset_store = store(group="assets")
-        >>> asset_store(
+        >>> asset_store = store(group="assets")  # doctest: +SKIP
+        >>> asset_store(  # doctest: +SKIP
         ...     with_description(
         ...         ["3WMG", "3XPA"],
         ...         "Model weights from quick and extended training",
@@ -815,12 +815,12 @@ def with_description(items: list, description: str) -> Any:
         A hydra-zen config that instantiates to a DescribedList.
 
     Example:
-        >>> from hydra_zen import store
-        >>> from deriva_ml.execution import with_description
+        >>> from hydra_zen import store  # doctest: +SKIP
+        >>> from deriva_ml.execution import with_description  # doctest: +SKIP
         >>>
         >>> # Assets with description
-        >>> asset_store = store(group="assets")
-        >>> asset_store(
+        >>> asset_store = store(group="assets")  # doctest: +SKIP
+        >>> asset_store(  # doctest: +SKIP
         ...     with_description(
         ...         ["3WMG", "3XPA"],
         ...         "Model weights from quick and extended training runs",
@@ -829,9 +829,9 @@ def with_description(items: list, description: str) -> Any:
         ... )
         >>>
         >>> # Datasets with description
-        >>> from deriva_ml.dataset import DatasetSpecConfig
-        >>> datasets_store = store(group="datasets")
-        >>> datasets_store(
+        >>> from deriva_ml.dataset import DatasetSpecConfig  # doctest: +SKIP
+        >>> datasets_store = store(group="datasets")  # doctest: +SKIP
+        >>> datasets_store(  # doctest: +SKIP
         ...     with_description(
         ...         [DatasetSpecConfig(rid="28CT", version="0.21.0")],
         ...         "Complete CIFAR-10 dataset with 10,000 images",
@@ -848,7 +848,7 @@ def with_description(items: list, description: str) -> Any:
         For model configs created with `builds()`, use the `zen_meta` parameter
         instead:
 
-        >>> model_store(
+        >>> model_store(  # doctest: +SKIP
         ...     Cifar10CNNConfig,
         ...     name="cifar10_quick",
         ...     epochs=3,

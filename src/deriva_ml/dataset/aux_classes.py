@@ -86,8 +86,9 @@ class DatasetVersion(Version):
 
         Advance the release-segment for a release:
 
+            >>> from deriva_ml.dataset.aux_classes import VersionPart
             >>> DatasetVersion(0, 4, 0).next_release(VersionPart.minor)
-            <Version('0.5.0')>
+            <DatasetVersion('0.5.0')>
     """
 
     def __init__(
@@ -181,14 +182,15 @@ class DatasetVersion(Version):
             component advanced.
 
         Example:
+            >>> from deriva_ml.dataset.aux_classes import VersionPart
             >>> DatasetVersion(0, 4, 0).next_release(VersionPart.minor)
-            <Version('0.5.0')>
+            <DatasetVersion('0.5.0')>
             >>> DatasetVersion(0, 4, 7).next_release(VersionPart.major)
-            <Version('1.0.0')>
+            <DatasetVersion('1.0.0')>
             >>> DatasetVersion.parse("0.4.0.post1.dev3").next_release(
             ...     VersionPart.minor
             ... )
-            <Version('0.5.0')>
+            <DatasetVersion('0.5.0')>
         """
         match bump:
             case VersionPart.major:
@@ -372,17 +374,17 @@ class DatasetSpec(BaseModel):
         Example:
             Parse a shorthand with explicit version::
 
-                >>> spec = DatasetSpec.from_shorthand("1-XYZ@2.0.0")
+                >>> spec = DatasetSpec.from_shorthand("1-XYZ0@2.0.0")
                 >>> spec.rid
-                '1-XYZ'
+                '1-XYZ0'
                 >>> str(spec.version)
                 '2.0.0'
 
             Parse a bare RID (version defaults to ``0.0.0``)::
 
-                >>> spec = DatasetSpec.from_shorthand("1-XYZ")
+                >>> spec = DatasetSpec.from_shorthand("1-XYZ0")
                 >>> spec.rid
-                '1-XYZ'
+                '1-XYZ0'
         """
         if not s:
             raise ValueError("empty dataset shorthand")

@@ -125,7 +125,7 @@ class FileSpec(BaseModel):
                 >>> specs = FileSpec.create_filespecs("/data/images", "Images", ["Image"])  # doctest: +SKIP
 
             Dynamic file types based on extension:
-                >>> def get_types(path):
+                >>> def get_types(path):  # doctest: +SKIP
                 ...     ext = path.suffix.lower()
                 ...     return {"png": ["PNG", "Image"], ".jpg": ["JPEG", "Image"]}.get(ext, [])
                 >>> specs = FileSpec.create_filespecs("/data", "Mixed files", get_types)  # doctest: +SKIP
@@ -176,7 +176,7 @@ class FileSpec(BaseModel):
             FileSpec: Parsed FileSpec object for each valid line.
 
         Example:
-            >>> for spec in FileSpec.read_filespec("files.jsonl"):
+            >>> for spec in FileSpec.read_filespec("files.jsonl"):  # doctest: +SKIP
             ...     print(f"{spec.url}: {spec.md5}")
         """
         path = Path(path)
