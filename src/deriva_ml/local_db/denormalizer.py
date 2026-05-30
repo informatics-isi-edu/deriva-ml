@@ -631,6 +631,20 @@ class Denormalizer:
         objects with ``RCT`` populated — the same shape the legacy
         PathBuilder ``feature_values`` produced.
 
+        **Target-scoped: unrelated anchors are dropped, not errored.** A
+        feature read is scoped to a single target table plus its
+        feature-association table. When the dataset (catalog or bag) also
+        contains sibling element types that have no FK path to that target
+        — e.g. reading a ``CGM_Blood_Glucose`` feature from a dataset whose
+        members also include ``Subject`` and ``OCT_DICOM`` — those siblings
+        are case-6 "unrelated anchors". They are legitimately irrelevant to
+        this read and are dropped silently
+        (``ignore_unrelated_anchors=True``) rather than raising
+        :class:`DerivaMLDenormalizeUnrelatedAnchor`. This holds identically
+        for catalog-mode (:meth:`Dataset.feature_values`) and bag-mode
+        (:meth:`DatasetBag.feature_values`), the two callers of this method,
+        so both surfaces return the same rows on multi-element datasets.
+
         Args:
             feature: A :class:`~deriva_ml.feature.Feature` (from
                 ``lookup_feature``). Supplies the feature-association
@@ -663,11 +677,24 @@ class Denormalizer:
         # feature value (matching the PathBuilder "one row per feature-assoc
         # row" shape). The selector, when given, reduces multi-row groups
         # inside _denormalize_impl before we materialize records.
+        #
+        # ignore_unrelated_anchors=True: a feature read is intentionally
+        # scoped to ONE target table + its feature-association table. When
+        # the dataset has sibling element types unrelated to that target
+        # (e.g. an AIREADI dataset with CGM_Blood_Glucose + Subject +
+        # OCT_DICOM members, reading a CGM feature), those siblings are
+        # case-6 anchors with no FK path to the include set. They are
+        # legitimately irrelevant to this read and must be dropped
+        # silently, not error. This applies to BOTH the catalog-mode
+        # (Dataset) and bag-mode (DatasetBag) wrappers — the only callers
+        # of feature_records — so both surfaces stay in lockstep. (Without
+        # this, a multi-element-type bag raised DerivaMLDenormalizeUnrelatedAnchor
+        # where the live catalog returned rows.)
         result = self._run(
             [target_table_name, feat_table],
             row_per=feat_table,
             via=None,
-            ignore_unrelated_anchors=False,
+            ignore_unrelated_anchors=True,
             selector=selector,
         )
 
