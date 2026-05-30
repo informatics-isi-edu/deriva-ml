@@ -280,9 +280,9 @@ def validate_rids(
                         f"Dataset '{rid}' has no version information. Required version: {required_version}"
                     )
                 elif current_version != required_version:
-                    # Check if the required version exists in history
+                    # Check if the required version exists in history.
                     try:
-                        history = dataset.list_versions()
+                        history = dataset.dataset_history()
                         version_exists = any(str(h.dataset_version) == required_version for h in history)
                         if not version_exists:
                             result.add_error(
@@ -294,8 +294,17 @@ def validate_rids(
                             # Version exists but is not current - this is OK
                             result.validated_rids[rid]["version"] = required_version
                             result.validated_rids[rid]["current_version"] = current_version
-                    except Exception:
-                        # Can't check history, just warn
+                    except DerivaMLException:
+                        # Narrow catch: ``dataset_history()`` documents
+                        # ``DerivaMLException`` as its only failure mode (a
+                        # catalog read error, or the RID not being a valid
+                        # dataset RID). That is a genuine "can't read history"
+                        # condition we degrade to a warning rather than crash.
+                        # Deliberately NOT ``except Exception`` — programming
+                        # errors (AttributeError, TypeError) must propagate
+                        # loudly so a future typo can't silently downgrade a
+                        # hard version error to a warning, as a misnamed
+                        # ``list_versions()`` call once did.
                         result.add_warning(
                             f"Dataset '{rid}' current version ({current_version}) differs from "
                             f"required version ({required_version}). Could not verify version history."

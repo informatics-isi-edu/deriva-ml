@@ -15,6 +15,7 @@ import logging
 
 import pytest
 
+from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.core.logging_config import (
     DERIVA_LOGGERS,
     HYDRA_LOGGERS,
@@ -22,8 +23,8 @@ from deriva_ml.core.logging_config import (
     get_logger,
     is_hydra_initialized,
 )
-from deriva_ml.core.validation import ValidationResult
-
+from deriva_ml.core.validation import ValidationResult, validate_rids
+from deriva_ml.dataset.aux_classes import DatasetHistory, DatasetVersion
 
 # ---------------------------------------------------------------------------
 # ValidationResult — the missing direct coverage
@@ -262,3 +263,197 @@ class TestConfigureLogging:
         """The return value is the configured ``deriva_ml`` logger."""
         returned = configure_logging(level=logging.INFO)
         assert returned is clean_deriva_ml_logger
+
+
+# ---------------------------------------------------------------------------
+# validate_rids — dataset version-history branch
+# ---------------------------------------------------------------------------
+#
+# Regression coverage for the alignment-audit Batch A finding
+# (core/validation.py:285): the version-checking branch called a
+# nonexistent ``dataset.list_versions()`` inside a broad ``except
+# Exception``. The AttributeError was silently swallowed, so the
+# intended hard ERROR for a required version that does not exist in
+# history NEVER ran — every bad version requirement degraded to a
+# warning. The fix calls ``dataset.dataset_history()`` and narrows the
+# except to ``DerivaMLException`` so programming errors propagate.
+
+
+def _history(*versions: str, dataset_rid: str = "1-DSAA") -> list[DatasetHistory]:
+    """Build a ``DatasetHistory`` list with real ``DatasetVersion`` labels.
+
+    Mirrors what ``Dataset.dataset_history()`` returns so the validator
+    exercises ``h.dataset_version`` exactly as it does in production.
+
+    Args:
+        *versions: PEP 440 version strings, e.g. ``"1.0.0"``.
+        dataset_rid: RID stamped on each history entry.
+
+    Returns:
+        A list of :class:`DatasetHistory`, one entry per version.
+
+    Example:
+        >>> hist = _history("0.1.0", "1.0.0")
+        >>> [str(h.dataset_version) for h in hist]
+        ['0.1.0', '1.0.0']
+    """
+    return [
+        DatasetHistory(
+            dataset_version=DatasetVersion.parse(v),
+            dataset_rid=dataset_rid,
+            version_rid=f"{i}-V{i:03d}",
+            snapshot=f"snap{i}",
+        )
+        for i, v in enumerate(versions)
+    ]
+
+
+class _ResolvedInfo:
+    """Stand-in for ``BatchRidResult`` — validator reads only these two attrs."""
+
+    def __init__(self, table_name: str, schema_name: str) -> None:
+        self.table_name = table_name
+        self.schema_name = schema_name
+
+
+class _StubDataset:
+    """Stand-in for the ``Dataset`` returned by ``ml.lookup_dataset``.
+
+    Carries a ``current_version`` and a ``dataset_history()`` whose
+    return value (or raised exception) is scripted per test.
+    """
+
+    def __init__(
+        self,
+        current_version: str,
+        history: list[DatasetHistory] | None = None,
+        history_exc: BaseException | None = None,
+    ) -> None:
+        self.current_version = DatasetVersion.parse(current_version)
+        self._history = history or []
+        self._history_exc = history_exc
+
+    def dataset_history(self) -> list[DatasetHistory]:
+        if self._history_exc is not None:
+            raise self._history_exc
+        return self._history
+
+
+class _StubML:
+    """Minimal ``DerivaML`` stand-in for ``validate_rids`` version checks.
+
+    ``validate_rids`` touches only ``resolve_rids`` (for batch RID
+    resolution) and ``lookup_dataset`` (for the version-history branch);
+    this stub scripts both.
+    """
+
+    def __init__(self, dataset_rid: str, dataset: _StubDataset) -> None:
+        self._dataset_rid = dataset_rid
+        self._dataset = dataset
+
+    def resolve_rids(self, rids):
+        return {rid: _ResolvedInfo(table_name="Dataset", schema_name="deriva-ml") for rid in rids}
+
+    def lookup_dataset(self, rid):
+        return self._dataset
+
+
+class TestValidateRidsVersionHistory:
+    """The version-history branch of ``validate_rids``.
+
+    These tests pin the FIXED behaviour: a required version absent
+    from ``dataset_history()`` is a hard ERROR (not a warning), while a
+    required version present in history validates cleanly. The bug being
+    regressed is that the branch called a nonexistent ``list_versions()``
+    whose ``AttributeError`` was swallowed, downgrading every bad
+    version to a warning.
+    """
+
+    def test_required_version_not_in_history_is_a_hard_error(self):
+        """A required version absent from history must produce an ERROR.
+
+        Pre-fix this only produced a warning (the swallowed
+        AttributeError fell through to the ``add_warning`` path).
+        """
+        ds = _StubDataset(current_version="1.0.0", history=_history("0.1.0", "1.0.0"))
+        ml = _StubML("1-DSAA", ds)
+
+        result = validate_rids(
+            ml,
+            dataset_rids=["1-DSAA"],
+            dataset_versions={"1-DSAA": "9.9.9"},  # not in history
+        )
+
+        assert result.is_valid is False, (
+            "A required dataset version that does not exist in history must be a hard error, not a warning."
+        )
+        assert any("does not have version '9.9.9'" in e for e in result.errors)
+        # And it must NOT have been silently degraded to a warning.
+        assert not any("Could not verify version history" in w for w in result.warnings)
+
+    def test_required_version_present_in_history_validates_ok(self):
+        """A non-current version that DOES exist in history is accepted."""
+        ds = _StubDataset(current_version="1.0.0", history=_history("0.1.0", "1.0.0"))
+        ml = _StubML("1-DSAA", ds)
+
+        result = validate_rids(
+            ml,
+            dataset_rids=["1-DSAA"],
+            dataset_versions={"1-DSAA": "0.1.0"},  # older but real
+        )
+
+        assert result.is_valid is True
+        assert result.errors == []
+        assert result.validated_rids["1-DSAA"]["version"] == "0.1.0"
+        assert result.validated_rids["1-DSAA"]["current_version"] == "1.0.0"
+
+    def test_history_read_failure_degrades_to_warning(self):
+        """A genuine catalog-read failure (DerivaMLException) still warns.
+
+        The narrowed except must preserve the original intent: when
+        history truly cannot be read, degrade to a warning rather than
+        crash.
+        """
+        ds = _StubDataset(
+            current_version="1.0.0",
+            history_exc=DerivaMLException("catalog unavailable"),
+        )
+        ml = _StubML("1-DSAA", ds)
+
+        result = validate_rids(
+            ml,
+            dataset_rids=["1-DSAA"],
+            dataset_versions={"1-DSAA": "9.9.9"},
+        )
+
+        # Degraded, not crashed: a warning, and is_valid stays True.
+        assert result.is_valid is True
+        assert any("Could not verify version history" in w for w in result.warnings)
+
+    def test_programming_error_in_history_propagates(self):
+        """A non-DerivaML error (e.g. a typo'd method) must NOT be swallowed.
+
+        This is the heart of the regression: the original
+        ``except Exception`` hid the AttributeError from the misnamed
+        ``list_versions()`` call. With the narrowed except, an
+        ``AttributeError`` raised while reading history propagates
+        loudly instead of degrading to a warning.
+        """
+        ds = _StubDataset(
+            current_version="1.0.0",
+            history_exc=AttributeError("'Dataset' object has no attribute 'list_versions'"),
+        )
+        ml = _StubML("1-DSAA", ds)
+
+        # validate_rids wraps the whole per-dataset block in a broad
+        # ``except Exception`` that turns the propagated AttributeError
+        # into a hard ERROR — it is decisively NOT a silent warning.
+        result = validate_rids(
+            ml,
+            dataset_rids=["1-DSAA"],
+            dataset_versions={"1-DSAA": "9.9.9"},
+        )
+
+        assert result.is_valid is False
+        assert any("Failed to validate dataset '1-DSAA' version" in e for e in result.errors)
+        assert not any("Could not verify version history" in w for w in result.warnings)
