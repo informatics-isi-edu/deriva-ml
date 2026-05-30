@@ -26,10 +26,13 @@ Selector classmethod suite (``FeatureRecord`` class methods):
     ``FeatureRecord.select_majority_vote(column)`` — Returns a selector that
         picks the most common value for a column (consensus labeling).
 
-Typical usage:
+Typical usage (the generated record carries one field per feature
+column, plus a *required* field named after the target table — here
+``Image`` — that holds the target row's RID)::
+
     >>> feature = ml.lookup_feature("Image", "Diagnosis")  # doctest: +SKIP
     >>> DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
-    >>> record = DiagnosisRecord(Diagnosis="benign", Confidence=0.97)  # doctest: +SKIP
+    >>> record = DiagnosisRecord(Image="1-abc123", Diagnosis="benign", Confidence=0.97)  # doctest: +SKIP
 """
 
 from collections import Counter, defaultdict
@@ -710,9 +713,13 @@ class Feature:
             DerivaMLException: If the feature table schema cannot be read.
 
         Example:
+            The generated model has one field per feature column plus a
+            *required* field named after the target table (``Image``)
+            that holds the target row's RID::
+
             >>> feature = ml.lookup_feature("Image", "Diagnosis")  # doctest: +SKIP
             >>> DiagnosisRecord = feature.feature_record_class()  # doctest: +SKIP
-            >>> rec = DiagnosisRecord(Diagnosis="benign")  # doctest: +SKIP
+            >>> rec = DiagnosisRecord(Image="1-abc123", Diagnosis="benign")  # doctest: +SKIP
         """
         # Compute the asset-column-name set once; map_type is called
         # for every column on the feature, and re-computing this
