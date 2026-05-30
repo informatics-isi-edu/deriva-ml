@@ -1,44 +1,46 @@
 """Tests for annotation builder classes."""
 
 import pytest
+from deriva.core import tag as deriva_tag
 
+from deriva_ml.core.mixins.annotation import DISPLAY_TAG
 from deriva_ml.model.annotations import (
-    # Builders
-    Display,
-    VisibleColumns,
-    VisibleForeignKeys,
-    TableDisplay,
-    TableDisplayOptions,
+    CONTEXT_COMPACT,
+    # Context constants
+    CONTEXT_DEFAULT,
+    CONTEXT_DETAILED,
+    CONTEXT_ENTRY,
+    TAG_COLUMN_DISPLAY,
+    # Tags
+    TAG_DISPLAY,
+    TAG_TABLE_DISPLAY,
+    TAG_VISIBLE_COLUMNS,
+    TAG_VISIBLE_FOREIGN_KEYS,
+    Aggregate,
+    ArrayUxMode,
     ColumnDisplay,
     ColumnDisplayOptions,
-    PreFormat,
-    PseudoColumn,
-    PseudoColumnDisplay,
+    # Builders
+    Display,
     Facet,
     FacetList,
     FacetRange,
-    SortKey,
-    NameStyle,
+    FacetUxMode,
     # FK helpers
     InboundFK,
+    NameStyle,
     OutboundFK,
-    fk_constraint,
+    PreFormat,
+    PseudoColumn,
+    PseudoColumnDisplay,
+    SortKey,
+    TableDisplay,
+    TableDisplayOptions,
     # Enums
     TemplateEngine,
-    Aggregate,
-    ArrayUxMode,
-    FacetUxMode,
-    # Context constants
-    CONTEXT_DEFAULT,
-    CONTEXT_COMPACT,
-    CONTEXT_DETAILED,
-    CONTEXT_ENTRY,
-    # Tags
-    TAG_DISPLAY,
-    TAG_VISIBLE_COLUMNS,
-    TAG_VISIBLE_FOREIGN_KEYS,
-    TAG_TABLE_DISPLAY,
-    TAG_COLUMN_DISPLAY,
+    VisibleColumns,
+    VisibleForeignKeys,
+    fk_constraint,
 )
 
 
@@ -48,7 +50,9 @@ class TestDisplay:
     def test_simple_name(self):
         """Test display with simple name."""
         display = Display(name="My Table")
-        assert display.tag == TAG_DISPLAY
+        # Pin against deriva-py's authoritative tag, not the local constant
+        # (asserting against TAG_DISPLAY here would be a tautology).
+        assert display.tag == deriva_tag.display
         assert display.to_dict() == {"name": "My Table"}
 
     def test_markdown_name(self):
@@ -600,3 +604,35 @@ class TestExternalConsumerContract:
             "The deriva-skills/use-annotation-builders skill calls it as ml.apply_annotations() "
             "with no arguments — any required arg here is a breaking change for that contract."
         )
+
+
+class TestDisplayTagAuthority:
+    """Pin deriva-ml's 2015 display tag to deriva-py's canonical value.
+
+    The 2015 ``display`` annotation is grandfathered under the historical
+    ``misd`` namespace; Chaise reads display annotations from
+    ``tag:misd.isi.edu,2015:display``. deriva-ml previously hardcoded the
+    ``isrd`` namespace, so display annotations were written under a tag
+    Chaise ignores. These assertions import the authoritative value from
+    ``deriva.core.tag`` (re-exported from
+    ``deriva.core.utils.core_utils``) so the constants can never drift
+    from deriva-py again — and so the tautology that let the original bug
+    survive (asserting a builder's tag against the constant it is set
+    from) cannot reoccur.
+    """
+
+    def test_authority_value_is_misd(self):
+        """deriva-py's canonical display tag is in the misd namespace."""
+        assert deriva_tag.display == "tag:misd.isi.edu,2015:display"
+
+    def test_display_builder_tag_matches_deriva_py(self):
+        """Display builder writes under deriva-py's authoritative tag."""
+        assert Display.tag == deriva_tag.display
+
+    def test_tag_display_constant_matches_deriva_py(self):
+        """annotations.TAG_DISPLAY matches deriva-py's authoritative tag."""
+        assert TAG_DISPLAY == deriva_tag.display
+
+    def test_display_tag_mixin_constant_matches_deriva_py(self):
+        """mixins.annotation.DISPLAY_TAG matches deriva-py's authoritative tag."""
+        assert DISPLAY_TAG == deriva_tag.display

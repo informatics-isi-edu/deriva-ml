@@ -5,7 +5,7 @@ Deriva catalog annotation operations for controlling how data
 is displayed in the Chaise web interface.
 
 Annotation Tags:
-    - display: tag:isrd.isi.edu,2015:display
+    - display: tag:misd.isi.edu,2015:display
     - visible-columns: tag:isrd.isi.edu,2016:visible-columns
     - visible-foreign-keys: tag:isrd.isi.edu,2016:visible-foreign-keys
     - table-display: tag:isrd.isi.edu,2016:table-display
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 # Annotation tag URIs
-DISPLAY_TAG = "tag:isrd.isi.edu,2015:display"
+DISPLAY_TAG = "tag:misd.isi.edu,2015:display"
 VISIBLE_COLUMNS_TAG = "tag:isrd.isi.edu,2016:visible-columns"
 VISIBLE_FOREIGN_KEYS_TAG = "tag:isrd.isi.edu,2016:visible-foreign-keys"
 TABLE_DISPLAY_TAG = "tag:isrd.isi.edu,2016:table-display"

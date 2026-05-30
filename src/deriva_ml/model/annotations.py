@@ -274,7 +274,7 @@ CONTEXT_ROW_NAME = "row_name"
 # Annotation Tag URIs
 # =============================================================================
 
-TAG_DISPLAY = "tag:isrd.isi.edu,2015:display"
+TAG_DISPLAY = "tag:misd.isi.edu,2015:display"
 TAG_VISIBLE_COLUMNS = "tag:isrd.isi.edu,2016:visible-columns"
 TAG_VISIBLE_FOREIGN_KEYS = "tag:isrd.isi.edu,2016:visible-foreign-keys"
 TAG_TABLE_DISPLAY = "tag:isrd.isi.edu,2016:table-display"
