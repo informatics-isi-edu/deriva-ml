@@ -82,7 +82,7 @@ setup_hooks = []
 pre_commit_hooks = []
 post_commit_hooks = ["git push", "git push --tags"]
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = ["tests", "src"]
 python_files = ["test_*.py"]
 #addopts = "-v --cov=deriva_ml --cov-report=term-missing  --import-mode=importlib"

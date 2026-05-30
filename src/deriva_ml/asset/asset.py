@@ -12,16 +12,16 @@ The Asset class parallels the Dataset class, providing:
 - Download capability for offline access
 
 Typical usage:
-    >>> # Look up an existing asset  # doctest: +SKIP
+    >>> # Look up an existing asset
     >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
     >>> print(f"Asset: {asset.filename} ({asset.asset_table})")  # doctest: +SKIP
     >>> print(f"Types: {asset.asset_types}")  # doctest: +SKIP
 
-    >>> # Find the execution that created this asset  # doctest: +SKIP
+    >>> # Find the execution that created this asset
     >>> executions = asset.list_executions(asset_role="Output")  # doctest: +SKIP
     >>> creator = executions[0] if executions else None  # doctest: +SKIP
 
-    >>> # Download for offline use  # doctest: +SKIP
+    >>> # Download for offline use
     >>> local_path = asset.download(Path("/tmp/assets"))  # doctest: +SKIP
 """
 
@@ -71,12 +71,12 @@ class Asset:
         _ml_instance (DerivaMLCatalog): Reference to the catalog containing this asset.
 
     Example:
-        >>> # Look up an existing asset  # doctest: +SKIP
+        >>> # Look up an existing asset
         >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
         >>> print(f"File: {asset.filename}, Size: {asset.length} bytes")  # doctest: +SKIP
         >>> print(f"Types: {asset.asset_types}")  # doctest: +SKIP
 
-        >>> # Find executions that used this asset  # doctest: +SKIP
+        >>> # Find executions that used this asset
         >>> for exe in asset.list_executions():  # doctest: +SKIP
         ...     print(f"Execution {exe.execution_rid}: {exe.configuration.description}")
     """
@@ -112,7 +112,7 @@ class Asset:
             execution_rid: RID of the execution that created this asset (if known).
 
         Example:
-            >>> # Usually created via ml.lookup_asset()  # doctest: +SKIP
+            >>> # Usually created via ml.lookup_asset()
             >>> asset = ml.lookup_asset("3JSE")  # doctest: +SKIP
         """
         self._logger = get_logger(__name__)
@@ -316,12 +316,12 @@ class Asset:
             with this asset.
 
         Example:
-            >>> # Find the execution that created this asset  # doctest: +SKIP
+            >>> # Find the execution that created this asset
             >>> creators = asset.list_executions(asset_role="Output")  # doctest: +SKIP
             >>> if creators:  # doctest: +SKIP
             ...     print(f"Created by execution {creators[0].execution_rid}")
 
-            >>> # Find all executions that used this asset as input  # doctest: +SKIP
+            >>> # Find all executions that used this asset as input
             >>> users = asset.list_executions(asset_role="Input")  # doctest: +SKIP
         """
         return self._ml_instance.list_asset_executions(self.asset_rid, asset_role=asset_role)
