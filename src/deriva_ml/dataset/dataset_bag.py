@@ -544,15 +544,30 @@ class DatasetBag:
     ) -> Iterable[FeatureRecord]:
         """Yield offline feature values — same signature as ``DerivaML.feature_values``.
 
-        Reads feature records from the bag's per-feature denormalization cache
-        (populated lazily on first access). Because bags are immutable snapshots,
-        the cache is stable for the bag's lifetime.
+        Bag-scoped feature read. Because bags are immutable snapshots, the
+        result is stable for the bag's lifetime.
 
-        When *selector* is ``None``, every stored record is yielded in source order.
+        When *selector* is ``None``, every feature record in the bag is yielded.
         When a *selector* is provided, records are grouped by target RID, the
         selector is called once per group (always, even single-element groups),
         and only groups for which the selector returns a non-``None`` value appear
         in the output.
+
+        **Implementation (Stage 3b of the ``feature_values`` /
+        ``Denormalizer`` consolidation):** this method delegates to
+        :meth:`~deriva_ml.local_db.denormalizer.Denormalizer.feature_records`,
+        the same delegation target ``Dataset.feature_values`` uses (Stage 3a).
+        The ``Denormalizer`` runs in bag mode (``source="local"``) and reads
+        the bag's **typed ORM tables** — ``ArrayAsJson`` / ``StringToDate``
+        TypeDecorators decode array and date columns, and the ``RCT`` system
+        column is recovered as a UTC-aware ISO-8601 string. This replaces the
+        legacy ``BagFeatureCache`` path, which stored every column as SQLite
+        ``TEXT`` and let pydantic coerce — that path returned ``RCT`` as a
+        tz-naive string, diverging from the live catalog's UTC-aware shape.
+        Dataset scoping is enforced by the denormalize SQL join (feature rows
+        are reached *through* the bag's membership tables), which subsumes the
+        legacy explicit ``target_rids`` dangling-FK filter (#126): a feature
+        row can only appear if its target is reachable from the dataset.
 
         Args:
             table: Target table name or ``Table`` object (e.g. ``"Image"``).
@@ -562,27 +577,31 @@ class DatasetBag:
                 drops the target when it returns ``None``). Use
                 ``FeatureRecord.select_newest`` to pick the most-recently created
                 value.
-            materialize_limit: Optional cap on the number of records
-                returned. The bag cache is already populated (bounded
-                by the snapshot), so this check is mainly for API
-                parity with the online ``DerivaML.feature_values``.
-                Raises ``DerivaMLMaterializeLimitExceeded`` when the
-                row count exceeds the limit.
-            execution_rids: Optional filter -- when set, only feature
-                records whose ``Execution`` value is in this list are
-                yielded. Applied Python-side after the cache fetch
-                (the bag cache has no server-side query layer).
-                Empty list short-circuits to no records.
+            materialize_limit: Optional cap on the number of feature rows
+                materialized. Raises ``DerivaMLMaterializeLimitExceeded``
+                when exceeded. Default ``None`` preserves unbounded behavior.
+
+                **Post-count guard (Stage 3b behavior note).** The denormalize
+                join materializes the bag-scoped feature rows into memory, then
+                this wrapper counts them and raises if the count exceeds the
+                cap. Mirrors the ``Dataset.feature_values`` guard.
+            execution_rids: Optional filter on the ``Execution`` column.
+                When set, only feature rows whose ``Execution`` value is in
+                this list survive. Applied Python-side after materialization
+                (the bag has no server-side query layer). Empty list
+                short-circuits to an empty result. The filter runs *before*
+                selector reduction, matching the legacy ordering.
 
         Yields:
             FeatureRecord instances with typed fields matching the feature
-            definition. Selector-filtered records (``None`` return) are omitted.
+            definition. ``RCT`` is populated (UTC-aware ISO-8601 string).
+            Selector-filtered records (``None`` return) are omitted.
 
         Raises:
             DerivaMLException: If *feature_name* does not exist on *table*.
             DerivaMLDataError: If the bag is corrupt (source table missing).
-            DerivaMLMaterializeLimitExceeded: If the result set exceeds
-                ``materialize_limit``.
+            DerivaMLMaterializeLimitExceeded: If the materialized row count
+                exceeds ``materialize_limit``.
 
         Example:
             >>> from deriva_ml.feature import FeatureRecord  # doctest: +SKIP
@@ -593,49 +612,37 @@ class DatasetBag:
             ...     "Image", "Glaucoma", selector=FeatureRecord.select_newest,
             ... ))
         """
-        from deriva_ml.dataset.bag_feature_cache import BagFeatureCache
+        from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
+        from deriva_ml.feature import reduce_with_selector
+        from deriva_ml.local_db.denormalizer import Denormalizer
 
-        if not hasattr(self, "_feature_cache"):
-            self._feature_cache = BagFeatureCache(self)
+        # execution_rids=[] short-circuits to empty — preserve the legacy
+        # behavior explicitly (matches Dataset.feature_values, audit §10).
+        if execution_rids is not None and not execution_rids:
+            return
 
-        target_col = table if isinstance(table, str) else table.name
-        records = list(self._feature_cache.fetch_feature_records(target_col, feature_name))
+        feat = self.lookup_feature(table, feature_name)
+        target_col = feat.target_table.name
 
-        # Filter to target rows that actually live in the bag. The bag
-        # walker can over-reach association tables (e.g. include
-        # Execution_Subject_Health rows whose Subject FK points at a
-        # Subject outside the dataset slice — see #126). A value whose
-        # target row isn't in the bag is dangling: drop it so the bag's
-        # feature_values matches what the bag actually contains.
-        try:
-            target_rids = {r["RID"] for r in self.model.get_table_contents(target_col)}
-        except Exception:
-            # If the target table is missing from the bag entirely,
-            # fall through with the unfiltered set — the cache fetch
-            # would have raised anyway. Defensive only.
-            target_rids = None
-        if target_rids is not None:
-            records = [r for r in records if getattr(r, target_col, None) in target_rids]
+        # Delegate the bag-scoped SQL join + RCT recovery + FeatureRecord
+        # materialization to the Denormalizer (bag mode, source="local").
+        # Selector reduction is applied in this wrapper (not pushed into
+        # feature_records) so the execution_rids filter runs first —
+        # matching the legacy ordering "filter by execution, then reduce".
+        records = Denormalizer(self).feature_records(feat, selector=None)
 
-        # Apply execution_rids filter (Python-side; the bag cache doesn't
-        # have a server-side query layer to push this into). Empty list
-        # short-circuits to an empty result.
-        if execution_rids is not None:
-            if not execution_rids:
-                return
-            execution_rid_set = set(execution_rids)
-            records = [r for r in records if getattr(r, "Execution", None) in execution_rid_set]
-
-        # Enforce materialize_limit cap. Bag-side limit is post-cache-fetch
-        # since the cache is already populated; primary purpose of the
-        # cap here is API parity with the online backend.
+        # materialize_limit: post-count guard (mirrors Dataset.feature_values).
         if materialize_limit is not None and len(records) > materialize_limit:
-            from deriva_ml.core.exceptions import DerivaMLMaterializeLimitExceeded
-
             raise DerivaMLMaterializeLimitExceeded(
                 actual_count=len(records),
                 limit=materialize_limit,
             )
+
+        # execution_rids: post-filter in the wrapper. The bag has no
+        # server-side Execution predicate.
+        if execution_rids is not None:
+            exec_set = set(execution_rids)
+            records = [rec for rec in records if rec.Execution in exec_set]
 
         if selector is None:
             yield from records
@@ -645,8 +652,6 @@ class DatasetBag:
         # — always call selector, never short-circuit for
         # single-element groups. Shared helper so the three
         # feature_values surfaces stay in lockstep.
-        from deriva_ml.feature import reduce_with_selector
-
         yield from reduce_with_selector(records, target_col, selector)
 
     def lookup_feature(self, table: str | Table, feature_name: str) -> Feature:
