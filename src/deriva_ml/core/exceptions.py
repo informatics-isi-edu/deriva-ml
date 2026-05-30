@@ -16,11 +16,13 @@ Exception Hierarchy:
     │   ├── DerivaMLNotFoundError (entity not found)
     │   │   ├── DerivaMLDatasetNotFound (dataset lookup failures)
     │   │   ├── DerivaMLTableNotFound (table lookup failures)
+    │   │   ├── DerivaMLFeatureNotFound (feature lookup failures)
     │   │   ├── DerivaMLInvalidTerm (vocabulary term not found)
     │   │   ├── DerivaMLRidsNotFound (one or more RIDs unresolved)
     │   │   └── NoAssociationException (find_association: zero matches)
     │   ├── DerivaMLTableTypeError (wrong table type)
     │   ├── DerivaMLValidationError (data validation failures)
+    │   │   └── DerivaMLMaterializeLimitExceeded (result set over materialize_limit)
     │   ├── DerivaMLCycleError (cycle detected in relationships)
     │   ├── DerivaMLStateInconsistency (SQLite/catalog state disagreement)
     │   └── AmbiguousAssociationException (find_association: multiple matches)
@@ -592,13 +594,13 @@ class DerivaMLDirtyWorkflowError(DerivaMLWorkflowError):
         dirty_paths: list[str] | None = None,
     ) -> None:
         """Args:
-            path: Path to the executable file whose workflow is being recorded.
-            dirty_paths: Optional list of git-status-porcelain lines describing
-                the actual offending paths (e.g. ["?? findings/out.txt",
-                " M src/models/train.py"]). When provided, the lines are
-                included in the exception message so the user can see what
-                tripped the check rather than having to run ``git status``
-                themselves.
+        path: Path to the executable file whose workflow is being recorded.
+        dirty_paths: Optional list of git-status-porcelain lines describing
+            the actual offending paths (e.g. ["?? findings/out.txt",
+            " M src/models/train.py"]). When provided, the lines are
+            included in the exception message so the user can see what
+            tripped the check rather than having to run ``git status``
+            themselves.
         """
         self.path = path
         self.dirty_paths = list(dirty_paths) if dirty_paths else []
@@ -617,10 +619,7 @@ class DerivaMLDirtyWorkflowError(DerivaMLWorkflowError):
         else:
             # Backward-compatible single-arg form. Kept for any external
             # caller that constructs this exception without the path list.
-            message = (
-                f"File {path} has uncommitted changes. Commit before running, "
-                f"or use --allow-dirty to override."
-            )
+            message = f"File {path} has uncommitted changes. Commit before running, or use --allow-dirty to override."
         super().__init__(message)
 
 
