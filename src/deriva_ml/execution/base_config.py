@@ -273,6 +273,142 @@ def get_notebook_configuration(
     return config
 
 
+def render_notebook_config(
+    config_name: str,
+    *,
+    overrides: list[str] | None = None,
+    cfg_mode: str | None = None,
+    info_mode: str | None = None,
+) -> str:
+    """Compose a notebook's hydra-zen config and render it as Hydra would.
+
+    This is the runner-process implementation of ``deriva-ml-run-notebook
+    --cfg`` and ``--info``. The notebook runner does not hand argv to Hydra (it
+    drives a papermill kernel that calls :func:`hydra_zen.launch`), so Hydra's
+    own ``--cfg`` / ``--info`` flags cannot flow through as argv. Instead this
+    function composes the registered config with the user's overrides and
+    renders it using Hydra's *own* ``show_cfg`` / ``show_info`` machinery —
+    giving byte-for-byte the same output Hydra's CLI would, **without executing
+    the notebook**.
+
+    The render is pure configuration composition: it goes through
+    :func:`hydra.compose` (not :func:`hydra_zen.launch`) and never instantiates
+    the config, so it requires **no live catalog and no network**. The returned
+    text is the raw composed config (``_target_:`` present, ``deriva_ml: null``
+    when unresolved), not an instantiated object.
+
+    Exactly one of ``cfg_mode`` / ``info_mode`` must be given.
+
+    Args:
+        config_name: Name of the registered notebook config (the Hydra config
+            name, e.g. the notebook's filename stem). Must have been registered
+            via :func:`notebook_config` or ``store(...)``.
+        overrides: Hydra override strings to apply during composition
+            (e.g. ``["assets=roc_all_six", "threshold=0.9"]``). Defaults to none.
+        cfg_mode: One of ``"job"``, ``"hydra"``, ``"all"`` — selects which slice
+            of the composed config Hydra's ``--cfg`` would print. Mutually
+            exclusive with ``info_mode``.
+        info_mode: One of ``"all"``, ``"config"``, ``"defaults"``,
+            ``"defaults-tree"``, ``"plugins"``, ``"searchpath"`` — selects which
+            of Hydra's ``--info`` sections to render. Mutually exclusive with
+            ``cfg_mode``.
+
+    Returns:
+        The rendered text (YAML for ``--cfg``; Hydra's formatted info sections
+        for ``--info``), suitable for printing to stdout.
+
+    Raises:
+        ValueError: If neither (or both) of ``cfg_mode`` / ``info_mode`` is
+            supplied.
+
+    Example:
+        >>> from dataclasses import dataclass  # doctest: +SKIP
+        >>> from deriva_ml.execution import BaseConfig, notebook_config  # doctest: +SKIP
+        >>>
+        >>> @dataclass  # doctest: +SKIP
+        ... class MyNB(BaseConfig):
+        ...     threshold: float = 0.5
+        >>>
+        >>> notebook_config("my_nb", config_class=MyNB, defaults={})  # doctest: +SKIP
+        >>> print(render_notebook_config(  # doctest: +SKIP
+        ...     "my_nb", overrides=["threshold=0.9"], cfg_mode="job"
+        ... ))
+        _target_: ...MyNB
+        ...
+        threshold: 0.9
+    """
+    if (cfg_mode is None) == (info_mode is None):
+        raise ValueError("render_notebook_config requires exactly one of cfg_mode or info_mode.")
+
+    # Ensure the hydra-zen store is in the global Hydra ConfigStore so the
+    # config name resolves during composition.
+    store.add_to_hydra_store(overwrite_ok=True)
+
+    # Build a fresh Hydra instance backed by the structured-config search path
+    # (no filesystem config dir). create_main_hydra2 wires up the same parser
+    # and search path Hydra's CLI uses, so show_cfg/show_info produce identical
+    # output. ``--cfg`` writes straight to stdout (captured via redirect_stdout);
+    # ``--info`` emits everything through the ``hydra._internal.hydra`` logger,
+    # so we capture that logger directly with a dedicated handler — robust
+    # against ambient logging state (e.g. a stray ``logging.disable`` left by
+    # other code) that a plain stdout redirect would silently drop.
+    import contextlib
+    import io
+    import logging
+
+    from hydra._internal.hydra import Hydra
+    from hydra._internal.utils import create_config_search_path
+    from hydra.core.global_hydra import GlobalHydra
+
+    overrides = overrides or []
+    GlobalHydra.instance().clear()
+    search_path = create_config_search_path(search_path_dir=None)
+    hydra = Hydra.create_main_hydra2(task_name="notebook", config_search_path=search_path)
+
+    buffer = io.StringIO()
+    try:
+        if cfg_mode is not None:
+            with contextlib.redirect_stdout(buffer):
+                hydra.show_cfg(
+                    config_name=config_name,
+                    overrides=overrides,
+                    cfg_type=cfg_mode,
+                    package=None,
+                )
+        else:
+            hydra_logger = logging.getLogger("hydra._internal.hydra")
+            handler = logging.StreamHandler(buffer)
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            handler.setLevel(logging.DEBUG)
+            # Snapshot and force a known-good logger state, then restore. The
+            # global manager-level ``disable`` threshold is lifted because
+            # Hydra renders --info at DEBUG, which a leaked disable would mute.
+            prev_disable = logging.root.manager.disable
+            prev_level = hydra_logger.level
+            prev_propagate = hydra_logger.propagate
+            logging.disable(logging.NOTSET)
+            hydra_logger.addHandler(handler)
+            hydra_logger.setLevel(logging.DEBUG)
+            hydra_logger.propagate = False
+            try:
+                # redirect_stdout too, in case a future Hydra prints directly.
+                with contextlib.redirect_stdout(buffer):
+                    hydra.show_info(
+                        info=info_mode,
+                        config_name=config_name,
+                        overrides=overrides,
+                    )
+            finally:
+                hydra_logger.removeHandler(handler)
+                hydra_logger.setLevel(prev_level)
+                hydra_logger.propagate = prev_propagate
+                logging.disable(prev_disable)
+    finally:
+        GlobalHydra.instance().clear()
+
+    return buffer.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # Registry for notebook configurations
 # ---------------------------------------------------------------------------

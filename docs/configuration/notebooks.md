@@ -190,8 +190,11 @@ uv run deriva-ml-run-notebook notebooks/train.ipynb --file params.yaml
 # Show notebook parameters (from the papermill parameters cell)
 uv run deriva-ml-run-notebook notebooks/train.ipynb --inspect
 
-# Show available Hydra config groups
-uv run deriva-ml-run-notebook notebooks/my_analysis.ipynb --info
+# List the menu of registered config groups + options
+uv run deriva-ml-run-notebook notebooks/my_analysis.ipynb --list-configs
+
+# Show the resolved config the notebook would use, without executing it
+uv run deriva-ml-run-notebook notebooks/my_analysis.ipynb --cfg job
 ```
 
 ### Kernel Selection
