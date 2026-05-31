@@ -1053,6 +1053,20 @@ def _create_split_hierarchy(
     split_ds.add_dataset_members(child_rids, validate=False)
     logger.info("  Linked child datasets to Split dataset")
 
+    # Record the source dataset as an INPUT consumed by this execution.
+    # The split datasets above are OUTPUTS (this execution authored
+    # them); the source is not nested under them and is not a
+    # ``Dataset_Dataset`` parent of the Split. Recording the source as
+    # an execution input is what makes the derivation walkable —
+    # ``execution.list_input_datasets()`` and lineage walks can then
+    # reach the source from the split, and vice versa — without the bag
+    # download that declaring it in ``ExecutionConfiguration.datasets``
+    # would force. The call is idempotent and a no-op under dry-run
+    # (this helper only runs on the live path, but the guard is there
+    # regardless).
+    execution.add_input_dataset(source_dataset_rid)
+    logger.info("  Recorded source dataset %s as execution input", source_dataset_rid)
+
     # Add members to each partition (batched).
     batch_size = 500
     for part_name, ds in [
@@ -1152,6 +1166,40 @@ def split_dataset(
 
     This function is generic and works with any DerivaML dataset
     that has registered element types.
+
+    Provenance — the source dataset's relationship to the split:
+        The new Split is a **standalone, self-contained** dataset
+        hierarchy. The ``source_dataset_rid`` you pass in is **NOT**
+        a parent of the Split and the Split is **NOT** nested under
+        the source: there is no ``Dataset_Dataset`` edge between them,
+        and ``source.list_dataset_children()`` /
+        ``list_dataset_relations(source)`` will **not** list the Split.
+        That is intentional — the source is an *input* the split
+        *consumed*, not a container the split lives inside (nesting
+        the Split under the source would re-partition the source's own
+        members and flip the source's version on every split).
+
+        The derivation is instead recorded as **execution provenance**:
+        ``split_dataset`` registers ``source_dataset_rid`` as an input
+        of ``execution`` (via :meth:`Execution.add_input_dataset`), and
+        the Split / Training / Testing / Validation datasets as that
+        execution's outputs. So the walkable path is
+        ``source -> (input of) -> execution -> (output) -> split``:
+        ``execution.list_input_datasets()`` returns the source, and a
+        lineage walk (``deriva_ml_get_lineage``) reaches the splits
+        from the source and vice versa. The ``SplitResult.source``
+        field returned by this call also carries the source RID for
+        immediate use.
+
+        Membership consequence: the Training / Testing / Validation
+        partitions are carved from the source's elements, so they
+        **share element rows with the source** (and, in a two-way
+        split, ``Training`` ∪ ``Testing`` reconstructs the source's
+        element set). The train/eval relationship therefore lives in
+        *shared membership*, not in a parent/child lineage edge —
+        evaluating a model trained on the source against one of these
+        partitions would leak. Reason about overlap via member sets,
+        not via the dataset hierarchy.
 
     Args:
         ml: Connected DerivaML instance.

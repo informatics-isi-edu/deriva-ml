@@ -1967,6 +1967,52 @@ class Execution:
             description=description,
         )
 
+    def add_input_dataset(self, dataset_rid: RID) -> None:
+        """Record an existing dataset as an *input* consumed by this execution.
+
+        Writes a single ``Dataset_Execution`` association row linking
+        ``dataset_rid`` to this execution. Because this execution did
+        not *author* ``dataset_rid`` (its ``Dataset_Version.Execution``
+        link points at whichever execution created it), the
+        input/output inference used by :meth:`list_input_datasets`
+        classifies it as an **input** — a consume edge — not an output.
+
+        This is the counterpart of :meth:`create_dataset` (which records
+        an *output*). Use it when an execution reads a dataset it did not
+        produce and you want that consumption recorded as walkable
+        provenance (so :meth:`list_input_datasets` and lineage walks can
+        reach the consumed dataset), *without* the bag download that
+        declaring the dataset in ``ExecutionConfiguration.datasets``
+        would trigger. The most common caller is
+        :func:`deriva_ml.dataset.split.split_dataset`, which records its
+        source dataset as an input of the splitting execution.
+
+        The link is idempotent: if ``dataset_rid`` is already associated
+        with this execution, no duplicate row is inserted. In dry-run
+        mode this is a no-op (the dry-run contract forbids catalog
+        mutations).
+
+        Args:
+            dataset_rid: RID of the already-existing dataset that this
+                execution consumed as an input.
+
+        Example:
+            >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+            ...     exe.add_input_dataset("1-ABC0")  # doctest: +SKIP
+            ...     # "1-ABC0" now appears in exe.list_input_datasets()
+        """
+        if self._dry_run:
+            return
+        schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
+        dataset_exec = schema_path.Dataset_Execution
+        already_linked = {
+            row["Dataset"]
+            for row in dataset_exec.filter(dataset_exec.Execution == self.execution_rid).entities().fetch()
+        }
+        if dataset_rid in already_linked:
+            return
+        dataset_exec.insert([{"Dataset": dataset_rid, "Execution": self.execution_rid}])
+
     @validate_call(config=VALIDATION_CONFIG)
     def add_files(
         self,

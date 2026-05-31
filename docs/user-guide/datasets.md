@@ -281,6 +281,28 @@ Split (parent, type: "Split")
 └── Testing (child, type: "Testing")
 ```
 
+### How the split relates to its source
+
+A common point of confusion: the source dataset you split is **not** part of the `Split` hierarchy above. The new `Split` is a standalone dataset; the source is **not** its parent, and the `Split` is **not** nested under the source. `source.list_dataset_children()` and `list_dataset_relations(source)` will **not** show the split — and that is correct, not a missing link. Nesting a split under its source would re-partition the source's own members into itself and flip the source's version on every split.
+
+The derivation is recorded as **execution provenance** instead. `split_dataset` registers the source as an *input* of the splitting execution and the partitions as that execution's *outputs*, so the walkable path is:
+
+```
+source ──(input of)──▶ split execution ──(output)──▶ Split / Training / Testing
+```
+
+```python
+with ml.create_execution(config) as exe:
+    result = split_dataset(ml, source_dataset_rid, exe, test_size=0.2, seed=42)
+    # The source is now a recorded input of this execution:
+    assert source_dataset_rid in {ds.dataset_rid for ds in exe.list_input_datasets()}
+exe.commit_output_assets(clean_folder=True)
+```
+
+`deriva_ml_get_lineage` walks this edge from either end, and `result.source` carries the source RID directly. (`split_dataset` records the input without downloading the source's bag — declaring the source in `ExecutionConfiguration(datasets=[...])` would, so don't do that just for provenance.)
+
+**Membership consequence — the split shares rows with its source.** Each partition is carved from the source's elements, so the partitions *share element rows* with the source (a two-way split's `Training ∪ Testing` reconstructs the source's element set). The train/eval boundary lives in *shared membership*, not in a parent/child edge: training a model on the source and evaluating it on one of these partitions would leak. Reason about overlap with member sets (`list_dataset_members`), never by inspecting the dataset hierarchy.
+
 ### Wrap split_dataset in an execution
 
 `split_dataset` runs inside an `Execution` the caller has already opened. The caller's workflow identifies the code making the splitting decision; deriva-ml never invents a workflow on the caller's behalf. Set this up once and reuse the same `exe` for every example below:
