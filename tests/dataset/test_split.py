@@ -818,6 +818,66 @@ class TestSplitDataset:
         assert "Labeled" in training_ds.dataset_types
         assert "Labeled" in testing_ds.dataset_types
 
+    def test_split_records_source_as_execution_input(self, test_ml):
+        """The source dataset is recorded as an INPUT of the split execution.
+
+        Regression for the e2e finding where a split's source dataset
+        was not discoverable from the catalog: ``split_dataset`` creates
+        a self-contained Split hierarchy (Split -> Training/Testing) but
+        the *source* it was derived from was recorded only in description
+        prose and the returned ``SplitResult.source`` field, never as a
+        walkable catalog edge. After the fix, the source is linked to the
+        splitting execution as a consume edge so
+        ``Execution.list_input_datasets()`` (and lineage walks) can reach
+        it. The split's own children are OUTPUTS, not inputs, and must
+        not appear.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        workflow = ml.create_workflow(
+            name="Input-Provenance Split Workflow",
+            workflow_type="Dataset_Split",
+            description="Splitting workflow for the source-input test",
+        )
+        with ml.create_execution(
+            ExecutionConfiguration(workflow=workflow, description="Split with input provenance")
+        ) as exe:
+            result = split_dataset(ml, source_rid, exe, test_size=4, seed=42)
+            input_rids = {ds.dataset_rid for ds in exe.list_input_datasets()}
+        exe.commit_output_assets(clean_folder=True)
+
+        # The source is recorded as a consumed input...
+        assert source_rid in input_rids, (
+            f"source {source_rid} should be an input of the split execution; got inputs {input_rids}"
+        )
+        # ...and the split's outputs are NOT inputs (they were authored by
+        # this execution, so the input/output inference must exclude them).
+        assert result.split.rid not in input_rids
+        assert result.training.rid not in input_rids
+        assert result.testing.rid not in input_rids
+
+    def test_split_dry_run_records_no_input_edge(self, test_ml):
+        """A dry-run split must not write the source-input edge.
+
+        ``split_dataset(dry_run=True)`` returns a plan without mutating
+        the catalog, so recording the source as an execution input would
+        be a side effect that violates the dry-run contract.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        workflow = ml.create_workflow(
+            name="Dry-Run Split Workflow",
+            workflow_type="Dataset_Split",
+            description="Dry-run splitting workflow for the input-edge test",
+        )
+        with ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Dry-run split")) as exe:
+            split_dataset(ml, source_rid, exe, test_size=4, seed=42, dry_run=True)
+            input_rids = {ds.dataset_rid for ds in exe.list_input_datasets()}
+
+        assert source_rid not in input_rids, "dry_run split must not record the source as an execution input"
+
     def test_dry_run(self, test_ml):
         """Test dry run mode returns plan without modifying catalog."""
         ml = test_ml
