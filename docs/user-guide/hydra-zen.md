@@ -73,18 +73,47 @@ deriva-ml-run model_config.learning_rate=0.0001
 
 # Sweep two dataset versions (multirun)
 deriva-ml-run --multirun datasets=training_v1,training_v2
-
-# Show available config groups and options
-deriva-ml-run --info
 ```
 
 Multirun creates a parent execution in the catalog with one child execution per sweep element. The parent-child relationship is recorded automatically — you do not need to manage it.
+
+### Inspecting configs: three distinct operations
+
+These three questions have three different commands. Confusing them is a common mistake (in particular, `--list-configs` does **not** show the resolved config — it shows the *menu of choices*):
+
+```bash
+# 1. "What group=value choices can I pass?" — the menu of registered options.
+#    deriva-ml-specific; Hydra has no equivalent. Ignores any overrides.
+deriva-ml-run --list-configs
+
+# 2. "What does my config actually resolve to?" — the fully composed config a
+#    run would use, given these overrides, WITHOUT executing. This is Hydra's
+#    own --cfg flag.
+deriva-ml-run +experiment=cifar10_quick --cfg job
+
+# 3. "Resolve AND validate against the live catalog" — checks every referenced
+#    RID / vocabulary term resolves, then stops before training. Heavier
+#    (downloads dataset bags). deriva-ml-specific.
+deriva-ml-run +experiment=cifar10_quick dry_run=true
+```
+
+### Every Hydra command-line flag works
+
+`deriva-ml-run` forwards any flag it does not itself define straight to Hydra,
+so the entire Hydra command-line surface works as documented upstream:
+
+- Flags reference: <https://hydra.cc/docs/advanced/hydra-command-line-flags/>
+- Override grammar (sweeps, deletions, package directives): <https://hydra.cc/docs/advanced/override_grammar/basic/>
+
+For example `--cfg job`, `--cfg hydra`, `--resolve`, `--package <group>`, and
+`--info config|defaults|searchpath` all behave exactly as the Hydra docs say.
 
 **Notes:**
 
 - `--multirun` requires comma-separated values with no spaces.
 - Config groups are discovered alphabetically; by convention, name the file `experiments.py` so it sorts last, allowing experiment configs to override base configs safely.
-- Pass `--host` and `--catalog` on the CLI to override the hostname and catalog ID without touching your config files.
+- Pass `--host` and `--catalog` on the CLI to override the hostname and catalog ID without touching your config files (they become `deriva_ml.hostname=` / `deriva_ml.catalog_id=` overrides).
+- deriva-ml's own flags are `--list-configs`, `--catalog`, `--host`, `--config-dir`, `--config-name`, `--multirun`, and `--allow-dirty`; everything else is forwarded to Hydra. Two short-flag collisions to know: deriva-ml's `-c` is `--config-dir` (use the long `--cfg` for Hydra's config dump), and on `deriva-ml-run-notebook` `-p` is papermill's `--parameter` (Hydra's `--package` is not exposed there — the notebook runner composes config kernel-side rather than forwarding argv, so it offers `--list-configs`, `--info <mode>`, and `--cfg <mode>` as render-only inspection but not full flag passthrough).
 
 See [Config groups](../configuration/groups.md) and [Experiments and multi-run](../configuration/experiments.md) for the full composition model.
 
