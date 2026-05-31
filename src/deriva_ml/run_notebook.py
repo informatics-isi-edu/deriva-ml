@@ -23,8 +23,36 @@ Usage:
     deriva-ml-run-notebook notebook.ipynb --host example.org --catalog 1
     deriva-ml-run-notebook notebook.ipynb -p param1 value1 -p param2 value2
     deriva-ml-run-notebook notebook.ipynb --file parameters.yaml
-    deriva-ml-run-notebook notebook.ipynb --inspect  # Show available parameters
+    deriva-ml-run-notebook notebook.ipynb --inspect       # papermill: list notebook params
     deriva-ml-run-notebook notebook.ipynb assets=my_assets  # Hydra overrides only
+
+CLI surface — four distinct inspection operations:
+    - ``--list-configs`` (deriva-ml): the menu of selectable ``group=value``
+      options registered in the hydra-zen store. deriva-ml-specific; Hydra has
+      no equivalent.
+    - ``--cfg [job|hydra|all]`` (Hydra vocabulary): render the fully *resolved*
+      config the notebook would run with, without executing it. ``--cfg job``
+      is "see what my overrides resolve to" — cheaper than ``dry_run=true``
+      (no dataset bag download).
+    - ``--info [config|defaults|defaults-tree|plugins|searchpath|all]`` (Hydra
+      vocabulary): Hydra's own info modes (composed config, defaults tree,
+      search path, plugins).
+    - ``--inspect`` (papermill): list the notebook's parameter-cell parameters.
+
+Unlike ``deriva-ml-run``, this runner never hands argv to Hydra — it drives a
+papermill kernel that calls ``hydra_zen.launch(...)``. So Hydra's ``--cfg`` /
+``--info`` cannot flow through as argv; instead they are served by resolving the
+notebook's config IN THE RUNNER PROCESS and rendering it with Hydra's own
+machinery, without executing the notebook (see
+``execution.base_config.render_notebook_config``). The Hydra-flag vocabulary is
+documented at
+https://hydra.cc/docs/advanced/hydra-command-line-flags/ and the override
+grammar at https://hydra.cc/docs/advanced/override_grammar/basic/.
+
+Note on ``-p``: on this runner ``-p`` is papermill's ``--parameter`` (notebook
+parameter injection). It is NOT Hydra's ``--package`` (which is reachable on the
+model runner ``deriva-ml-run``). The asymmetry is inherent: papermill owns ``-p``
+here and there is no argv to forward to Hydra anyway.
 
 Example:
     # Run a training notebook with explicit host/catalog
@@ -37,9 +65,15 @@ Example:
     # Run using Hydra config defaults (no --host/--catalog needed)
     deriva-ml-run-notebook analysis.ipynb assets=roc_comparison_probabilities
 
+    # Inspect without executing
+    deriva-ml-run-notebook analysis.ipynb --list-configs          # menu of group=value
+    deriva-ml-run-notebook analysis.ipynb assets=roc_all --cfg job  # resolved config
+    deriva-ml-run-notebook analysis.ipynb --info config           # Hydra composed config
+
 See Also:
     - install_kernel: Module for installing Jupyter kernels for virtual environments
     - Workflow: Class that handles workflow registration and Git integration
+    - run_model: CLI for running Python model functions (forwards every Hydra flag)
 """
 
 import base64
@@ -59,10 +93,16 @@ from nbconvert import MarkdownExporter
 
 from deriva_ml import DerivaML, ExecAssetType, MLAsset
 from deriva_ml.cli.hydra_overrides import validate_hydra_overrides
+from deriva_ml.cli.show_info import render_config_groups
 from deriva_ml.core.constants import DRY_RUN_RID
 from deriva_ml.core.enums import ExecMetadataType
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
 from deriva_ml.execution import Execution, ExecutionConfiguration, Workflow
+from deriva_ml.execution.base_config import (
+    _derive_config_name_from_notebook,
+    load_configs,
+    render_notebook_config,
+)
 
 
 def _html_table_to_markdown(html: str) -> str | None:
@@ -274,9 +314,45 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         )
 
         self.parser.add_argument(
-            "--info",
+            "--list-configs",
             action="store_true",
-            help="Display available Hydra configuration groups and options.",
+            help=(
+                "List the deriva-ml/hydra-zen config groups and the options "
+                "registered in each (the menu of group=value choices). This is "
+                "deriva-ml-specific; Hydra has no equivalent. To inspect the "
+                "fully resolved config the notebook would use, pass --cfg job; "
+                "to see Hydra internals, pass --info config (etc.)."
+            ),
+        )
+
+        # Hydra's own --info vocabulary. The notebook runner never hands argv to
+        # Hydra (it drives a papermill kernel via hydra_zen.launch), so these
+        # modes are served by resolving the config IN THIS PROCESS and rendering
+        # it with Hydra's own machinery, without executing the notebook.
+        self.parser.add_argument(
+            "--info",
+            nargs="?",
+            const="all",
+            choices=["all", "config", "defaults", "defaults-tree", "plugins", "searchpath"],
+            default=None,
+            help=(
+                "Render Hydra's --info for the resolved notebook config without "
+                "executing the notebook. Bare --info defaults to 'all'. "
+                "See https://hydra.cc/docs/advanced/hydra-command-line-flags/."
+            ),
+        )
+
+        self.parser.add_argument(
+            "--cfg",
+            nargs="?",
+            const="job",
+            choices=["job", "hydra", "all"],
+            default=None,
+            help=(
+                "Render the resolved notebook config (Hydra's --cfg) without "
+                "executing the notebook. Bare --cfg defaults to 'job' (the "
+                "composed job config the notebook would run with)."
+            ),
         )
 
         self.parser.add_argument(
@@ -354,9 +430,12 @@ class DerivaMLRunNotebookCLI(BaseCLI):
 
         This is the main entry point that orchestrates:
         1. Parsing command-line arguments
-        2. Loading parameters from file if specified
-        3. Validating the notebook file
-        4. Either inspecting notebook parameters or executing the notebook
+        2. Validating Hydra overrides and short-circuiting on inspection flags
+           (``--list-configs`` menu, ``--cfg``/``--info`` resolved-config render)
+        3. Loading parameters from file if specified
+        4. Validating the notebook file
+        5. Either inspecting notebook parameters (``--inspect``) or executing the
+           notebook
 
         The method merges parameters from multiple sources with the following
         precedence (later sources override earlier):
@@ -382,6 +461,24 @@ class DerivaMLRunNotebookCLI(BaseCLI):
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             exit(1)
+
+        # Inspection flags short-circuit BEFORE any notebook validation or
+        # parameter parsing — they neither read the notebook's parameter cell
+        # nor execute it. --list-configs is the deriva-ml group menu; --info /
+        # --cfg resolve the notebook's config in this process and render it the
+        # way Hydra would, without running the notebook (see _show_resolved_config).
+        if args.list_configs:
+            self._show_hydra_info(notebook_file)
+            return
+
+        if args.info is not None or args.cfg is not None:
+            self._show_resolved_config(
+                notebook_file,
+                overrides=args.hydra_overrides,
+                cfg_mode=args.cfg,
+                info_mode=args.info,
+            )
+            return
 
         # Build parameters dict from command-line -p/--parameter flags
         # args.parameter is a list of [KEY, VALUE] lists, e.g. [['timeout', '30'], ...]
@@ -418,11 +515,6 @@ class DerivaMLRunNotebookCLI(BaseCLI):
                 print(f"{param}:{value['inferred_type_name']}  (default {value['default']})")
             return
 
-        if args.info:
-            # Display available Hydra configuration options
-            self._show_hydra_info(notebook_file)
-            return
-
         # Determine allow-dirty from CLI flag or environment variable
         allow_dirty = args.allow_dirty or os.environ.get("DERIVA_ML_ALLOW_DIRTY", "").lower() == "true"
         if allow_dirty:
@@ -446,80 +538,115 @@ class DerivaMLRunNotebookCLI(BaseCLI):
             os.environ.pop("DERIVA_ML_ALLOW_DIRTY", None)
 
     @staticmethod
-    def _show_hydra_info(notebook_file: Path) -> None:
-        """Display available Hydra configuration groups and options.
+    def _load_project_configs(notebook_file: Path) -> bool:
+        """Import the project's config package so the hydra-zen store is populated.
 
-        Attempts to load the project's config module and display the available
-        configuration groups (e.g., assets, datasets, deriva_ml) and their
-        registered options.
+        Both the ``--list-configs`` menu and the ``--info`` / ``--cfg`` config
+        resolution need the project's configs registered in the hydra-zen store.
+        The notebook lives in ``<project>/notebooks/``; its ``src/`` sibling holds
+        the ``configs`` package. This adds ``src/`` to ``sys.path`` and imports
+        every config module (which registers configs as an import side effect).
 
         Args:
-            notebook_file: Path to the notebook file (used to find the project root).
+            notebook_file: Path to the notebook file, used to locate the project
+                root (assumed to be the notebook's grandparent directory).
+
+        Returns:
+            True if the ``configs`` package was found and loaded, False if it
+            could not be imported (the caller prints a diagnostic and returns).
+
+        Example:
+            >>> from pathlib import Path  # doctest: +SKIP
+            >>> DerivaMLRunNotebookCLI._load_project_configs(  # doctest: +SKIP
+            ...     Path("notebooks/roc_analysis.ipynb")
+            ... )
+            True
         """
-        import sys
-
-        from hydra_zen import store
-
-        # Add src directory to path so we can import configs
+        # Add src directory to path so we can import configs.
         notebook_dir = notebook_file.parent.resolve()
         project_root = notebook_dir.parent  # Assume notebooks/ is one level down
         src_dir = project_root / "src"
-
-        if src_dir.exists():
+        if src_dir.exists() and str(src_dir) not in sys.path:
             sys.path.insert(0, str(src_dir))
 
-        # Try to load configs using the new API, fall back to old method
+        # Try the new API, then the legacy load_all_configs() entry point.
         try:
-            from deriva_ml.execution import load_configs
-
             loaded = load_configs("configs")
             if not loaded:
-                # Try the old way
                 from configs import load_all_configs
 
                 load_all_configs()
         except ImportError:
+            return False
+        return True
+
+    @staticmethod
+    def _show_hydra_info(notebook_file: Path) -> None:
+        """Print the deriva-ml/hydra-zen config-group menu (``--list-configs``).
+
+        Loads the project's configs (so the store is populated) and delegates to
+        the shared :func:`deriva_ml.cli.show_info.render_config_groups`, so this
+        runner and ``deriva-ml-run`` render the same listing. The notebook runner
+        has no multirun surface, so the multirun section is omitted.
+
+        Args:
+            notebook_file: Path to the notebook file (used to find the project
+                root and its ``src/configs`` package).
+        """
+        if not DerivaMLRunNotebookCLI._load_project_configs(notebook_file):
             print("Could not import configs module. Make sure src/configs/__init__.py exists.")
             print("Available Hydra groups cannot be determined without loading the config module.")
             return
+        print(render_config_groups(include_multirun=False))
 
-        # Access the internal store to list groups and entries
-        print("Available Hydra Configuration Groups:")
-        print("=" * 50)
+    @staticmethod
+    def _show_resolved_config(
+        notebook_file: Path,
+        *,
+        overrides: list[str],
+        cfg_mode: str | None,
+        info_mode: str | None,
+    ) -> None:
+        """Render the notebook's resolved config (``--cfg`` / ``--info``).
 
-        # The hydra_zen store._queue contains (group, name) tuples
-        try:
-            groups: dict[str, list[str]] = {}
+        The notebook runner never hands argv to Hydra; it drives a papermill
+        kernel that calls :func:`hydra_zen.launch`. So Hydra's ``--cfg`` /
+        ``--info`` cannot flow through as argv. Instead this resolves the
+        notebook's config **in the runner process** and renders it with Hydra's
+        own ``show_cfg`` / ``show_info`` machinery — byte-for-byte what Hydra's
+        CLI would print — **without executing the notebook** and **without
+        touching a live catalog** (pure config composition; see
+        :func:`deriva_ml.execution.base_config.render_notebook_config`).
 
-            for group, name in store._queue:
-                if group:
-                    if group not in groups:
-                        groups[group] = []
-                    if name not in groups[group]:
-                        groups[group].append(name)
-                else:
-                    # Top-level configs (group is None)
-                    if "__root__" not in groups:
-                        groups["__root__"] = []
-                    if name not in groups["__root__"]:
-                        groups["__root__"].append(name)
+        The config name follows the DerivaML convention ``X.ipynb`` ↔ config
+        ``X``: it is derived from the notebook filename via
+        ``DERIVA_ML_NOTEBOOK_PATH`` + ``_derive_config_name_from_notebook()``.
 
-            # Print groups and their options
-            for group in sorted(groups.keys()):
-                if group == "__root__":
-                    print("\nTop-level configs:")
-                else:
-                    print(f"\n{group}:")
-                for name in sorted(groups[group]):
-                    print(f"  - {name}")
+        Args:
+            notebook_file: Path to the notebook whose config to resolve.
+            overrides: Hydra override strings to apply (the positional
+                ``hydra_overrides``).
+            cfg_mode: ``--cfg`` mode (``job`` / ``hydra`` / ``all``) or None.
+            info_mode: ``--info`` mode (``all`` / ``config`` / ``defaults`` /
+                ``defaults-tree`` / ``plugins`` / ``searchpath``) or None.
+        """
+        if not DerivaMLRunNotebookCLI._load_project_configs(notebook_file):
+            print("Could not import configs module. Make sure src/configs/__init__.py exists.")
+            print("The resolved config cannot be rendered without loading the config module.")
+            return
 
-            print("\n" + "=" * 50)
-            print("Usage: deriva-ml-run-notebook notebook.ipynb [options] <group>=<option>")
-            print("Example: deriva-ml-run-notebook notebook.ipynb --host localhost assets=roc_quick_probabilities")
-
-        except Exception as e:
-            print(f"Error inspecting Hydra store: {e}")
-            print("Try running with --help for basic usage information.")
+        # Set DERIVA_ML_NOTEBOOK_PATH so the config name is derived from the
+        # notebook filename via the same convention run_notebook() uses.
+        os.environ["DERIVA_ML_NOTEBOOK_PATH"] = notebook_file.resolve().as_posix()
+        config_name = _derive_config_name_from_notebook()
+        print(
+            render_notebook_config(
+                config_name,
+                overrides=overrides,
+                cfg_mode=cfg_mode,
+                info_mode=info_mode,
+            )
+        )
 
     @staticmethod
     def _find_kernel_for_venv() -> str | None:
@@ -768,7 +895,22 @@ def main():
     Returns:
         None. Executes the CLI.
     """
-    cli = DerivaMLRunNotebookCLI(description="Deriva ML Execution Script Demo", epilog="")
+    cli = DerivaMLRunNotebookCLI(
+        description="Run Jupyter notebooks with DerivaML execution tracking",
+        epilog=(
+            "Examples:\n"
+            "  deriva-ml-run-notebook analysis.ipynb --host localhost --catalog 45\n"
+            "  deriva-ml-run-notebook analysis.ipynb assets=roc_comparison_probabilities\n"
+            "  deriva-ml-run-notebook analysis.ipynb -p learning_rate 0.001\n"
+            "  deriva-ml-run-notebook analysis.ipynb --inspect          # papermill: list notebook params\n"
+            "  deriva-ml-run-notebook analysis.ipynb --list-configs     # menu of group=value options\n"
+            "  deriva-ml-run-notebook analysis.ipynb assets=roc_all --cfg job  # show the resolved config\n"
+            "  deriva-ml-run-notebook analysis.ipynb --info config      # Hydra's composed config\n"
+            "On this runner -p is papermill's --parameter, NOT Hydra's --package.\n"
+            "Hydra's --cfg/--info vocabulary (rendered without running the notebook):\n"
+            "  https://hydra.cc/docs/advanced/hydra-command-line-flags/\n"
+        ),
+    )
     cli.main()
 
 
