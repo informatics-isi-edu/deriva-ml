@@ -492,18 +492,20 @@ exe.commit_output_assets()   # Pending_Upload → Uploaded
 
 ```
 deriva-ml-run [--host HOST] [--catalog CATALOG] [--config-dir DIR]
-              [--config-name NAME] [--info] [--multirun|-m] [OVERRIDES...]
+              [--config-name NAME] [--list-configs] [--multirun|-m]
+              [OVERRIDES... + any Hydra flag]
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--host HOST` | from config | Deriva server hostname |
-| `--catalog CATALOG` | from config | Catalog ID |
+| `--host HOST` | from config | Deriva server hostname (→ `deriva_ml.hostname=`) |
+| `--catalog CATALOG` | from config | Catalog ID (→ `deriva_ml.catalog_id=`) |
 | `--config-dir DIR`, `-c` | `src/configs` | Path to the configs directory |
 | `--config-name NAME` | `deriva_model` | Name of the main Hydra-zen config |
-| `--info` | | Show available config groups and options |
+| `--list-configs` | | List registered config groups + options (the menu of `group=value` choices). deriva-ml-specific; ignores overrides. |
 | `--multirun`, `-m` | | Enable Hydra multirun for parameter sweeps |
-| `OVERRIDES` | | Hydra-zen configuration overrides (positional) |
+| `OVERRIDES` | | Hydra-zen overrides (positional), e.g. `model_config=quick` |
+| *any Hydra flag* | | Forwarded to Hydra: `--cfg job` (resolved config), `--info config`, `--resolve`, `--package`, … see <https://hydra.cc/docs/advanced/hydra-command-line-flags/> |
 
 ```bash
 # Run with defaults
@@ -515,7 +517,13 @@ uv run deriva-ml-run model_config=quick model_config.epochs=5
 # Use an experiment preset
 uv run deriva-ml-run +experiment=cifar10_quick
 
-# Dry run (downloads inputs, skips catalog writes)
+# List the menu of selectable config options
+uv run deriva-ml-run --list-configs
+
+# Show the resolved config a run would use, without executing (Hydra --cfg)
+uv run deriva-ml-run +experiment=cifar10_quick --cfg job
+
+# Dry run (resolves + validates against the catalog, skips training)
 uv run deriva-ml-run dry_run=true
 
 # Named parameter sweep
@@ -527,21 +535,27 @@ uv run deriva-ml-run +multirun=lr_sweep
 ```
 deriva-ml-run-notebook NOTEBOOK [--host HOST] [--catalog CATALOG]
                        [--file FILE] [--parameter KEY VALUE]
-                       [--kernel KERNEL] [--inspect] [--info]
-                       [--log-output] [OVERRIDES...]
+                       [--kernel KERNEL] [--inspect] [--list-configs]
+                       [--info [MODE]] [--cfg [MODE]] [--log-output]
+                       [OVERRIDES...]
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `NOTEBOOK` | required | Path to the `.ipynb` file |
-| `--host HOST` | from config | Deriva server hostname |
-| `--catalog CATALOG` | from config | Catalog ID |
+| `--host HOST` | from config | Deriva server hostname (papermill parameter) |
+| `--catalog CATALOG` | from config | Catalog ID (papermill parameter) |
 | `--file FILE`, `-f` | | JSON or YAML file with parameter values |
-| `--parameter KEY VALUE`, `-p` | | Inject a parameter (repeatable) |
+| `--parameter KEY VALUE`, `-p` | | Inject a papermill parameter (repeatable) |
 | `--kernel KERNEL`, `-k` | auto-detected | Jupyter kernel name |
-| `--inspect` | | Show notebook parameters and exit |
+| `--inspect` | | Show the notebook's papermill parameters and exit |
+| `--list-configs` | | List registered config groups + options (the menu) |
+| `--info [MODE]` | `all` | Render Hydra info (`all`/`config`/`defaults`/`defaults-tree`/`plugins`/`searchpath`) for the notebook's resolved config, without executing |
+| `--cfg [MODE]` | `job` | Render the resolved config (`job`/`hydra`/`all`) without executing |
 | `--log-output` | | Stream cell output during execution |
 | `OVERRIDES` | | Hydra-zen overrides (positional) |
+
+The notebook runner composes its config kernel-side (via `hydra_zen.launch`), so unlike `deriva-ml-run` it does **not** forward arbitrary Hydra flags — `--list-configs`, `--info <mode>`, and `--cfg <mode>` are the supported render-only inspection commands, and `-p` is papermill's `--parameter` (not Hydra's `--package`).
 
 ```bash
 # Run a notebook with defaults
