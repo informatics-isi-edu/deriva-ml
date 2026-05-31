@@ -12,7 +12,24 @@ Usage:
     deriva-ml-run --host localhost --catalog 45 model_config=my_model
     deriva-ml-run +experiment=my_experiment
     deriva-ml-run --multirun model_config=m1,m2
-    deriva-ml-run --info  # Show available Hydra config options
+    deriva-ml-run --list-configs   # deriva-ml: list registered config groups/options
+
+CLI surface — three distinct inspection operations:
+    - ``--list-configs`` (deriva-ml): the menu of selectable ``group=value``
+      options registered in the hydra-zen store. deriva-ml-specific; Hydra has
+      no equivalent.
+    - ``--cfg job`` (Hydra): print the fully *resolved* config a run would use,
+      without executing. The right command to "see what my overrides resolve
+      to."
+    - ``--info [config|defaults|searchpath|...]`` (Hydra): Hydra internals.
+
+Because the runner forwards every unrecognized (Hydra-native) flag to Hydra
+verbatim, the full Hydra command-line surface documented at
+https://hydra.cc/docs/advanced/hydra-command-line-flags/ and the override
+grammar at https://hydra.cc/docs/advanced/override_grammar/basic/ work as-is.
+deriva-ml only adds ``--list-configs``, ``--catalog``/``--host`` (injected as
+``deriva_ml.catalog_id=``/``deriva_ml.hostname=`` overrides), ``--config-dir``,
+``--allow-dirty``, and ``+multirun=<name>`` expansion.
 
 This parallels `deriva-ml-run-notebook` but for Python model functions instead
 of Jupyter notebooks.
@@ -22,14 +39,16 @@ See Also:
     - runner.run_model: The underlying function that executes models
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
 
-from deriva.core import BaseCLI
+from deriva.core import BaseCLI, init_logging
 from hydra_zen import store, zen
 
-from deriva_ml.cli.hydra_overrides import validate_hydra_overrides
+from deriva_ml.cli.hydra_overrides import validate_cli_remainder
+from deriva_ml.cli.show_info import render_config_groups
 from deriva_ml.core.exceptions import DerivaMLDirtyWorkflowError
 from deriva_ml.execution import (
     get_all_multirun_configs,
@@ -37,6 +56,66 @@ from deriva_ml.execution import (
     load_configs,
     run_model,
 )
+
+
+def build_hydra_argv(
+    *,
+    prog: str,
+    forwarded: list[str],
+    use_multirun: bool,
+    host: str | None,
+    catalog: str | None,
+) -> list[str]:
+    """Assemble the ``sys.argv`` that ``hydra.main`` will re-parse.
+
+    ``deriva-ml-run`` uses ``parse_known_args`` and treats the entire ordered
+    remainder as ``forwarded`` — a mix of Hydra overrides (``group=value``,
+    ``+experiment=name``, ...) and Hydra-native flags (``--cfg``, ``--info``,
+    ``--resolve``, ``--package``, ...) the wrapper does not itself define.
+    Because ``zen(run_model).hydra_main(...)`` ultimately calls ``hydra.main``,
+    which re-parses ``sys.argv`` with Hydra's *own* full argument parser, every
+    forwarded flag is honored exactly as the Hydra documentation describes — no
+    per-flag wiring on the deriva-ml side.
+
+    deriva-ml-specific inputs are translated into Hydra overrides here:
+    ``--catalog`` / ``--host`` become ``deriva_ml.catalog_id=`` /
+    ``deriva_ml.hostname=`` overrides, and multirun is signalled by inserting
+    ``--multirun`` (unless the user already passed it through ``forwarded``).
+
+    Args:
+        prog: ``sys.argv[0]`` for the assembled argv (the program name).
+        forwarded: The ordered remainder from ``parse_known_args`` — overrides
+            (post ``+multirun=`` expansion + description composition) and
+            Hydra-native flags, in original CLI order.
+        use_multirun: Whether to run in Hydra multirun mode.
+        host: Value of ``--host`` (injected as ``deriva_ml.hostname=``), or None.
+        catalog: Value of ``--catalog`` (injected as ``deriva_ml.catalog_id=``),
+            or None.
+
+    Returns:
+        The argv list to assign to ``sys.argv`` before invoking ``hydra.main``.
+
+    Example:
+        >>> build_hydra_argv(
+        ...     prog="deriva-ml-run",
+        ...     forwarded=["+experiment=cifar10_quick", "--cfg", "job"],
+        ...     use_multirun=False,
+        ...     host=None,
+        ...     catalog="45",
+        ... )
+        ['deriva-ml-run', '+experiment=cifar10_quick', '--cfg', 'job', 'deriva_ml.catalog_id=45']
+    """
+    argv = [prog, *forwarded]
+    if catalog:
+        argv.append(f"deriva_ml.catalog_id={catalog}")
+    if host:
+        argv.append(f"deriva_ml.hostname={host}")
+
+    # Signal multirun unless the user already forwarded a multirun flag.
+    if use_multirun and "--multirun" not in forwarded and "-m" not in forwarded:
+        argv.insert(1, "--multirun")
+
+    return argv
 
 
 class DerivaMLRunCLI(BaseCLI):
@@ -64,7 +143,7 @@ class DerivaMLRunCLI(BaseCLI):
         >>> cli.main()  # doctest: +SKIP
     """
 
-    def __init__(self, description: str, epilog: str, **kwargs) -> None:
+    def __init__(self, description: str = "Run ML models with DerivaML", epilog: str = "", **kwargs) -> None:
         """Initialize the model runner CLI with command-line arguments.
 
         Sets up argument parsing for model execution, including host/catalog,
@@ -100,9 +179,15 @@ class DerivaMLRunCLI(BaseCLI):
         )
 
         self.parser.add_argument(
-            "--info",
+            "--list-configs",
             action="store_true",
-            help="Display available Hydra configuration groups and options.",
+            help=(
+                "List the deriva-ml/hydra-zen config groups and the options "
+                "registered in each (the menu of group=value choices). This is "
+                "deriva-ml-specific; Hydra has no equivalent. To inspect the "
+                "fully resolved config a run would use, pass Hydra's --cfg job; "
+                "to see Hydra internals, pass Hydra's --info."
+            ),
         )
 
         self.parser.add_argument(
@@ -118,11 +203,15 @@ class DerivaMLRunCLI(BaseCLI):
             help="Allow execution with uncommitted changes (skips git clean check).",
         )
 
-        self.parser.add_argument(
-            "hydra_overrides",
-            nargs="*",
-            help="Hydra-zen configuration overrides (e.g., model_config=cifar10_quick)",
-        )
+        # NOTE: deriva-ml deliberately does NOT register a ``nargs="*"``
+        # positional for Hydra overrides. A greedy positional steals the value
+        # of an interleaved Hydra flag (``--cfg job`` would leave ``job`` as a
+        # stray override). Instead ``main`` uses ``parse_known_args`` and treats
+        # the entire ordered remainder as overrides + Hydra-native flags,
+        # forwarding it verbatim so Hydra's own parser handles both. The
+        # remainder syntax (``group=value``, ``+experiment=name``, plus every
+        # Hydra flag such as ``--cfg``/``--info``/``--resolve``) is documented
+        # in the epilog and the user guide.
 
     def main(self) -> int:
         """Parse command-line arguments and execute the model.
@@ -135,14 +224,24 @@ class DerivaMLRunCLI(BaseCLI):
         Returns:
             Exit code (0 for success, 1 for failure).
         """
-        args = self.parse_cli()
+        # Parse with parse_known_args so Hydra-native flags this wrapper does
+        # NOT define (--cfg, --info, --resolve, --package, --config-name, ...)
+        # fall into ``unknown`` and are forwarded to Hydra verbatim (see
+        # build_hydra_argv). deriva-ml-specific flags stay explicit on the
+        # parser and are consumed here. ``parse_cli`` cannot be used because it
+        # calls ``parse_args``, which rejects unknown flags before Hydra runs.
+        args, unknown = self.parser.parse_known_args()
+        init_logging(level=logging.CRITICAL if args.quiet else (logging.DEBUG if args.debug else logging.INFO))
 
-        # Pre-validate Hydra overrides before any work happens, so bare
-        # positional args (e.g. 'cifar10_quick' instead of
-        # '+experiment=cifar10_quick') produce a diagnostic error rather
-        # than the cryptic ANTLR "missing EQUAL at '<EOF>'" from Hydra.
+        # Pre-validate the remainder before any work happens, so a bare
+        # positional (e.g. 'cifar10_quick' instead of
+        # '+experiment=cifar10_quick') produces a diagnostic error rather than
+        # the cryptic ANTLR "missing EQUAL at '<EOF>'" from Hydra. The
+        # validator skips recognized Hydra flags and their values (arities
+        # introspected from Hydra), so legitimate '--cfg job' / '--info config'
+        # pass through untouched.
         try:
-            validate_hydra_overrides(args.hydra_overrides, cli_name="deriva-ml-run")
+            validate_cli_remainder(unknown, cli_name="deriva-ml-run")
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
@@ -175,19 +274,21 @@ class DerivaMLRunCLI(BaseCLI):
                 print("Make sure the config directory contains an __init__.py with load_all_configs()")
                 return 1
 
-        if args.info:
+        if args.list_configs:
             self._show_hydra_info()
             return 0
 
-        # Build Hydra overrides list
-        hydra_overrides = list(args.hydra_overrides) if args.hydra_overrides else []
+        # The remainder is the ordered overrides + Hydra-native flags. Expand
+        # any +multirun=<name> token in place; everything else (plain overrides
+        # AND Hydra flags like --cfg/--info) is forwarded verbatim.
+        remainder = list(unknown)
 
         # Check for +multirun=<name> and expand it
         multirun_description = None
         use_multirun = args.multirun
         expanded_overrides = []
 
-        for override in hydra_overrides:
+        for override in remainder:
             if override.startswith("+multirun="):
                 # Extract the multirun config name
                 multirun_name = override.split("=", 1)[1]
@@ -214,12 +315,6 @@ class DerivaMLRunCLI(BaseCLI):
 
         hydra_overrides = expanded_overrides
 
-        # Add host/catalog overrides if provided on command line
-        if args.host:
-            hydra_overrides.append(f"deriva_ml.hostname={args.host}")
-        if args.catalog:
-            hydra_overrides.append(f"deriva_ml.catalog_id={args.catalog}")
-
         # If we have a multirun description, add it as an override
         # This gets passed to run_model which uses it for the parent execution
         if multirun_description:
@@ -241,10 +336,17 @@ class DerivaMLRunCLI(BaseCLI):
         if any(o in ("dry_run=True", "dry_run=true") for o in hydra_overrides):
             os.environ["DERIVA_ML_DRY_RUN"] = "true"
 
-        # Build argv for Hydra
-        hydra_argv = [sys.argv[0]] + hydra_overrides
-        if use_multirun:
-            hydra_argv.insert(1, "--multirun")
+        # Build argv for Hydra. ``forwarded`` is the ordered remainder
+        # (overrides + Hydra-native flags such as --cfg/--info/--resolve);
+        # Hydra's own parser honors every flag. Host and catalog become
+        # deriva_ml.* overrides inside the helper.
+        hydra_argv = build_hydra_argv(
+            prog=sys.argv[0],
+            forwarded=hydra_overrides,
+            use_multirun=use_multirun,
+            host=args.host,
+            catalog=args.catalog,
+        )
 
         # Save and replace sys.argv for Hydra
         original_argv = sys.argv
@@ -268,63 +370,13 @@ class DerivaMLRunCLI(BaseCLI):
 
     @staticmethod
     def _show_hydra_info() -> None:
-        """Display available Hydra configuration groups and options.
+        """Print the deriva-ml/hydra-zen config-group menu (``--list-configs``).
 
-        Inspects the hydra-zen store and prints all registered configuration
-        groups and their available options.
+        Delegates to the shared :func:`deriva_ml.cli.show_info.render_config_groups`
+        so this runner and ``deriva-ml-run-notebook`` render the same listing.
+        The model runner includes the named-multirun section.
         """
-        print("Available Hydra Configuration Groups:")
-        print("=" * 50)
-
-        try:
-            groups: dict[str, list[str]] = {}
-
-            for group, name in store._queue:
-                if group:
-                    if group not in groups:
-                        groups[group] = []
-                    if name not in groups[group]:
-                        groups[group].append(name)
-                else:
-                    if "__root__" not in groups:
-                        groups["__root__"] = []
-                    if name not in groups["__root__"]:
-                        groups["__root__"].append(name)
-
-            for group in sorted(groups.keys()):
-                if group == "__root__":
-                    print("\nTop-level configs:")
-                else:
-                    print(f"\n{group}:")
-                for name in sorted(groups[group]):
-                    print(f"  - {name}")
-
-            # Show multirun configs if any are registered
-            multirun_configs = get_all_multirun_configs()
-            if multirun_configs:
-                print("\nmultirun:")
-                for name in sorted(multirun_configs.keys()):
-                    spec = multirun_configs[name]
-                    # Show first line of description or overrides summary
-                    if spec.description:
-                        first_line = spec.description.strip().split("\n")[0]
-                        # Remove markdown formatting for display
-                        first_line = first_line.lstrip("#").strip()
-                        if len(first_line) > 50:
-                            first_line = first_line[:47] + "..."
-                        print(f"  - {name}: {first_line}")
-                    else:
-                        print(f"  - {name}: {', '.join(spec.overrides[:2])}")
-
-            print("\n" + "=" * 50)
-            print("Usage: deriva-ml-run [options] <group>=<option> ...")
-            print("Example: deriva-ml-run --host localhost --catalog 45 model_config=cifar10_quick")
-            print("Example: deriva-ml-run +experiment=cifar10_quick")
-            print("Example: deriva-ml-run +multirun=quick_vs_extended")
-            print("Example: deriva-ml-run --multirun +experiment=cifar10_quick,cifar10_extended")
-
-        except Exception as e:
-            print(f"Error inspecting Hydra store: {e}")
+        print(render_config_groups(include_multirun=True))
 
 
 def main() -> int:
@@ -344,7 +396,10 @@ def main() -> int:
             "  deriva-ml-run +multirun=quick_vs_extended\n"
             "  deriva-ml-run +multirun=lr_sweep model_config.epochs=5\n"
             "  deriva-ml-run --multirun +experiment=cifar10_quick,cifar10_extended\n"
-            "  deriva-ml-run --info\n"
+            "  deriva-ml-run --list-configs                       # menu of group=value options\n"
+            "  deriva-ml-run +experiment=cifar10_quick --cfg job  # show the resolved config (Hydra)\n"
+            "Every Hydra command-line flag is supported (forwarded to Hydra):\n"
+            "  https://hydra.cc/docs/advanced/hydra-command-line-flags/\n"
         ),
     )
     return cli.main()
