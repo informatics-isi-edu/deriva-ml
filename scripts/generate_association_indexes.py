@@ -338,6 +338,18 @@ def _emit_association_block(
 def generate(hostname: str, catalog_id: str, output_path: Path, verbose: bool = False) -> dict:
     """Walk the catalog and write the SQL file.
 
+    Uses the same ``DerivaML(hostname, catalog_id)`` entry point as
+    the other deriva-ml operator scripts in this directory (notably
+    ``cutover_smoke_check.py``). That handles Globus credential
+    discovery, the ermrest connection, and the model load in one
+    shot — same path the performance-evaluation work uses, so the
+    auth + connection behavior matches what was used to identify the
+    join-performance bottleneck this tool addresses.
+
+    The underlying deriva-py ``Model`` is reachable as
+    ``ml.model.schemas`` via DerivaModel's ``__getattr__`` proxy;
+    we walk it just like raw deriva-py would.
+
     Args:
         hostname: Deriva catalog hostname (e.g. ``www.eye-ai.org``).
         catalog_id: Catalog ID.
@@ -348,17 +360,18 @@ def generate(hostname: str, catalog_id: str, output_path: Path, verbose: bool = 
         Summary dict: ``{"associations_found": int, "warnings": list[str],
         "output_path": str}``.
     """
-    # Imports inside the function so the module's docstring + helper
-    # tests don't require deriva-py at import time (matches the style
-    # of scripts/cutover_smoke_check.py).
-    from deriva.core import DerivaServer, get_credential
+    # Import inside the function so the module's helper-function
+    # doctests (quote_ident, live_index_sql, etc.) don't require a
+    # deriva-ml import at module load time. Matches the style of
+    # scripts/cutover_smoke_check.py.
+    from deriva_ml import DerivaML
 
-    credential = get_credential(hostname)
-    server = DerivaServer("https", hostname, credentials=credential)
-    catalog = server.connect_ermrest(catalog_id)
-
-    model = catalog.getCatalogModel()
-    table_rid, column_rid = _build_rid_lookup(catalog)
+    ml = DerivaML(hostname=hostname, catalog_id=catalog_id)
+    # ``ml.catalog`` is the open ErmrestCatalog; ``ml.model`` is the
+    # DerivaModel wrapper, whose ``.schemas`` (and other model attrs)
+    # proxy through to the underlying deriva-py Model.
+    table_rid, column_rid = _build_rid_lookup(ml.catalog)
+    model = ml.model
 
     associations = _walk_associations(model)
     if verbose:
