@@ -2079,17 +2079,20 @@ def subsample(
             ``include_tables``, ambiguous ``partition_by``, etc.).
 
     Example:
-        >>> # Take 400 stratified samples from a Training dataset.  # doctest: +SKIP
-        >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
-        ...     small = subsample(  # doctest: +SKIP
-        ...         ml, training_rid, exe,  # doctest: +SKIP
-        ...         size=400,  # doctest: +SKIP
-        ...         stratify_by_column="Image_Class.Name",  # doctest: +SKIP
-        ...         element_table="Image",  # doctest: +SKIP
-        ...         include_tables=["Image", "Image_Class"],  # doctest: +SKIP
-        ...         dataset_types=["Training", "Labeled"],  # doctest: +SKIP
-        ...     )  # doctest: +SKIP
-        >>> exe.commit_output_assets()  # doctest: +SKIP
+        Take 400 stratified samples from a Training dataset::
+
+            with ml.create_execution(cfg) as exe:
+                small = subsample(
+                    ml, training_rid, exe,
+                    size=400,
+                    stratify_by_column="Image_Class.Name",
+                    element_table="Image",
+                    include_tables=["Image", "Image_Class"],
+                    dataset_types=["Training", "Labeled"],
+                )
+            exe.commit_output_assets()
+
+        >>> from deriva_ml.dataset.split import subsample  # doctest: +SKIP
     """
     effective_partition_by = _validate_subsample_inputs(
         size=size,
