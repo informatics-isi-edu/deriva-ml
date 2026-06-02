@@ -214,6 +214,11 @@ def random_split(
     """Random split into N partitions.
 
     Shuffles the DataFrame indices and splits at partition boundaries.
+    This is the **default selector** used by :func:`split_dataset` when
+    neither ``stratify_by_column`` nor ``selection_fn`` is supplied —
+    the unified selector pipeline produces one random partition per
+    name in ``partition_sizes`` by handing this function the synthetic
+    dataframe whose only column is the element-table RID.
 
     Args:
         df: Source DataFrame.
@@ -230,6 +235,44 @@ def random_split(
     indices = indices[:total_needed]
 
     result = {}
+    offset = 0
+    for name, size in partition_sizes.items():
+        result[name] = indices[offset : offset + size]
+        offset += size
+    return result
+
+
+def _ordered_split(
+    df: pd.DataFrame,
+    partition_sizes: dict[str, int],
+    seed: int,
+) -> dict[str, np.ndarray]:
+    """In-order split into N partitions (no shuffle).
+
+    Slices contiguous chunks from the input dataframe's index in
+    insertion order. Used by :func:`_compute_partitions` only when the
+    caller passes ``shuffle=False`` and no stratify column / selection
+    function — the unified-selector counterpart to the legacy inlined
+    "no-shuffle" branch.
+
+    ``seed`` is accepted for protocol conformance with
+    :class:`SelectionFunction` but is unused — the operation is
+    deterministic by construction.
+
+    Args:
+        df: Source DataFrame.
+        partition_sizes: Dict mapping partition names to counts.
+        seed: Unused (kept for selector-protocol conformance).
+
+    Returns:
+        Dict mapping partition names to contiguous index arrays.
+    """
+    del seed  # protocol conformance; in-order split is deterministic
+    indices = np.arange(len(df))
+    total_needed = sum(partition_sizes.values())
+    indices = indices[:total_needed]
+
+    result: dict[str, np.ndarray] = {}
     offset = 0
     for name, size in partition_sizes.items():
         result[name] = indices[offset : offset + size]
@@ -863,6 +906,18 @@ def _compute_partitions(
     size_summary = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
     logger.info(f"Split sizes: {size_summary} (total={total})")
 
+    # Dispatch refactor (§3.5): one selector pipeline regardless of
+    # strategy. ``stratify_by_column`` and ``selection_fn`` both
+    # require the denormalized dataframe (with the stratify column
+    # / the columns the custom selector reads); the random path uses
+    # a tiny synthetic dataframe carrying only ``{element_table}.RID``.
+    # The selector is then uniformly ``random_split`` / ``stratified_split``
+    # / ``selection_fn``, the indices come back the same way, and
+    # ``df.iloc[indices][rid_column]`` extracts the RIDs. This collapses
+    # the previously two-path dispatch (denormalize + selector vs
+    # inlined shuffle-and-slice) into one — ``random_split`` is now the
+    # default selector, the load-bearing public symbol it always
+    # advertised itself as.
     use_denormalization = stratify_by_column is not None or selection_fn is not None
 
     if use_denormalization:
@@ -923,50 +978,60 @@ def _compute_partitions(
             partition_sizes = _resolve_sizes(len(df), test_size, train_size, val_size)
             size_summary = ", ".join(f"{k}={v}" for k, v in partition_sizes.items())
             logger.info(f"Adjusted split sizes after dedupe: {size_summary} (total={len(df)})")
-
-        if stratify_by_column:
-            logger.info(f"Using stratified split on column: {stratify_by_column}")
-            selector = stratified_split(stratify_by_column, missing=stratify_missing)
-        else:
-            logger.info("Using custom selection function")
-            selector = selection_fn
-
-        partition_indices = selector(df, partition_sizes, seed)
-
-        partition_rids = {name: df.iloc[indices][rid_column].tolist() for name, indices in partition_indices.items()}
-
-        if partition_by == "element":
-            # Defensive invariant — after a correct dedupe the
-            # selector sees disjoint rows (one per element_RID), so
-            # mapping indices → RIDs preserves disjointness. If this
-            # ever fires, the dedupe logic regressed or a selector
-            # ignored its input contract; either case is a bug, not
-            # bad user input — hence ``assert``, not ``ValueError``.
-            seen: dict[str, str] = {}
-            for name, rids in partition_rids.items():
-                for r in rids:
-                    assert r not in seen, (
-                        "partition_by='element' disjointness invariant violated: "
-                        f"RID {r!r} appears in both {seen.get(r)!r} and {name!r}. "
-                        "Internal correctness bug — the element-level dedupe "
-                        "failed to produce one row per element_table RID, or "
-                        "the selector returned overlapping indices."
-                    )
-                    seen[r] = name
     else:
-        all_rids = [record["RID"] for record in member_records]
+        # No denormalization needed — build a tiny synthetic dataframe
+        # carrying only the member RIDs. The unified selector pipeline
+        # below then uses ``random_split`` to shuffle-and-slice these
+        # rows, producing the same observable outputs as the legacy
+        # inlined shuffle path. Cost: a single in-memory DataFrame
+        # construction over the member RID list (no I/O, no joins, no
+        # extra catalog reads). See §3.5 + §7 R1 in the spec.
+        rid_column = f"{element_table}.RID"
+        df = pd.DataFrame({rid_column: [record["RID"] for record in member_records]})
 
+    # Uniform selector dispatch: stratified > custom > random (default).
+    if stratify_by_column:
+        logger.info(f"Using stratified split on column: {stratify_by_column}")
+        selector: SelectionFunction = stratified_split(stratify_by_column, missing=stratify_missing)
+    elif selection_fn is not None:
+        logger.info("Using custom selection function")
+        selector = selection_fn
+    else:
+        # ``shuffle=False`` historically meant "preserve input order"
+        # for the random path. The unified pipeline always runs through
+        # ``random_split``, which shuffles deterministically by seed; to
+        # honor ``shuffle=False`` we hand back contiguous chunks in
+        # input order without shuffling. Stratified / custom selectors
+        # ignore ``shuffle`` (they own their own ordering).
         if shuffle:
-            rng = np.random.default_rng(seed)
-            indices = np.arange(len(all_rids))
-            rng.shuffle(indices)
-            all_rids = [all_rids[i] for i in indices]
+            logger.info("Using random split (default selector)")
+            selector = random_split
+        else:
+            logger.info("Using in-order split (shuffle=False)")
+            selector = _ordered_split
 
-        partition_rids = {}
-        offset = 0
-        for name, size in partition_sizes.items():
-            partition_rids[name] = all_rids[offset : offset + size]
-            offset += size
+    partition_indices = selector(df, partition_sizes, seed)
+
+    partition_rids = {name: df.iloc[indices][rid_column].tolist() for name, indices in partition_indices.items()}
+
+    if use_denormalization and partition_by == "element":
+        # Defensive invariant — after a correct dedupe the
+        # selector sees disjoint rows (one per element_RID), so
+        # mapping indices → RIDs preserves disjointness. If this
+        # ever fires, the dedupe logic regressed or a selector
+        # ignored its input contract; either case is a bug, not
+        # bad user input — hence ``assert``, not ``ValueError``.
+        seen: dict[str, str] = {}
+        for name, rids in partition_rids.items():
+            for r in rids:
+                assert r not in seen, (
+                    "partition_by='element' disjointness invariant violated: "
+                    f"RID {r!r} appears in both {seen.get(r)!r} and {name!r}. "
+                    "Internal correctness bug — the element-level dedupe "
+                    "failed to produce one row per element_table RID, or "
+                    "the selector returned overlapping indices."
+                )
+                seen[r] = name
 
     for name, rids in partition_rids.items():
         logger.info(f"Selected {len(rids)} {name} RIDs")
