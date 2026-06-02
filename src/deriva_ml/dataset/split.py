@@ -1007,9 +1007,16 @@ def _create_split_hierarchy(
 
     logger.info("Splitting inside caller's execution %s", execution.execution_rid)
 
-    train_types = ["Training"] + (training_types or [])
-    test_types = ["Testing"] + (testing_types or [])
-    val_types = ["Validation"] + (validation_types or []) if val_size is not None else []
+    # Every child of a Split carries the origin-axis ``Split_Partition``
+    # tag (see CONTEXT.md "Datasets — types and partitions"). The tag
+    # is the 1-hop discriminator that distinguishes a partition-role
+    # ``Training`` dataset (the Training half of a split) from a
+    # corpus-role ``Training`` dataset (a hand-built training corpus).
+    # The parent Split itself stays tagged ``["Split"]`` only — it is
+    # the container, not a partition.
+    train_types = ["Training", "Split_Partition"] + (training_types or [])
+    test_types = ["Testing", "Split_Partition"] + (testing_types or [])
+    val_types = ["Validation", "Split_Partition"] + (validation_types or []) if val_size is not None else []
 
     # Save split parameters as config artifact. The caller's execution
     # is responsible for uploading this on its own
@@ -1636,9 +1643,13 @@ def split_dataset(
     # ``execution`` and chose its type.
     _ensure_dataset_types(ml)
 
-    train_types = ["Training"] + (training_types or [])
-    test_types = ["Testing"] + (testing_types or [])
-    val_types = ["Validation"] + (validation_types or []) if val_size is not None else []
+    # Mirror the per-child tag set built in ``_create_split_hierarchy``
+    # — every Split child carries ``Split_Partition``. Recorded in the
+    # ``split_config.json`` artifact so the config reflects what the
+    # operation actually applied.
+    train_types = ["Training", "Split_Partition"] + (training_types or [])
+    test_types = ["Testing", "Split_Partition"] + (testing_types or [])
+    val_types = ["Validation", "Split_Partition"] + (validation_types or []) if val_size is not None else []
 
     split_params = {
         "source_dataset_rid": source_dataset_rid,
