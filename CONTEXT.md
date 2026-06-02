@@ -63,6 +63,108 @@ released version.
 _Avoid_: "publish", "tag", "freeze" (overloaded with other Deriva
 concepts).
 
+### Datasets — types and partitions
+
+Dataset_Type vocabulary terms have three orthogonal axes. A single
+dataset carries one or more tags from any combination of them, and
+the axes mean different things to readers of the catalog.
+
+**Role-axis Dataset_Type**:
+A tag that says what this dataset is *for* in its immediate
+context. Includes `Training`, `Testing`, `Validation`, and `Split`
+(the parent of a split hierarchy). Role-axis types are **not
+inherited from a parent dataset** and are **not propagated to
+child datasets**. `split_dataset` assigns the partition roles
+(Training / Testing / Validation) to its children based on the
+partition's position in the split, regardless of what the source
+dataset's role was.
+_Avoid_: "kind" (too generic), "purpose" (a dataset's purpose is
+in its description, not its type tag).
+
+**Content-axis Dataset_Type**:
+A tag that says what *kind of data* the dataset contains. Includes
+`Labeled`, `Unlabeled`, and domain-specific types like `Complete`,
+`CIFAR_10`, `Eye_Image_Fundus`. Content-axis types describe
+properties of the data itself and **may propagate** when the
+partitioning operation preserves them (a stratified sample of a
+Labeled dataset is still Labeled). Whether they propagate is a
+caller decision, expressed via `training_types=`, `testing_types=`,
+`validation_types=` arguments to `split_dataset` and the
+`dataset_types=` argument to `subsample`.
+_Avoid_: "data kind", "content kind" (vague).
+
+**Origin-axis Dataset_Type**:
+A tag that says how this dataset *came to exist*. Includes `Split`
+(parent dataset of a split hierarchy), `Split_Partition` (a child
+of a Split — Training, Testing, or Validation), and `Subsample`
+(a dataset produced by `subsample()`). Origin tags are
+**never inherited**. They are always set by the producing
+operation, never copied from another dataset.
+_Avoid_: "lineage tag" (lineage lives in execution edges, not in
+type tags; the origin tag is a denormalized signal, not the
+truth).
+
+**Split**:
+A parent dataset produced by `split_dataset` that contains the
+Training, Testing, and optional Validation children as
+`Dataset_Dataset` members. Carries `Dataset_Type=["Split"]` only
+(not `Split_Partition` — it is the container, not a partition).
+_Avoid_: "split parent" (Split *is* the parent — the modifier is
+redundant), "split dataset" as a phrase (ambiguous with the
+function name `split_dataset`).
+
+**Split_Partition**:
+The origin-axis tag attached to every child of a Split — the
+Training, Testing, and Validation children of `split_dataset`'s
+output. The discriminator that distinguishes a corpus-role
+`Training` dataset (a dataset tagged `Training` because it is a
+training corpus) from a partition-role `Training` dataset (a
+dataset tagged `Training` because it is the training partition of
+a split). Hand-built Split hierarchies should also tag children
+with `Split_Partition` to remain discoverable through the same
+filters.
+_Avoid_: "split child", "split result", "split member" (Split has
+`Dataset_Dataset` members, but those members are tagged
+`Split_Partition`, not "Split_Member").
+
+**Subsample**:
+The origin-axis tag attached to the single dataset output of the
+`subsample()` operation. Distinguishes a subsampled dataset from a
+hand-curated dataset of the same role and content. The source
+relationship lives in the execution graph (the source is an input
+of the subsample's producing execution), not in `Dataset_Dataset`
+edges — there is no parent/child hierarchy between a subsample and
+its source. Same provenance shape as `split_dataset` outputs.
+_Avoid_: "subsampled dataset" (the `Subsample` *is* the dataset),
+"sample" (too generic, conflates with the `subsample()` operation
+itself).
+
+**Partition unit**:
+The granularity at which `split_dataset` and `subsample`
+distribute rows across partitions. Controlled by the `partition_by`
+parameter and constrained by `element_table` plus `row_per`. Two
+values: `"element"` dedupes the denormalized dataframe to one row
+per `element_table` RID before partitioning and asserts
+element-RID disjointness after; `"row"` partitions denormalized
+rows directly and may legitimately place the same element RID in
+multiple partitions.
+_Avoid_: "granularity", "split unit" (vague).
+
+**Source dataset**:
+The dataset passed as `source_dataset_rid` to `split_dataset` or
+`subsample`. The split/subsample operation does NOT create a
+`Dataset_Dataset` edge from the source to its outputs; instead,
+the source is recorded as an *input of the producing execution*
+via the existing `Dataset_Execution` association. The derivation
+relationship is therefore reached via
+`output.producing_execution.list_input_datasets()`, not via
+`output.list_dataset_parents()`. This matches ADR-0001 (lineage
+walks data flow, not orchestration).
+_Avoid_: "parent dataset" (the source is NOT a Dataset_Dataset
+parent of the output), "input dataset" outside of execution
+context (sources become "inputs" only in the producing
+execution's frame).
+
 ### Bags
 
 **Deriva-bag profile**:
