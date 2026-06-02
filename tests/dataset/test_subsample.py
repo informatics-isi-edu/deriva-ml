@@ -168,10 +168,7 @@ class TestSubsample:
         ml.add_dataset_element_type("SubsampleTestItem")
 
         table_path = ml.catalog.getPathBuilder().schemas[ml.default_schema].tables["SubsampleTestItem"]
-        records = [
-            {"Name": f"Item{i}", "Category": ["A", "B", "C", "D"][i % 4]}
-            for i in range(24)
-        ]
+        records = [{"Name": f"Item{i}", "Category": ["A", "B", "C", "D"][i % 4]} for i in range(24)]
         table_path.insert(records)
         item_rids = [r["RID"] for r in table_path.entities().fetch()]
 
@@ -294,15 +291,11 @@ class TestSubsample:
             workflow_type="Subsample",
             description="Dry-run subsample input-edge test",
         )
-        with ml.create_execution(
-            ExecutionConfiguration(workflow=workflow, description="Dry-run subsample")
-        ) as exe:
+        with ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Dry-run subsample")) as exe:
             subsample(ml, source_rid, exe, size=4, seed=42, dry_run=True)
             input_rids = {ds.dataset_rid for ds in exe.list_input_datasets()}
 
-        assert source_rid not in input_rids, (
-            "dry_run subsample must not record the source as an execution input"
-        )
+        assert source_rid not in input_rids, "dry_run subsample must not record the source as an execution input"
 
     # ------ single-output / no parent ------
 
@@ -321,8 +314,7 @@ class TestSubsample:
         # No parent Dataset_Dataset edges — the subsample is standalone.
         parents = sub_ds.list_dataset_parents()
         assert len(parents) == 0, (
-            "subsample must not create a Dataset_Dataset parent edge; "
-            f"got parents={[p.dataset_rid for p in parents]}"
+            f"subsample must not create a Dataset_Dataset parent edge; got parents={[p.dataset_rid for p in parents]}"
         )
         # No children either (a subsample is a leaf).
         children = sub_ds.list_dataset_children()
@@ -346,17 +338,14 @@ class TestSubsample:
             workflow_type="Subsample",
             description="Subsample provenance test",
         )
-        with ml.create_execution(
-            ExecutionConfiguration(workflow=workflow, description="Subsample provenance")
-        ) as exe:
+        with ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Subsample provenance")) as exe:
             result = subsample(ml, source_rid, exe, size=8, seed=42)
             input_rids = {ds.dataset_rid for ds in exe.list_input_datasets()}
         exe.commit_output_assets(clean_folder=True)
 
         # The source is an input...
         assert source_rid in input_rids, (
-            f"source {source_rid} should be an input of the subsample execution; "
-            f"got inputs {input_rids}"
+            f"source {source_rid} should be an input of the subsample execution; got inputs {input_rids}"
         )
         # ...and the subsample (this execution authored it) is NOT an input.
         assert result.subsample.rid not in input_rids
@@ -375,9 +364,7 @@ class TestSubsample:
 
         src_ds = ml.lookup_dataset(source_rid)
         child_rids = {c.dataset_rid for c in src_ds.list_dataset_children()}
-        assert result.subsample.rid not in child_rids, (
-            "subsample must not be a Dataset_Dataset child of its source"
-        )
+        assert result.subsample.rid not in child_rids, "subsample must not be a Dataset_Dataset child of its source"
 
     # ------ Subsample tag application ------
 
@@ -482,10 +469,7 @@ class TestSubsample:
             dataset_types=["Training", "Labeled"],
         )
         after = set(ml.lookup_dataset(source_rid).dataset_types)
-        assert before == after, (
-            f"subsample must not mutate the source's dataset_types; "
-            f"before={before}, after={after}"
-        )
+        assert before == after, f"subsample must not mutate the source's dataset_types; before={before}, after={after}"
 
     # ------ determinism ------
 
@@ -497,17 +481,13 @@ class TestSubsample:
         result_a = self._subsample_in_execution(ml, source_rid, size=8, seed=42)
         rids_a = {
             r["RID"]
-            for r in ml.lookup_dataset(result_a.subsample.rid)
-            .list_dataset_members()
-            .get("SubsampleTestItem", [])
+            for r in ml.lookup_dataset(result_a.subsample.rid).list_dataset_members().get("SubsampleTestItem", [])
         }
 
         result_b = self._subsample_in_execution(ml, source_rid, size=8, seed=42)
         rids_b = {
             r["RID"]
-            for r in ml.lookup_dataset(result_b.subsample.rid)
-            .list_dataset_members()
-            .get("SubsampleTestItem", [])
+            for r in ml.lookup_dataset(result_b.subsample.rid).list_dataset_members().get("SubsampleTestItem", [])
         }
 
         assert rids_a == rids_b, "Same seed must produce the same subsample"
@@ -524,17 +504,13 @@ class TestSubsample:
         result_a = self._subsample_in_execution(ml, source_rid, size=8, seed=42)
         rids_a = {
             r["RID"]
-            for r in ml.lookup_dataset(result_a.subsample.rid)
-            .list_dataset_members()
-            .get("SubsampleTestItem", [])
+            for r in ml.lookup_dataset(result_a.subsample.rid).list_dataset_members().get("SubsampleTestItem", [])
         }
 
         result_c = self._subsample_in_execution(ml, source_rid, size=8, seed=99)
         rids_c = {
             r["RID"]
-            for r in ml.lookup_dataset(result_c.subsample.rid)
-            .list_dataset_members()
-            .get("SubsampleTestItem", [])
+            for r in ml.lookup_dataset(result_c.subsample.rid).list_dataset_members().get("SubsampleTestItem", [])
         }
 
         assert rids_a != rids_c, "Different seeds should produce different subsamples"
@@ -553,9 +529,7 @@ class TestSubsample:
             workflow_type="Subsample",
             description="Subsample config artifact test",
         )
-        with ml.create_execution(
-            ExecutionConfiguration(workflow=workflow, description="Config subsample")
-        ) as exe:
+        with ml.create_execution(ExecutionConfiguration(workflow=workflow, description="Config subsample")) as exe:
             subsample(
                 ml,
                 source_rid,
@@ -566,8 +540,7 @@ class TestSubsample:
             )
             params_file = Path(exe.working_dir) / "subsample_config.json"
             assert params_file.exists(), (
-                f"subsample must write subsample_config.json to "
-                f"execution.working_dir; not found at {params_file}"
+                f"subsample must write subsample_config.json to execution.working_dir; not found at {params_file}"
             )
             # The file is valid JSON and carries the source + sample size.
             import json

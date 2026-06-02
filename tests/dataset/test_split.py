@@ -1479,12 +1479,20 @@ class TestSplitDataset:
 
         # Same-seed determinism.
         result1 = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
-        train1 = {r["RID"] for r in ml.lookup_dataset(result1.training.rid).list_dataset_members().get("SplitTestItem", [])}
-        test1 = {r["RID"] for r in ml.lookup_dataset(result1.testing.rid).list_dataset_members().get("SplitTestItem", [])}
+        train1 = {
+            r["RID"] for r in ml.lookup_dataset(result1.training.rid).list_dataset_members().get("SplitTestItem", [])
+        }
+        test1 = {
+            r["RID"] for r in ml.lookup_dataset(result1.testing.rid).list_dataset_members().get("SplitTestItem", [])
+        }
 
         result2 = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
-        train2 = {r["RID"] for r in ml.lookup_dataset(result2.training.rid).list_dataset_members().get("SplitTestItem", [])}
-        test2 = {r["RID"] for r in ml.lookup_dataset(result2.testing.rid).list_dataset_members().get("SplitTestItem", [])}
+        train2 = {
+            r["RID"] for r in ml.lookup_dataset(result2.training.rid).list_dataset_members().get("SplitTestItem", [])
+        }
+        test2 = {
+            r["RID"] for r in ml.lookup_dataset(result2.testing.rid).list_dataset_members().get("SplitTestItem", [])
+        }
 
         assert train1 == train2, "Same seed must produce the same training partition"
         assert test1 == test2
@@ -1492,11 +1500,12 @@ class TestSplitDataset:
         # Different seed → different partition (probabilistically; with
         # 12 elements split 8/4 the collision rate is 1/C(12,4)=1/495).
         result3 = self._split_in_execution(ml, source_rid, test_size=4, seed=99)
-        train3 = {r["RID"] for r in ml.lookup_dataset(result3.training.rid).list_dataset_members().get("SplitTestItem", [])}
+        train3 = {
+            r["RID"] for r in ml.lookup_dataset(result3.training.rid).list_dataset_members().get("SplitTestItem", [])
+        }
 
         assert train1 != train3, (
-            "Different seeds should produce different random partitions "
-            "(only colliding with probability 1/495 here)"
+            "Different seeds should produce different random partitions (only colliding with probability 1/495 here)"
         )
 
         # Full coverage + no leakage on result1.
@@ -1530,8 +1539,7 @@ class TestSplitDataset:
 
         after = set(ml.lookup_dataset(source_rid).dataset_types)
         assert before == after, (
-            f"split_dataset must not mutate the source's dataset_types; "
-            f"before={before}, after={after}"
+            f"split_dataset must not mutate the source's dataset_types; before={before}, after={after}"
         )
         # In particular, neither the new origin-axis Split_Partition tag
         # nor caller-supplied content-axis types should leak onto the source.

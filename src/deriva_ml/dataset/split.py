@@ -2141,10 +2141,7 @@ def subsample(
             types_in_order.append(t)
     subsample_types = types_in_order
 
-    auto_description = (
-        f"Subsample of dataset {source_dataset_rid} "
-        f"({strategy_desc}, n={sample_size}, seed={seed})"
-    )
+    auto_description = f"Subsample of dataset {source_dataset_rid} ({strategy_desc}, n={sample_size}, seed={seed})"
 
     # Persist the subsample parameters so the operation is replayable.
     # Mirrors ``split_dataset``'s ``split_config.json`` artifact —

@@ -664,8 +664,7 @@ class TestRowModeLeakageMatrix:
         # zero element overlap is essentially nil. The contract is that
         # the API *allows* it.
         assert len(train & test) > 0, (
-            "stratify + partition_by='row' must permit element-level "
-            "overlap (per-annotation statistics is the intent)"
+            "stratify + partition_by='row' must permit element-level overlap (per-annotation statistics is the intent)"
         )
 
     # ------ custom_fn selector ------
