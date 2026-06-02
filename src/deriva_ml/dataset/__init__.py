@@ -14,9 +14,11 @@ from .split import (
     PartitionInfo,
     SelectionFunction,
     SplitResult,
+    SubsampleResult,
     random_split,
     split_dataset,
     stratified_split,
+    subsample,
 )
 
 __all__ = [
@@ -28,8 +30,10 @@ __all__ = [
     "PartitionInfo",
     "SelectionFunction",
     "SplitResult",
+    "SubsampleResult",
     "VersionPart",
     "random_split",
     "split_dataset",
     "stratified_split",
+    "subsample",
 ]
