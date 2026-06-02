@@ -1219,6 +1219,23 @@ def split_dataset(
         partitions would leak. Reason about overlap via member sets,
         not via the dataset hierarchy.
 
+        **Role types do not inherit from the source and do not
+        propagate to children.** The Training / Testing / Validation
+        tags on the partition children are assigned based on the
+        partition's position in the split, **not** copied from the
+        source's ``dataset_types``. A source tagged ``Testing``
+        (because it is a testing corpus) produces a Training partition
+        tagged ``Training`` (because that partition is the training
+        half of the split). This is intentional: role-axis types
+        describe a dataset's role in its *immediate context*, not a
+        property the operation should preserve. See CONTEXT.md's
+        ``Datasets — types and partitions`` subsection for the
+        canonical three-axis (role / content / origin) framing — the
+        ``training_types`` / ``testing_types`` / ``validation_types``
+        arguments exist precisely so the caller can propagate
+        *content-axis* types (e.g., ``Labeled``) onto the children
+        when that propagation is meaningful.
+
     Args:
         ml: Connected DerivaML instance.
         source_dataset_rid: RID of the source dataset to split.
