@@ -457,6 +457,17 @@ def _ensure_dataset_types(ml: DerivaML) -> None:
         "Split": "A dataset that contains nested dataset splits",
         "Labeled": "A dataset containing records with ground truth labels",
         "Unlabeled": "A dataset containing records without ground truth labels",
+        "Split_Partition": (
+            "A child partition of a Split — set by ``split_dataset`` on "
+            "every Training/Testing/Validation child. The discriminator "
+            "that distinguishes a split-partition role tag from a "
+            "corpus role tag."
+        ),
+        "Subsample": (
+            "A dataset produced by ``subsample()`` as a stratified "
+            "sample of another dataset. Source relationship is recorded "
+            "in execution provenance, not in Dataset_Dataset edges."
+        ),
     }
 
     existing_terms = {t.name for t in ml.list_vocabulary_terms("Dataset_Type")}
