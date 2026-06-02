@@ -267,7 +267,9 @@ class Workflow(BaseModel):
         if self._ml_instance is not None:
             _, atable_path = self._get_workflow_type_association_table()
             wt_types = (
-                atable_path.filter(atable_path.Workflow == self.workflow_rid).attributes(atable_path.Workflow_Type).fetch()
+                atable_path.filter(atable_path.Workflow == self.workflow_rid)
+                .attributes(atable_path.Workflow_Type)
+                .fetch()
             )
             return [wt[MLVocab.workflow_type] for wt in wt_types]
         return list(self.workflow_type)
@@ -321,7 +323,9 @@ class Workflow(BaseModel):
             return
 
         _, atable_path = self._get_workflow_type_association_table()
-        atable_path.filter((atable_path.Workflow == self.workflow_rid) & (atable_path.Workflow_Type == vocab_term.name)).delete()
+        atable_path.filter(
+            (atable_path.Workflow == self.workflow_rid) & (atable_path.Workflow_Type == vocab_term.name)
+        ).delete()
 
     def add_workflow_types(self, workflow_types: str | VocabularyTerm | list[str | VocabularyTerm]) -> None:
         """Add one or more workflow types to this workflow.
@@ -365,7 +369,9 @@ class Workflow(BaseModel):
 
         # Insert new type associations
         if new_workflow_types:
-            atable_path.insert([{MLVocab.workflow_type: wt, "Workflow": self.workflow_rid} for wt in new_workflow_types])
+            atable_path.insert(
+                [{MLVocab.workflow_type: wt, "Workflow": self.workflow_rid} for wt in new_workflow_types]
+            )
 
     @model_validator(mode="after")
     def setup_url_checksum(self) -> "Workflow":
@@ -418,6 +424,18 @@ class Workflow(BaseModel):
                 repo, Docker env vars missing, no explicit overrides).
         """
         self._logger = get_logger(__name__)
+
+        # Loaded from a catalog row: provenance is already known.
+        # ``workflow_rid`` is set only for a workflow that already exists in
+        # the catalog (``lookup_workflow`` / ``find_workflows`` pass it; the
+        # create path does not). Its ``url`` / ``checksum`` / ``version`` are
+        # stored columns, so re-deriving them from the runtime environment is
+        # both wrong and fragile -- the derivation calls setuptools-scm and
+        # raises in any non-git, non-Docker working directory. Trust the
+        # stored values and skip all derivation.
+        if self.workflow_rid is not None:
+            return self
+
         # Check if running in Docker container (no git repo available)
         if os.environ.get("DERIVA_MCP_IN_DOCKER", "").lower() == "true":
             # Use Docker image metadata for provenance
