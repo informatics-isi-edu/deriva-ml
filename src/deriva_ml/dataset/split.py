@@ -132,6 +132,34 @@ class SplitResult(BaseModel):
     dry_run: bool = False
 
 
+class SubsampleResult(BaseModel):
+    """Result of a :func:`subsample` operation.
+
+    Mirrors :class:`SplitResult` but carries a single output
+    (``subsample``) rather than a Split parent + per-partition
+    children. Dry-run instances have ``rid`` / ``version`` set to
+    ``"(dry run)"`` placeholders, matching :class:`SplitResult`'s
+    convention.
+
+    Attributes:
+        source: RID of the source dataset that was sampled.
+        subsample: :class:`PartitionInfo` for the produced dataset.
+        strategy: Human-readable strategy (``"random"`` or
+            ``"stratified by ..."``).
+        element_table: The element table the sample was drawn from.
+        seed: Random seed used.
+        dry_run: ``True`` when the result represents a plan rather
+            than a created dataset.
+    """
+
+    source: str
+    subsample: PartitionInfo
+    strategy: str
+    element_table: str
+    seed: int
+    dry_run: bool = False
+
+
 # =============================================================================
 # Selection Function Protocol and Built-in Implementations
 # =============================================================================
@@ -1705,6 +1733,413 @@ def split_dataset(
         validation_types=validation_types,
         val_size=val_size,
         split_params=split_params,
+    )
+
+
+# =============================================================================
+# Subsample primitive (§3.4 of 2026-06-01 spec)
+# =============================================================================
+
+
+def _validate_subsample_inputs(
+    *,
+    size: int | float,
+    stratify_by_column: str | None,
+    include_tables: list[str] | None,
+    row_per: str | None,
+    element_table: str | None,
+    partition_by: Literal["element", "row"] | None,
+) -> Literal["element", "row"]:
+    """Argument-shape validation for :func:`subsample`.
+
+    Mirrors :func:`_validate_split_inputs` but for the single-output
+    subsample shape: there is no ``selection_fn`` axis (rejected per
+    spec §2 non-goals), and ``size`` carries its own validation
+    (positive; > 0; an int or a fraction in ``(0, 1)``). All other
+    ambiguity rules around (``row_per``, ``element_table``,
+    ``partition_by``) are identical to ``split_dataset``'s.
+
+    Args:
+        size: Subsample size — float in (0, 1) for fraction, int for
+            absolute count. Must be positive.
+        stratify_by_column: As passed to :func:`subsample`.
+        include_tables: As passed to :func:`subsample`.
+        row_per: As passed to :func:`subsample`.
+        element_table: As passed to :func:`subsample`.
+        partition_by: As passed to :func:`subsample`.
+
+    Returns:
+        Effective ``partition_by`` value after defaulting (same
+        semantics as :func:`_validate_split_inputs`).
+
+    Raises:
+        ValueError: When ``size`` is non-positive, when
+            ``stratify_by_column`` is set without ``include_tables``,
+            or when ``partition_by`` is required and unset.
+    """
+    if isinstance(size, float):
+        if not (0 < size < 1):
+            raise ValueError(
+                f"size must be a float in (0, 1) or an int >= 1, got {size}. "
+                "Pass a float fraction in (0, 1) for proportional sampling "
+                "or an int for an absolute count."
+            )
+    elif isinstance(size, int):
+        if size < 1:
+            raise ValueError(f"size must be a positive integer, got {size}")
+    else:
+        raise ValueError(f"size must be a float in (0, 1) or an int >= 1, got {size!r}")
+
+    if stratify_by_column and not include_tables:
+        raise ValueError(
+            "include_tables is required when using stratify_by_column. "
+            "Specify the tables needed for denormalization "
+            "(e.g., include_tables=['Image', 'Image_Class'])."
+        )
+
+    if partition_by is not None and partition_by not in ("element", "row"):
+        raise ValueError(f"partition_by must be 'element', 'row', or None, got {partition_by!r}.")
+
+    # Reuse the (row_per, element_table) ambiguity rule from split.
+    row_per_differs = row_per is not None and row_per != element_table
+
+    if partition_by is None:
+        if row_per_differs:
+            raise ValueError(
+                "partition_by is required when row_per != element_table "
+                f"(got row_per={row_per!r}, element_table={element_table!r}). "
+                "Pick 'element' (dedupe rows per element RID before sampling, "
+                "partitions disjoint at the element level) or 'row' "
+                "(sample rows directly, same element RID may appear multiple "
+                "times in the subsample)."
+            )
+        return "element"
+
+    return partition_by
+
+
+def _compute_subsample(
+    *,
+    source_ds: "Dataset",
+    source_dataset_rid: str,
+    element_table: str | None,
+    size: int | float,
+    seed: int,
+    stratify_by_column: str | None,
+    stratify_missing: str,
+    include_tables: list[str] | None,
+    row_per: str | None,
+    via: list[str] | None,
+    ignore_unrelated_anchors: bool,
+    partition_by: Literal["element", "row"] = "element",
+) -> tuple[list[str], int, str, str]:
+    """Resolve the source members to a single stratified sample.
+
+    Reuses the denormalize → dedupe → stratified-or-random selector
+    pipeline from :func:`_compute_partitions`, but with a
+    single-partition shape ``{"Subsample": size}``. Pure read path —
+    no catalog writes.
+
+    Args:
+        source_ds: The looked-up source :class:`Dataset`.
+        source_dataset_rid: Source RID (used in error messages).
+        element_table: Caller-specified element table (or None for
+            auto-detect).
+        size, seed, stratify_by_column, stratify_missing,
+            include_tables, row_per, via,
+            ignore_unrelated_anchors, partition_by: As passed to
+            :func:`subsample`.
+
+    Returns:
+        Four-tuple ``(sample_rids, sample_size, strategy_desc,
+        element_table)``:
+
+        - ``sample_rids`` — RID list of the sampled element rows.
+        - ``sample_size`` — final integer count after defaulting and
+          (when applicable) element-level deduplication.
+        - ``strategy_desc`` — ``"random"`` or
+          ``"stratified by <col>"``.
+        - ``element_table`` — resolved element table.
+
+    Raises:
+        ValueError: When the source has no members, the element
+            table is ambiguous, the requested size exceeds the
+            available pool, or within-element disagreement on the
+            stratify column is detected (with consensus-feature
+            guidance).
+    """
+    # ``_compute_partitions`` already does the heavy lifting:
+    # member enumeration, element_table auto-detect, denormalize +
+    # dedupe (in element mode), uniform selector dispatch. We hand
+    # it a single-partition shape and let ``_resolve_sizes`` validate
+    # ``size`` against the pool — passing ``size`` as ``test_size``
+    # is unusual (subsample is not a "test"), but ``_resolve_sizes``
+    # treats the value uniformly as an absolute count or a fraction.
+    #
+    # We need to produce a single-partition output ``{"Subsample": N}``
+    # rather than the {"Training": ..., "Testing": ...} pair. We
+    # achieve that by:
+    #   - calling _compute_partitions with the *full* element-table
+    #     row count as the Training partition and ``size`` as the
+    #     Testing partition (after _resolve_sizes converts a fraction
+    #     to absolute), then discarding the Training partition and
+    #     returning the Testing partition's RIDs as the subsample.
+    #
+    # This is the same shape sklearn's resample(replace=False) uses
+    # internally: stratified two-way split, keep one side. Reusing
+    # _compute_partitions keeps the dedupe / disjointness / stratify
+    # logic in one place.
+    partition_rids, partition_sizes, strategy_desc, resolved_element_table = _compute_partitions(
+        source_ds=source_ds,
+        source_dataset_rid=source_dataset_rid,
+        element_table=element_table,
+        # train_size is "the rest of the pool the subsample doesn't
+        # touch"; we don't keep it but _resolve_sizes wants a value.
+        test_size=size,
+        train_size=None,
+        val_size=None,
+        shuffle=True,
+        seed=seed,
+        stratify_by_column=stratify_by_column,
+        stratify_missing=stratify_missing,
+        include_tables=include_tables,
+        selection_fn=None,
+        row_per=row_per,
+        via=via,
+        ignore_unrelated_anchors=ignore_unrelated_anchors,
+        partition_by=partition_by,
+    )
+    sample_rids = partition_rids["Testing"]
+    sample_size = partition_sizes["Testing"]
+    return sample_rids, sample_size, strategy_desc, resolved_element_table
+
+
+def subsample(
+    ml: "DerivaML",
+    source_dataset_rid: str,
+    execution: "Execution",
+    *,
+    size: int | float,
+    seed: int = 42,
+    stratify_by_column: str | None = None,
+    stratify_missing: Literal["error", "drop", "include"] = "error",
+    element_table: str | None = None,
+    include_tables: list[str] | None = None,
+    via: list[str] | None = None,
+    row_per: str | None = None,
+    ignore_unrelated_anchors: bool = False,
+    partition_by: Literal["element", "row"] | None = None,
+    dataset_types: list[str] | None = None,
+    description: str | None = None,
+    dry_run: bool = False,
+) -> SubsampleResult:
+    """Create a stratified subsample of ``source_dataset_rid``.
+
+    Returns one new dataset whose member set is a stratified random
+    subset of the source's members. The source relationship is
+    recorded as **execution provenance only** — the source is an
+    input of ``execution``; the subsample is an output. No
+    ``Dataset_Dataset`` edge is created between source and subsample
+    (mirroring ``split_dataset``'s design call; see CONTEXT.md's
+    ``Datasets — types and partitions`` subsection for the canonical
+    framing).
+
+    Mirrors sklearn's ``resample(stratify=y, replace=False,
+    n_samples=N)`` semantics: stratified sample without replacement.
+
+    See :func:`split_dataset` for the meaning of
+    ``stratify_by_column``, ``element_table``, ``include_tables``,
+    ``via``, ``row_per``, and ``partition_by`` — they pass through
+    to the same denormalization machinery.
+
+    Role types do not inherit from the source and do not propagate to
+    the subsample. The subsample's role-axis types — Training,
+    Testing, Validation — come exclusively from the caller's
+    ``dataset_types`` argument. The ``Subsample`` origin-axis tag is
+    always applied automatically (deduplicated defensively if the
+    caller also passes it).
+
+    Args:
+        ml: Connected :class:`DerivaML` instance.
+        source_dataset_rid: The dataset to sample from.
+        execution: The caller's open :class:`Execution`; the
+            subsample is attributed to it for provenance, and the
+            source is recorded as an input of this execution via
+            :meth:`Execution.add_input_dataset`.
+        size: If float in ``(0, 1)``, fraction of source to sample.
+            If int, absolute sample count. Mirrors sklearn
+            ``train_test_split``'s shape for ``test_size``.
+        seed: Random seed for reproducibility. Default: 42.
+        stratify_by_column: Optional column for stratified sampling
+            (preserves class proportions). When ``None``, the
+            subsample is a uniform random sample. Requires
+            ``include_tables``.
+        stratify_missing: How to handle nulls in the stratify column
+            (``"error"`` / ``"drop"`` / ``"include"``). Same
+            semantics as :func:`split_dataset`.
+        element_table: Element table to sample. When ``None``,
+            auto-detected from the source dataset's members.
+        include_tables: Tables to include when denormalizing for
+            the stratify column. Required when
+            ``stratify_by_column`` is set.
+        via: Tables forced into the join chain without contributing
+            columns. Pass-through to the denormalizer.
+        row_per: Explicit leaf table for denormalization. When
+            ``row_per != element_table``, ``partition_by`` must be
+            set explicitly.
+        ignore_unrelated_anchors: Pass-through to the denormalizer.
+        partition_by: Explicit partition unit. ``"element"`` (the
+            default when unambiguous) dedupes to one row per
+            element_table RID before sampling; ``"row"`` samples
+            denormalized rows directly. See :func:`split_dataset`'s
+            discussion for the trade-offs.
+        dataset_types: Caller-supplied additional dataset types
+            (typically content-axis types like ``"Labeled"`` or
+            role-axis types like ``"Training"``). ``"Subsample"`` is
+            always appended; duplicates are de-duped defensively if
+            the caller also passes it.
+        description: Description for the output dataset. When
+            ``None``, an auto-description is generated.
+        dry_run: If ``True``, return the planned outputs without
+            mutating the catalog.
+
+    Returns:
+        :class:`SubsampleResult` carrying the new dataset's RID,
+        version, and member count (or ``"(dry run)"`` placeholders
+        when ``dry_run=True``).
+
+    Raises:
+        ValueError: Argument-shape errors (``size`` <= 0 or
+            >= total, ``stratify_by_column`` without
+            ``include_tables``, ambiguous ``partition_by``, etc.).
+
+    Example:
+        >>> # Take 400 stratified samples from a Training dataset.  # doctest: +SKIP
+        >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
+        ...     small = subsample(  # doctest: +SKIP
+        ...         ml, training_rid, exe,  # doctest: +SKIP
+        ...         size=400,  # doctest: +SKIP
+        ...         stratify_by_column="Image_Class.Name",  # doctest: +SKIP
+        ...         element_table="Image",  # doctest: +SKIP
+        ...         include_tables=["Image", "Image_Class"],  # doctest: +SKIP
+        ...         dataset_types=["Training", "Labeled"],  # doctest: +SKIP
+        ...     )  # doctest: +SKIP
+        >>> exe.commit_output_assets()  # doctest: +SKIP
+    """
+    effective_partition_by = _validate_subsample_inputs(
+        size=size,
+        stratify_by_column=stratify_by_column,
+        include_tables=include_tables,
+        row_per=row_per,
+        element_table=element_table,
+        partition_by=partition_by,
+    )
+
+    logger.info(f"Looking up source dataset: {source_dataset_rid}")
+    source_ds = ml.lookup_dataset(source_dataset_rid)
+
+    sample_rids, sample_size, strategy_desc, resolved_element_table = _compute_subsample(
+        source_ds=source_ds,
+        source_dataset_rid=source_dataset_rid,
+        element_table=element_table,
+        size=size,
+        seed=seed,
+        stratify_by_column=stratify_by_column,
+        stratify_missing=stratify_missing,
+        include_tables=include_tables,
+        row_per=row_per,
+        via=via,
+        ignore_unrelated_anchors=ignore_unrelated_anchors,
+        partition_by=effective_partition_by,
+    )
+
+    # Dry-run early return — mirrors ``split_dataset``'s dry-run
+    # contract (no catalog mutations, no source-input edge, RIDs and
+    # versions are ``"(dry run)"`` placeholders).
+    if dry_run:
+        return SubsampleResult(
+            source=source_dataset_rid,
+            subsample=PartitionInfo(rid="(dry run)", version="(dry run)", count=sample_size),
+            strategy=strategy_desc,
+            element_table=resolved_element_table,
+            seed=seed,
+            dry_run=True,
+        )
+
+    _ensure_dataset_types(ml)
+
+    # ``Subsample`` origin tag is always applied. Defensively dedupe
+    # in case the caller passes it themselves (spec §7 R4).
+    types_in_order: list[str] = ["Subsample"]
+    for t in dataset_types or []:
+        if t not in types_in_order:
+            types_in_order.append(t)
+    subsample_types = types_in_order
+
+    auto_description = (
+        f"Subsample of dataset {source_dataset_rid} "
+        f"({strategy_desc}, n={sample_size}, seed={seed})"
+    )
+
+    # Persist the subsample parameters so the operation is replayable.
+    # Mirrors ``split_dataset``'s ``split_config.json`` artifact —
+    # written into ``execution.working_dir`` and picked up by the
+    # caller's eventual ``commit_output_assets``.
+    sub_params: dict[str, Any] = {
+        "source_dataset_rid": source_dataset_rid,
+        "size": size,
+        "sample_size": sample_size,
+        "seed": seed,
+        "stratify_by_column": stratify_by_column,
+        "stratify_missing": stratify_missing,
+        "element_table": resolved_element_table,
+        "include_tables": include_tables,
+        "row_per": row_per,
+        "via": via,
+        "ignore_unrelated_anchors": ignore_unrelated_anchors,
+        "partition_by": effective_partition_by,
+        "dataset_types": subsample_types,
+        "strategy": strategy_desc,
+    }
+    params_file = Path(execution.working_dir) / "subsample_config.json"
+    params_file.write_text(json.dumps(sub_params, indent=2))
+    logger.info(f"  Saved subsample parameters to {params_file}")
+
+    # Create the output dataset.
+    subsample_ds = execution.create_dataset(
+        description=description or auto_description,
+        dataset_types=subsample_types,
+    )
+    logger.info(f"  Created Subsample dataset: {subsample_ds.dataset_rid}")
+
+    # Record the source as an execution input — same provenance shape
+    # as ``split_dataset``. No ``Dataset_Dataset`` edge between source
+    # and subsample (the source is consumed, not nested).
+    execution.add_input_dataset(source_dataset_rid)
+    logger.info("  Recorded source dataset %s as execution input", source_dataset_rid)
+
+    # Add members to the subsample (batched, same shape as
+    # ``_create_split_hierarchy``).
+    batch_size = 500
+    logger.info(f"  Adding {len(sample_rids)} members to Subsample dataset...")
+    for i in range(0, len(sample_rids), batch_size):
+        batch = sample_rids[i : i + batch_size]
+        subsample_ds.add_dataset_members({resolved_element_table: batch}, validate=False)
+        added = min(i + batch_size, len(sample_rids))
+        if added % 2000 == 0 or added >= len(sample_rids):
+            logger.info(f"    Added {added}/{len(sample_rids)}")
+
+    subsample_ds_info = ml.lookup_dataset(subsample_ds.dataset_rid)
+    return SubsampleResult(
+        source=source_dataset_rid,
+        subsample=PartitionInfo(
+            rid=subsample_ds.dataset_rid,
+            version=str(subsample_ds_info.current_version),
+            count=sample_size,
+        ),
+        strategy=strategy_desc,
+        element_table=resolved_element_table,
+        seed=seed,
     )
 
 
