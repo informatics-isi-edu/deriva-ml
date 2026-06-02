@@ -1352,6 +1352,193 @@ class TestSplitDataset:
         assert len(df_a) == len(df_b) == 12
         assert list(df_a.columns) == list(df_b.columns)
 
+    # ------------------------------------------------------------------
+    # Mandatory pins from spec 2026-06-01 §6
+    # ------------------------------------------------------------------
+    #
+    # Each test here closes one of the coverage gaps that grilling
+    # surfaced for the Split_Partition + role-types-don't-propagate
+    # design. CONTEXT.md ``Datasets — types and partitions`` is the
+    # canonical glossary for the vocabulary.
+
+    def test_source_does_not_list_split_as_child(self, test_ml):
+        """Gap A: ``split_dataset`` does not nest the Split under its source.
+
+        The Split is a standalone, self-contained hierarchy — the
+        source is recorded as an *execution input*, not as a
+        ``Dataset_Dataset`` parent of the Split. So the source's
+        ``list_dataset_children()`` must not list the Split (or its
+        partition children).
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
+
+        source_ds = ml.lookup_dataset(source_rid)
+        children = source_ds.list_dataset_children()
+        child_rids = {c.dataset_rid for c in children}
+
+        assert result.split.rid not in child_rids, (
+            "Split must not be a Dataset_Dataset child of its source — "
+            "the derivation lives in execution provenance, not the "
+            "dataset hierarchy"
+        )
+        assert result.training.rid not in child_rids
+        assert result.testing.rid not in child_rids
+
+    def test_split_children_carry_split_partition_tag(self, test_ml):
+        """Gap B: every child of split_dataset carries the Split_Partition tag.
+
+        The Split_Partition origin-axis tag is the 1-hop discriminator
+        between a partition-role ``Training`` dataset and a corpus-role
+        ``Training`` dataset (see CONTEXT.md). The parent Split itself
+        is NOT tagged Split_Partition — it is the container.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        result = self._split_in_execution(
+            ml,
+            source_rid,
+            test_size=2,
+            val_size=2,
+            seed=42,
+        )
+
+        training_ds = ml.lookup_dataset(result.training.rid)
+        validation_ds = ml.lookup_dataset(result.validation.rid)
+        testing_ds = ml.lookup_dataset(result.testing.rid)
+        split_ds = ml.lookup_dataset(result.split.rid)
+
+        assert "Split_Partition" in training_ds.dataset_types
+        assert "Split_Partition" in validation_ds.dataset_types
+        assert "Split_Partition" in testing_ds.dataset_types
+
+        # Parent Split is the container, not a partition.
+        assert "Split_Partition" not in split_ds.dataset_types
+        assert "Split" in split_ds.dataset_types
+
+    def test_role_types_dont_inherit_from_source(self, test_ml):
+        """Gap C: role-axis types on partitions reflect partition role, not source role.
+
+        A source tagged ``Testing`` (because it is a testing corpus)
+        produces a Training partition tagged ``Training`` (because that
+        partition is the training half of the split). The role tag
+        describes the dataset's role in its *immediate context*, never
+        the source's role. See CONTEXT.md "Role-axis Dataset_Type".
+        """
+        from deriva_ml import MLVocab
+
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        # Tag the source as a testing corpus to set up the
+        # "role-inheritance would be wrong" condition.
+        ml.add_term(MLVocab.dataset_type, "Testing", description="Test role tag")
+        source_ds = ml.lookup_dataset(source_rid)
+        source_ds.add_dataset_type("Testing")
+        assert "Testing" in ml.lookup_dataset(source_rid).dataset_types
+
+        result = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
+
+        training_ds = ml.lookup_dataset(result.training.rid)
+        testing_ds = ml.lookup_dataset(result.testing.rid)
+
+        # The training partition carries Training (its role in the split),
+        # not Testing (inherited from the source).
+        assert "Training" in training_ds.dataset_types
+        # The training partition is NOT tagged Testing just because the
+        # source was tagged Testing. This is the load-bearing assertion
+        # for the non-inheritance rule — without it, gap C is silent.
+        assert "Testing" not in training_ds.dataset_types, (
+            f"Role-axis types must not propagate from source to children. "
+            f"Source was tagged Testing; the Training partition should NOT "
+            f"inherit it. Got training_types={training_ds.dataset_types}"
+        )
+        # The testing partition carries Testing because of its role in
+        # the split, not because the source did. (We can't directly test
+        # the negative here — both would produce the same observable
+        # output for this side of the split. The Training-partition
+        # assertion above is the discriminator.)
+        assert "Testing" in testing_ds.dataset_types
+
+    def test_split_dataset_default_selector_is_random(self, test_ml):
+        """Gap D: the no-stratify, no-selection_fn default produces a random split.
+
+        Pins the §3.5 dispatch refactor: ``random_split`` is now the
+        load-bearing default selector. We assert observable behavior
+        (deterministic-by-seed, full coverage of source members, no
+        within-partition duplicates, two different seeds give different
+        partitions) rather than introspecting the dispatch internals —
+        the contract is "the default selector is random," not "the
+        function literal called is ``random_split``."
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        # Same-seed determinism.
+        result1 = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
+        train1 = {r["RID"] for r in ml.lookup_dataset(result1.training.rid).list_dataset_members().get("SplitTestItem", [])}
+        test1 = {r["RID"] for r in ml.lookup_dataset(result1.testing.rid).list_dataset_members().get("SplitTestItem", [])}
+
+        result2 = self._split_in_execution(ml, source_rid, test_size=4, seed=42)
+        train2 = {r["RID"] for r in ml.lookup_dataset(result2.training.rid).list_dataset_members().get("SplitTestItem", [])}
+        test2 = {r["RID"] for r in ml.lookup_dataset(result2.testing.rid).list_dataset_members().get("SplitTestItem", [])}
+
+        assert train1 == train2, "Same seed must produce the same training partition"
+        assert test1 == test2
+
+        # Different seed → different partition (probabilistically; with
+        # 12 elements split 8/4 the collision rate is 1/C(12,4)=1/495).
+        result3 = self._split_in_execution(ml, source_rid, test_size=4, seed=99)
+        train3 = {r["RID"] for r in ml.lookup_dataset(result3.training.rid).list_dataset_members().get("SplitTestItem", [])}
+
+        assert train1 != train3, (
+            "Different seeds should produce different random partitions "
+            "(only colliding with probability 1/495 here)"
+        )
+
+        # Full coverage + no leakage on result1.
+        assert train1.isdisjoint(test1)
+        assert len(train1) + len(test1) == 12
+        # The strategy field reports random for the default selector.
+        assert result1.strategy == "random"
+
+    def test_split_does_not_mutate_source_dataset_types(self, test_ml):
+        """Gap G: split_dataset never adds tags to the source dataset.
+
+        Defensive — ``split_dataset`` reads the source and creates new
+        Split / Training / Testing datasets. The source is recorded as
+        an *input* of the execution; its ``dataset_types`` are never
+        modified. The Split_Partition tag goes on the *children*, not
+        the source.
+        """
+        ml = test_ml
+        source_rid = self._setup_splittable_dataset(ml)
+
+        before = set(ml.lookup_dataset(source_rid).dataset_types)
+
+        self._split_in_execution(
+            ml,
+            source_rid,
+            test_size=4,
+            seed=42,
+            training_types=["Labeled"],
+            testing_types=["Labeled"],
+        )
+
+        after = set(ml.lookup_dataset(source_rid).dataset_types)
+        assert before == after, (
+            f"split_dataset must not mutate the source's dataset_types; "
+            f"before={before}, after={after}"
+        )
+        # In particular, neither the new origin-axis Split_Partition tag
+        # nor caller-supplied content-axis types should leak onto the source.
+        assert "Split_Partition" not in after
+        assert "Training" not in after - before
+        assert "Testing" not in after - before
+
 
 # =============================================================================
 # Unit Tests: split_dataset denormalization plumbing (issue #174)
