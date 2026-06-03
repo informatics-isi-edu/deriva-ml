@@ -562,6 +562,8 @@ class ExecutionMixin:
         workflow_type: str | None = None,
         status: ExecutionStatus | None = None,
         sort: SortSpec = None,
+        dataset: "RID | DatasetSpec | None" = None,
+        dataset_role: str = "any",
     ) -> Iterable["ExecutionRecord"]:
         """Search the live catalog for executions matching the given filters.
 
@@ -588,6 +590,25 @@ class ExecutionMixin:
                   Execution table path and returns one or more
                   path-builder sort keys (e.g. ``path.RCT.desc``,
                   or ``[path.Status, path.RCT.desc]``).
+            dataset: Optional dataset filter. A dataset RID (``str``)
+                or a :class:`DatasetSpec`. When a ``DatasetSpec`` is
+                given, its ``version`` pins the filter to executions
+                that touched that specific dataset version. Only
+                executions with an edge to this dataset (per
+                ``dataset_role``) are yielded.
+            dataset_role: Which dataset edge to match when ``dataset``
+                is given. One of:
+
+                - ``"input"``: executions that *consumed* the dataset
+                  (``Dataset_Execution`` rows).
+                - ``"output"``: executions that *produced* the dataset
+                  (``Dataset_Version.Execution`` authorship).
+                - ``"any"`` (default): union of input and output.
+
+                Authorship-canonical model: output edges live only in
+                ``Dataset_Version.Execution``; input edges live in
+                ``Dataset_Execution``. Raises ``ValueError`` if a
+                non-``"any"`` role is given without a ``dataset``.
 
         Returns:
             Iterable of live ``ExecutionRecord`` objects.
@@ -609,11 +630,55 @@ class ExecutionMixin:
             ...     pass
         """
         # Import for type checking
+        from deriva_ml.dataset.aux_classes import DatasetSpec
         from deriva_ml.execution.workflow import Workflow as WorkflowClass
 
         # Get datapath to the Execution table
         pb = self.pathBuilder()
         execution_path = pb.schemas[self.ml_schema].Execution
+
+        # Build the allowed-execution-RID set from the dataset filter.
+        # None means "no dataset filter applied" (don't intersect).
+        allowed_exec_rids: set[str] | None = None
+        if dataset is None:
+            if dataset_role != "any":
+                raise ValueError("dataset_role requires a dataset argument")
+        else:
+            if isinstance(dataset, DatasetSpec):
+                ds_rid, ds_version = dataset.rid, str(dataset.version)
+            else:
+                ds_rid, ds_version = dataset, None
+
+            # Resolve a version pin once to a Dataset_Version RID so the
+            # input-edge filter is a direct RID comparison (no per-row
+            # _version_label query).
+            pinned_version_rid = self._version_rid(ds_rid, ds_version) if ds_version is not None else None
+
+            input_rids: set[str] = set()
+            if dataset_role in ("input", "any"):
+                ds_exec = pb.schemas[self.ml_schema].Dataset_Execution
+                for row in ds_exec.filter(ds_exec.Dataset == ds_rid).entities().fetch():
+                    if ds_version is not None and row.get("Dataset_Version") != pinned_version_rid:
+                        continue
+                    if row.get("Execution"):
+                        input_rids.add(row["Execution"])
+
+            output_rids: set[str] = set()
+            if dataset_role in ("output", "any"):
+                vp = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+                for row in vp.filter(vp.Dataset == ds_rid).entities().fetch():
+                    if not row.get("Execution"):
+                        continue
+                    if ds_version is not None and (row.get("Version") or "") != ds_version:
+                        continue
+                    output_rids.add(row["Execution"])
+
+            if dataset_role == "input":
+                allowed_exec_rids = input_rids
+            elif dataset_role == "output":
+                allowed_exec_rids = output_rids
+            else:  # any
+                allowed_exec_rids = input_rids | output_rids
 
         # Apply filters
         filtered_path = execution_path
@@ -649,6 +714,9 @@ class ExecutionMixin:
         for exec_record in entity_set.fetch():
             # If filtering by workflow type, check the execution's workflow is in the matching set
             if matching_workflow_rids is not None and exec_record.get("Workflow") not in matching_workflow_rids:
+                continue
+            # If filtering by dataset, skip executions outside the allowed set
+            if allowed_exec_rids is not None and exec_record.get("RID") not in allowed_exec_rids:
                 continue
             yield self.lookup_execution(exec_record["RID"])
 
@@ -1071,6 +1139,22 @@ class ExecutionMixin:
             if (row.get("Version") or "") == want:
                 return row["RID"]
         return None
+
+    def _version_label(self, version_rid) -> str | None:
+        """Map a ``Dataset_Version`` RID to its ``Version`` string, or None.
+
+        Inverse of :meth:`_version_rid`. Used by :meth:`find_executions`
+        to resolve the ``Dataset_Execution.Dataset_Version`` FK on an
+        input edge back to its semantic-version label for comparison
+        against a caller's version pin. Returns None when ``version_rid``
+        is falsy or no matching version row exists.
+        """
+        if not version_rid:
+            return None
+        pb = self.pathBuilder()
+        vp = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        rows = list(vp.filter(vp.RID == version_rid).entities().fetch())
+        return rows[0].get("Version") if rows else None
 
     def _producer_of_asset(self, asset_rid: RID, asset_table: Any) -> RID | None:
         """Return the Execution RID that produced ``asset_rid`` (asset_role="Output").
