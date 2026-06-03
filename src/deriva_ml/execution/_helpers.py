@@ -229,11 +229,7 @@ def list_input_datasets(
     """
     pb = ml_instance.pathBuilder()
     dataset_exec = pb.schemas[ml_instance.ml_schema].Dataset_Execution
-    records = list(
-        dataset_exec.filter(dataset_exec.Execution == execution_rid)
-        .entities()
-        .fetch()
-    )
+    records = dataset_exec.filter(dataset_exec.Execution == execution_rid).entities().fetch()
     return [ml_instance.lookup_dataset(record["Dataset"]) for record in records if record.get("Dataset")]
 
 

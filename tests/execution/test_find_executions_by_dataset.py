@@ -104,10 +104,47 @@ def test_find_executions_dataset_spec_version_pin(producer_and_consumer):
     assert consumer_rid not in rids_bogus
 
 
+@pytest.mark.integration
+def test_find_executions_bogus_version_pin_excludes_null_version_input(producer_and_consumer):
+    """Regression: a bogus version pin must NOT match a NULL-version input edge.
+
+    ``add_input_dataset(rid)`` (no version) leaves ``Dataset_Execution.Dataset_Version``
+    NULL. A ``DatasetSpec`` pinned to a version the dataset never had resolves to no
+    ``Dataset_Version`` RID. The input filter must then match NOTHING -- the consumer
+    that recorded a NULL-version edge must not be returned just because the pin also
+    failed to resolve.
+    """
+    ml, _producer_rid, _consumer_rid, dataset_rid, _version = producer_and_consumer
+
+    # A consumer that records an input edge WITHOUT a version -> Dataset_Version is NULL.
+    workflow = _setup_workflow(ml)
+    null_consumer = ml.create_execution(
+        ExecutionConfiguration(description="NULL-version consumer", workflow=workflow)
+    )
+    null_consumer.add_input_dataset(dataset_rid)  # no version -> Dataset_Version NULL
+
+    # Sanity: with no version pin the NULL-version consumer IS returned.
+    rids = {r.execution_rid for r in ml.find_executions(dataset=dataset_rid, dataset_role="input")}
+    assert null_consumer.execution_rid in rids
+
+    # A bogus version pin (dataset never had it) must match NOTHING on the input side.
+    bogus = DatasetSpec(rid=dataset_rid, version="99.0.0")
+    rids_bogus = {r.execution_rid for r in ml.find_executions(dataset=bogus, dataset_role="input")}
+    assert null_consumer.execution_rid not in rids_bogus
+    assert rids_bogus == set()
+
+
 def test_find_executions_role_without_dataset_raises(test_ml):
     """dataset_role without a dataset argument raises ValueError early."""
     with pytest.raises(ValueError, match="dataset_role requires a dataset"):
         list(test_ml.find_executions(dataset_role="input"))
+
+
+def test_find_executions_invalid_role_raises(test_ml):
+    """An invalid dataset_role raises ValueError (find_executions is a generator,
+    so the guard fires on iteration -- wrap in list())."""
+    with pytest.raises(ValueError, match="invalid dataset_role"):
+        list(test_ml.find_executions(dataset="1-ABC0", dataset_role="in"))
 
 
 @pytest.mark.integration
