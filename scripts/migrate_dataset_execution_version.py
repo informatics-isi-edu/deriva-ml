@@ -438,14 +438,30 @@ def run_migration(catalog: ErmrestCatalog, ml_schema: str, dry_run: bool) -> dic
     return result
 
 
-def migrate(hostname: str, catalog_id: str, ml_schema: str = "deriva-ml", dry_run: bool = False) -> bool:
+def migrate(
+    hostname: str,
+    catalog_id: str,
+    ml_schema: str = "deriva-ml",
+    dry_run: bool = False,
+    backfill_only: bool = False,
+) -> bool:
     """Connect, report preconditions, short-circuit, and run the migration.
+
+    Args:
+        backfill_only: When True, skip the structural steps (add column / delete
+            output rows) and the "already complete" short-circuit, and run ONLY
+            the best-effort version backfill (Step 3) against existing
+            NULL-version input rows. Use this to re-attempt backfill on an
+            already-structurally-migrated catalog after a change makes more
+            ``configuration.json`` files resolvable (e.g. a config-parser fix).
+            Requires the ``Dataset_Version`` column to already exist.
 
     Returns:
         True on success.
     """
     mode = "[DRY-RUN] " if dry_run else ""
-    print(f"\n{mode}Migrating Dataset_Execution to the input-only shape")
+    action = "Backfilling input versions for" if backfill_only else "Migrating"
+    print(f"\n{mode}{action} Dataset_Execution")
     print(f"  Catalog: {hostname}/{catalog_id}")
     print(f"  Schema:  {ml_schema}")
 
@@ -457,9 +473,35 @@ def migrate(hostname: str, catalog_id: str, ml_schema: str = "deriva-ml", dry_ru
     print(f"  Dataset_Version FK present:     {info['has_fk']}")
     print(f"  Dataset_Execution row count:    {info['row_count']}")
 
+    if backfill_only:
+        # Explicit operator intent to re-run ONLY the backfill. Bypass the
+        # short-circuit and the structural steps. The column must already exist.
+        if not info["has_column"]:
+            print(
+                "\n[ERROR] --backfill-only requires the Dataset_Version column to "
+                "exist; run the full migration first."
+            )
+            return False
+        print("\nStep 3 (only): Backfill consumed version on input rows (best-effort)")
+        backfill = step3_backfill_input_versions(catalog, hostname, ml_schema, dry_run)
+        print("\nSummary:")
+        print(
+            f"  Backfilled versions: {backfill['filled']} "
+            f"(null_config={backfill['null_config']}, "
+            f"null_no_record={backfill['null_no_record']}, "
+            f"errors={backfill['errors']})"
+        )
+        if not dry_run:
+            verify = _verify(catalog, ml_schema)
+            print("\nVerification:")
+            print(f"  Surviving rows with NULL Dataset_Version:   {verify['null_version_count']}")
+        print(f"\n{mode}Backfill complete!")
+        return True
+
     # Short-circuit: nothing to do when the column already exists AND no output
     # rows remain to delete. (Backfill is best-effort and never the sole reason
-    # to keep re-running; the NULL rows that remain are expected.)
+    # to keep re-running; the NULL rows that remain are expected. Use
+    # --backfill-only to deliberately re-attempt backfill after a parser fix.)
     if info["has_column"] and info["has_fk"]:
         authored = _authored_pairs(catalog, ml_schema)
         pb = catalog.getPathBuilder()
@@ -467,6 +509,7 @@ def migrate(hostname: str, catalog_id: str, ml_schema: str = "deriva-ml", dry_ru
         output_remaining = any((r.get("Dataset"), r.get("Execution")) in authored for r in rows)
         if not output_remaining:
             print("\nMigration already complete (column present, no output rows). Nothing to do.")
+            print("  (To re-attempt version backfill, re-run with --backfill-only.)")
             return True
 
     run_migration(catalog, ml_schema, dry_run)
@@ -486,9 +529,25 @@ def main() -> None:
         action="store_true",
         help="Preview migration without making changes",
     )
+    parser.add_argument(
+        "--backfill-only",
+        action="store_true",
+        help=(
+            "Skip the structural steps and the short-circuit; run only the "
+            "best-effort version backfill against existing NULL-version input "
+            "rows. Use to re-attempt backfill on an already-migrated catalog "
+            "(requires the Dataset_Version column to already exist)."
+        ),
+    )
     args = parser.parse_args()
 
-    success = migrate(args.hostname, args.catalog_id, args.schema, args.dry_run)
+    success = migrate(
+        args.hostname,
+        args.catalog_id,
+        args.schema,
+        args.dry_run,
+        backfill_only=args.backfill_only,
+    )
     sys.exit(0 if success else 1)
 
 
