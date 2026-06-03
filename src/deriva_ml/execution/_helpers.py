@@ -208,11 +208,11 @@ def list_input_datasets(
     """Return the input :class:`Dataset` list for an execution.
 
     Filters the ``Dataset_Execution`` association table for rows
-    referencing ``execution_rid``, then drops any dataset that
-    this same execution itself *produced* (its
-    ``Dataset_Version.Execution`` link points back). The
-    catalog has no role column on ``Dataset_Execution``, so
-    authorship via the version row is the source of truth.
+    referencing ``execution_rid``. Under the authorship-canonical
+    model ``Dataset_Execution`` is **input-only** — output edges
+    (a dataset an execution produced) live in
+    ``Dataset_Version.Execution``, never here — so every row is an
+    input and no producer subtraction is needed.
 
     Replaces parallel implementations on
     :meth:`Execution.list_input_datasets` (dry-run fallback)
@@ -225,26 +225,12 @@ def list_input_datasets(
 
     Returns:
         List of :class:`Dataset` objects. Empty when the
-        execution has no input datasets or every dataset on
-        the association table was produced by this execution.
+        execution has no input datasets.
     """
     pb = ml_instance.pathBuilder()
     dataset_exec = pb.schemas[ml_instance.ml_schema].Dataset_Execution
-    records = list(
-        dataset_exec.filter(dataset_exec.Execution == execution_rid)
-        .entities()
-        .fetch()
-    )
-    datasets = []
-    for record in records:
-        dataset_rid = record.get("Dataset")
-        if not dataset_rid:
-            continue
-        producer = ml_instance._producer_of_dataset(dataset_rid)
-        if producer == execution_rid:
-            continue
-        datasets.append(ml_instance.lookup_dataset(dataset_rid))
-    return datasets
+    records = dataset_exec.filter(dataset_exec.Execution == execution_rid).entities().fetch()
+    return [ml_instance.lookup_dataset(record["Dataset"]) for record in records if record.get("Dataset")]
 
 
 def list_assets(

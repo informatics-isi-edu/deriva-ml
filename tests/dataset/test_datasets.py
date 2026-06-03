@@ -416,7 +416,14 @@ class TestDataset:
         assert remaining[0].dataset_rid == ds3.dataset_rid
 
     def test_dataset_list_executions(self, test_ml):
-        """Test listing executions associated with a dataset."""
+        """``Dataset.list_executions`` returns input (consumer) executions only.
+
+        Authorship-canonical model: ``Dataset.list_executions`` reads the
+        ``Dataset_Execution`` association table, which is **input-only**.
+        It returns executions that *consumed* the dataset as input and
+        does NOT return the pure producer (whose output edge lives in
+        ``Dataset_Version.Execution``).
+        """
         ml_instance = test_ml
 
         # Add required vocabulary terms
@@ -430,32 +437,22 @@ class TestDataset:
             description="Testing list_executions",
         )
 
-        # Create an execution that will use a dataset
+        # Execution 1 PRODUCES a dataset (output edge -> Dataset_Version.Execution).
         execution1 = ml_instance.create_execution(ExecutionConfiguration(description="Execution 1", workflow=workflow))
-
-        # Create a dataset within this execution
         dataset = execution1.create_dataset(dataset_types=["TestSet"], description="Test dataset")
 
-        # Test list_executions - should return the execution that created the dataset
-        executions = dataset.list_executions()
-        assert len(executions) == 1
-        assert executions[0].execution_rid == execution1.execution_rid
+        # The pure producer is NOT an input -> list_executions is empty.
+        assert dataset.list_executions() == []
 
-        # Create a second execution that uses the same dataset
-        execution2 = ml_instance.create_execution(
-            ExecutionConfiguration(
-                description="Execution 2",
-                workflow=workflow,
-                datasets=[DatasetSpec(rid=dataset.dataset_rid, version=dataset.current_version)],
-            )
-        )
+        # Execution 2 CONSUMES the same dataset as input (input edge -> Dataset_Execution).
+        execution2 = ml_instance.create_execution(ExecutionConfiguration(description="Execution 2", workflow=workflow))
+        execution2.add_input_dataset(dataset.dataset_rid, version=dataset.current_version)
 
-        # Now list_executions should return both executions
+        # Now list_executions returns the consumer, and only the consumer.
         executions = dataset.list_executions()
-        assert len(executions) == 2
         execution_rids = {exe.execution_rid for exe in executions}
-        assert execution1.execution_rid in execution_rids
         assert execution2.execution_rid in execution_rids
+        assert execution1.execution_rid not in execution_rids
 
     def test_add_dataset_members_rejects_self_reference_cycle(self, dataset_test, tmp_path):
         """Adding a dataset as a member of itself raises a cycle exception.

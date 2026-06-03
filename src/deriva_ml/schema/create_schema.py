@@ -165,15 +165,26 @@ def create_dataset_table(
             ),
         )
     )
-    schema.create_table(
+    dataset_execution = schema.create_table(
         Table.define_association(
             associates=[("Dataset", dataset_table), ("Execution", execution_table)],
             comment=(
-                "Many-to-many association between datasets and executions. "
-                "An execution can consume or produce multiple datasets; a "
-                "dataset can be referenced by multiple executions over time."
+                "Input-only association between datasets and executions: each "
+                "row records that an execution *consumed* a dataset. Output "
+                "edges (which execution *produced* a dataset version) live in "
+                "`Dataset_Version.Execution`, not here. The optional "
+                "`Dataset_Version` FK pins the exact version that was consumed."
             ),
         )
+    )
+    # Nullable FK recording which Dataset_Version this input edge consumed.
+    # The (base_name, nullok, target) tuple form creates both the
+    # `Dataset_Version` column and its FK to the Dataset_Version table in one
+    # step — mirrors `dataset_table.create_reference(("Version", True, ...))`
+    # above. NULL means the consumed version is unknown (e.g. legacy rows).
+    dv_cols, _ = dataset_execution.create_reference(("Dataset_Version", True, dataset_version))
+    dv_cols[0].alter(
+        comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown)."
     )
     return dataset_table
 
