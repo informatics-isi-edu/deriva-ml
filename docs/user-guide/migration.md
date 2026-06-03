@@ -8,7 +8,8 @@ If you are upgrading from the previously-published deriva-ml version to the post
 |---|---|---|
 | **`DatasetBag.restructure_assets`** | `group_by` → `targets`; `value_selector` merged into `targets` dict form; `"Feature.column"` dotted syntax removed | Rename kwargs; `target_transform` replaces dotted syntax |
 | **12 private-named methods** | Public methods that were internal helpers are now `_`-prefixed | Switch to the public alternative where one exists; otherwise your calls break with `AttributeError` |
-| **5 deleted methods** | `prefetch_dataset`, `list_foreign_keys`, `add_page`, `user_list`, `globus_login` removed | Use replacements (below) or delete the calls |
+| **4 deleted methods** | `prefetch_dataset`, `list_foreign_keys`, `add_page`, `globus_login` removed | Use replacements (below) or delete the calls |
+| **`FeatureValueRecord` → `FeatureRecord`** | The feature-record class exported from `deriva_ml.dataset.dataset_bag` is named `FeatureRecord`; there is no `FeatureValueRecord` | Update imports; column access is via attributes (`rec.Column` / `getattr(rec, "Column", default)`), not `.raw_record` |
 | **`AssetRIDConfig` (doc-only)** | The class was never actually named `AssetRIDConfig`; real name is `AssetSpec` / `AssetSpecConfig` | Update imports |
 | **`Execution.metrics_file()`** | New recommended path for training-metric logs | Additive; replace ad-hoc `asset_file_path()` calls for metrics if you want the cleaner API |
 | **`DatasetBag.as_torch_dataset()` / `as_tf_dataset()`** | New framework adapters | Additive; consider replacing hand-rolled `Dataset` subclasses |
@@ -127,15 +128,19 @@ The underscored versions still work and behave identically — they are simply n
 
 ### Deleted methods (`AttributeError` on call)
 
-Five methods with no callers in any sibling repo were removed entirely.
+Four methods were removed entirely.
 
 | Deleted | Replacement |
 |---|---|
 | `ml.prefetch_dataset(rid)` | `ml.cache_dataset(rid)` — `prefetch_dataset` was a one-line deprecated shim |
 | `ml.list_foreign_keys(...)` | None needed — the method had no users |
 | `ml.add_page(...)` | None — stale web-app helper |
-| `ml.user_list()` | None — stale web-app helper |
 | `ml.globus_login()` | None — handled transparently by deriva-py |
+
+> **Note:** `ml.user_list()` is **not** removed — it is a supported public method
+> (returns `list[dict[str, str]]` with `ID` / `Full_Name` keys, sourced from
+> `public.ERMrest_Client`). An earlier draft of this guide listed it as deleted;
+> that was incorrect. If your code calls `ml.user_list()`, no change is needed.
 
 ### AssetRIDConfig class name (`ImportError` on copy-paste)
 
@@ -157,6 +162,51 @@ cfg = AssetSpecConfig(rid="YYYY", cache=True)
 ```
 
 Note that the real classes do not accept a `description` parameter (that kwarg was fabricated in the old docs).
+
+### FeatureValueRecord class name (`ImportError` on call)
+
+Some downstream code imported a `FeatureValueRecord` from
+`deriva_ml.dataset.dataset_bag`. No class by that name exists — the public
+feature-record class is `FeatureRecord`. Code that imported the wrong name
+fails with `ImportError` (and the module won't load).
+
+```python
+# Before (never existed under this name)
+from deriva_ml.dataset.dataset_bag import FeatureValueRecord
+
+def select_initial(records: list[FeatureValueRecord]) -> FeatureValueRecord:
+    for r in records:
+        if r.raw_record.get("Diagnosis_Tag") == "Initial Diagnosis":
+            return r
+    return records[0]
+
+# After
+from deriva_ml.dataset.dataset_bag import FeatureRecord
+
+def select_initial(records: list[FeatureRecord]) -> FeatureRecord:
+    for r in records:
+        # FeatureRecord is a Pydantic model; feature columns are attributes,
+        # not entries in a `.raw_record` dict. Use getattr with a default for
+        # columns that may be absent on a short/base record (extra="forbid").
+        if getattr(r, "Diagnosis_Tag", None) == "Initial Diagnosis":
+            return r
+    return records[0]
+```
+
+`FeatureRecord` selectors are exactly the callables the `targets={...}` /
+`selector=` slots expect (see the `restructure_assets` / `as_*_dataset`
+sections above). Selectors receive a **non-empty** `list[FeatureRecord]`, so a
+`records[0]` fallback is safe.
+
+### `create_model_config` is still available
+
+The `deriva-ml-model-template` writes its top-level model config by inlining
+`builds(partial(run_model, ml_class=DerivaML), ...)`. That is one valid form,
+but the convenience helper `create_model_config(ml_class=..., description=...,
+hydra_defaults=...)` (in `deriva_ml.execution.runner`) is **not** removed — it
+is the supported public wrapper around that same `builds(partial(run_model))`
+call. If your `src/configs/base.py` uses `create_model_config(...)`, no change
+is required; you do not need to inline `builds(partial(run_model))` to upgrade.
 
 ## New recommended patterns (additive; no migration required)
 
@@ -354,8 +404,11 @@ grep -rnE 'restructure_assets.*"[A-Za-z_]+\.[A-Za-z_]+"' your_project/ --include
 grep -rnE "\b(domain_path|table_path|is_system_schema|get_domain_schemas|apply_logger_overrides|compute_diff|retrieve_rid|cache_features|add_workflow|start_upload)\(" your_project/ --include="*.py" \
   | grep -v -E "\._\(?(domain_path|table_path|is_system_schema|get_domain_schemas|apply_logger_overrides|compute_diff|retrieve_rid|cache_features|add_workflow|start_upload)"
 
-# Deleted methods
-grep -rnE "\.(prefetch_dataset|list_foreign_keys|add_page|user_list|globus_login)\(" your_project/ --include="*.py"
+# Deleted methods (user_list is NOT deleted — excluded here)
+grep -rnE "\.(prefetch_dataset|list_foreign_keys|add_page|globus_login)\(" your_project/ --include="*.py"
+
+# FeatureValueRecord — the class is named FeatureRecord; this import breaks
+grep -rn "FeatureValueRecord" your_project/ --include="*.py"
 
 # AssetRIDConfig (doc-only break)
 grep -rn "AssetRIDConfig" your_project/ --include="*.py"
