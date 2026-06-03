@@ -373,3 +373,73 @@ def test_dry_run_does_not_backfill_when_column_present(seeded_ml, tmp_path):
     in_rows = [r for r in _dataset_execution_rows(catalog) if r["Execution"] == in_exec and r["Dataset"] == out_ds]
     assert in_rows, "input edge must still be present"
     assert in_rows[0].get("Dataset_Version") is None
+
+
+@pytest.mark.integration
+def test_backfill_only_runs_backfill_past_short_circuit(seeded_ml, tmp_path):
+    """``migrate(..., backfill_only=True)`` backfills NULL-version input rows on an
+    already-structurally-migrated catalog, where a normal run would short-circuit.
+
+    Reproduces the prod/dev second-pass scenario: the column+FK exist and no output
+    rows remain (so the normal short-circuit fires), but an input row still has a
+    NULL Dataset_Version that became resolvable after a config-parser fix.
+    """
+    ml = seeded_ml
+    catalog = ml.catalog
+    hostname = catalog.deriva_server.server
+
+    # 1. Bring the catalog to the fully-structurally-migrated state.
+    out_ds, _ = _seed_output_edge(ml)
+    pb = catalog.getPathBuilder()
+    dv_rows = [r for r in pb.schemas[ML_SCHEMA].Dataset_Version.entities().fetch() if r["Dataset"] == out_ds]
+    target_version = dv_rows[0]["Version"]
+    target_dv_rid = dv_rows[0]["RID"]
+    in_exec = _seed_input_edge_with_config(ml, out_ds, target_version)
+    migrate.run_migration(catalog, ML_SCHEMA, dry_run=False)
+
+    # Force the input row's Dataset_Version back to NULL to simulate a row that
+    # could not be backfilled on the first pass (e.g. parser couldn't read config yet).
+    de = pb.schemas[ML_SCHEMA].Dataset_Execution
+    in_row = next(r for r in de.entities().fetch() if r["Execution"] == in_exec and r["Dataset"] == out_ds)
+    de.update([{"RID": in_row["RID"], "Dataset_Version": None}], [de.RID])
+    assert next(r for r in _dataset_execution_rows(catalog)
+                if r["RID"] == in_row["RID"])["Dataset_Version"] is None
+
+    # 2. A NORMAL migrate() would short-circuit (column present, no output rows) and
+    #    leave the NULL row untouched.
+    migrate.migrate(hostname, catalog.catalog_id, ML_SCHEMA, dry_run=False)
+    still_null = next(r for r in _dataset_execution_rows(catalog) if r["RID"] == in_row["RID"])
+    assert still_null.get("Dataset_Version") is None, "normal run should short-circuit, not backfill"
+
+    # 3. backfill_only=True bypasses the short-circuit and fills the row.
+    migrate.migrate(hostname, catalog.catalog_id, ML_SCHEMA, dry_run=False, backfill_only=True)
+    filled = next(r for r in _dataset_execution_rows(catalog) if r["RID"] == in_row["RID"])
+    assert filled.get("Dataset_Version") == target_dv_rid
+
+
+# NOTE: the column-absent error path (backfill_only=True with no Dataset_Version
+# column -> returns False) is not unit-tested here. A freshly-created catalog is
+# born WITH the column (create_schema.py adds it); a column-absent state only
+# arises transiently if a prior test drops it (reset() clears data, not schema),
+# which is order-dependent and not reliable to depend on -- so a robust test would
+# need a deliberate column-drop dance. The guard is a trivial
+# `if not info["has_column"]: return False`, verified by inspection instead.
+
+
+@pytest.mark.integration
+def test_backfill_only_does_not_add_columns_or_delete_rows(seeded_ml):
+    """``backfill_only=True`` must not run Step 1 (add column) or Step 2 (delete output rows)."""
+    ml = seeded_ml
+    catalog = ml.catalog
+    hostname = catalog.deriva_server.server
+
+    out_ds, out_exec = _seed_output_edge(ml)
+    _seed_input_edge(ml, out_ds)
+    # Structurally migrate first so the column exists and output rows are gone.
+    migrate.run_migration(catalog, ML_SCHEMA, dry_run=False)
+    rows_before = len(_dataset_execution_rows(catalog))
+
+    # backfill_only on the already-migrated catalog: no structural change, no deletions.
+    migrate.migrate(hostname, catalog.catalog_id, ML_SCHEMA, dry_run=False, backfill_only=True)
+    rows_after = len(_dataset_execution_rows(catalog))
+    assert rows_after == rows_before, "backfill_only must not delete or add rows"
