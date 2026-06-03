@@ -173,9 +173,53 @@ associations fully covered: 12 / 12   (incomplete: 0)
 association table has composite-key indexes in both directions on both
 the live table and the history table. **Met.**
 
-## 7. Index usability (planner uses the index)
+## 7. Index usability (planner uses the index) — ✅ PASS
 
-_(filled in Task 7)_
+Representative table: `demo-schema.Dataset_Subject` (live + history,
+both directions). Method per the spec: natural plan, then forced plan
+with `enable_seqscan=off` / `enable_bitmapscan=off`, then an
+`idx_scan` counter check.
+
+**Natural plan (no override):** still `Seq Scan` on both live and
+history — **expected and not a failure**: at 8 rows a seq scan is
+genuinely cheaper than an index lookup, so the cost model correctly
+declines the index.
+
+**Forced plan (`enable_seqscan=off`) — the usability proof:**
+
+| Query | Table kind | Plan | Index used |
+|-------|-----------|------|-----------|
+| `Dataset='5CT' AND Subject='4C6'` | live | Index Only Scan | `Dataset_Subject_assoc_rev_idx` ✓ |
+| `Subject='4C6' AND Dataset='5CT'` | live | Index Only Scan | `Dataset_Subject_assoc_rev_idx` ✓ |
+| `rowdata->>'57W' AND rowdata->>'57Y'` | history | Index Scan | `Dataset_Subject_hist_assoc_rev_idx` ✓ |
+| `rowdata->>'57Y' AND rowdata->>'57W'` | history | Index Scan | `Dataset_Subject_hist_assoc_rev_idx` ✓ |
+
+Every query switches from Seq Scan to an **Index (Only) Scan on one of
+our named composite indexes**, with the `Index Cond` matching both
+predicate columns — including the JSONB `rowdata->>'<col_rid>'`
+expressions on the history side, which is the non-trivial case (the
+expression index must match the query's expression exactly to be
+eligible). The history-side proof is the key result: the script's
+RID-keyed expression indexes are real, correctly-formed, and
+planner-usable.
+
+> **Why `rev` for both orderings (not a defect):** a B-tree composite
+> index supports equality predicates on its columns regardless of the
+> order they appear in the `WHERE` clause, so both the `fwd` and `rev`
+> indexes are eligible for either query; the planner picked `rev` for
+> all four. Both directions' indexes exist (§6) and are usable; having
+> both simply lets a *range/sort* on either leading column be served.
+
+**`idx_scan` corroboration (independent of EXPLAIN):** counter
+`0 → 1` after executing the live and history queries (via
+`EXPLAIN ANALYZE`, which actually runs them):
+
+```
+Dataset_Subject_assoc_rev_idx        0 → 1
+Dataset_Subject_hist_assoc_rev_idx   0 → 1
+```
+`EXPLAIN ANALYZE` reported `Index (Only) Scan ... actual time=… rows=1`
+for both — the indexes were genuinely consulted, not merely eligible.
 
 ## 8. Findings / bugs
 
