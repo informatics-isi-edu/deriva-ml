@@ -35,7 +35,27 @@
 
 ## 2. Associations discovered
 
-_(filled in Task 4)_
+The generator found **12 pure binary association tables** across the
+`demo-schema` and `deriva-ml` schemas. All 12 resolved table + column
+RIDs cleanly, so each got the full 4-index set (2 live + 2 history):
+
+| # | Association | FK pair |
+|---|-------------|---------|
+| 1 | `demo-schema.BoundingBox_Asset_Type` | (Asset_Type, BoundingBox) |
+| 2 | `demo-schema.Dataset_Image` | (Dataset, Image) |
+| 3 | `demo-schema.Dataset_Subject` | (Dataset, Subject) |
+| 4 | `demo-schema.Image_Asset_Type` | (Asset_Type, Image) |
+| 5 | `deriva-ml.Dataset_Dataset` | (Dataset, Nested_Dataset) |
+| 6 | `deriva-ml.Dataset_Dataset_Type` | (Dataset, Dataset_Type) |
+| 7 | `deriva-ml.Dataset_Execution` | (Dataset, Execution) |
+| 8 | `deriva-ml.Dataset_File` | (Dataset, File) |
+| 9 | `deriva-ml.Execution_Asset_Asset_Type` | (Asset_Type, Execution_Asset) |
+| 10 | `deriva-ml.Execution_Metadata_Asset_Type` | (Asset_Type, Execution_Metadata) |
+| 11 | `deriva-ml.File_Asset_Type` | (Asset_Type, File) |
+| 12 | `deriva-ml.Workflow_Workflow_Type` | (Workflow, Workflow_Type) |
+
+(Feature-value tables like `Execution_Subject_Health` are absent —
+correctly, as noted in §3, they are not pure binary associations.)
 
 ## 3. Baseline plans (no index)
 
@@ -79,7 +99,32 @@ Seq Scan on "t57G"  (cost=0.00..1.16 rows=1 width=4)
 
 ## 4. Generated SQL
 
-_(filled in Task 4)_
+- **Command:** `uv run python scripts/generate_association_indexes.py --hostname localhost --catalog-id 3 --output /tmp/assoc-idx-test/indexes.sql --verbose`
+- **Exit code:** 0. **Warnings:** none (only a harmless urllib3
+  `InsecureRequestWarning` for the self-signed localhost cert — not a
+  generator warning; no RID-lookup misses).
+- **Shape:** 48 `CREATE INDEX CONCURRENTLY IF NOT EXISTS` statements =
+  12 associations × 4 (live fwd, live rev, hist fwd, hist rev). Counts
+  per direction: live fwd 12, live rev 12, hist fwd 12, hist rev 12.
+
+**Cross-check — the `Dataset_Subject` block matches the RIDs this test
+discovered independently from Postgres `_ermrest` metadata (table
+`57G`, `Dataset=57W`, `Subject=57Y`):**
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "Dataset_Subject_assoc_fwd_idx"
+  ON "demo-schema"."Dataset_Subject" ("Dataset", "Subject");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "Dataset_Subject_assoc_rev_idx"
+  ON "demo-schema"."Dataset_Subject" ("Subject", "Dataset");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "Dataset_Subject_hist_assoc_fwd_idx"
+  ON _ermrest_history."t57G"
+     (((rowdata->>'57W')), ((rowdata->>'57Y')));
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "Dataset_Subject_hist_assoc_rev_idx"
+  ON _ermrest_history."t57G"
+     (((rowdata->>'57Y')), ((rowdata->>'57W')));
+```
+
+Full file: `/tmp/assoc-idx-test/indexes.sql` (not committed — scratch).
 
 ## 5. Apply result + idempotence
 
