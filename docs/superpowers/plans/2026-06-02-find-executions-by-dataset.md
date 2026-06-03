@@ -80,11 +80,21 @@ other `tests/schema/` tests — they load the demo catalog model.)
 Run: `cd /Users/carl/GitHub/DerivaML/deriva-ml && DERIVA_ML_ALLOW_DIRTY=true uv run pytest tests/schema/test_dataset_execution_version_column.py -v`
 Expected: FAIL — `"Dataset_Execution must have a Dataset_Version column"`.
 
-- [ ] **Step 3: Add the column + FK in create_schema.py**
+- [ ] **Step 3: Add the column + FK in create_schema.py — follow the existing impure-association idiom**
 
-The table is built with `Table.define_association`, which doesn't take
-extra columns. Add the column and FK **after** creation. Replace the
-block at `create_schema.py:168-177`:
+The repo already adds extra columns to association tables two ways:
+- **plain column** via `metadata=[ColumnDef(...).to_dict()]` — see the
+  `Sequence` column on the Nested-Execution association
+  (`create_schema.py:405-411`);
+- **FK column** via the same `metadata=` column **plus a separate
+  `create_reference(target_table)`** — see the `Asset_Role` FK on the
+  `{Asset}_Execution` association (`create_asset_table`, the
+  `atable.create_reference(asset_role_table)` call at
+  `create_schema.py:494`).
+
+`Dataset_Version` is an FK column, so follow the **`Asset_Role`
+precedent**: declare the column in `metadata=`, then `create_reference`.
+Replace the `Dataset_Execution` block at `create_schema.py:168-177`:
 
 ```python
     dataset_execution_table = schema.create_table(
@@ -93,21 +103,20 @@ block at `create_schema.py:168-177`:
             comment=(
                 "Association linking datasets to executions that CONSUMED them "
                 "as inputs. Output (producing) edges are NOT recorded here — they "
-                "live in Dataset_Version.Execution. Each row optionally records "
-                "the consumed version via the Dataset_Version FK."
+                "live in Dataset_Version.Execution. The Dataset_Version column "
+                "optionally pins the consumed version."
             ),
+            metadata=[
+                ColumnDef(
+                    name="Dataset_Version",
+                    type=BuiltinType.text,
+                    nullok=True,
+                    comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown).",
+                ).to_dict()  # Convert to dict for Table.define_association()
+            ],
         )
     )
-    # Input edges may pin the consumed version. Nullable: legacy/no-version
-    # links (e.g. add_input_dataset without a version) leave it NULL.
-    dataset_execution_table.create_column(
-        Column.define(
-            "Dataset_Version",
-            BuiltinType.text,
-            nullok=True,
-            comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown).",
-        )
-    )
+    # Wire the FK the same way create_asset_table wires Asset_Role.
     dataset_execution_table.create_reference(dataset_version_table)
     return dataset_table
 ```
@@ -116,12 +125,12 @@ Notes for the implementer:
 - `dataset_version_table` is the `Dataset_Version` table created earlier
   in this same function (the one `Dataset.Version` references via
   `create_reference(("Version", True, dataset_version))` at line ~154).
-  If it isn't already bound to a local name, capture it from its
-  `schema.create_table(...)` return value.
-- `Column` / `BuiltinType` are already imported in this module (see the
-  `ColumnDef`/`BuiltinType` usage elsewhere in the file). If the helper
-  is `ColumnDef` rather than `Column.define`, match the surrounding
-  style.
+  If it isn't already bound to a local name, capture it from that
+  `schema.create_table(...)` / definition site and reuse the binding.
+- `ColumnDef` and `BuiltinType` are already imported and used in this
+  module (e.g. the `Sequence` metadata column at 405-411 and the
+  `Dataset_Version` table columns at ~200). Match that exact style;
+  `.to_dict()` is required on the `ColumnDef` passed to `metadata=`.
 
 - [ ] **Step 4: Surface the FK in Chaise annotations**
 
@@ -248,6 +257,11 @@ import sys
 
 from deriva.core import ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import Column, builtin_types
+# NB: a standalone migration script uses raw deriva-py
+# (Column.define / builtin_types.text — see deriva-py ermrest_model.py:740).
+# This is intentionally DIFFERENT from create_schema.py, which uses the
+# deriva-ml wrappers (ColumnDef / BuiltinType.text). Do not "harmonize"
+# them — each is correct for its context (raw script vs. schema builder).
 
 
 def get_catalog(hostname: str, catalog_id: str) -> ErmrestCatalog:
@@ -275,6 +289,10 @@ def _authored_versions(catalog: ErmrestCatalog, ml_schema: str) -> set[tuple[str
 
 
 def step1_add_column(catalog, ml_schema, dry_run) -> int:
+    # Live-table column add uses the deriva-py Table.create_column /
+    # Table.create_reference API (ermrest_model.py:2054 / :2112) — the
+    # in-place analog of the metadata=/create_reference idiom used at
+    # schema-creation time (create_schema.py Asset_Role precedent).
     model = catalog.getCatalogModel()
     de = model.schemas[ml_schema].tables["Dataset_Execution"]
     if "Dataset_Version" in {c.name for c in de.columns}:
@@ -283,7 +301,14 @@ def step1_add_column(catalog, ml_schema, dry_run) -> int:
     if dry_run:
         print("  [DRY-RUN] would add Dataset_Version column + FK")
         return 1
-    de.create_column(Column.define("Dataset_Version", builtin_types.text, nullok=True))
+    de.create_column(
+        Column.define(
+            "Dataset_Version",
+            builtin_types.text,
+            nullok=True,
+            comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown).",
+        )
+    )
     dv = model.schemas[ml_schema].tables["Dataset_Version"]
     de.create_reference(dv)
     print("  [OK] added Dataset_Version column + FK")
