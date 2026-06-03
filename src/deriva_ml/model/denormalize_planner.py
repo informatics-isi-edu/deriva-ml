@@ -1646,6 +1646,7 @@ class DenormalizePlanner:
         *,
         row_per: str | None = None,
         via: list[str] | None = None,
+        system_columns: list[str] | None = None,
     ) -> tuple[dict[str, Any], list[tuple], bool]:
         """Generate a join plan for denormalizing a dataset into a wide table.
 
@@ -1790,7 +1791,10 @@ class DenormalizePlanner:
         paths_by_element = {elem: paths for elem, paths in paths_by_element.items() if elem in include_tables_set}
 
         # ── Phase 2: build JoinTree per element ──────────────────────────────
-        skip_columns = {"RCT", "RMT", "RCB", "RMB"}
+        # System columns are dropped from the wide table by default. Callers
+        # that need provenance (e.g. RCB = the row's creating user) can opt
+        # specific ones back in via ``system_columns``.
+        skip_columns = {"RCT", "RMT", "RCB", "RMB"} - set(system_columns or [])
         element_tables: dict[str, tuple[list[str], dict[str, set], dict[str, str]]] = {}
 
         for element_name, paths in paths_by_element.items():

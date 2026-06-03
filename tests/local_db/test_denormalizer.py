@@ -44,6 +44,30 @@ class TestAsDataframe:
         assert any(c.startswith("Image.") for c in df.columns)
         assert any(c.startswith("Subject.") for c in df.columns)
 
+    def test_system_columns_excluded_by_default(self, populated_denorm) -> None:
+        """RCT/RMT/RCB/RMB are dropped from the wide table by default."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        df = d.as_dataframe(["Image", "Subject"])
+        for sys_col in ("RCT", "RMT", "RCB", "RMB"):
+            assert not any(c.endswith(f".{sys_col}") for c in df.columns), (
+                f"{sys_col} should be excluded by default"
+            )
+
+    def test_system_columns_opt_in_retains_rcb(self, populated_denorm) -> None:
+        """system_columns=['RCB'] retains the creating-user column per table."""
+        ds = _FakeDataset(populated_denorm)
+        d = Denormalizer(ds)
+        df = d.as_dataframe(["Image", "Subject"], system_columns=["RCB"])
+        # RCB now present, labeled Table.RCB, for each contributing table.
+        assert "Image.RCB" in df.columns
+        assert "Subject.RCB" in df.columns
+        # The other system columns remain excluded (opt-in is per-column).
+        for sys_col in ("RCT", "RMT", "RMB"):
+            assert not any(c.endswith(f".{sys_col}") for c in df.columns), (
+                f"{sys_col} should still be excluded"
+            )
+
     def test_empty_dataset(self, populated_denorm) -> None:
         """Nonexistent dataset RID returns empty DataFrame with correct columns."""
         ds = _FakeDataset(populated_denorm, dataset_rid="NO-SUCH-DS")

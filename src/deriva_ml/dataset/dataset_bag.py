@@ -917,6 +917,7 @@ class DatasetBag:
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
         selector: Callable[[list[FeatureRecord]], FeatureRecord | None] | None = None,
+        system_columns: list[str] | None = None,
     ) -> pd.DataFrame:
         """Return the dataset bag as a denormalized wide table (DataFrame).
 
@@ -940,6 +941,13 @@ class DatasetBag:
                 feature-association table; raises ``ValueError``
                 otherwise. Identical contract to
                 :meth:`feature_values`'s ``selector`` argument.
+            system_columns: Optional list of per-table system columns to
+                retain in the output (any of ``"RCT"``, ``"RMT"``,
+                ``"RCB"``, ``"RMB"``). These are dropped by default. Use
+                this when you need provenance — e.g. ``["RCB"]`` keeps each
+                row's creating-user id so it can be joined against the
+                catalog user list. Retained columns are labeled
+                ``Table.RCB`` like any other column.
 
         Returns:
             A :class:`pandas.DataFrame` with one row per ``row_per``
@@ -956,6 +964,11 @@ class DatasetBag:
                 ["Image", "Execution_Image_Image_Classification"],
                 selector=FeatureRecord.select_newest,
             )
+
+            # Keep the diagnosis row's creating-user id for a grader join:
+            df = bag.get_denormalized_as_dataframe(
+                ["Image", "Image_Diagnosis"], system_columns=["RCB"]
+            )
         """
         from deriva_ml.local_db.denormalizer import Denormalizer
 
@@ -965,6 +978,7 @@ class DatasetBag:
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
             selector=selector,
+            system_columns=system_columns,
         )
 
     def get_denormalized_as_dict(

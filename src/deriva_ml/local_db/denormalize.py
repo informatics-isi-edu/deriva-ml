@@ -207,6 +207,7 @@ def _denormalize_impl(
     row_per: str | None = None,
     via: list[str] | None = None,
     selector: Callable[[list[Any]], Any] | None = None,
+    system_columns: list[str] | None = None,
 ) -> DenormalizeResult:
     """Unified denormalization: plan joins via ``_prepare_wide_table``, execute locally.
 
@@ -332,6 +333,7 @@ def _denormalize_impl(
         include_tables,
         row_per=row_per,
         via=via,
+        system_columns=system_columns,
     )
 
     # Build a quick lookup from table name to schema name so we can form
