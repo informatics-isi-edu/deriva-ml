@@ -1054,6 +1054,24 @@ class ExecutionMixin:
         latest = max(rows, key=_key)
         return latest.get("Execution")
 
+    def _version_rid(self, dataset_rid: RID, version: Any) -> RID | None:
+        """RID of the ``Dataset_Version`` row for (``dataset_rid``, ``version``), or None.
+
+        Maps a (dataset, version) pair to the RID of its ``Dataset_Version``
+        row so the consumed version can be recorded on the
+        ``Dataset_Execution.Dataset_Version`` FK (the input edge). ``version``
+        may be a :class:`DatasetVersion`, a version string, or anything whose
+        ``str(...)`` matches the catalog's stored ``Version`` text (e.g.
+        ``"1.0.0"``). Returns None when no matching version row exists.
+        """
+        pb = self.pathBuilder()
+        vp = pb.schemas[self.ml_schema].tables["Dataset_Version"]
+        want = str(version)
+        for row in vp.filter(vp.Dataset == dataset_rid).entities().fetch():
+            if (row.get("Version") or "") == want:
+                return row["RID"]
+        return None
+
     def _producer_of_asset(self, asset_rid: RID, asset_table: Any) -> RID | None:
         """Return the Execution RID that produced ``asset_rid`` (asset_role="Output").
 

@@ -344,9 +344,11 @@ class Dataset:
             ]
         )[0]["RID"]
 
-        pb.schemas[ml_instance.model.ml_schema].Dataset_Execution.insert(
-            [{"Dataset": dataset_rid, "Execution": execution_rid}]
-        )
+        # NOTE: Under the authorship-canonical provenance model, an output
+        # edge (this execution PRODUCED the dataset) is recorded solely via
+        # ``Dataset_Version.Execution`` (written by ``_insert_dataset_versions``
+        # below). It must NOT be written to ``Dataset_Execution``, which is the
+        # input-only edge table. See ADR / Task 4.
         dataset = Dataset(
             catalog=ml_instance,
             dataset_rid=dataset_rid,

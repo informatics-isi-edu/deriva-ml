@@ -655,8 +655,19 @@ class Execution:
 
         schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
         if self.dataset_rids and not (reload or self._dry_run):
+            # Config-declared datasets are *inputs* (consume edges). Record the
+            # consumed version on each input edge via the
+            # ``Dataset_Execution.Dataset_Version`` FK, resolved from the
+            # ``DatasetSpec.version`` (authorship-canonical model, Task 4).
             schema_path.Dataset_Execution.insert(
-                [{"Dataset": d, "Execution": self.execution_rid} for d in self.dataset_rids]
+                [
+                    {
+                        "Dataset": dataset.rid,
+                        "Execution": self.execution_rid,
+                        "Dataset_Version": self._ml_object._version_rid(dataset.rid, dataset.version),
+                    }
+                    for dataset in self.configuration.datasets
+                ]
             )
 
     def _download_input_assets(self, reload: RID | None) -> None:
@@ -1967,7 +1978,7 @@ class Execution:
             description=description,
         )
 
-    def add_input_dataset(self, dataset_rid: RID) -> None:
+    def add_input_dataset(self, dataset_rid: RID, version: DatasetVersion | str | None = None) -> None:
         """Record an existing dataset as an *input* consumed by this execution.
 
         Writes a single ``Dataset_Execution`` association row linking
@@ -1987,6 +1998,12 @@ class Execution:
         :func:`deriva_ml.dataset.split.split_dataset`, which records its
         source dataset as an input of the splitting execution.
 
+        When ``version`` is supplied, the consumed version is recorded on
+        the input edge via the ``Dataset_Execution.Dataset_Version`` FK
+        (resolved through :meth:`_version_rid`). When ``version`` is
+        ``None`` the ``Dataset_Version`` column is left NULL — fully
+        backward-compatible with callers that pass only a RID.
+
         The link is idempotent: if ``dataset_rid`` is already associated
         with this execution, no duplicate row is inserted. In dry-run
         mode this is a no-op (the dry-run contract forbids catalog
@@ -1995,6 +2012,9 @@ class Execution:
         Args:
             dataset_rid: RID of the already-existing dataset that this
                 execution consumed as an input.
+            version: Optional consumed dataset version. May be a
+                :class:`DatasetVersion` or a version string. When given,
+                recorded on the input edge's ``Dataset_Version`` FK.
 
         Example:
             >>> with ml.create_execution(cfg) as exe:  # doctest: +SKIP
@@ -2011,7 +2031,10 @@ class Execution:
         }
         if dataset_rid in already_linked:
             return
-        dataset_exec.insert([{"Dataset": dataset_rid, "Execution": self.execution_rid}])
+        version_rid = self._ml_object._version_rid(dataset_rid, version) if version is not None else None
+        dataset_exec.insert(
+            [{"Dataset": dataset_rid, "Execution": self.execution_rid, "Dataset_Version": version_rid}]
+        )
 
     @validate_call(config=VALIDATION_CONFIG)
     def add_files(
