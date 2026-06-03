@@ -1,8 +1,8 @@
 # Find Executions by Dataset — Design
 
 **Date:** 2026-06-02
-**Status:** Approved design (pre-implementation)
-**Repos touched:** `deriva-ml` (library), `deriva-ml-mcp-plugin` (MCP tools)
+**Status:** Design — pending review (revised to catalog-native role/version model)
+**Repos touched:** `deriva-ml` (library + schema), `deriva-ml-mcp-plugin` (MCP tools)
 
 ## Problem
 
@@ -26,58 +26,96 @@ The existing execution-query surface filters by **workflow**,
 Today the only way to get the answer is a hand-built ERMrest query
 against the `Dataset_Execution` association table — the exact
 "drop to `query_attribute`" anti-pattern the getting-started guide warns
-against. The capability is one association join; it has simply never
-been surfaced.
+against.
 
 "Which experiments used this data?" is a headline provenance question
 for a reproducibility platform — arguably more common than the
 producer-direction question the lineage tools already answer well.
 
-## Schema constraints (these drive the design)
+## Root cause: datasets never got the role/version model assets already have
 
-`deriva-ml:Dataset_Execution` is a bare many-to-many association:
-columns are just `Dataset` and `Execution` (plus system columns). The
-table comment states it covers both "consume or produce". Critically:
+Investigating the question exposed a deeper, structural asymmetry. The
+catalog records dataset↔execution edges and asset↔execution edges very
+differently:
 
-1. **No role column.** Unlike assets — whose `{Asset}_Execution` rows
-   carry an `Asset_Role` ("Input"/"Output") column that
-   `list_assets(asset_role=...)` filters on directly — `Dataset_Execution`
-   cannot natively distinguish inputs from outputs.
+| | Recorded in | Role stored? | Version stored? |
+|---|---|---|---|
+| **Asset** ↔ execution | `{Asset}_Execution` tables (`Image_Execution`, …) | **Yes** — `Asset_Role` FK (`Input`/`Output`) | n/a (assets aren't versioned) |
+| **Output dataset** ↔ execution | `Dataset_Version.Execution` FK | implied (authorship) | **Yes** (the authored version row) |
+| **Input dataset** ↔ execution | `Dataset_Execution` association | **No** | **No** (points at version-agnostic `Dataset`) |
 
-2. **No version column.** A link records `(Dataset, Execution)` but not
-   *which version* of the dataset was involved.
+Consequences of this split:
 
-The library already has a source of truth for role on the dataset side:
-**`Dataset_Version.Execution` authorship.** An execution *produced*
-(output) a dataset if a `Dataset_Version` row for that dataset points
-its `Execution` FK back at the execution. `list_input_datasets()`
-already relies on exactly this (see
-`execution/_helpers.py::list_input_datasets`, which excludes
-datasets the execution produced via `_producer_of_dataset`).
+1. **Dataset role must be *derived*** (linked-but-not-author = input),
+   instead of read from a column the way `Asset_Role` is.
+2. **Input dataset version is lost** at the catalog level. It survives
+   only inside the execution's `configuration.json` metadata asset
+   (`DatasetSpec.version`, a required field) for config-declared inputs;
+   for lightweight `add_input_dataset` links (e.g. `split_dataset`) it is
+   recorded nowhere.
+3. **Input and output datasets are modeled through two different tables**,
+   so they can't be queried uniformly.
 
-This is why the asset side has a clean `asset_role=` parameter while the
-dataset side has a name-baked `list_input_datasets()` — role is *stored*
-for assets but must be *derived* for datasets. Our design honors that:
-the dataset filter derives role rather than pretending a column exists.
+The principle this design follows: **provenance must be queryable
+catalog data, not reconstructed by parsing a config file.** The
+`configuration.json` asset records what was *requested at launch*; it is
+not the catalog's authoritative model of what an execution used. The
+read path must never fetch or parse it.
+
+The fix is to give datasets the same first-class role/version model that
+assets already have — then read everything relationally.
 
 ## Design
 
-### Layer 1 — Library: extend `find_executions`
+### Layer 0 — Schema: make `Dataset_Execution` role- and version-aware
 
-Rather than add a new method, extend the existing
-`DerivaML.find_executions` (in `core/mixins/execution.py`) with three
-optional, keyword-only dataset filters. This was chosen over a
-standalone `find_dataset_executions` library method because:
+Add two columns to the `deriva-ml:Dataset_Execution` association table:
 
-- The dataset filter is structurally identical to the existing
-  `workflow_type` filter — a join through an association table
-  (`Dataset_Execution`, mirroring `Workflow_Workflow_Type`).
-- It returns the same type (`ExecutionRecord`), unlike `find_experiments`
-  (which returns `Experiment` and earned its own method).
-- Keeps the library method count minimal; one method that already
-  filters executions gains one more filter axis.
+- **`Role`** — FK to the existing `Asset_Role` vocabulary (reused, not a
+  new vocab) carrying `Input` / `Output`. Mirrors `{Asset}_Execution`'s
+  `Asset_Role`.
+- **`Dataset_Version`** — nullable FK to `Dataset_Version.RID`, recording
+  the *exact* version of the dataset involved in this edge.
 
-New signature:
+The existing `Dataset` FK stays (the version-agnostic "which dataset"
+link, needed for the "any version" query and preserved so every current
+reader keeps working). Both new columns are nullable so pre-existing
+rows remain valid.
+
+This collapses the input/output dataset split: every dataset↔execution
+edge becomes one uniform association row
+`(Dataset, Dataset_Version, Execution, Role)` — structurally identical to
+how `{Asset}_Execution` rows already work. Role stops being derived;
+version becomes native on both sides.
+
+The output side's existing `Dataset_Version.Execution` authorship FK is
+retained as a convenience mirror (and to avoid a larger rewrite); it is
+no longer the *only* source of output-edge truth.
+
+### Layer 1 — Write path: populate Role + Version at link time
+
+Both writers already have the role and version in hand at link time:
+
+- **`create_dataset`** (output): writes `Role="Output"` and the authored
+  `Dataset_Version` RID on the `Dataset_Execution` row it inserts.
+- **`add_input_dataset(rid, version=…)`** (input): gains an optional
+  `version` and writes `Role="Input"` plus the `Dataset_Version` RID when
+  known. `split_dataset` (the canonical caller) passes the source
+  version it already resolved.
+- **Config-declared inputs** (`ExecutionConfiguration.datasets`): the
+  `DatasetSpec.version` (required) is written to the association row at
+  materialization time.
+
+Backward compatibility: `add_input_dataset` keeps working without a
+`version` argument (writes `Role="Input"`, `Dataset_Version=null`).
+
+### Layer 2 — Library: extend `find_executions`
+
+Extend the existing `DerivaML.find_executions` (in
+`core/mixins/execution.py`) with dataset filters, rather than adding a
+separate method — the dataset filter is structurally identical to the
+existing `workflow_type` association-join filter, returns the same
+`ExecutionRecord` type, and keeps the library method count minimal.
 
 ```python
 def find_executions(
@@ -85,182 +123,166 @@ def find_executions(
     workflow=None,
     workflow_type=None,
     status=None,
-    dataset=None,            # NEW: RID or Dataset — executions linked to this dataset
+    dataset=None,            # NEW: RID or Dataset
     dataset_role="any",      # NEW: "input" | "output" | "any"
-    dataset_version=None,    # NEW: pin to a specific version (output side only)
+    dataset_version=None,    # NEW: pin to a specific version
     sort=None,
 ) -> Iterable["ExecutionRecord"]
 ```
 
-**Filter mechanics** (mirrors the `workflow_type` association-join +
-set-intersection pattern at execution.py:626-634):
+**Filter mechanics** (now a pure relational read — no role derivation,
+no config parsing):
 
-1. When `dataset` is set, collect candidate `Execution` RIDs from
-   `Dataset_Execution` where `Dataset == dataset_rid`.
-2. Derive role for each candidate via a shared helper (Layer 2): an
-   execution is **output** for the dataset if a `Dataset_Version` row
-   for that dataset has `Execution ==` it; otherwise **input**.
-3. `dataset_role` filters the candidate set:
-   - `"any"` (default) — all linked executions, no role filter.
-   - `"input"` — linked but not a producer of any version.
-   - `"output"` — produced at least one version of the dataset.
-4. `dataset_version`, when set, narrows the **output**-side match to the
-   execution(s) that authored that specific `Dataset_Version`. It does
-   **not** constrain the input side (no per-version link exists), and is
-   a documented no-op when combined with `dataset_role="input"`.
-5. The derived role and authored version travel with each result so the
-   tool layer can surface them without recomputation.
+1. `dataset` set → select `Dataset_Execution` rows where
+   `Dataset == dataset_rid`, intersect their `Execution` RIDs into the
+   result set (same pattern as `workflow_type`).
+2. `dataset_role` → filters on the stored `Role` column directly
+   (`"any"` = no filter).
+3. `dataset_version` → filters on the stored `Dataset_Version` FK
+   directly. Now meaningful on **both** sides (no longer output-only),
+   because the column is populated for inputs too.
 
-**Guardrails:** passing `dataset_role` (≠ "any") or `dataset_version`
-without `dataset` raises `ValueError` (fail fast on a nonsensical
-combination).
+**Guardrails:** `dataset_role`/`dataset_version` without `dataset` →
+`ValueError`.
 
-The existing `workflow` / `workflow_type` / `status` filters compose
-with the dataset filters (e.g. "Training-type executions that consumed
-dataset X"), via the same intersect-into-result-set approach already
-used for `workflow_type`.
+Composes with `workflow` / `workflow_type` / `status` (e.g. "Training
+executions that consumed dataset X at version 2.0.0").
 
-### Layer 2 — Library: shared role-derivation helper
+### Layer 3 — Library: unify the role classification (cleanup)
 
-Factor the "classify a dataset↔execution link by role" logic into
-`execution/_helpers.py`, consumed by **both**:
+With `Role` stored on the association, `list_input_datasets()` no longer
+needs to *derive* role by excluding produced datasets — it filters
+`Dataset_Execution` on `Role == "Input"`. Refactor it (and the
+symmetric output accessor) to read the column. Internal change; public
+signatures unchanged. Removes the `_producer_of_dataset` derivation as
+the source of truth (kept only as a fallback for legacy null-`Role`
+rows during the transition).
 
-- the new `find_executions` dataset filter, and
-- the existing `list_input_datasets()` (which currently inlines the
-  "exclude produced datasets" logic via `_producer_of_dataset`).
+### Layer 4 — Plugin: two tool surfaces over one library method
 
-This is an **internal DRY refactor — no public signature changes** to
-`list_input_datasets()`. The helper returns, for a `(dataset, candidate
-executions)` pair, each execution's derived role plus the authored
-version (where it is a producer). Both call sites consume the same
-classification so they cannot drift.
+Mirrors the existing precedent where
+`deriva_ml_list_executions(workflow_rid=...)` and
+`deriva_ml_find_workflow_executions(...)` both wrap `ml.find_executions`
+via the shared `_list_executions_impl` helper, yet exist as two tools —
+tools are shaped by LLM intent, not 1:1 with library methods.
 
-### Layer 3 — Plugin: two tool surfaces over one library method
+**A. Extend** `deriva_ml_list_executions` with `dataset`,
+`dataset_role="any"`, `dataset_version`. Forwarded into the extended
+`_list_executions_impl`. When `dataset` is `None`, behavior and response
+shape are identical to today — zero change for existing callers.
 
-Mirrors the existing precedent where `deriva_ml_list_executions(
-workflow_rid=...)` and `deriva_ml_find_workflow_executions(...)` both
-wrap `ml.find_executions` via the shared `_list_executions_impl` helper,
-yet exist as two tools — tools are shaped by **LLM intent**, not by 1:1
-correspondence to library methods.
+**B. Add** `deriva_ml_find_dataset_executions(dataset_rid,
+dataset_role="any", dataset_version=None, status=None, limit, after_rid,
+preflight_count, sort)`. Body shape identical to
+`find_workflow_executions`; calls `_list_executions_impl`. Docstring
+opens with the "Distinct from `deriva_ml_list_executions(dataset=...)`"
+framing.
 
-**A. Extend the browser** `deriva_ml_list_executions`:
-Add `dataset: str | None = None`, `dataset_role: str = "any"`,
-`dataset_version: str | None = None` alongside the current filters.
-They forward into the (extended) `_list_executions_impl` →
-`ml.find_executions(...)`. Combinable with the existing filters. When
-`dataset` is `None`, behavior and response shape are **identical to
-today** — zero change for existing callers. The preflight branch picks
-up the new filters for free.
+Both share `_list_executions_impl`, so wire shapes cannot drift.
 
-**B. Add the intent tool** `deriva_ml_find_dataset_executions`:
+### Layer 5 — Plugin: response shape
 
-```python
-@ctx.tool(mutates=False)
-async def deriva_ml_find_dataset_executions(
-    hostname: str, catalog_id: str,
-    dataset_rid: str,
-    dataset_role: str = "any",          # "input" | "output" | "any"
-    dataset_version: str | None = None,
-    status: str | None = None,
-    limit: int = 100,
-    after_rid: str | None = None,
-    preflight_count: bool = False,
-    sort: bool = False,
-) -> str
-```
+Introduce `DatasetExecutionSummary` extending `ExecutionSummary` with two
+fields read **directly from the association row** (no extra fetch):
 
-Body shape identical to `deriva_ml_find_workflow_executions`:
-`asyncio.to_thread(_pkg.get_ml, …)` inside `with deriva_call():`, drain
-the generator in the worker thread, `_paginate`,
-`_error_envelope(operation="find_dataset_executions", audit=False)`.
-Calls `_list_executions_impl(dataset=dataset_rid, dataset_role=...,
-dataset_version=...)`. Preflight message:
-`"Found N executions that <role> dataset {dataset_rid}. Choose a
-limit…"`.
+- `dataset_role: "input" | "output"`
+- `dataset_version: str | None` — the stored version. Now populated on
+  **both** sides for new rows; `null` only for legacy rows written before
+  Layer 0, or for `add_input_dataset` calls that supplied no version.
 
-Docstring opens with the "Distinct from
-`deriva_ml_list_executions(dataset=...)`" framing (mirroring the
-workflow tool) and carries the two caveats below.
-
-Both surfaces share `_list_executions_impl`, so their wire shapes cannot
-drift — the same guarantee the workflow pair relies on.
-
-### Layer 4 — Plugin: response shape
-
-Introduce `DatasetExecutionSummary` extending the existing
-`ExecutionSummary` (in `_response_models.py`) with two derived fields:
-
-- `dataset_role: "input" | "output"` — the per-execution derived role.
-- `dataset_version: str | None` — the dataset version the execution is
-  associated with. **Populated on the output side** (authored version
-  known via `Dataset_Version`); **`null` on the input side**
-  (`Dataset_Execution` has no per-version link, so the consumed version
-  cannot be determined without deeper inference).
-
-Used **only** on the dataset-scoped paths:
-- `deriva_ml_find_dataset_executions` always.
-- `deriva_ml_list_executions` only when `dataset` is set.
-
-When `dataset` is not set, `deriva_ml_list_executions` returns the plain
-`ExecutionSummary` exactly as today. Wire shape:
+Used only on the dataset-scoped paths (`find_dataset_executions` always;
+`list_executions` only when `dataset` is set). Plain `ExecutionSummary`
+retained otherwise. Wire shape:
 
 ```json
 {"executions": [{"rid": "...", "workflow_rid": "...", "status": "...",
   "description": "...", "start_time": "...", "stop_time": "...",
-  "duration": "...", "dataset_role": "input", "dataset_version": null}],
+  "duration": "...", "dataset_role": "input",
+  "dataset_version": "2.0.0"}],
  "count": N, "truncated": false, "next_after_rid": null}
 ```
 
-## Documented caveats (must appear in tool/method docstrings)
+## Migration
 
-1. **Role is derived, not stored.** `dataset_role` is computed from
-   `Dataset_Version` authorship — an execution is `output` if it authored
-   a version of the dataset, otherwise `input`. There is no role column
-   on `Dataset_Execution`.
-2. **Version pinning is output-side only.** `dataset_version` constrains
-   only the producing (output) side; on the input side it is a no-op,
-   and the returned `dataset_version` is `null` for input executions.
+There is **no migration framework** in `deriva-ml` (the `schema/` package
+has only `create_schema.py` for fresh-catalog DDL and `annotations.py`).
+Schema changes are applied imperatively via ERMrest column/FK calls.
 
-## Out of scope (deferred)
+- **New catalogs:** add the two columns + FKs in `create_schema.py`.
+- **Existing catalogs** (e.g. `dev.eye-ai.org`): a one-shot upgrade
+  script adds the `Role` + `Dataset_Version` columns and FKs, then
+  **best-effort backfills**:
+  - `Role`: derivable for every existing row via the current authorship
+    rule (`Dataset_Version.Execution` authorship → `Output`, else
+    `Input`). Backfill is complete.
+  - `Dataset_Version`: backfillable for **output** rows (the authored
+    version is known) and for **config-declared inputs** where the
+    historical `configuration.json` is still readable. **Irreducibly
+    `null`** for legacy `add_input_dataset` links that never recorded a
+    version. This is a one-time historical gap; all new writes are clean.
+- **Chaise annotations** (`annotations.py:525-526`): the existing
+  `visible_foreign_keys` lists the two current FK constraint names; the
+  new FKs are additive. Optionally add the `Role` / `Dataset_Version` FKs
+  so they render in the Chaise UI (cosmetic).
 
-**Unifying the `list_*` relation accessors** (`list_input_datasets`,
-`list_assets`, `list_execution_parents`, `list_execution_children`).
-These already share parameterized helpers underneath
-(`fetch_nested_execution_rows(direction=...)`,
-`list_assets(asset_role=...)`); the duplication is confined to thin
-public façades. The `parents`/`children` split is a deliberate naming
-mirror of `list_dataset_parents`/`list_dataset_children`, established in
-a documented "R5.1 hard cutover" with no compat alias. Collapsing the
-execution pair alone would break that symmetry and cascade into the
-dataset API. This is a separate, breaking refactor — a candidate future
-ADR, not part of this additive change.
+## Blast radius (verified)
 
-An **asset-keyed twin** (`find_executions(asset=...)`) is the obvious
-future symmetric capability; this design's parameter-naming convention
-(`dataset_role` mirroring `asset_role`) is chosen to make that twin a
-natural follow-on.
+- **Writers (2):** `create_dataset` (`dataset.py:347`), input path
+  (`execution.py:658`, `add_input_dataset` at `2007`). Both updated to
+  set `Role` (+ `Dataset_Version`).
+- **Readers (4):** `_helpers.list_input_datasets`,
+  `Dataset.list_executions` (`dataset.py:2426`),
+  `DatasetBag.list_executions` (`dataset_bag.py:906`), and the new
+  filter. All currently select `Dataset`/`Execution` explicitly — none
+  breaks on added columns; `list_input_datasets` is upgraded to read
+  `Role`.
+- **Bag export / offline ORM:** export traverses whole FK-connected
+  tables (`dataset.py:2517`), and the offline SQLite ORM is
+  reflection-based (SQLAlchemy `MetaData`), so the new columns round-trip
+  automatically. Only new code that *reads* them needs writing.
+- **`catalog.py`:** only *excludes* `Dataset_Execution` from asset-table
+  discovery (`find_asset_execution_tables`) — untouched by added columns.
+
+## Unification notes
+
+- **Input datasets ↔ output datasets:** unified by Layer 0 — one
+  association row with a `Role` column, exactly like `{Asset}_Execution`.
+  This is the core of the design, not a side effect.
+- **Output datasets ↔ output assets:** unified at the **API surface**,
+  not storage. They remain different entity kinds (datasets are versioned
+  collections; assets are files), so they keep separate tables. But once
+  datasets carry `Role`, both edges read as `(thing, execution, role)`,
+  making a future unified accessor (`record.list_outputs()`) or an
+  asset-keyed `find_executions(asset=…)` twin a natural follow-on. Out of
+  scope here; noted as the obvious next symmetry.
+- **`list_*` accessor unification** (`list_execution_parents/children`
+  etc.) remains deferred — deliberate naming symmetry with the dataset
+  hierarchy API; a separate breaking refactor / future ADR.
 
 ## Testing
 
-- **Library unit tests** (`tests/`): `find_executions` with each
-  `dataset_role` value against a fixture catalog with known
-  input-only, output-only, and both-role executions; `dataset_version`
-  output-side pinning; `ValueError` guardrails; composition with
-  `status`/`workflow_type`. Assert the shared helper produces identical
-  role classification as `list_input_datasets()` for the input case.
-- **Plugin tests** (`tests/test_execution.py` patterns): both tool
-  surfaces return shape-identical payloads via `_list_executions_impl`;
-  `dataset_role`/`dataset_version` surfaced on `DatasetExecutionSummary`;
-  plain `ExecutionSummary` retained when `dataset` is absent; preflight
-  counts; `_error_envelope` on bad RID.
+- **Schema/migration:** upgrade script adds columns + FKs idempotently;
+  backfill assigns correct `Role` to every existing row and
+  `Dataset_Version` where recoverable; `add_input_dataset` legacy rows
+  end up `Role="Input"`, `Dataset_Version=null`.
+- **Library:** `find_executions` with each `dataset_role`;
+  `dataset_version` filtering on both sides; `ValueError` guardrails;
+  composition with `status`/`workflow_type`; `list_input_datasets` reads
+  `Role` and matches legacy derivation on null-`Role` rows.
+- **Plugin:** both tool surfaces share-shape via `_list_executions_impl`;
+  `DatasetExecutionSummary` carries `dataset_role` + `dataset_version`
+  from the association row with no extra fetch; plain summary retained
+  when `dataset` absent; preflight; `_error_envelope` on bad RID.
 
 ## Implementation order
 
-1. Library: shared role-derivation helper in `execution/_helpers.py`;
-   refactor `list_input_datasets()` to consume it (no API change).
-2. Library: extend `find_executions` with the three params + guardrails.
-3. Plugin: extend `_list_executions_impl` to forward the dataset params.
-4. Plugin: `DatasetExecutionSummary` response model.
-5. Plugin: extend `deriva_ml_list_executions`; add
+1. Schema: add `Role` + `Dataset_Version` columns/FKs (`create_schema.py`
+   + standalone upgrade/backfill script).
+2. Library write path: `create_dataset`, `add_input_dataset(version=…)`,
+   config-input writer populate the new columns.
+3. Library read path: refactor `list_input_datasets` to read `Role`;
+   extend `find_executions` with the dataset filters.
+4. Plugin: extend `_list_executions_impl`; `DatasetExecutionSummary`;
+   extend `deriva_ml_list_executions`; add
    `deriva_ml_find_dataset_executions`.
-6. Tests at both layers; update the getting-started guide's tool menu.
+5. Tests at every layer; update the getting-started guide's tool menu.
