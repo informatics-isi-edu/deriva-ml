@@ -267,4 +267,24 @@ No bugs found in `generate_association_indexes.py`.
 
 ## 9. Catalog disposition
 
-_(filled at end of Task 8)_
+Both test catalogs deleted via the ermrest API (user-authorized):
+
+- **Catalog 3** (the test catalog) — `DELETE /ermrest/catalog/3` → 204;
+  subsequent `GET` → 404.
+- **Catalog 2** (the auth-probe stray) — `DELETE /ermrest/catalog/2` →
+  204; `GET` → 404.
+- **Catalog 1** (pre-existing, untouched) — still `GET` → 200.
+
+(The backing `_ermrest_catalog_2/3` Postgres databases linger until
+ermrest's async reaper drops them; the catalogs are deregistered and
+no longer API-accessible, which is the meaningful deletion.)
+
+---
+
+**Conclusion:** `scripts/generate_association_indexes.py` is validated
+end-to-end. It discovers every pure binary association, emits correct
+composite-pair indexes for the live table and matching JSONB expression
+indexes for the history table in both directions, applies cleanly and
+idempotently via psql, and the resulting indexes are planner-usable
+(including the non-trivial history-side expression indexes). No bugs
+found.
