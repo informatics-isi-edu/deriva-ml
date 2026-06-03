@@ -1,3 +1,18 @@
+Migration notes — corrections (2026-06-03)
+
+**Documentation backfill for previously under-documented public-API breakages.** The
+changes below already shipped in earlier releases but were missing from (or only
+partially covered by) these notes. They are recorded here because they break
+external callers — notably domain subclasses of `DerivaML` such as `EyeAI` — and a
+consumer migrating across these versions needs them.
+
+| Change | Shipped in | Migration |
+|--------|-----------|-----------|
+| `DatasetBag.denormalize_as_dataframe(...)` renamed to **`DatasetBag.get_denormalized_as_dataframe(...)`** | ~v1.30.6 (the denormalize sugar-method refactor; old names removed) | Rename the call. Arguments are unchanged: the positional `include_tables` list and the `include_tables=`, `row_per=`, `via=`, `selector=` keywords all carry over. The dict variant is likewise `get_denormalized_as_dict(...)`. There is no deprecation shim — the old name raises `AttributeError`. |
+| Public `DerivaML.domain_path` property removed; replaced by the **`_domain_path()` method** | mixin refactor (path-builder accessors moved to `PathBuilderMixin`) | Change `self.domain_path.<Table>...` to `self._domain_path().<Table>...` (note the parentheses — it is now a method). `_domain_path(schema=None)` returns the path builder for the domain schema (defaulting to `default_schema`); pass a schema name for a non-default one. |
+| `check_auth` removed — **also from the `DerivaML.__init__` constructor**, not only from `DerivaMLConfig` | v1.37.x auth refactor (see the existing 1.37.0 note) | The existing note says to drop `check_auth` from hydra-zen configs / `DerivaMLConfig`. It is *also* gone from the `DerivaML(...)` constructor signature: subclasses that accepted `check_auth` and forwarded it via `super().__init__(check_auth=...)` now raise `TypeError`. Remove the parameter and the forwarded keyword. |
+| `DerivaML.__init__` gained a **`mode` parameter** (`ConnectionMode`, default `online`) | the mode-branched `__init__` change | Non-breaking addition. `mode=ConnectionMode.online` (the default) preserves prior behavior; `mode=ConnectionMode.offline` (or the string `"online"`/`"offline"`) stages writes locally. Subclasses overriding `__init__` may forward `mode` through to `super().__init__(...)` to expose offline mode. |
+
 Version 1.39.0
 
 **Breaking-API change shipped as a minor bump.** The four ways to upload execution outputs (`Execution.upload_execution_outputs`, `Execution.upload_outputs`, `ExecutionSnapshot.upload_outputs`, `DerivaML.upload_pending`) collapse into one per-execution method and one batch method. Callers of the removed methods must migrate at upgrade — there are no deprecation shims. Major-version (`v2.0.0`) is deferred until the unified surface has more bake time. See ADR-0009 for the rationale and the two latent bugs fixed.

@@ -46,6 +46,7 @@ class PathBuilderMixin:
         _table_path: Internal filesystem path for table CSV files
         get_table_as_dataframe: Get table contents as pandas DataFrame
         get_table_as_dict: Get table contents as dictionaries
+        user_list: Get catalog users from public.ERMrest_Client
     """
 
     # Type hints for IDE support - actual attributes from host class
@@ -162,3 +163,30 @@ class PathBuilderMixin:
         table_obj = self.model.name_to_table(table)
         pb = self.pathBuilder()
         yield from pb.schemas[table_obj.schema.name].tables[table_obj.name].entities().fetch()
+
+    def user_list(self) -> list[dict[str, str]]:
+        """Returns the catalog user list.
+
+        Retrieves basic information about all users who have access to the
+        catalog, from the ``public.ERMrest_Client`` table.
+
+        Note:
+            The user table lives in the ``public`` schema, which is *outside*
+            the domain/ML schema search path used by
+            :meth:`get_table_as_dict` (``name_to_table`` searches
+            ``domain_schemas → ml_schema → WWW``). This method is the
+            supported accessor for catalog users; ``get_table_as_dict``
+            cannot reach ``ERMrest_Client``.
+
+        Returns:
+            A list of user dictionaries, each with:
+                - ``'ID'``: the user's globus identifier
+                - ``'Full_Name'``: the user's full name
+
+        Example:
+            >>> users = ml.user_list()  # doctest: +SKIP
+            >>> for user in users:  # doctest: +SKIP
+            ...     print(f"{user['Full_Name']} ({user['ID']})")
+        """
+        user_path = self.pathBuilder().schemas["public"].tables["ERMrest_Client"]
+        return [{"ID": u["ID"], "Full_Name": u["Full_Name"]} for u in user_path.entities().fetch()]
