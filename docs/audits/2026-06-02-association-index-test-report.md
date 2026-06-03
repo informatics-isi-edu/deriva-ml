@@ -223,4 +223,48 @@ for both — the indexes were genuinely consulted, not merely eligible.
 
 ## 8. Findings / bugs
 
-_(filled in Task 8)_
+**Overall: the script works end-to-end.** Both gates pass — every pure
+binary association ends up with composite indexes in both directions on
+both the live and history tables (§6), and the planner uses them (§7).
+No bugs found in `generate_association_indexes.py`.
+
+**Findings (none block the script; recorded for completeness):**
+
+1. **Feature-value association tables are intentionally not indexed.**
+   `Execution_Subject_Health` (and the other `Execution_<X>_<Feature>`
+   tables) carry 4 user FKs, so `Table.is_association()` (pure binary)
+   rejects them. This is correct behavior, but worth knowing: if the
+   motivation for the indexes is *feature-query* performance, those
+   tables are out of scope for this tool and would need a separate
+   indexing approach. The tool covers dataset-member, nested-dataset,
+   and `{X}_Asset_Type` / `{X}_Execution` link tables.
+
+2. **Planner picks the `rev` index for both orderings at this scale.**
+   Not a defect — B-tree equality is order-insensitive across indexed
+   columns, so both `fwd` and `rev` are eligible and the planner chose
+   one. Both are present and usable (§6, §7). The two directions earn
+   their keep on range/sort-on-leading-column queries, not equality.
+
+3. **`pg_indexes`/`pg_class` substring counting needs care.**
+   `_assoc_fwd_idx` is a substring of `_hist_assoc_fwd_idx`; naive
+   `grep -c '_assoc_fwd_idx'` double-counts. This is a *test-script*
+   gotcha (handled here by anchoring on whole index names), not a
+   script issue.
+
+4. **Environment / auth.** Catalog creation first failed HTTP 401
+   (stale `localhost` bearer token); resolved by a user re-login, after
+   which everything ran. An empty stray catalog (`_ermrest_catalog_2`)
+   was created during the auth probe and could not be auto-deleted
+   (permission guard on shared infra) — **left in place; harmless**
+   (no association tables). Clean it up manually if desired:
+   `curl -k -X DELETE -H "Authorization: Bearer <tok>" https://localhost/ermrest/catalog/2`.
+
+5. **zsh vs the plan's `eval "$PG"` pattern.** The plan's
+   `eval "$PG" -c "<sql>"` idiom breaks under zsh (glob/word-split on
+   the parenthesised SQL). Switched to a `pg()` helper piping SQL via
+   `docker exec -i ... psql` stdin heredocs. A future run of this
+   runbook should use the heredoc form.
+
+## 9. Catalog disposition
+
+_(filled at end of Task 8)_
