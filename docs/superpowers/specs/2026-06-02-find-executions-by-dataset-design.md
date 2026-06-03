@@ -202,28 +202,91 @@ retained otherwise. Wire shape:
  "count": N, "truncated": false, "next_after_rid": null}
 ```
 
-## Migration
+## Schema creation update (fresh catalogs)
 
-There is **no migration framework** in `deriva-ml` (the `schema/` package
-has only `create_schema.py` for fresh-catalog DDL and `annotations.py`).
-Schema changes are applied imperatively via ERMrest column/FK calls.
+`schema/create_schema.py` builds `Dataset_Execution` today as a bare
+`(Dataset, Execution)` association (the table is defined via the
+`associates=[("Dataset", …), ("Execution", …)]` helper near
+`create_schema.py:170`). Update the definition to add:
 
-- **New catalogs:** add the two columns + FKs in `create_schema.py`.
-- **Existing catalogs** (e.g. `dev.eye-ai.org`): a one-shot upgrade
-  script adds the `Role` + `Dataset_Version` columns and FKs, then
-  **best-effort backfills**:
-  - `Role`: derivable for every existing row via the current authorship
-    rule (`Dataset_Version.Execution` authorship → `Output`, else
-    `Input`). Backfill is complete.
-  - `Dataset_Version`: backfillable for **output** rows (the authored
-    version is known) and for **config-declared inputs** where the
-    historical `configuration.json` is still readable. **Irreducibly
-    `null`** for legacy `add_input_dataset` links that never recorded a
-    version. This is a one-time historical gap; all new writes are clean.
-- **Chaise annotations** (`annotations.py:525-526`): the existing
-  `visible_foreign_keys` lists the two current FK constraint names; the
-  new FKs are additive. Optionally add the `Role` / `Dataset_Version` FKs
-  so they render in the Chaise UI (cosmetic).
+- a **`Role`** column with a `create_reference(asset_role_table)` FK to
+  the `Asset_Role` vocabulary (mirroring how `{Asset}_Execution` tables
+  get their `Asset_Role` reference at `create_schema.py:494`); and
+- a nullable **`Dataset_Version`** column with a `create_reference`
+  / `ForeignKeyDef` to `Dataset_Version.RID` (the same `Dataset_Version`
+  table created in this module).
+
+`schema/annotations.py` (`visible_foreign_keys`, line ~525) gains the two
+new FK constraint names so the columns render in the Chaise UI. The
+fresh-catalog path therefore produces role/version-aware catalogs with no
+migration needed. `demo_catalog.py` (used by the test suite) inherits the
+change automatically.
+
+## Catalog deployment & old-data remediation (existing catalogs)
+
+There is **no migration framework** in `deriva-ml` — schema changes are
+applied imperatively via ERMrest model calls, with standalone scripts in
+`scripts/`. This work ships **one idempotent migration script**,
+modeled on the existing `scripts/migrate_workflow_types.py` (same shape:
+`(hostname, catalog_id)` positional args, `--dry-run`, `--schema`,
+`check_preconditions`, per-step `[SKIP]` guards, a verification pass, and
+a "migration already complete" short-circuit).
+
+`scripts/migrate_dataset_execution_role_version.py` steps:
+
+1. **Preconditions:** report whether `Role` / `Dataset_Version` columns
+   and FKs already exist, and count `Dataset_Execution` rows. Short-circuit
+   if already migrated.
+2. **Add columns + FKs** (`Role` → `Asset_Role`, `Dataset_Version` →
+   `Dataset_Version`). Idempotent: `[SKIP]` if present. Additive and
+   nullable, so no existing reader breaks at this step.
+3. **Backfill `Role`** — complete for every existing row via the current
+   authorship rule: a row whose dataset has a `Dataset_Version` authored
+   by this execution → `Output`; otherwise → `Input`. (This is exactly
+   the `_producer_of_dataset` logic `list_input_datasets` uses today, run
+   once over the whole table.)
+4. **Backfill `Dataset_Version`** — best-effort:
+   - **Output rows:** set to the authored `Dataset_Version` RID (known
+     from the authorship link). Complete.
+   - **Input rows, config-declared:** resolve from the execution's
+     `configuration.json` metadata asset (`DatasetSpec.version`) **at
+     migration time only** — this is a one-time backfill, not the steady-
+     state read path (which never touches the config). Best-effort: skip
+     rows whose config asset is missing/unreadable, logging each.
+   - **Input rows from `add_input_dataset`:** **irreducibly `null`** — no
+     version was ever recorded. Reported in the summary as the known gap.
+5. **Verify:** every row has a non-null `Role`; report the count of
+   `Dataset_Version` nulls broken down by cause (legacy
+   `add_input_dataset` vs. unreadable config) so the residual is visible,
+   not silent.
+
+**Deployment order — dev first, then production:**
+
+1. Run with `--dry-run` against **`dev.eye-ai.org` / eye-ai** (catalog
+   `eye-ai`, ~88 datasets, the `Dataset_Execution` table with the 48-link
+   `2-7P5P` history we already inspected). Review the preview.
+2. Run for real on **dev**. Validate with the new tools end-to-end
+   (`find_dataset_executions` on `2-7P5P`, role/version populated; spot-
+   check a `split_dataset`-origin input row shows `Role="Input"`,
+   `Dataset_Version=null`).
+3. After dev validation, repeat `--dry-run` then real run on
+   **production `eye.rosci.org`** (or the production eye-ai host) — same
+   script, same idempotency guarantees.
+4. The script is safe to re-run; the precondition short-circuit makes a
+   second invocation a no-op.
+
+**Sequencing constraint:** deploy the schema + backfill **before**
+upgrading the library write path on any client that writes to these
+catalogs, so writers populating the new columns never hit a catalog that
+lacks them. The columns being nullable means an un-upgraded writer
+remains compatible during the rollout window.
+
+**eye-ai-ml repo note:** the eye-ai project keeps catalog-management
+migrations under `eye-ai-ml/scripts/catalog_management/` (e.g. the recent
+junction-table migrations). If the team prefers eye-ai catalog changes to
+live there rather than in `deriva-ml/scripts/`, the generic migration
+script stays in `deriva-ml` and a thin eye-ai wrapper (pinning the two
+hostnames/catalog ids) lives in `catalog_management/`.
 
 ## Blast radius (verified)
 
@@ -259,30 +322,78 @@ Schema changes are applied imperatively via ERMrest column/FK calls.
   etc.) remains deferred — deliberate naming symmetry with the dataset
   hierarchy API; a separate breaking refactor / future ADR.
 
-## Testing
+## Testing (new test cases)
 
-- **Schema/migration:** upgrade script adds columns + FKs idempotently;
-  backfill assigns correct `Role` to every existing row and
-  `Dataset_Version` where recoverable; `add_input_dataset` legacy rows
-  end up `Role="Input"`, `Dataset_Version=null`.
-- **Library:** `find_executions` with each `dataset_role`;
-  `dataset_version` filtering on both sides; `ValueError` guardrails;
-  composition with `status`/`workflow_type`; `list_input_datasets` reads
-  `Role` and matches legacy derivation on null-`Role` rows.
-- **Plugin:** both tool surfaces share-shape via `_list_executions_impl`;
-  `DatasetExecutionSummary` carries `dataset_role` + `dataset_version`
-  from the association row with no extra fetch; plain summary retained
-  when `dataset` absent; preflight; `_error_envelope` on bad RID.
+New tests are required at every layer; this is not covered by existing
+suites because the role/version columns and the dataset filter are new.
+
+**Schema creation** (`tests/` against `demo_catalog`):
+- A freshly created catalog's `Dataset_Execution` table has the `Role`
+  and `Dataset_Version` columns and both FKs.
+- The `Role` FK targets `Asset_Role`; `Dataset_Version` FK targets
+  `Dataset_Version` and is nullable.
+
+**Write path** (`tests/test_execution.py` / dataset tests):
+- `create_dataset` writes `Role="Output"` and the authored
+  `Dataset_Version` RID on the association row.
+- `add_input_dataset(rid, version=v)` writes `Role="Input"` and the
+  `Dataset_Version` RID.
+- `add_input_dataset(rid)` (no version) writes `Role="Input"`,
+  `Dataset_Version=null` — backward-compatible signature.
+- `split_dataset` records its source as `Role="Input"` with the resolved
+  source version.
+
+**Library read path:**
+- `find_executions(dataset=X)` returns all linked executions;
+  `dataset_role="input"|"output"` filter each return the correct subset;
+  `dataset_version=v` filters on the stored column (both sides).
+- `ValueError` when `dataset_role`/`dataset_version` passed without
+  `dataset`.
+- Composition: `find_executions(dataset=X, workflow_type="Training",
+  status="Uploaded")` intersects correctly.
+- `list_input_datasets()` reads `Role` and returns the same set as the
+  legacy authorship derivation (regression guard), including on a fixture
+  row left with `Role=null` (fallback path still works).
+
+**Migration script** (`tests/` against a seeded demo catalog):
+- Idempotency: a second run is a no-op (`[SKIP]` on every step;
+  "already complete" short-circuit).
+- `--dry-run` makes no changes (preconditions re-checked unchanged after).
+- After a real run: every row has a non-null `Role`; output rows and
+  config-declared input rows have a `Dataset_Version`; an
+  `add_input_dataset`-origin fixture row ends `Dataset_Version=null` and
+  is counted in the residual summary.
+- `Role` backfill matches the authorship rule on a mixed fixture
+  (known inputs, known outputs).
+
+**Plugin** (`tests/test_execution.py` patterns):
+- Both tool surfaces (`list_executions` with `dataset` set;
+  `find_dataset_executions`) return shape-identical payloads via
+  `_list_executions_impl`.
+- `DatasetExecutionSummary` carries `dataset_role` + `dataset_version`
+  read from the association row with **no extra catalog fetch** (assert no
+  config/Hatrac call).
+- Plain `ExecutionSummary` (no new fields) returned when `dataset` is
+  absent — existing-caller regression guard.
+- Preflight count; `_error_envelope` on bad dataset RID.
 
 ## Implementation order
 
-1. Schema: add `Role` + `Dataset_Version` columns/FKs (`create_schema.py`
-   + standalone upgrade/backfill script).
-2. Library write path: `create_dataset`, `add_input_dataset(version=…)`,
-   config-input writer populate the new columns.
-3. Library read path: refactor `list_input_datasets` to read `Role`;
-   extend `find_executions` with the dataset filters.
-4. Plugin: extend `_list_executions_impl`; `DatasetExecutionSummary`;
+1. **Schema (library):** update `create_schema.py` to add `Role` +
+   `Dataset_Version` columns/FKs to `Dataset_Execution`; update
+   `annotations.py` visible-FKs. Schema-creation tests.
+2. **Migration script:** `scripts/migrate_dataset_execution_role_version.py`
+   (idempotent, `--dry-run`, backfill + verification), modeled on
+   `migrate_workflow_types.py`. Migration tests against a seeded catalog.
+3. **Catalog deployment:** dry-run → run on **dev** (`dev.eye-ai.org`
+   eye-ai); validate with the new tools; then dry-run → run on
+   **production**. (Schema/backfill lands before client write-path upgrade.)
+4. **Library write path:** `create_dataset`, `add_input_dataset(version=…)`,
+   config-input writer populate the new columns. Write-path tests.
+5. **Library read path:** refactor `list_input_datasets` to read `Role`
+   (authorship fallback for null rows); extend `find_executions` with the
+   dataset filters. Read-path tests.
+6. **Plugin:** extend `_list_executions_impl`; add `DatasetExecutionSummary`;
    extend `deriva_ml_list_executions`; add
-   `deriva_ml_find_dataset_executions`.
-5. Tests at every layer; update the getting-started guide's tool menu.
+   `deriva_ml_find_dataset_executions`. Plugin tests; update the
+   getting-started guide's tool menu.
