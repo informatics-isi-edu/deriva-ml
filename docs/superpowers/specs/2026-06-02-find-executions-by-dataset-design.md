@@ -1,7 +1,8 @@
 # Find Executions by Dataset — Design
 
 **Date:** 2026-06-02
-**Status:** Design — pending review (revised to catalog-native role/version model)
+**Status:** Design — pending review (authorship-canonical model)
+**Branch:** `feature/find-executions-by-dataset`
 **Repos touched:** `deriva-ml` (library + schema), `deriva-ml-mcp-plugin` (MCP tools)
 
 ## Problem
@@ -19,103 +20,110 @@ The existing execution-query surface filters by **workflow**,
   `deriva_ml_find_workflow_executions`, `deriva_ml_find_experiments`,
   `deriva_ml_list_execution_{children,parents}`,
   `deriva_ml_get_lineage` — none takes a dataset.
-- Resources: `execution/{rid}` is per-execution (forward direction);
-  `lineage/{rid}` walks **producing** executions only and is empty for
-  curated root datasets (every version row has `execution_rid = null`).
 
 Today the only way to get the answer is a hand-built ERMrest query
-against the `Dataset_Execution` association table — the exact
+against the `Dataset_Execution` association table — the
 "drop to `query_attribute`" anti-pattern the getting-started guide warns
-against.
+against. "Which experiments used this data?" is a headline provenance
+question for a reproducibility platform.
 
-"Which experiments used this data?" is a headline provenance question
-for a reproducibility platform — arguably more common than the
-producer-direction question the lineage tools already answer well.
+## Two edge types, two sources of truth (the model)
 
-## Root cause: datasets never got the role/version model assets already have
+A dataset relates to an execution in exactly two ways, and the catalog
+**already records each one in its own authoritative place**:
 
-Investigating the question exposed a deeper, structural asymmetry. The
-catalog records dataset↔execution edges and asset↔execution edges very
-differently:
+| Edge | Meaning | Sole source of truth |
+|------|---------|----------------------|
+| **Output** | execution *produced* version V of the dataset | `Dataset_Version.Execution` — the per-version author FK |
+| **Input** | execution *consumed* the dataset | `Dataset_Execution` association row |
 
-| | Recorded in | Role stored? | Version stored? |
-|---|---|---|---|
-| **Asset** ↔ execution | `{Asset}_Execution` tables (`Image_Execution`, …) | **Yes** — `Asset_Role` FK (`Input`/`Output`) | n/a (assets aren't versioned) |
-| **Output dataset** ↔ execution | `Dataset_Version.Execution` FK | implied (authorship) | **Yes** (the authored version row) |
-| **Input dataset** ↔ execution | `Dataset_Execution` association | **No** | **No** (points at version-agnostic `Dataset`) |
+This is the key design decision (resolving an earlier dual-source-of-truth
+concern): **we keep these as two separate, non-overlapping sources rather
+than mirroring output edges into a `Role` column on `Dataset_Execution`.**
 
-Consequences of this split:
+- `Dataset_Version.Execution` stays the **single** source of truth for
+  "who produced version V." `get_lineage` already uses it
+  (`execution.py:865`); `_producer_of_dataset` already reads it
+  (`execution.py:1032`). The `DatasetHistory` value object
+  (`dataset/aux_classes.py:206`) already models it: `dataset_rid`,
+  `dataset_version`, `version_rid`, and `execution_rid` (nullable — `None`
+  when the version was created outside an execution, e.g. curated
+  datasets like `2-7P5P` whose 29 version rows are all null).
+- `Dataset_Execution` becomes **input-only by definition.** Every row is a
+  consume edge. It gains nothing but a nullable `Dataset_Version` FK to
+  record *which version* was consumed.
 
-1. **Dataset role must be *derived*** (linked-but-not-author = input),
-   instead of read from a column the way `Asset_Role` is.
-2. **Input dataset version is lost** at the catalog level. It survives
-   only inside the execution's `configuration.json` metadata asset
-   (`DatasetSpec.version`, a required field) for config-declared inputs;
-   for lightweight `add_input_dataset` links (e.g. `split_dataset`) it is
-   recorded nowhere.
-3. **Input and output datasets are modeled through two different tables**,
-   so they can't be queried uniformly.
+No `Role` column. No overlap. No drift. No sync burden. The producer
+question is answered by version authorship; the consumer question by the
+association table; "any" is their union.
 
-The principle this design follows: **provenance must be queryable
-catalog data, not reconstructed by parsing a config file.** The
-`configuration.json` asset records what was *requested at launch*; it is
-not the catalog's authoritative model of what an execution used. The
-read path must never fetch or parse it.
+**Principle:** provenance is queryable catalog data, never reconstructed
+by parsing a config file. The `configuration.json` asset records what was
+*requested at launch*; it is not consulted on the read path. (It is read
+exactly once, at migration time, as a best-effort backfill source — see
+remediation.)
 
-The fix is to give datasets the same first-class role/version model that
-assets already have — then read everything relationally.
+## How "what produced a dataset" is determined (precise definition)
+
+`Dataset_Version` is a **per-version** table: one row per
+`(dataset, version)`, each row's `Execution` FK = *"RID of the execution
+that produced this version"* (nullable; `null` = produced outside an
+execution / curated / dev row).
+
+So "executions that produced dataset X" = the set of non-null
+`Dataset_Version.Execution` values across X's version history (read via
+`DatasetHistory`). It is naturally **per-version**:
+
+- `dataset_role="output"`, no version pin → **every** execution that
+  authored **any** version of X.
+- version pinned (via `DatasetSpec`, below) → the execution that authored
+  **that** version.
+
+`_producer_of_dataset`'s "highest-semver version" rule stays an internal
+convenience ("the current producer"); it is **not** the tool's output
+semantics.
 
 ## Design
 
-### Layer 0 — Schema: make `Dataset_Execution` role- and version-aware
+### Layer 0 — Schema: one nullable FK on `Dataset_Execution`
 
-Add two columns to the `deriva-ml:Dataset_Execution` association table:
+Add a single column to `deriva-ml:Dataset_Execution`:
 
-- **`Role`** — FK to the existing `Asset_Role` vocabulary (reused, not a
-  new vocab) carrying `Input` / `Output`. Mirrors `{Asset}_Execution`'s
-  `Asset_Role`.
 - **`Dataset_Version`** — nullable FK to `Dataset_Version.RID`, recording
-  the *exact* version of the dataset involved in this edge.
+  the exact version consumed by this input edge.
 
-The existing `Dataset` FK stays (the version-agnostic "which dataset"
-link, needed for the "any version" query and preserved so every current
-reader keeps working). Both new columns are nullable so pre-existing
-rows remain valid.
+The existing `Dataset` FK stays (version-agnostic "which dataset"). No
+`Role` column. In `schema/create_schema.py`, add the column + FK to the
+`Dataset_Execution` definition (near line 170); in `schema/annotations.py`
+(`visible_foreign_keys`, ~line 525) add the new FK so it renders in
+Chaise. `demo_catalog.py` inherits the change for tests.
 
-This collapses the input/output dataset split: every dataset↔execution
-edge becomes one uniform association row
-`(Dataset, Dataset_Version, Execution, Role)` — structurally identical to
-how `{Asset}_Execution` rows already work. Role stops being derived;
-version becomes native on both sides.
+### Layer 1 — Write path
 
-The output side's existing `Dataset_Version.Execution` authorship FK is
-retained as a convenience mirror (and to avoid a larger rewrite); it is
-no longer the *only* source of output-edge truth.
-
-### Layer 1 — Write path: populate Role + Version at link time
-
-Both writers already have the role and version in hand at link time:
-
-- **`create_dataset`** (output): writes `Role="Output"` and the authored
-  `Dataset_Version` RID on the `Dataset_Execution` row it inserts.
+- **`create_dataset`** (output): **stops** writing a `Dataset_Execution`
+  row (`dataset.py:347`). Output provenance is recorded **only** via
+  `Dataset_Version.Execution` (which `_insert_dataset_versions` already
+  writes). This removes the redundant write that caused the dual-source
+  concern. *(Implementation check: confirm no reader depends on output
+  datasets appearing in a `Dataset_Execution` scan — see Blast radius;
+  `Dataset.list_executions` is the one affected, and the change aligns it
+  with its own docstring.)*
 - **`add_input_dataset(rid, version=…)`** (input): gains an optional
-  `version` and writes `Role="Input"` plus the `Dataset_Version` RID when
-  known. `split_dataset` (the canonical caller) passes the source
-  version it already resolved.
+  `version`; writes the `Dataset_Execution` row with the `Dataset_Version`
+  FK populated when known. `split_dataset` (the canonical caller) passes
+  the source version it already resolved.
 - **Config-declared inputs** (`ExecutionConfiguration.datasets`): the
-  `DatasetSpec.version` (required) is written to the association row at
+  required `DatasetSpec.version` is written to the `Dataset_Version` FK at
   materialization time.
 
-Backward compatibility: `add_input_dataset` keeps working without a
-`version` argument (writes `Role="Input"`, `Dataset_Version=null`).
+Backward compatible: `add_input_dataset(rid)` still works, leaving
+`Dataset_Version=null`.
 
 ### Layer 2 — Library: extend `find_executions`
 
 Extend the existing `DerivaML.find_executions` (in
-`core/mixins/execution.py`) with dataset filters, rather than adding a
-separate method — the dataset filter is structurally identical to the
-existing `workflow_type` association-join filter, returns the same
-`ExecutionRecord` type, and keeps the library method count minimal.
+`core/mixins/execution.py`) rather than adding a method — keeps the
+library minimal and the dataset filter composes with the existing ones.
 
 ```python
 def find_executions(
@@ -123,76 +131,99 @@ def find_executions(
     workflow=None,
     workflow_type=None,
     status=None,
-    dataset=None,            # NEW: RID or Dataset
+    dataset=None,            # NEW: RID | DatasetSpec
     dataset_role="any",      # NEW: "input" | "output" | "any"
-    dataset_version=None,    # NEW: pin to a specific version
     sort=None,
 ) -> Iterable["ExecutionRecord"]
 ```
 
-**Filter mechanics** (now a pure relational read — no role derivation,
-no config parsing):
+**The `dataset` argument is `RID | DatasetSpec`** — reusing the existing
+`DatasetSpec` value object (`dataset/aux_classes.py:312`) that
+`ExecutionConfiguration.datasets` already uses, so a spec from an
+execution config can be passed straight in:
 
-1. `dataset` set → select `Dataset_Execution` rows where
-   `Dataset == dataset_rid`, intersect their `Execution` RIDs into the
-   result set (same pattern as `workflow_type`).
-2. `dataset_role` → filters on the stored `Role` column directly
-   (`"any"` = no filter).
-3. `dataset_version` → filters on the stored `Dataset_Version` FK
-   directly. Now meaningful on **both** sides (no longer output-only),
-   because the column is populated for inputs too.
+- **bare RID** → "this dataset, **any** version."
+- **`DatasetSpec`** → pins the version (`spec.rid` + `spec.version`). The
+  spec's bag-download fields (`materialize`, `timeout`, `exclude_tables`,
+  `fetch_concurrency`, `description`) are **ignored** by the filter; only
+  `rid` + `version` are read. Documented explicitly.
 
-**Guardrails:** `dataset_role`/`dataset_version` without `dataset` →
-`ValueError`.
+There is **no separate `dataset_version` scalar** — version travels
+inside the `DatasetSpec`, eliminating incoherent scalar combinations.
 
-Composes with `workflow` / `workflow_type` / `status` (e.g. "Training
-executions that consumed dataset X at version 2.0.0").
+**Filter mechanics** (pure relational reads — no role derivation, no
+config parsing):
 
-### Layer 3 — Library: unify the role classification (cleanup)
+1. Resolve `dataset` to `(rid, version|None)`.
+2. By role:
+   - `"input"` → `Dataset_Execution` rows where `Dataset == rid`
+     (and `Dataset_Version == version` when pinned).
+   - `"output"` → executions from `Dataset_Version.Execution` across the
+     dataset's history (filtered to the pinned version when set) — read
+     via `DatasetHistory`.
+   - `"any"` → union of the two.
+3. Intersect the resulting execution set with the other active filters
+   (`workflow` / `workflow_type` / `status`), same pattern as
+   `workflow_type` today.
 
-With `Role` stored on the association, `list_input_datasets()` no longer
-needs to *derive* role by excluding produced datasets — it filters
-`Dataset_Execution` on `Role == "Input"`. Refactor it (and the
-symmetric output accessor) to read the column. Internal change; public
-signatures unchanged. Removes the `_producer_of_dataset` derivation as
-the source of truth (kept only as a fallback for legacy null-`Role`
-rows during the transition).
+**Guardrails:** `dataset_role` ≠ `"any"` without `dataset` → `ValueError`.
+
+### Layer 3 — Library: simplify `list_input_datasets`
+
+With `Dataset_Execution` now input-only, `list_input_datasets()` no
+longer needs to *subtract* produced datasets (its current
+`_producer_of_dataset` exclusion) — every row is already an input. It
+becomes a plain read of `Dataset_Execution`. Public signature unchanged;
+internals simplified. (Legacy catalogs: the migration removes the stale
+output rows so this holds for historical data too — see remediation.)
 
 ### Layer 4 — Plugin: two tool surfaces over one library method
 
-Mirrors the existing precedent where
-`deriva_ml_list_executions(workflow_rid=...)` and
-`deriva_ml_find_workflow_executions(...)` both wrap `ml.find_executions`
-via the shared `_list_executions_impl` helper, yet exist as two tools —
-tools are shaped by LLM intent, not 1:1 with library methods.
+Mirrors the precedent where `deriva_ml_list_executions(workflow_rid=...)`
+and `deriva_ml_find_workflow_executions(...)` both wrap
+`ml.find_executions` via the shared `_list_executions_impl` helper yet
+exist as two tools — shaped by LLM intent, not 1:1 with methods.
 
-**A. Extend** `deriva_ml_list_executions` with `dataset`,
-`dataset_role="any"`, `dataset_version`. Forwarded into the extended
-`_list_executions_impl`. When `dataset` is `None`, behavior and response
-shape are identical to today — zero change for existing callers.
+The MCP wire surface can't pass a Python `DatasetSpec`, so the tools take
+scalars and construct the spec internally:
+
+**A. Extend** `deriva_ml_list_executions` with `dataset: str | None`,
+`dataset_role: str = "any"`, `dataset_version: str | None`. When
+`dataset_version` is set, the tool builds `DatasetSpec(rid=dataset,
+version=dataset_version)`; otherwise passes the bare RID. When `dataset`
+is `None`, behavior/shape are identical to today.
 
 **B. Add** `deriva_ml_find_dataset_executions(dataset_rid,
 dataset_role="any", dataset_version=None, status=None, limit, after_rid,
 preflight_count, sort)`. Body shape identical to
-`find_workflow_executions`; calls `_list_executions_impl`. Docstring
-opens with the "Distinct from `deriva_ml_list_executions(dataset=...)`"
-framing.
+`find_workflow_executions`; constructs the spec and calls
+`_list_executions_impl`. Docstring opens with "Distinct from
+`deriva_ml_list_executions(dataset=...)`".
 
 Both share `_list_executions_impl`, so wire shapes cannot drift.
+
+*(The scalar `dataset` + `dataset_version` on the MCP boundary is a
+transport concession — the typed `DatasetSpec` lives in the Python API.
+The tool layer immediately lifts the scalars into a spec, so the
+"incoherent scalar combination" risk is confined to one well-tested
+construction site, not spread across the API.)*
 
 ### Layer 5 — Plugin: response shape
 
 Introduce `DatasetExecutionSummary` extending `ExecutionSummary` with two
-fields read **directly from the association row** (no extra fetch):
+derived fields:
 
-- `dataset_role: "input" | "output"`
-- `dataset_version: str | None` — the stored version. Now populated on
-  **both** sides for new rows; `null` only for legacy rows written before
-  Layer 0, or for `add_input_dataset` calls that supplied no version.
+- `dataset_role: "input" | "output"` — **which source the edge came
+  from** (input = `Dataset_Execution`; output = `Dataset_Version`
+  authorship), not a stored column.
+- `dataset_version: str | None` — the version. For input edges, read from
+  the `Dataset_Execution.Dataset_Version` FK (null for legacy/no-version
+  `add_input_dataset` links). For output edges, the authored version from
+  `DatasetHistory`. No extra catalog fetch beyond the rows already read.
 
 Used only on the dataset-scoped paths (`find_dataset_executions` always;
 `list_executions` only when `dataset` is set). Plain `ExecutionSummary`
-retained otherwise. Wire shape:
+otherwise. Wire shape:
 
 ```json
 {"executions": [{"rid": "...", "workflow_rid": "...", "status": "...",
@@ -202,198 +233,162 @@ retained otherwise. Wire shape:
  "count": N, "truncated": false, "next_after_rid": null}
 ```
 
+## Behavior change to call out
+
+`Dataset.list_executions` (`dataset.py:2426`) is documented as *"all
+executions that used this dataset as **input**"* but currently scans all
+`Dataset_Execution` rows — which today **include** the output rows
+`create_dataset` writes. Making the table input-only (Layer 1) **fixes
+this method to match its own docstring**: it stops returning the
+producing execution. This is an intentional, documented behavior change;
+callers wanting producers use the output side of `find_executions` /
+`get_lineage`.
+
 ## Schema creation update (fresh catalogs)
 
-`schema/create_schema.py` builds `Dataset_Execution` today as a bare
-`(Dataset, Execution)` association (the table is defined via the
-`associates=[("Dataset", …), ("Execution", …)]` helper near
-`create_schema.py:170`). Update the definition to add:
-
-- a **`Role`** column with a `create_reference(asset_role_table)` FK to
-  the `Asset_Role` vocabulary (mirroring how `{Asset}_Execution` tables
-  get their `Asset_Role` reference at `create_schema.py:494`); and
-- a nullable **`Dataset_Version`** column with a `create_reference`
-  / `ForeignKeyDef` to `Dataset_Version.RID` (the same `Dataset_Version`
-  table created in this module).
-
-`schema/annotations.py` (`visible_foreign_keys`, line ~525) gains the two
-new FK constraint names so the columns render in the Chaise UI. The
-fresh-catalog path therefore produces role/version-aware catalogs with no
-migration needed. `demo_catalog.py` (used by the test suite) inherits the
-change automatically.
+`create_schema.py`: add the nullable `Dataset_Version` column + FK to the
+`Dataset_Execution` definition. `annotations.py`: add the FK to
+`visible_foreign_keys`. Fresh catalogs are version-aware with no
+migration; `demo_catalog.py` (test suite) inherits it.
 
 ## Catalog deployment & old-data remediation (existing catalogs)
 
-There is **no migration framework** in `deriva-ml` — schema changes are
-applied imperatively via ERMrest model calls, with standalone scripts in
-`scripts/`. This work ships **one idempotent migration script**,
-modeled on the existing `scripts/migrate_workflow_types.py` (same shape:
-`(hostname, catalog_id)` positional args, `--dry-run`, `--schema`,
-`check_preconditions`, per-step `[SKIP]` guards, a verification pass, and
-a "migration already complete" short-circuit).
+No migration framework exists; changes are applied imperatively via
+standalone scripts in `scripts/`. Ship one idempotent script,
+`scripts/migrate_dataset_execution_version.py`, modeled on
+`scripts/migrate_workflow_types.py` (same shape: `(hostname, catalog_id)`
+args, `--dry-run`, `--schema`, `check_preconditions`, per-step `[SKIP]`
+guards, verification, "already complete" short-circuit).
 
-`scripts/migrate_dataset_execution_role_version.py` steps:
+Steps:
 
-1. **Preconditions:** report whether `Role` / `Dataset_Version` columns
-   and FKs already exist, and count `Dataset_Execution` rows. Short-circuit
-   if already migrated.
-2. **Add columns + FKs** (`Role` → `Asset_Role`, `Dataset_Version` →
-   `Dataset_Version`). Idempotent: `[SKIP]` if present. Additive and
-   nullable, so no existing reader breaks at this step.
-3. **Backfill `Role`** — complete for every existing row via the current
-   authorship rule: a row whose dataset has a `Dataset_Version` authored
-   by this execution → `Output`; otherwise → `Input`. (This is exactly
-   the `_producer_of_dataset` logic `list_input_datasets` uses today, run
-   once over the whole table.)
-4. **Backfill `Dataset_Version`** — best-effort:
-   - **Output rows:** set to the authored `Dataset_Version` RID (known
-     from the authorship link). Complete.
-   - **Input rows, config-declared:** resolve from the execution's
-     `configuration.json` metadata asset (`DatasetSpec.version`) **at
-     migration time only** — this is a one-time backfill, not the steady-
-     state read path (which never touches the config). Best-effort: skip
-     rows whose config asset is missing/unreadable, logging each.
-   - **Input rows from `add_input_dataset`:** **irreducibly `null`** — no
-     version was ever recorded. Reported in the summary as the known gap.
-5. **Verify:** every row has a non-null `Role`; report the count of
-   `Dataset_Version` nulls broken down by cause (legacy
-   `add_input_dataset` vs. unreadable config) so the residual is visible,
-   not silent.
+1. **Preconditions:** report whether the `Dataset_Version` column/FK
+   exists and count rows. Short-circuit if migrated.
+2. **Add column + FK** (idempotent, additive, nullable — no reader breaks
+   at this step).
+3. **Remove stale output rows** — delete `Dataset_Execution` rows that
+   correspond to an *output* edge (the dataset has a `Dataset_Version`
+   authored by that execution). These are the redundant rows
+   `create_dataset` historically wrote; output provenance is preserved in
+   `Dataset_Version.Execution`, so deletion loses no information and
+   de-duplicates the model. **This is the data-remediation core.**
+4. **Backfill input `Dataset_Version`** — best-effort for the remaining
+   (input) rows:
+   - **Config-declared inputs:** resolve the consumed version from the
+     execution's `configuration.json` (`DatasetSpec.version`) — read
+     **at migration time only**, never on the steady-state read path.
+   - **`add_input_dataset` links:** **irreducibly `null`** — no version
+     was ever recorded. Reported in the summary as the known gap.
+5. **Verify:** no output rows remain in `Dataset_Execution`; report the
+   count of `Dataset_Version` nulls by cause (legacy `add_input_dataset`
+   vs. unreadable config) so the residual is visible, not silent.
 
 **Deployment order — dev first, then production:**
 
-1. Run with `--dry-run` against **`dev.eye-ai.org` / eye-ai** (catalog
-   `eye-ai`, ~88 datasets, the `Dataset_Execution` table with the 48-link
-   `2-7P5P` history we already inspected). Review the preview.
-2. Run for real on **dev**. Validate with the new tools end-to-end
-   (`find_dataset_executions` on `2-7P5P`, role/version populated; spot-
-   check a `split_dataset`-origin input row shows `Role="Input"`,
-   `Dataset_Version=null`).
-3. After dev validation, repeat `--dry-run` then real run on
-   **production `eye.rosci.org`** (or the production eye-ai host) — same
-   script, same idempotency guarantees.
-4. The script is safe to re-run; the precondition short-circuit makes a
-   second invocation a no-op.
+1. `--dry-run` on **`dev.eye-ai.org` / eye-ai** (the catalog with the
+   48-link `2-7P5P` history we inspected); review.
+2. Real run on **dev**; validate end-to-end with the new tools
+   (`find_dataset_executions` on `2-7P5P`; confirm a `split_dataset`-origin
+   input row shows `dataset_version=null`; confirm no output rows linger).
+3. `--dry-run` then real run on **production** (`eye.rosci.org` / prod
+   eye-ai) — same script, same idempotency.
+4. Re-runnable: the precondition short-circuit makes a second run a no-op.
 
-**Sequencing constraint:** deploy the schema + backfill **before**
-upgrading the library write path on any client that writes to these
-catalogs, so writers populating the new columns never hit a catalog that
-lacks them. The columns being nullable means an un-upgraded writer
-remains compatible during the rollout window.
+**Sequencing constraint:** deploy schema + remediation **before** the
+library write-path upgrade on any client writing to these catalogs.
+Nullable column ⇒ un-upgraded writers stay compatible during rollout.
 
-**eye-ai-ml repo note:** the eye-ai project keeps catalog-management
-migrations under `eye-ai-ml/scripts/catalog_management/` (e.g. the recent
-junction-table migrations). If the team prefers eye-ai catalog changes to
-live there rather than in `deriva-ml/scripts/`, the generic migration
-script stays in `deriva-ml` and a thin eye-ai wrapper (pinning the two
-hostnames/catalog ids) lives in `catalog_management/`.
+**eye-ai-ml repo note:** eye-ai keeps catalog migrations under
+`eye-ai-ml/scripts/catalog_management/`. The generic script lives in
+`deriva-ml/scripts/`; a thin eye-ai wrapper pinning the two hosts/catalogs
+may live in `catalog_management/` if the team prefers.
 
 ## Blast radius (verified)
 
-- **Writers (2):** `create_dataset` (`dataset.py:347`), input path
-  (`execution.py:658`, `add_input_dataset` at `2007`). Both updated to
-  set `Role` (+ `Dataset_Version`).
-- **Readers (4):** `_helpers.list_input_datasets`,
-  `Dataset.list_executions` (`dataset.py:2426`),
-  `DatasetBag.list_executions` (`dataset_bag.py:906`), and the new
-  filter. All currently select `Dataset`/`Execution` explicitly — none
-  breaks on added columns; `list_input_datasets` is upgraded to read
-  `Role`.
-- **Bag export / offline ORM:** export traverses whole FK-connected
-  tables (`dataset.py:2517`), and the offline SQLite ORM is
-  reflection-based (SQLAlchemy `MetaData`), so the new columns round-trip
-  automatically. Only new code that *reads* them needs writing.
+- **Writers (2):** `create_dataset` (`dataset.py:347`) — *stops* writing
+  the output row; input path (`execution.py:658`, `add_input_dataset` at
+  `2007`) — writes the `Dataset_Version` FK.
+- **Readers (4):** `_helpers.list_input_datasets` (simplified — no more
+  authorship subtraction), `Dataset.list_executions` (`dataset.py:2426`,
+  now correctly input-only — see Behavior change), `DatasetBag.list_executions`
+  (`dataset_bag.py:906`, input-only offline mirror; unchanged query),
+  the new filter. None breaks on an added column.
+- **`get_lineage` / `_producer_of_dataset`:** already read
+  `Dataset_Version.Execution` for producers — **unaffected** and now the
+  sole producer source, exactly as intended.
+- **Bag export / offline ORM:** whole-table FK traversal
+  (`dataset.py:2517`) + reflection-based SQLite ORM ⇒ new column
+  round-trips automatically.
 - **`catalog.py`:** only *excludes* `Dataset_Execution` from asset-table
-  discovery (`find_asset_execution_tables`) — untouched by added columns.
+  discovery — untouched.
 
 ## Unification notes
 
-- **Input datasets ↔ output datasets:** unified by Layer 0 — one
-  association row with a `Role` column, exactly like `{Asset}_Execution`.
-  This is the core of the design, not a side effect.
-- **Output datasets ↔ output assets:** unified at the **API surface**,
-  not storage. They remain different entity kinds (datasets are versioned
-  collections; assets are files), so they keep separate tables. But once
-  datasets carry `Role`, both edges read as `(thing, execution, role)`,
-  making a future unified accessor (`record.list_outputs()`) or an
-  asset-keyed `find_executions(asset=…)` twin a natural follow-on. Out of
-  scope here; noted as the obvious next symmetry.
-- **`list_*` accessor unification** (`list_execution_parents/children`
-  etc.) remains deferred — deliberate naming symmetry with the dataset
-  hierarchy API; a separate breaking refactor / future ADR.
+- **Input ↔ output datasets:** unified at the *query* level —
+  `find_executions(dataset=, dataset_role=)` answers both from their
+  respective canonical sources, with `DatasetSpec` pinning version on
+  either side. Storage stays appropriately separate (authorship vs.
+  association).
+- **Output datasets ↔ output assets:** API-surface symmetry only (an
+  asset-keyed `find_executions(asset=…)` twin is the natural follow-on);
+  different entity kinds keep different tables. Deferred.
+- **`list_*` accessor unification:** deferred (deliberate naming symmetry
+  with the dataset-hierarchy API; future ADR).
 
 ## Testing (new test cases)
 
-New tests are required at every layer; this is not covered by existing
-suites because the role/version columns and the dataset filter are new.
+**Schema creation:** fresh catalog's `Dataset_Execution` has the nullable
+`Dataset_Version` column + FK to `Dataset_Version`.
 
-**Schema creation** (`tests/` against `demo_catalog`):
-- A freshly created catalog's `Dataset_Execution` table has the `Role`
-  and `Dataset_Version` columns and both FKs.
-- The `Role` FK targets `Asset_Role`; `Dataset_Version` FK targets
-  `Dataset_Version` and is nullable.
-
-**Write path** (`tests/test_execution.py` / dataset tests):
-- `create_dataset` writes `Role="Output"` and the authored
-  `Dataset_Version` RID on the association row.
-- `add_input_dataset(rid, version=v)` writes `Role="Input"` and the
-  `Dataset_Version` RID.
-- `add_input_dataset(rid)` (no version) writes `Role="Input"`,
-  `Dataset_Version=null` — backward-compatible signature.
-- `split_dataset` records its source as `Role="Input"` with the resolved
-  source version.
+**Write path:**
+- `create_dataset` writes **no** `Dataset_Execution` row; output
+  provenance present only via `Dataset_Version.Execution`.
+- `add_input_dataset(rid, version=v)` writes the row with `Dataset_Version`
+  set; `add_input_dataset(rid)` leaves it null (back-compat).
+- `split_dataset` records its source input with the resolved version.
 
 **Library read path:**
-- `find_executions(dataset=X)` returns all linked executions;
-  `dataset_role="input"|"output"` filter each return the correct subset;
-  `dataset_version=v` filters on the stored column (both sides).
-- `ValueError` when `dataset_role`/`dataset_version` passed without
-  `dataset`.
-- Composition: `find_executions(dataset=X, workflow_type="Training",
-  status="Uploaded")` intersects correctly.
-- `list_input_datasets()` reads `Role` and returns the same set as the
-  legacy authorship derivation (regression guard), including on a fixture
-  row left with `Role=null` (fallback path still works).
+- `find_executions(dataset=rid)` (any version) returns inputs + outputs
+  (union); `dataset_role="input"|"output"` each return the correct subset
+  from the correct source.
+- `find_executions(dataset=DatasetSpec(rid, version))` filters both sides
+  to that version; bag-download fields on the spec are ignored.
+- `ValueError` when `dataset_role` given without `dataset`.
+- Composition with `workflow_type` / `status`.
+- `list_input_datasets()` returns only inputs (regression: a dataset the
+  execution produced does **not** appear), via the simplified read.
 
-**Migration script** (`tests/` against a seeded demo catalog):
-- Idempotency: a second run is a no-op (`[SKIP]` on every step;
-  "already complete" short-circuit).
-- `--dry-run` makes no changes (preconditions re-checked unchanged after).
-- After a real run: every row has a non-null `Role`; output rows and
-  config-declared input rows have a `Dataset_Version`; an
-  `add_input_dataset`-origin fixture row ends `Dataset_Version=null` and
-  is counted in the residual summary.
-- `Role` backfill matches the authorship rule on a mixed fixture
-  (known inputs, known outputs).
+**Migration script** (seeded demo catalog):
+- Idempotency (second run no-op); `--dry-run` makes no changes.
+- After run: **no output rows remain** in `Dataset_Execution`; input rows
+  from config have a `Dataset_Version`; an `add_input_dataset`-origin row
+  is null and counted in the residual summary.
+- Stale-output-row deletion targets exactly the authored-version rows and
+  leaves input rows intact.
 
-**Plugin** (`tests/test_execution.py` patterns):
-- Both tool surfaces (`list_executions` with `dataset` set;
-  `find_dataset_executions`) return shape-identical payloads via
-  `_list_executions_impl`.
+**Plugin:**
+- Both surfaces share-shape via `_list_executions_impl`.
 - `DatasetExecutionSummary` carries `dataset_role` + `dataset_version`
-  read from the association row with **no extra catalog fetch** (assert no
-  config/Hatrac call).
-- Plain `ExecutionSummary` (no new fields) returned when `dataset` is
-  absent — existing-caller regression guard.
-- Preflight count; `_error_envelope` on bad dataset RID.
+  with **no extra catalog/Hatrac fetch** (asserted).
+- Plain `ExecutionSummary` when `dataset` absent (existing-caller guard).
+- `dataset_version` scalar lifts into a `DatasetSpec` correctly; preflight;
+  `_error_envelope` on bad RID.
 
 ## Implementation order
 
-1. **Schema (library):** update `create_schema.py` to add `Role` +
-   `Dataset_Version` columns/FKs to `Dataset_Execution`; update
-   `annotations.py` visible-FKs. Schema-creation tests.
-2. **Migration script:** `scripts/migrate_dataset_execution_role_version.py`
-   (idempotent, `--dry-run`, backfill + verification), modeled on
-   `migrate_workflow_types.py`. Migration tests against a seeded catalog.
-3. **Catalog deployment:** dry-run → run on **dev** (`dev.eye-ai.org`
-   eye-ai); validate with the new tools; then dry-run → run on
-   **production**. (Schema/backfill lands before client write-path upgrade.)
-4. **Library write path:** `create_dataset`, `add_input_dataset(version=…)`,
-   config-input writer populate the new columns. Write-path tests.
-5. **Library read path:** refactor `list_input_datasets` to read `Role`
-   (authorship fallback for null rows); extend `find_executions` with the
-   dataset filters. Read-path tests.
-6. **Plugin:** extend `_list_executions_impl`; add `DatasetExecutionSummary`;
+1. **Schema:** `create_schema.py` + `annotations.py` add the
+   `Dataset_Version` column/FK. Schema-creation tests.
+2. **Migration script:** `migrate_dataset_execution_version.py` (add FK →
+   delete stale output rows → backfill input version → verify),
+   `--dry-run`, idempotent. Migration tests.
+3. **Catalog deployment:** dev dry-run → dev run → validate → production
+   dry-run → production run. (Before client write-path upgrade.)
+4. **Library write path:** `create_dataset` stops writing the output row;
+   `add_input_dataset(version=…)` + config writer set the FK. Write tests.
+5. **Library read path:** simplify `list_input_datasets`; extend
+   `find_executions` with `dataset: RID|DatasetSpec` + `dataset_role`.
+   Read tests.
+6. **Plugin:** extend `_list_executions_impl`; `DatasetExecutionSummary`;
    extend `deriva_ml_list_executions`; add
    `deriva_ml_find_dataset_executions`. Plugin tests; update the
    getting-started guide's tool menu.
