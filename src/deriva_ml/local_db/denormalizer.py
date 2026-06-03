@@ -434,6 +434,7 @@ class Denormalizer:
         via: list[str] | None = None,
         ignore_unrelated_anchors: bool = False,
         selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"] | None = None,
+        system_columns: list[str] | None = None,
     ) -> pd.DataFrame:
         """Materialize the denormalized table as a :class:`pandas.DataFrame`.
 
@@ -529,6 +530,7 @@ class Denormalizer:
             via=via,
             ignore_unrelated_anchors=ignore_unrelated_anchors,
             selector=selector,
+            system_columns=system_columns,
         )
         return result.to_dataframe()
 
@@ -1400,6 +1402,7 @@ class Denormalizer:
         via: list[str] | None,
         ignore_unrelated_anchors: bool,
         selector: Callable[[list["FeatureRecord"]], "FeatureRecord | None"] | None = None,
+        system_columns: list[str] | None = None,
     ) -> DenormalizeResult:
         """Execute the full 4-phase denormalization pipeline.
 
@@ -1546,6 +1549,7 @@ class Denormalizer:
             row_per=resolved_row_per,
             via=list(via or []) or None,
             selector=selector,
+            system_columns=system_columns,
         )
 
         # Step 4a: Augment orphans with scoping-upstream anchors whose specific
