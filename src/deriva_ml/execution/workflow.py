@@ -143,6 +143,37 @@ class Workflow(BaseModel):
     _ml_instance: "DerivaMLCatalog | None" = PrivateAttr(default=None)
     _logger: logging.Logger = PrivateAttr(default_factory=lambda: get_logger(__name__))
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_rid_key(cls, data: Any) -> Any:
+        """Map the pre-#226 legacy ``rid`` key to ``workflow_rid``.
+
+        Workflow substructures serialized before the ``rid -> workflow_rid``
+        rename (#226) -- e.g. the ``workflow`` block of older
+        ``configuration.json`` execution-metadata files -- carry a ``rid``
+        key. The current model renamed that field and sets ``extra="forbid"``
+        (see ``model_config`` below), so those legacy payloads would otherwise
+        fail to parse with ``rid -- extra_forbidden``.
+
+        This normalizer renames ``rid`` to ``workflow_rid`` *before* validation
+        so legacy configs load, WITHOUT relaxing ``extra="forbid"`` -- a
+        genuinely-unknown field (the case #226's guard exists to catch) still
+        raises. The canonical ``workflow_rid`` always wins when both keys are
+        present (including an explicit ``workflow_rid=None``, via
+        ``setdefault``), so a correctly-shaped payload is never altered.
+
+        Only dict inputs are touched; non-dict inputs (e.g. an already-built
+        ``Workflow`` instance) pass through untouched.
+        """
+        if isinstance(data, dict) and "rid" in data:
+            # Copy rather than mutate the caller's dict -- a validator must not
+            # have side effects on its input (the same payload may be reused).
+            data = dict(data)
+            legacy_rid = data.pop("rid")
+            # Don't clobber a canonical value if both keys somehow appear.
+            data.setdefault("workflow_rid", legacy_rid)
+        return data
+
     @field_validator("workflow_type", mode="before")
     @classmethod
     def _normalize_workflow_type(cls, v: str | list[str]) -> list[str]:
