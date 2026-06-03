@@ -7,7 +7,31 @@
 
 ## 1. Catalog under test
 
-_(filled in Task 2)_
+- **Catalog id:** `3` (`https://localhost/ermrest/catalog/3`)
+- **Postgres DB:** `_ermrest_catalog_3`
+- **Built with:** `create_demo_catalog(hostname="localhost", create_features=True, create_datasets=True, on_exit_delete=False)`
+- **Schemas:** `deriva-ml` (core ML) + `demo-schema` (domain).
+- **Populated** — representative association tables and approximate row counts (post-`ANALYZE`):
+
+  | Table | Kind | Rows |
+  |-------|------|------|
+  | `demo-schema.Execution_Subject_Health` | feature association | 12 |
+  | `demo-schema.Execution_Image_Quality` | feature association | 12 |
+  | `demo-schema.Execution_Image_BoundingBox` | feature association | 12 |
+  | `demo-schema.Dataset_Subject` | dataset-member association | 8 |
+  | `demo-schema.Dataset_Image` | dataset-member association | 4 |
+  | `deriva-ml.Dataset_Dataset` | nested-dataset association | 6 |
+
+- **Note (env):** an empty stray catalog `4`/`_ermrest_catalog_2` was
+  created and partially cleaned during an auth probe before the real
+  build; it contains no association tables and does not affect this
+  test (the generator is run against catalog 3 explicitly). Flagged in
+  §8.
+
+> Auth note: catalog creation initially failed with HTTP 401; the
+> `localhost` bearer token in `~/.deriva/credential.json` was refreshed
+> by the user, after which `POST /ermrest/catalog` returned 201 and the
+> build succeeded.
 
 ## 2. Associations discovered
 
