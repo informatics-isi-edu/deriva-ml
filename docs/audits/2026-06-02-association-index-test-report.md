@@ -142,9 +142,36 @@ The re-run is a clean no-op: every `CREATE INDEX CONCURRENTLY IF NOT
 EXISTS` reports `NOTICE: relation "…" already exists, skipping`. Safe
 to re-run against a live catalog.
 
-## 6. Index existence (contract gate)
+## 6. Index existence (contract gate) — ✅ PASS
 
-_(filled in Task 6)_
+`pg_indexes` confirms **48 indexes** = 12 associations × 4. Per-direction
+totals: live fwd 12, live rev 12, hist fwd 12, hist rev 12. Schema
+split: 24 in `_ermrest_history`, 24 live (16 `deriva-ml`, 8
+`demo-schema`).
+
+**Per-association cross-check — all 12 fully covered, both directions on
+both live + history:**
+
+```
+BoundingBox_Asset_Type          live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Image                   live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Subject                 live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Image_Asset_Type                live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Dataset                 live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Dataset_Type            live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_Execution               live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Dataset_File                    live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Execution_Asset_Asset_Type      live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Execution_Metadata_Asset_Type   live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+File_Asset_Type                 live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+Workflow_Workflow_Type          live(fwd=1 rev=1) hist(fwd=1 rev=1)  OK
+---
+associations fully covered: 12 / 12   (incomplete: 0)
+```
+
+**This is the literal success criterion from the request:** every
+association table has composite-key indexes in both directions on both
+the live table and the history table. **Met.**
 
 ## 7. Index usability (planner uses the index)
 
