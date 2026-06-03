@@ -39,7 +39,43 @@ _(filled in Task 4)_
 
 ## 3. Baseline plans (no index)
 
-_(filled in Task 3)_
+**Representative pure-binary association chosen:**
+`demo-schema.Dataset_Subject` — FK pair `(Dataset, Subject)`, table
+RID `57G`, column RIDs `Dataset=57W`, `Subject=57Y`. History table
+`_ermrest_history."t57G"` (8 rows). Real predicate values pulled from a
+live row: `Dataset='5CT'`, `Subject='4C6'`.
+
+> **Scope finding (carried to §8):** feature-value association tables
+> like `demo-schema.Execution_Subject_Health` are **not** pure binary
+> associations — they carry 4 user FKs (`Execution`, `Feature_Name`,
+> `Subject`, `SubjectHealth`), so `Table.is_association()` (pure,
+> binary) correctly rejects them and the script does **not** index
+> them. The pure-binary associations the script targets are the
+> dataset-member (`Dataset_Subject`, `Dataset_Image`), nested-dataset
+> (`Dataset_Dataset`), and `{X}_Execution` / `{X}_Asset_Type` link
+> tables. The second representative table for the usability check is
+> taken from the script's own discovered set in §2/Task 4.
+
+All four targeted queries are **Seq Scan** before indexing (the clean
+"before" state):
+
+```
+-- LIVE Dataset_Subject forward (Dataset, Subject)
+Seq Scan on "Dataset_Subject"  (cost=0.00..1.12 rows=1 width=4)
+  Filter: (("Dataset" = '5CT') AND ("Subject" = '4C6'))
+
+-- LIVE Dataset_Subject reverse (Subject, Dataset)
+Seq Scan on "Dataset_Subject"  (cost=0.00..1.12 rows=1 width=4)
+  Filter: (("Subject" = '4C6') AND ("Dataset" = '5CT'))
+
+-- HIST t57G forward (rowdata->>'57W', rowdata->>'57Y')
+Seq Scan on "t57G"  (cost=0.00..1.16 rows=1 width=4)
+  Filter: (((rowdata ->> '57W') = '5CT') AND ((rowdata ->> '57Y') = '4C6'))
+
+-- HIST t57G reverse (rowdata->>'57Y', rowdata->>'57W')
+Seq Scan on "t57G"  (cost=0.00..1.16 rows=1 width=4)
+  Filter: (((rowdata ->> '57Y') = '4C6') AND ((rowdata ->> '57W') = '5CT'))
+```
 
 ## 4. Generated SQL
 
