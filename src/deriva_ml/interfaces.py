@@ -765,6 +765,14 @@ class DerivaMLCatalogReader(Protocol):
         """
         ...
 
+    def user_list(self) -> list[dict[str, str]]:
+        """Get the catalog user list from public.ERMrest_Client.
+
+        Returns:
+            List of user dicts, each with 'ID' and 'Full_Name'.
+        """
+        ...
+
     def list_dataset_element_types(self) -> Iterable[Table]:
         """List the types of elements that can be contained in datasets.
 
