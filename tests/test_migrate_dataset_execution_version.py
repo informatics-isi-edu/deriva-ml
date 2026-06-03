@@ -82,10 +82,20 @@ def _dataset_execution_rows(catalog) -> list[dict]:
 def _seed_output_edge(ml) -> tuple[str, str]:
     """Create an OUTPUT edge: an execution that PRODUCED a dataset version.
 
-    ``create_dataset`` writes BOTH a ``Dataset_Execution`` row (the legacy,
-    redundant output row this migration deletes) AND a ``Dataset_Version`` row
-    authored by the same execution (``Dataset_Version.Execution`` points back).
-    That is exactly the pre-migration output shape.
+    Reproduces the LEGACY pre-write-path-change output shape, which had BOTH:
+      (a) a ``Dataset_Version`` row authored by the producing execution
+          (``Dataset_Version.Execution`` points back) — current
+          ``create_dataset`` still writes this; and
+      (b) a redundant ``Dataset_Execution`` output row
+          ``{Dataset, Execution}`` — which the OLD ``create_dataset`` wrote but
+          the CURRENT one does NOT (the write path now records output
+          provenance ONLY via ``Dataset_Version.Execution``).
+
+    Because current ``create_dataset`` no longer emits (b), this helper now
+    SIMULATES the legacy output edge with a direct ``pathBuilder`` insert of the
+    ``Dataset_Execution`` row, using the SAME execution that authored the
+    version. That makes the migration's ``_authored_pairs`` classify the pair as
+    an output edge to delete — exactly the pre-migration state under test.
 
     Returns:
         ``(dataset_rid, execution_rid)`` of the produced dataset.
@@ -93,6 +103,12 @@ def _seed_output_edge(ml) -> tuple[str, str]:
     workflow = ml.create_workflow(name="Producer Workflow", workflow_type="Test Workflow")
     execution = ml.create_execution(ExecutionConfiguration(description="Produce", workflow=workflow))
     dataset = execution.create_dataset(dataset_types=["TestDS"], description="Produced dataset")
+    # Directly insert the legacy redundant output row that the OLD create_dataset
+    # used to write; the current write path no longer does.
+    pb = ml.pathBuilder()
+    pb.schemas[ML_SCHEMA].Dataset_Execution.insert(
+        [{"Dataset": dataset.dataset_rid, "Execution": execution.execution_rid}]
+    )
     return dataset.dataset_rid, execution.execution_rid
 
 
@@ -113,11 +129,23 @@ def _seed_input_edge(ml, dataset_rid: str) -> str:
 
 
 def _seed_input_edge_with_config(ml, dataset_rid: str, version: str) -> str:
-    """Create an INPUT edge whose execution recorded the consumed version.
+    """Create a LEGACY INPUT edge whose consumed version lives only in config.
 
-    A consuming execution records ``dataset_rid`` as an input AND uploads a
-    ``configuration.json`` declaring ``DatasetSpec(rid=dataset_rid, version)``.
-    This is the shape ``step3_backfill_input_versions`` can resolve.
+    Reproduces the pre-write-path-change shape that ``step3_backfill_input_versions``
+    is designed to repair: an input ``Dataset_Execution`` row with a NULL
+    ``Dataset_Version`` whose consumed version is recoverable ONLY from the
+    execution's ``configuration.json``.
+
+    A consuming execution declares ``DatasetSpec(rid=dataset_rid, version)`` in
+    its configuration (so a real ``configuration.json`` is uploaded as an
+    ``Execution_Metadata`` asset) and records ``dataset_rid`` as an input. The
+    CURRENT write path, however, no longer leaves the input edge NULL: at init
+    ``_materialize_input_datasets`` already resolves and populates the input
+    row's ``Dataset_Version`` FK from the ``DatasetSpec.version``. To recreate
+    the legacy NULL-version edge (the only shape there is anything to backfill),
+    this helper resets that row's ``Dataset_Version`` back to NULL via a direct
+    ``pathBuilder`` update after init. The consumed version then survives ONLY in
+    ``configuration.json`` — exactly what the backfill step must resolve.
 
     Returns:
         The consuming ``execution_rid``.
@@ -133,6 +161,25 @@ def _seed_input_edge_with_config(ml, dataset_rid: str, version: str) -> str:
     with ml.create_execution(cfg) as exe:
         exe.add_input_dataset(dataset_rid)
     exe.commit_output_assets(clean_folder=True)
+
+    # The current write path auto-populates Dataset_Version on the config-declared
+    # input edge. Reset it to NULL to reproduce the legacy edge whose version is
+    # recoverable only from configuration.json (the state step3 backfills).
+    #
+    # The shared session catalog may currently be in the pre-Task-1 (legacy)
+    # shape with the column dropped (an earlier dry-run test leaves it dropped).
+    # When the column is absent there is nothing to reset — the edge is already
+    # in the legacy NULL-version shape — so guard on column presence to avoid a
+    # write against a non-existent column.
+    if _has_version_column(ml.catalog):
+        de = ml.pathBuilder().schemas[ML_SCHEMA].Dataset_Execution
+        in_rows = [
+            r
+            for r in de.entities().fetch()
+            if r["Execution"] == exe.execution_rid and r["Dataset"] == dataset_rid and r.get("Dataset_Version")
+        ]
+        if in_rows:
+            de.update([{"RID": r["RID"], "Dataset_Version": None} for r in in_rows])
     return exe.execution_rid
 
 
