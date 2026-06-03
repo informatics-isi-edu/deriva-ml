@@ -530,6 +530,14 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 },
                 {
                     "source": [
+                        {"inbound": [schema, "Dataset_Execution_Execution_fkey"]},
+                        {"outbound": [schema, "Dataset_Execution_Dataset_Version_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Input Dataset Version",
+                },
+                {
+                    "source": [
                         {
                             "inbound": [
                                 schema,
