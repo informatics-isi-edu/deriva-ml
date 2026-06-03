@@ -128,7 +128,19 @@ Full file: `/tmp/assoc-idx-test/indexes.sql` (not committed — scratch).
 
 ## 5. Apply result + idempotence
 
-_(filled in Task 5)_
+Applied with
+`docker exec deriva-postgres psql -U ermrest -d _ermrest_catalog_3 -v ON_ERROR_STOP=1 -f /tmp/indexes.sql`
+(default psql autocommit — `CREATE INDEX CONCURRENTLY` is **not** wrapped
+in a transaction, which it cannot be).
+
+| Run | Exit | New indexes created | `already exists, skipping` | Errors |
+|-----|------|---------------------|----------------------------|--------|
+| First apply | 0 | 48 | 0 | 0 |
+| Re-apply (idempotence) | 0 | 0 (all skipped) | 48 | 0 |
+
+The re-run is a clean no-op: every `CREATE INDEX CONCURRENTLY IF NOT
+EXISTS` reports `NOTICE: relation "…" already exists, skipping`. Safe
+to re-run against a live catalog.
 
 ## 6. Index existence (contract gate)
 
