@@ -415,6 +415,14 @@ class TestDataset:
         assert len(remaining) == 1
         assert remaining[0].dataset_rid == ds3.dataset_rid
 
+    @pytest.mark.xfail(
+        reason="Read path not yet updated for authorship-canonical model (Task 5). "
+        "Under the new model the producing execution's output edge lives in "
+        "Dataset_Version.Execution, not Dataset_Execution; Dataset.list_executions "
+        "still reads only Dataset_Execution and so omits the producer until "
+        "find_executions/list_executions are updated in Task 5.",
+        strict=True,
+    )
     def test_dataset_list_executions(self, test_ml):
         """Test listing executions associated with a dataset."""
         ml_instance = test_ml

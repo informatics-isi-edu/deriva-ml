@@ -1316,7 +1316,15 @@ class TestExecutionDatasets:
     """Tests for dataset operations within executions."""
 
     def test_create_dataset_in_execution(self, basic_execution):
-        """Test creating a dataset within an execution."""
+        """Test creating a dataset within an execution.
+
+        Under the authorship-canonical provenance model, an output edge (this
+        execution *produced* the dataset) is recorded solely via
+        ``Dataset_Version.Execution`` — NOT in ``Dataset_Execution`` (which is
+        the input-only edge table). So no ``Dataset_Execution`` row exists for
+        the produced dataset, and the producing execution is resolved via
+        ``_producer_of_dataset``.
+        """
         with basic_execution.execute() as execution:
             # Use "File" which is a standard dataset type
             dataset = execution.create_dataset(
@@ -1325,15 +1333,15 @@ class TestExecutionDatasets:
             )
             assert dataset is not None
             assert dataset.dataset_rid is not None
-            # Note: execution_rid is not returned on the dataset object;
-            # the link is stored in Dataset_Execution table
+            # No Dataset_Execution (input-edge) row is written for an output.
             ml = execution._ml_object
             pb = ml.pathBuilder().schemas[ml.ml_schema]
             ds_exec = pb.Dataset_Execution
             query = ds_exec.filter(ds_exec.Dataset == dataset.dataset_rid)
             links = list(query.entities().fetch())
-            assert len(links) == 1
-            assert links[0]["Execution"] == execution.execution_rid
+            assert links == []
+            # Producer is recorded via Dataset_Version.Execution.
+            assert ml._producer_of_dataset(dataset.dataset_rid) == execution.execution_rid
 
     def test_download_dataset_in_execution(self, dataset_test, tmp_path):
         """Test downloading a dataset within an execution."""
