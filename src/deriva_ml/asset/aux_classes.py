@@ -195,13 +195,21 @@ class AssetSpec(BaseModel):
 class AssetSpecConfig:
     """Hydra-zen configuration interface for ``AssetSpec``.
 
-    Field-for-field parity with :class:`AssetSpec`; configuring
-    an asset via hydra-zen must be able to express everything that
-    constructing an ``AssetSpec`` directly can. Drift would mean
-    some asset semantics are quietly unreachable from hydra-zen
-    configs — silent feature loss.
+    Exposes the asset attributes that are meaningful to *configure*: the
+    asset ``rid`` and whether to ``cache`` it. It deliberately does **not**
+    expose ``asset_role`` — an asset's role (``Input`` / ``Output``) is
+    determined by **context**, not by configuration: an asset referenced in
+    an execution's input configuration is an *input*, and assets written via
+    ``commit_output_assets`` are *outputs*. ``AssetSpec.asset_role`` therefore
+    keeps its ``"Input"`` default here and is set by the producing/consuming
+    operation, never by the config author.
 
-    Use in hydra-zen store definitions to specify assets with caching:
+    (Exposing ``asset_role`` as a configurable, ``Literal``-typed field also
+    broke structured-config registration under omegaconf < 2.4, which cannot
+    serialize ``Literal`` annotations — another reason it does not belong on
+    this interface.)
+
+    Use in hydra-zen store definitions to specify assets, optionally cached:
 
         >>> from hydra_zen import store  # doctest: +SKIP
         >>> asset_store = store(group="assets")  # doctest: +SKIP
@@ -210,18 +218,11 @@ class AssetSpecConfig:
         ...     name="cached_weights",
         ... )
 
-        >>> # Mark as an Output asset (e.g. for a workflow that
-        >>> # produces a model file):
-        >>> cfg = AssetSpecConfig(rid="6-EPNR", asset_role="Output")  # doctest: +SKIP
-
     Attributes:
         rid: Resource Identifier of the asset. Mirrors ``AssetSpec.rid``.
-        asset_role: Role of the asset (``"Input"`` or ``"Output"``).
-            Defaults to ``"Input"``. Mirrors ``AssetSpec.asset_role``.
         cache: If True, cache the downloaded asset by MD5 checksum in
             the DerivaML cache directory. Mirrors ``AssetSpec.cache``.
     """
 
     rid: str
-    asset_role: Literal["Input", "Output"] = "Input"
     cache: bool = False
