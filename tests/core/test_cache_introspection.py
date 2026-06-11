@@ -210,3 +210,75 @@ class TestListBags:
 
         assert len(bags) == 1
         assert bags[0].status == CacheStatus.not_cached
+
+    def test_multi_anchor_bag_yields_one_entry_per_dataset_with_status_check(self, tmp_path: Path):
+        from deriva.bag.cache_index import BagCacheIndex
+        from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="ccc333", dataset_rid="RID-X")
+        # Second dataset anchors the same content-addressed bag.
+        index = BagCacheIndex(cache_dir)
+        try:
+            index.record(checksum="ccc333", anchors=[("Dataset", "RID-Y")])
+        finally:
+            index.dispose()
+
+        with BagCache(cache_dir) as cache:
+            bags = cache.list_bags()
+
+        assert len(bags) == 2
+        assert {b.dataset_rid for b in bags} == {"RID-X", "RID-Y"}
+        assert {b.checksum for b in bags} == {"ccc333"}
+        by_rid = {b.dataset_rid: b for b in bags}
+        # RID-Y anchors the same checksum but has no Dataset_RID-Y dir
+        # on disk — status detection must report it not_cached.
+        assert by_rid["RID-Y"].status == CacheStatus.not_cached
+        assert by_rid["RID-X"].status == CacheStatus.cached_materialized
+
+
+# ---------------------------------------------------------------------------
+# BagCache.purge_dataset
+# ---------------------------------------------------------------------------
+
+
+class TestPurgeDataset:
+    def test_purge_all_versions(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
+
+        cache_dir = tmp_path / "cache"
+        d1 = _record_bag(cache_dir, checksum="e1", dataset_rid="RID-P", version="1.0.0")
+        d2 = _record_bag(cache_dir, checksum="e2", dataset_rid="RID-P", version="2.0.0")
+        _record_bag(cache_dir, checksum="e3", dataset_rid="RID-Q", version="1.0.0")
+
+        with BagCache(cache_dir) as cache:
+            stats = cache.purge_dataset("RID-P")
+            remaining = cache.list_bags()
+            status = cache.cache_status("RID-P")
+
+        assert stats["bags_removed"] == 2
+        assert stats["bytes_freed"] > 0
+        assert not d1.exists() and not d2.exists()
+        assert {b.dataset_rid for b in remaining} == {"RID-Q"}
+        assert status["status"] == CacheStatus.not_cached.value
+
+    def test_purge_single_version(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="f1", dataset_rid="RID-V", version="1.0.0")
+        kept = _record_bag(cache_dir, checksum="f2", dataset_rid="RID-V", version="2.0.0")
+
+        with BagCache(cache_dir) as cache:
+            stats = cache.purge_dataset("RID-V", version="1.0.0")
+            remaining = cache.list_bags()
+
+        assert stats["bags_removed"] == 1
+        assert kept.exists()
+        assert [b.version for b in remaining] == ["2.0.0"]
+
+    def test_purge_unknown_rid_is_idempotent_zero(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        with BagCache(tmp_path / "cache") as cache:
+            assert cache.purge_dataset("NOPE") == {"bags_removed": 0, "bytes_freed": 0}

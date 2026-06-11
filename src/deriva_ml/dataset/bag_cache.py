@@ -30,7 +30,7 @@ caches written by older code keep working.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -39,6 +39,16 @@ from deriva.bag.cache_index import BagCacheIndex
 from deriva_ml.core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _utc(ts: datetime) -> datetime:
+    """Attach UTC to a naive datetime; pass tz-aware through unchanged.
+
+    ``BagCacheIndex.record()`` defaults to tz-aware UTC timestamps,
+    but accepts naive ones — normalize so ``CachedBag.built_at`` is
+    always comparable.
+    """
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
 
 
 class CacheStatus(StrEnum):
@@ -186,12 +196,55 @@ class BagCache:
                         version=version,
                         checksum=checksum,
                         status=status,
-                        built_at=datetime.fromisoformat(row["built_at"]),
+                        built_at=_utc(datetime.fromisoformat(row["built_at"])),
                         size_bytes=row.get("size_bytes") or _dir_size(bag_dir) or None,
                         path=bag_dir,
                     )
                 )
         return bags
+
+    def purge_dataset(self, dataset_rid: str, version: str | None = None) -> dict[str, int]:
+        """Delete cached bags for a dataset (all versions, or one).
+
+        Each matching bag is removed via
+        :meth:`~deriva.bag.cache_index.BagCacheIndex.purge`, which
+        drops the index row and the on-disk directory together — the
+        index never outlives its referent.
+
+        Caution: a content-addressed bag anchored by *several*
+        datasets is removed for all of them (the cache is always
+        re-downloadable, so this is at worst a re-fetch).
+
+        Args:
+            dataset_rid: Dataset RID whose cached bags to remove.
+            version: When given, only the bag(s) whose recorded
+                ``anchor_summary['version']`` matches. ``None``
+                removes every cached version.
+
+        Returns:
+            ``{"bags_removed": n, "bytes_freed": n}``. Unknown RID
+            (or version) yields zeros — deletion is idempotent.
+
+        Example:
+            >>> with BagCache(cache_dir) as cache:  # doctest: +SKIP
+            ...     cache.purge_dataset("1ABC", version="1.2.0")  # doctest: +SKIP
+            {'bags_removed': 1, 'bytes_freed': 52431}
+        """
+        from deriva_ml.core.storage import _dir_size
+
+        stats = {"bags_removed": 0, "bytes_freed": 0}
+        for checksum in self._index.find_bags_for_rid(table="Dataset", rid=dataset_rid):
+            if version is not None:
+                row = self._index.get(checksum) or {}
+                recorded = (row.get("anchor_summary") or {}).get("version")
+                if recorded != str(version):
+                    continue
+            bag_root = self._index.bag_dir_for(checksum)
+            freed = _dir_size(bag_root)
+            if self._index.purge(checksum):
+                stats["bags_removed"] += 1
+                stats["bytes_freed"] += freed
+        return stats
 
     def _dataset_anchors(self) -> dict[str, list[str]]:
         """Map checksum -> Dataset RIDs from the reverse index.
