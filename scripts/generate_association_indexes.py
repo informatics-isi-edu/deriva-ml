@@ -1,7 +1,7 @@
 """Generate SQL for adding composite indexes on association tables.
 
-Reads a deriva catalog via the ermrest HTTP API, finds every pure
-binary association table, and writes a single ``.sql`` file with
+Reads a deriva catalog via the ermrest HTTP API, finds every binary
+association table (pure or impure), and writes a single ``.sql`` file with
 ``CREATE INDEX CONCURRENTLY IF NOT EXISTS`` statements for both
 join orderings. Each association gets four indexes:
 
@@ -33,7 +33,11 @@ table but does not create the composite-pair indexes needed for
 fast joins in either direction, and never creates expression
 indexes on the JSONB ``rowdata`` of the corresponding history table.
 On a real catalog (eye-ai) the composite indexes are noticeably
-faster for join queries through pure binary associations.
+faster for join queries through binary associations. Impure
+associations (extra metadata columns decorating the FK pair, e.g.
+the deriva-ml ``{Asset}_Execution`` tables with ``Asset_Role``) are
+included since 2026-06: production evidence showed they are the
+hottest join paths (eye-ai dataset-download timeouts).
 
 Origin: design archived at
 ``docs/superpowers/specs/archive/2026-04-30-association-index-sql-generator-design.md``.
@@ -206,17 +210,24 @@ def _build_rid_lookup(catalog: Any) -> tuple[dict[tuple[str, str], str], dict[tu
 
 
 def _walk_associations(model: Any) -> list[dict[str, Any]]:
-    """Yield one record per pure binary association table.
+    """Yield one record per binary association table, pure or impure.
 
-    Uses ``Table.is_association(return_fkeys=True)`` with all defaults
-    (pure, unqualified, non-overlapping, binary). Skips system schemas
-    entirely.
+    Uses ``Table.is_association(pure=False, return_fkeys=True)``:
+    binary, unqualified, non-overlapping associations are matched
+    whether or not they carry extra metadata columns. An *impure*
+    association (e.g. the deriva-ml ``{Asset}_Execution`` tables with
+    their ``Asset_Role`` column) decorates the FK pair without
+    changing its row key, so the composite-pair indexes are built
+    identically — and production evidence (eye-ai download timeouts,
+    2026-06-11) shows the impure ``{X}_Execution`` tables are the
+    hottest join paths of all. Skips system schemas entirely.
 
     Args:
         model: A deriva-py ``Model`` from ``catalog.getCatalogModel()``.
 
     Returns:
         List of dicts with keys ``schema_name``, ``table_name``,
+        ``impure`` (bool — carries metadata columns),
         ``fk1_columns``, ``fk1_target_schema``, ``fk1_target_table``,
         ``fk2_columns``, ``fk2_target_schema``, ``fk2_target_table``.
     """
@@ -225,7 +236,7 @@ def _walk_associations(model: Any) -> list[dict[str, Any]]:
         if schema_name in SYSTEM_SCHEMAS:
             continue
         for table_name, table in schema.tables.items():
-            fkeys = table.is_association(return_fkeys=True)
+            fkeys = table.is_association(pure=False, return_fkeys=True)
             if not fkeys:
                 continue
             # ``return_fkeys=True`` returns a 2-tuple/set of ForeignKey
@@ -240,6 +251,9 @@ def _walk_associations(model: Any) -> list[dict[str, Any]]:
                 {
                     "schema_name": schema_name,
                     "table_name": table_name,
+                    # Re-test with the pure default to label the block
+                    # header for DBA review; emission is identical.
+                    "impure": not bool(table.is_association()),
                     "fk1_columns": [c.name for c in fk1.foreign_key_columns],
                     "fk1_target_schema": fk1.pk_table.schema.name,
                     "fk1_target_table": fk1.pk_table.name,
@@ -303,9 +317,10 @@ def _emit_association_block(
 
     fk1_str = ", ".join(fk1_cols)
     fk2_str = ", ".join(fk2_cols)
+    impure_note = "  (impure — carries metadata columns)" if assoc.get("impure") else ""
     header = (
         "-- " + "=" * 72 + "\n"
-        f"-- {tname}  ({sname}.{tname})\n"
+        f"-- {tname}  ({sname}.{tname}){impure_note}\n"
         f"--   Table RID: {t_rid or '<missing>'}\n"
         f"--   FK1: ({fk1_str})  ->  {fk1_target}\n"
         f"--   FK2: ({fk2_str})  ->  {fk2_target}\n"
@@ -376,7 +391,7 @@ def generate(hostname: str, catalog_id: str, output_path: Path, verbose: bool = 
     associations = _walk_associations(model)
     if verbose:
         print(
-            f"Found {len(associations)} pure binary association(s) "
+            f"Found {len(associations)} binary association(s) "
             f"across {len(model.schemas) - sum(1 for s in model.schemas if s in SYSTEM_SCHEMAS)} schema(s).",
             file=sys.stderr,
         )
@@ -408,7 +423,7 @@ def generate(hostname: str, catalog_id: str, output_path: Path, verbose: bool = 
             )
         blocks.append(_emit_association_block(assoc, table_rid, column_rid, warnings))
 
-    body = "\n".join(blocks) if blocks else "-- No pure binary association tables found.\n"
+    body = "\n".join(blocks) if blocks else "-- No binary association tables found.\n"
 
     output_path.write_text(header + "\n" + body, encoding="utf-8")
 
@@ -433,7 +448,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="generate_association_indexes",
         description=(
-            "Generate CREATE INDEX SQL for pure binary association tables "
+            "Generate CREATE INDEX SQL for binary association tables (pure "
+            "and impure) "
             "in a deriva catalog. Read-only; output is reviewed and applied "
             "manually by a DBA."
         ),
