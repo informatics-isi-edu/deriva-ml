@@ -348,3 +348,72 @@ class TestCachedAssets:
         assert stats["assets_removed"] == 1
         assert not target.exists()
         assert bystander.exists()
+
+
+# ---------------------------------------------------------------------------
+# clear_cache (index-coherent engine)
+# ---------------------------------------------------------------------------
+
+
+class TestClearCacheCoherent:
+    def test_clears_bags_assets_and_strays(self, tmp_path: Path):
+        from deriva_ml.core.storage import clear_cache
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="g1", dataset_rid="RID-C")
+        _make_cached_asset(cache_dir, "RID-1", MD5_A)
+        (cache_dir / "stray.txt").write_text("x")
+
+        stats = clear_cache(cache_dir)
+
+        assert stats["errors"] == 0
+        assert stats["bytes_freed"] > 0
+        with BagCache(cache_dir) as cache:
+            assert cache.list_bags() == []           # index agrees: nothing cached
+        assert list((cache_dir / "assets").iterdir()) == []
+        assert not (cache_dir / "stray.txt").exists()
+
+    def test_age_filter_uses_index_built_at_for_bags(self, tmp_path: Path):
+        from deriva_ml.core.storage import clear_cache
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        old = datetime.now(timezone.utc) - timedelta(days=40)
+        _record_bag(cache_dir, checksum="h1", dataset_rid="RID-OLD", built_at=old)
+        fresh_dir = _record_bag(cache_dir, checksum="h2", dataset_rid="RID-NEW")
+
+        stats = clear_cache(cache_dir, older_than_days=30)
+
+        assert stats["dirs_removed"] == 1
+        with BagCache(cache_dir) as cache:
+            remaining = cache.list_bags()
+        assert [b.dataset_rid for b in remaining] == ["RID-NEW"]
+        assert fresh_dir.exists()
+
+    def test_index_never_references_removed_dirs(self, tmp_path: Path):
+        """Regression: the pre-rewrite clear_cache could delete bag
+        dirs while the index still listed them (spec section 1)."""
+        from deriva.bag.cache_index import BagCacheIndex
+        from deriva_ml.core.storage import clear_cache
+
+        cache_dir = tmp_path / "cache"
+        old = datetime.now(timezone.utc) - timedelta(days=40)
+        _record_bag(cache_dir, checksum="i1", dataset_rid="RID-Z", built_at=old)
+
+        clear_cache(cache_dir, older_than_days=30)
+
+        index = BagCacheIndex(cache_dir)
+        try:
+            for row in index.list_bags():
+                assert index.bag_dir_for(row["checksum"]).exists(), (
+                    f"index references removed bag {row['checksum']}"
+                )
+        finally:
+            index.dispose()
+
+    def test_missing_cache_dir_returns_zeros(self, tmp_path: Path):
+        from deriva_ml.core.storage import clear_cache
+
+        stats = clear_cache(tmp_path / "nope")
+        assert stats == {"files_removed": 0, "dirs_removed": 0, "bytes_freed": 0, "errors": 0}

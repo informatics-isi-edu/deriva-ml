@@ -218,3 +218,122 @@ def delete_cached_asset(cache_dir: Path, rid: str, md5: str | None = None) -> di
         stats["assets_removed"] += 1
         stats["bytes_freed"] += freed
     return stats
+
+
+# Cache-dir entries owned by the bag index / asset cache machinery.
+# clear_cache handles these through their own coherent paths; only
+# entries outside this set get the legacy mtime-walk treatment.
+_PROTECTED_CACHE_ENTRIES = frozenset(
+    {"bags", "assets", "index.sqlite", "index.sqlite-wal", "index.sqlite-shm"}
+)
+
+
+def clear_cache(
+    cache_dir: Path,
+    older_than_days: int | None = None,
+    log: Any | None = None,
+) -> dict[str, int]:
+    """Clear the dataset cache directory, index-coherently.
+
+    Three passes:
+
+    1. **Bags through the index** — every bag whose ``built_at`` is
+       older than the cutoff is removed with
+       :meth:`~deriva.bag.cache_index.BagCacheIndex.purge`, dropping
+       the index row and the on-disk directory together. The index
+       can never claim a bag whose directory this function removed.
+    2. **Assets by mtime** — ``assets/*`` entries older than the
+       cutoff are removed.
+    3. **Stray top-level entries** (anything not in
+       ``_PROTECTED_CACHE_ENTRIES``) keep the legacy mtime behavior.
+
+    Args:
+        cache_dir: The DerivaML cache directory.
+        older_than_days: Only remove entries older than this many
+            days; ``None`` removes everything.
+        log: Logger for per-entry failures (defaults to the module
+            logger).
+
+    Returns:
+        ``{"files_removed", "dirs_removed", "bytes_freed", "errors"}``
+        — same shape as the historical ``DerivaML.clear_cache``.
+
+    Example:
+        >>> from pathlib import Path
+        >>> clear_cache(Path("/nonexistent"))
+        {'files_removed': 0, 'dirs_removed': 0, 'bytes_freed': 0, 'errors': 0}
+    """
+    log = log or logger
+    stats = {"files_removed": 0, "dirs_removed": 0, "bytes_freed": 0, "errors": 0}
+    cache_dir = Path(cache_dir)
+    if not cache_dir.exists():
+        return stats
+
+    cutoff = time.time() - older_than_days * 86400 if older_than_days is not None else None
+
+    # Pass 1: bags, through the index (never orphan the index).
+    if (cache_dir / "index.sqlite").exists():
+        from deriva.bag.cache_index import BagCacheIndex
+
+        index = BagCacheIndex(cache_dir)
+        try:
+            for row in index.list_bags():
+                if cutoff is not None:
+                    built = datetime.fromisoformat(row["built_at"]).timestamp()
+                    if built > cutoff:
+                        continue
+                freed = _dir_size(index.bag_dir_for(row["checksum"]))
+                try:
+                    index.purge(row["checksum"])
+                except (OSError, PermissionError) as e:
+                    log.warning("Failed to purge cached bag %s: %s", row["checksum"], e)
+                    stats["errors"] += 1
+                    continue
+                stats["dirs_removed"] += 1
+                stats["bytes_freed"] += freed
+        finally:
+            index.dispose()
+
+    # Pass 2: assets, by mtime.
+    assets_dir = cache_dir / "assets"
+    if assets_dir.exists():
+        for entry in assets_dir.iterdir():
+            try:
+                if cutoff is not None and entry.stat().st_mtime > cutoff:
+                    continue
+                freed = _dir_size(entry) if entry.is_dir() else entry.stat().st_size
+                if entry.is_dir():
+                    shutil.rmtree(entry)
+                    stats["dirs_removed"] += 1
+                else:
+                    entry.unlink()
+                    stats["files_removed"] += 1
+                stats["bytes_freed"] += freed
+            except (OSError, PermissionError) as e:
+                log.warning("Failed to remove cached asset %s: %s", entry, e)
+                stats["errors"] += 1
+
+    # Pass 3: stray top-level entries (legacy behavior).
+    try:
+        for entry in cache_dir.iterdir():
+            if entry.name in _PROTECTED_CACHE_ENTRIES:
+                continue
+            try:
+                if cutoff is not None and entry.stat().st_mtime > cutoff:
+                    continue
+                freed = _dir_size(entry) if entry.is_dir() else entry.stat().st_size
+                if entry.is_dir():
+                    shutil.rmtree(entry)
+                    stats["dirs_removed"] += 1
+                else:
+                    entry.unlink()
+                    stats["files_removed"] += 1
+                stats["bytes_freed"] += freed
+            except (OSError, PermissionError) as e:
+                log.warning("Failed to remove cache entry %s: %s", entry, e)
+                stats["errors"] += 1
+    except OSError as e:
+        log.error("Failed to iterate cache directory: %s", e)
+        stats["errors"] += 1
+
+    return stats
