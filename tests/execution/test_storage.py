@@ -267,3 +267,42 @@ class TestCleanExecutionDirConfig:
         # Cleanup
         if execution.working_dir.exists():
             shutil.rmtree(execution.working_dir)
+
+
+class TestCacheIntrospectionIntegration:
+    """Live-catalog round-trip: download → list → delete → verify.
+
+    Uses the session CatalogManager (same pattern as
+    tests/dataset/test_dataset_caching.py).
+    """
+
+    def test_download_list_delete_roundtrip(self, catalog_manager, tmp_path):
+        from deriva_ml.dataset.bag_cache import CacheStatus
+
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "src")
+        dataset = dataset_desc.dataset
+        version = dataset.current_version
+
+        # Not cached yet → listing has no entry for this RID
+        before = [b for b in ml.list_cached_bags() if b.dataset_rid == dataset.dataset_rid]
+        assert before == []
+
+        dataset.download_dataset_bag(version=version, use_minid=False)
+
+        listed = [b for b in ml.list_cached_bags() if b.dataset_rid == dataset.dataset_rid]
+        assert len(listed) == 1
+        assert listed[0].version == str(version)
+        assert listed[0].status in (CacheStatus.cached_materialized, CacheStatus.cached_holey)
+        assert listed[0].path.exists()
+
+        # Summary sees it
+        summary = ml.get_storage_summary()
+        assert summary["bag_count"] >= 1
+
+        # Delete and verify both the listing and bag_info agree
+        stats = ml.delete_cached_bag(dataset.dataset_rid)
+        assert stats["bags_removed"] >= 1
+        assert [b for b in ml.list_cached_bags() if b.dataset_rid == dataset.dataset_rid] == []
+        info = dataset.bag_info(version=version)
+        assert info["status"] == CacheStatus.not_cached.value
