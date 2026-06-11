@@ -147,3 +147,66 @@ class TestRecords:
             path=tmp_path / "assets" / "A1_d41d8cd98f00b204e9800998ecf8427e",
         )
         assert asset.model_dump()["rid"] == "A1"
+
+
+# ---------------------------------------------------------------------------
+# BagCache.list_bags
+# ---------------------------------------------------------------------------
+
+
+class TestListBags:
+    def test_empty_cache_returns_empty_list(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        with BagCache(tmp_path / "cache") as cache:
+            assert cache.list_bags() == []
+
+    def test_lists_recorded_bags_with_rid_version_status(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="aaa111", dataset_rid="RID-A", version="1.0.0")
+        _record_bag(cache_dir, checksum="bbb222", dataset_rid="RID-B", version="2.0.0", holey=True)
+
+        with BagCache(cache_dir) as cache:
+            bags = cache.list_bags()
+
+        assert {b.dataset_rid for b in bags} == {"RID-A", "RID-B"}
+        by_rid = {b.dataset_rid: b for b in bags}
+        assert by_rid["RID-A"].version == "1.0.0"
+        assert by_rid["RID-A"].status == CacheStatus.cached_materialized
+        assert by_rid["RID-B"].status == CacheStatus.cached_holey
+        assert by_rid["RID-A"].size_bytes > 0
+        assert by_rid["RID-A"].path.exists()
+
+    def test_multi_anchor_bag_yields_one_entry_per_dataset(self, tmp_path: Path):
+        from deriva.bag.cache_index import BagCacheIndex
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="ccc333", dataset_rid="RID-X")
+        # Second dataset anchors the same content-addressed bag.
+        index = BagCacheIndex(cache_dir)
+        try:
+            index.record(checksum="ccc333", anchors=[("Dataset", "RID-Y")])
+        finally:
+            index.dispose()
+
+        with BagCache(cache_dir) as cache:
+            bags = cache.list_bags()
+
+        assert len(bags) == 2
+        assert {b.dataset_rid for b in bags} == {"RID-X", "RID-Y"}
+        assert {b.checksum for b in bags} == {"ccc333"}
+
+    def test_index_row_with_missing_dir_reports_not_cached(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="ddd444", dataset_rid="RID-G", on_disk=False)
+
+        with BagCache(cache_dir) as cache:
+            bags = cache.list_bags()
+
+        assert len(bags) == 1
+        assert bags[0].status == CacheStatus.not_cached

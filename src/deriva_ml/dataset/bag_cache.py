@@ -29,6 +29,8 @@ caches written by older code keep working.
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -147,6 +149,77 @@ class BagCache:
             "cache_path": cache_path,
             "versions_cached": list(checksums),
         }
+
+    def list_bags(self) -> "list[CachedBag]":
+        """List every dataset-anchored bag in the local cache.
+
+        Joins the index's bag rows with the ``bag_anchor_rids``
+        reverse index: one :class:`~deriva_ml.core.storage.CachedBag`
+        per (bag, Dataset-anchor) pair, most-recently-built first.
+        Purely local — no catalog access.
+
+        Returns:
+            List of ``CachedBag`` records (empty when nothing cached).
+
+        Example:
+            >>> from deriva_ml.dataset.bag_cache import BagCache  # doctest: +SKIP
+            >>> with BagCache(cache_dir) as cache:  # doctest: +SKIP
+            ...     for bag in cache.list_bags():  # doctest: +SKIP
+            ...         print(bag.dataset_rid, bag.version, bag.status.value)  # doctest: +SKIP
+        """
+        # Lazy import: core.storage imports CacheStatus from this
+        # module at module level; importing the record lazily here
+        # keeps the import graph acyclic.
+        from deriva_ml.core.storage import CachedBag, _dir_size
+
+        anchors = self._dataset_anchors()
+        bags: list[CachedBag] = []
+        for row in self._index.list_bags():
+            checksum = row["checksum"]
+            version = (row.get("anchor_summary") or {}).get("version")
+            for rid in anchors.get(checksum, []):
+                bag_dir = self._index.bag_dir_for(checksum) / f"Dataset_{rid}"
+                status = self._determine_index_status(checksum, bag_dir)
+                bags.append(
+                    CachedBag(
+                        dataset_rid=rid,
+                        version=version,
+                        checksum=checksum,
+                        status=status,
+                        built_at=datetime.fromisoformat(row["built_at"]),
+                        size_bytes=row.get("size_bytes") or _dir_size(bag_dir) or None,
+                        path=bag_dir,
+                    )
+                )
+        return bags
+
+    def _dataset_anchors(self) -> dict[str, list[str]]:
+        """Map checksum -> Dataset RIDs from the reverse index.
+
+        ``BagCacheIndex`` exposes rid->checksums
+        (:meth:`~deriva.bag.cache_index.BagCacheIndex.find_bags_for_rid`)
+        but not the reverse, so read ``bag_anchor_rids`` directly with
+        a read-only sqlite3 connection. Safe against schema drift:
+        ``self._index`` was constructed first, and its schema-version
+        guard raises before this query can see an unexpected layout.
+        (Follow-up: a public ``anchors_for()`` upstream would replace
+        this.)
+        """
+        db = self._cache_dir / "index.sqlite"
+        if not db.exists():
+            return {}
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            rows = conn.execute(
+                'SELECT checksum, rid FROM bag_anchor_rids WHERE "table" = ?',
+                ("Dataset",),
+            ).fetchall()
+        finally:
+            conn.close()
+        anchors: dict[str, list[str]] = {}
+        for checksum, rid in rows:
+            anchors.setdefault(checksum, []).append(rid)
+        return anchors
 
     # ------------------------------------------------------------------
     # Status detection helpers
