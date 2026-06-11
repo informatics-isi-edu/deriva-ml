@@ -70,6 +70,7 @@ from deriva_ml.interfaces import DerivaMLCatalog
 if TYPE_CHECKING:
     from deriva_ml.catalog.provenance import CatalogProvenance
     from deriva_ml.core.schema_diff import SchemaDiff
+    from deriva_ml.core.storage import CachedAsset, CachedBag
     from deriva_ml.execution.execution import Execution
     from deriva_ml.model.catalog import DerivaModel
 
@@ -1410,70 +1411,30 @@ class DerivaML(
     def clear_cache(self, older_than_days: int | None = None) -> dict[str, int]:
         """Clear the dataset cache directory.
 
-        Removes cached dataset bags from the cache directory. Can optionally filter
-        by age to only remove old cache entries.
+        Removes cached dataset bags and assets. Bags are removed
+        *through the bag-cache index* (index row and on-disk directory
+        together), so the index never references a removed bag.
 
         Args:
             older_than_days: If provided, only remove cache entries older than this
-                many days. If None, removes all cache entries.
+                many days (bags age by their recorded ``built_at``; assets and
+                stray entries by mtime). If None, removes all cache entries.
 
         Returns:
-            dict with keys:
+            dict: Statistics about the cleanup:
                 - 'files_removed': Number of files removed
                 - 'dirs_removed': Number of directories removed
                 - 'bytes_freed': Total bytes freed
-                - 'errors': Number of removal errors
+                - 'errors': Number of errors encountered
 
         Example:
             >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
-            >>> # Clear all cache
-            >>> result = ml.clear_cache()  # doctest: +SKIP
-            >>> print(f"Freed {result['bytes_freed'] / 1e6:.1f} MB")  # doctest: +SKIP
-            >>>
-            >>> # Clear cache older than 7 days
-            >>> result = ml.clear_cache(older_than_days=7)  # doctest: +SKIP
+            >>> stats = ml.clear_cache(older_than_days=30)  # doctest: +SKIP
+            >>> print(f"Freed {stats['bytes_freed'] / 1e6:.1f} MB")  # doctest: +SKIP
         """
-        import shutil
-        import time
+        from deriva_ml.core.storage import clear_cache as _clear_cache
 
-        stats = {"files_removed": 0, "dirs_removed": 0, "bytes_freed": 0, "errors": 0}
-
-        if not self.cache_dir.exists():
-            return stats
-
-        cutoff_time = None
-        if older_than_days is not None:
-            cutoff_time = time.time() - (older_than_days * 24 * 60 * 60)
-
-        try:
-            for entry in self.cache_dir.iterdir():
-                try:
-                    # Check age if filtering
-                    if cutoff_time is not None:
-                        entry_mtime = entry.stat().st_mtime
-                        if entry_mtime > cutoff_time:
-                            continue  # Skip recent entries
-
-                    # Calculate size before removal
-                    if entry.is_dir():
-                        entry_size = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
-                        shutil.rmtree(entry)
-                        stats["dirs_removed"] += 1
-                    else:
-                        entry_size = entry.stat().st_size
-                        entry.unlink()
-                        stats["files_removed"] += 1
-
-                    stats["bytes_freed"] += entry_size
-                except (OSError, PermissionError) as e:
-                    self._logger.warning(f"Failed to remove cache entry {entry}: {e}")
-                    stats["errors"] += 1
-
-        except OSError as e:
-            self._logger.error(f"Failed to iterate cache directory: {e}")
-            stats["errors"] += 1
-
-        return stats
+        return _clear_cache(self.cache_dir, older_than_days, self._logger)
 
     def get_cache_size(self) -> dict[str, int | float]:
         """Get the current size of the cache directory.
@@ -1628,6 +1589,87 @@ class DerivaML(
 
         return stats
 
+    def list_cached_bags(self) -> "list[CachedBag]":
+        """List every dataset bag in the local cache.
+
+        Answers "what bags are currently cached?" without needing to
+        know any dataset RID up front. One record per
+        (bag, dataset-anchor) pair, most-recently-built first.
+
+        Returns:
+            List of :class:`~deriva_ml.core.storage.CachedBag` records
+            (empty when nothing is cached).
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> for bag in ml.list_cached_bags():  # doctest: +SKIP
+            ...     print(bag.dataset_rid, bag.version, bag.status.value)  # doctest: +SKIP
+        """
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        with BagCache(self.cache_dir) as cache:
+            return cache.list_bags()
+
+    def delete_cached_bag(self, dataset_rid: str, version: str | None = None) -> dict[str, int]:
+        """Delete a dataset's cached bag(s).
+
+        Args:
+            dataset_rid: Dataset RID whose cached bags to remove.
+            version: When given, only the bag for that version;
+                ``None`` removes every cached version.
+
+        Returns:
+            ``{"bags_removed": n, "bytes_freed": n}``; zeros when the
+            dataset isn't cached (idempotent).
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> ml.delete_cached_bag('1-ABC', version='1.2.0')  # doctest: +SKIP
+        """
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        with BagCache(self.cache_dir) as cache:
+            return cache.purge_dataset(dataset_rid, version=version)
+
+    def list_cached_assets(self) -> "list[CachedAsset]":
+        """List cached input assets (``assets/{rid}_{md5}`` entries).
+
+        These are written by ``Execution.download_asset(use_cache=True)``
+        / ``AssetSpec(cache=True)``.
+
+        Returns:
+            List of :class:`~deriva_ml.core.storage.CachedAsset`
+            records (empty when no assets are cached).
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> for a in ml.list_cached_assets():  # doctest: +SKIP
+            ...     print(a.rid, a.size_bytes)  # doctest: +SKIP
+        """
+        from deriva_ml.core.storage import list_cached_assets as _list
+
+        return _list(self.cache_dir)
+
+    def delete_cached_asset(self, rid: str, md5: str | None = None) -> dict[str, int]:
+        """Delete cached copies of an input asset.
+
+        Args:
+            rid: Asset RID whose cache entries to remove.
+            md5: When given, only the copy with that checksum;
+                ``None`` removes every cached copy.
+
+        Returns:
+            ``{"assets_removed": n, "bytes_freed": n}``; zeros when
+            nothing matched (idempotent).
+
+        Example:
+            >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
+            >>> ml.delete_cached_asset('2-XYZ')  # doctest: +SKIP
+        """
+        from deriva_ml.core.storage import delete_cached_asset as _delete
+
+        return _delete(self.cache_dir, rid, md5=md5)
+
     def get_storage_summary(self) -> dict[str, Any]:
         """Get a summary of local storage usage.
 
@@ -1640,6 +1682,10 @@ class DerivaML(
                 - 'execution_dir_count': Number of execution directories
                 - 'execution_size_mb': Total size of execution directories in MB
                 - 'total_size_mb': Combined size in MB
+                - 'bag_count': Number of cached dataset bags
+                - 'bag_size_mb': Total size of cached bags in MB
+                - 'asset_count': Number of cached input assets
+                - 'asset_size_mb': Total size of cached assets in MB
 
         Example:
             >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
@@ -1653,6 +1699,15 @@ class DerivaML(
 
         exec_size_mb = sum(d["size_mb"] for d in exec_dirs)
 
+        bags = self.list_cached_bags()
+        assets = self.list_cached_assets()
+        # A multi-anchor bag appears once per dataset RID in the
+        # listing; size it once per checksum for the summary.
+        bag_bytes = sum(
+            {b.checksum: (b.size_bytes or 0) for b in bags}.values()
+        )
+        asset_bytes = sum(a.size_bytes for a in assets)
+
         return {
             "working_dir": str(self.working_dir),
             "cache_dir": str(self.cache_dir),
@@ -1661,6 +1716,11 @@ class DerivaML(
             "execution_dir_count": len(exec_dirs),
             "execution_size_mb": exec_size_mb,
             "total_size_mb": cache_stats["total_mb"] + exec_size_mb,
+            # Per-species breakdown (spec 2026-06-11)
+            "bag_count": len(bags),
+            "bag_size_mb": bag_bytes / (1024 * 1024),
+            "asset_count": len(assets),
+            "asset_size_mb": asset_bytes / (1024 * 1024),
         }
 
     # Schema integrity validation runs at CI time via the

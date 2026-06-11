@@ -437,3 +437,88 @@ class TestClearCacheCoherent:
             assert index.list_bags() == []  # stale row repaired
         finally:
             index.dispose()
+
+
+# ---------------------------------------------------------------------------
+# DerivaML surface (unbound methods against the harness)
+# ---------------------------------------------------------------------------
+
+
+class TestDerivaMLSurface:
+    def test_list_cached_bags_delegates(self, harness):
+        from deriva_ml.core.base import DerivaML
+
+        _record_bag(harness.cache_dir, checksum="j1", dataset_rid="RID-S")
+        bags = DerivaML.list_cached_bags(harness)
+        assert [b.dataset_rid for b in bags] == ["RID-S"]
+
+    def test_delete_cached_bag_delegates(self, harness):
+        from deriva_ml.core.base import DerivaML
+
+        _record_bag(harness.cache_dir, checksum="k1", dataset_rid="RID-T")
+        stats = DerivaML.delete_cached_bag(harness, "RID-T")
+        assert stats["bags_removed"] == 1
+        assert DerivaML.list_cached_bags(harness) == []
+
+    def test_list_and_delete_cached_assets_delegate(self, harness):
+        from deriva_ml.core.base import DerivaML
+
+        _make_cached_asset(harness.cache_dir, "RID-U", MD5_A)
+        assert [a.rid for a in DerivaML.list_cached_assets(harness)] == ["RID-U"]
+        stats = DerivaML.delete_cached_asset(harness, "RID-U")
+        assert stats["assets_removed"] == 1
+
+    def test_clear_cache_is_index_coherent_via_derivaml(self, harness):
+        from deriva.bag.cache_index import BagCacheIndex
+        from deriva_ml.core.base import DerivaML
+
+        _record_bag(harness.cache_dir, checksum="l1", dataset_rid="RID-W")
+        DerivaML.clear_cache(harness)
+        index = BagCacheIndex(harness.cache_dir)
+        try:
+            assert index.list_bags() == []
+        finally:
+            index.dispose()
+
+    def test_clear_cache_survives_corrupt_index(self, harness):
+        """Regression for graceful degradation: a corrupt index.sqlite
+        must not abort passes 2-3 or raise."""
+        from deriva_ml.core.base import DerivaML
+
+        (harness.cache_dir / "index.sqlite").write_text("not a sqlite database")
+        _make_cached_asset(harness.cache_dir, "RID-CC", MD5_A)
+        (harness.cache_dir / "stray.txt").write_text("x")
+
+        stats = DerivaML.clear_cache(harness)
+
+        assert stats["errors"] >= 1                    # the unusable index
+        assert not (harness.cache_dir / "stray.txt").exists()
+        assert list((harness.cache_dir / "assets").iterdir()) == []
+
+    def test_storage_summary_has_species_breakdown(self, harness):
+        from deriva_ml.core.base import DerivaML
+
+        # get_storage_summary calls these as self.<method>(); bind the
+        # real implementations to the harness (existing pattern in
+        # tests/core/test_storage_management.py).
+        harness.get_cache_size = lambda: DerivaML.get_cache_size(harness)
+        harness.list_execution_dirs = lambda: DerivaML.list_execution_dirs(harness)
+        harness.list_cached_bags = lambda: DerivaML.list_cached_bags(harness)
+        harness.list_cached_assets = lambda: DerivaML.list_cached_assets(harness)
+
+        _record_bag(harness.cache_dir, checksum="m1", dataset_rid="RID-SUM")
+        _make_cached_asset(harness.cache_dir, "RID-AS", MD5_A)
+
+        summary = DerivaML.get_storage_summary(harness)
+
+        # Existing keys unchanged
+        for key in (
+            "working_dir", "cache_dir", "cache_size_mb", "cache_file_count",
+            "execution_dir_count", "execution_size_mb", "total_size_mb",
+        ):
+            assert key in summary
+        # New per-species keys
+        assert summary["bag_count"] == 1
+        assert summary["asset_count"] == 1
+        assert summary["bag_size_mb"] > 0
+        assert summary["asset_size_mb"] > 0
