@@ -1687,6 +1687,11 @@ class DerivaML(
                 - 'asset_count': Number of cached input assets
                 - 'asset_size_mb': Total size of cached assets in MB
 
+            Note: ``bag_size_mb`` and ``asset_size_mb`` break down
+            ``cache_size_mb`` by species — they are subsets of it, not
+            additive with it; ``total_size_mb`` remains
+            ``cache_size_mb + execution_size_mb``.
+
         Example:
             >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
             >>> summary = ml.get_storage_summary()  # doctest: +SKIP

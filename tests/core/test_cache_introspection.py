@@ -438,6 +438,22 @@ class TestClearCacheCoherent:
         finally:
             index.dispose()
 
+    def test_survives_corrupt_index(self, tmp_path: Path):
+        """A corrupt index.sqlite must not abort passes 2-3 or raise."""
+        from deriva_ml.core.storage import clear_cache
+
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        (cache_dir / "index.sqlite").write_text("not a sqlite database")
+        _make_cached_asset(cache_dir, "RID-CC", MD5_A)
+        (cache_dir / "stray.txt").write_text("x")
+
+        stats = clear_cache(cache_dir)
+
+        assert stats["errors"] >= 1                    # the unusable index
+        assert not (cache_dir / "stray.txt").exists()
+        assert list((cache_dir / "assets").iterdir()) == []
+
 
 # ---------------------------------------------------------------------------
 # DerivaML surface (unbound methods against the harness)
@@ -479,21 +495,6 @@ class TestDerivaMLSurface:
             assert index.list_bags() == []
         finally:
             index.dispose()
-
-    def test_clear_cache_survives_corrupt_index(self, harness):
-        """Regression for graceful degradation: a corrupt index.sqlite
-        must not abort passes 2-3 or raise."""
-        from deriva_ml.core.base import DerivaML
-
-        (harness.cache_dir / "index.sqlite").write_text("not a sqlite database")
-        _make_cached_asset(harness.cache_dir, "RID-CC", MD5_A)
-        (harness.cache_dir / "stray.txt").write_text("x")
-
-        stats = DerivaML.clear_cache(harness)
-
-        assert stats["errors"] >= 1                    # the unusable index
-        assert not (harness.cache_dir / "stray.txt").exists()
-        assert list((harness.cache_dir / "assets").iterdir()) == []
 
     def test_storage_summary_has_species_breakdown(self, harness):
         from deriva_ml.core.base import DerivaML
