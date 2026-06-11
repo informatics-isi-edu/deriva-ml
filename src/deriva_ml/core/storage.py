@@ -164,17 +164,21 @@ def list_cached_assets(cache_dir: Path) -> list[CachedAsset]:
             logger.debug("Skipping non-conforming asset-cache entry: %s", entry)
             continue
         rid, md5 = parsed
-        files = [f for f in entry.rglob("*") if f.is_file()]
-        assets.append(
-            CachedAsset(
-                rid=rid,
-                md5=md5,
-                file_count=len(files),
-                size_bytes=sum(f.stat().st_size for f in files),
-                modified=datetime.fromtimestamp(entry.stat().st_mtime, tz=timezone.utc),
-                path=entry,
+        try:
+            files = [f for f in entry.rglob("*") if f.is_file()]
+            assets.append(
+                CachedAsset(
+                    rid=rid,
+                    md5=md5,
+                    file_count=len(files),
+                    size_bytes=sum(f.stat().st_size for f in files),
+                    modified=datetime.fromtimestamp(entry.stat().st_mtime, tz=timezone.utc),
+                    path=entry,
+                )
             )
-        )
+        except (FileNotFoundError, OSError):
+            logger.debug("Asset-cache entry vanished mid-listing: %s", entry)
+            continue
     return assets
 
 
@@ -202,7 +206,8 @@ def delete_cached_asset(cache_dir: Path, rid: str, md5: str | None = None) -> di
         return stats
     pattern = f"{rid}_{md5}" if md5 else f"{rid}_*"
     for entry in assets_dir.glob(pattern):
-        if not entry.is_dir() or _parse_asset_dir_name(entry.name) is None:
+        parsed = _parse_asset_dir_name(entry.name)
+        if not entry.is_dir() or parsed is None or parsed[0] != rid:
             continue
         freed = _dir_size(entry)
         try:

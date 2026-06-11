@@ -334,3 +334,17 @@ class TestCachedAssets:
             "assets_removed": 0,
             "bytes_freed": 0,
         }
+
+    def test_delete_does_not_overmatch_prefix_sharing_rids(self, tmp_path: Path):
+        from deriva_ml.core.storage import delete_cached_asset
+
+        cache_dir = tmp_path / "cache"
+        target = _make_cached_asset(cache_dir, "RID-1", MD5_A)
+        # Shares the "RID-1" prefix but is a different rid — glob
+        # "RID-1_*" must not delete it.
+        bystander = _make_cached_asset(cache_dir, "RID-1_EXTRA", MD5_B)
+
+        stats = delete_cached_asset(cache_dir, "RID-1")
+        assert stats["assets_removed"] == 1
+        assert not target.exists()
+        assert bystander.exists()
