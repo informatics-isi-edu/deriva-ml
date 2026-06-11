@@ -65,6 +65,8 @@ def _make_harness(tmp_path: Path) -> _StorageHarness:
     # to the real implementations, bound to this harness instance.
     h.get_cache_size = lambda: DerivaML.get_cache_size(h)  # type: ignore[arg-type,method-assign]
     h.list_execution_dirs = lambda: DerivaML.list_execution_dirs(h)  # type: ignore[arg-type,method-assign]
+    h.list_cached_bags = lambda: DerivaML.list_cached_bags(h)  # type: ignore[arg-type,method-assign]
+    h.list_cached_assets = lambda: DerivaML.list_cached_assets(h)  # type: ignore[arg-type,method-assign]
     return h
 
 

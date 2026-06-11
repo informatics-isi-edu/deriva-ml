@@ -114,6 +114,14 @@ def __getattr__(name: str) -> type:
         from deriva_ml.catalog.provenance import set_catalog_provenance
 
         return set_catalog_provenance
+    elif name == "CachedBag":
+        from deriva_ml.core.storage import CachedBag
+
+        return CachedBag
+    elif name == "CachedAsset":
+        from deriva_ml.core.storage import CachedAsset
+
+        return CachedAsset
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -152,11 +160,12 @@ __all__ = [
     "DerivaMLMaterializeLimitExceeded",
     "DerivaMLTableTypeError",
     # Definitions
-    "RID",
     "BuiltinTypes",
+    "CachedAsset",
+    "CachedBag",
     "ColumnDefinition",
-    "DerivaSystemColumns",
     "DerivaAssetColumns",
+    "DerivaSystemColumns",
     "ExecAssetType",
     "ExecMetadataType",
     "FileSpec",
@@ -165,6 +174,7 @@ __all__ = [
     "KeyDefinition",
     "MLAsset",
     "MLVocab",
+    "RID",
     "TableDefinition",
     "UploadCallback",
     "UploadProgress",

@@ -29,14 +29,30 @@ caches written by older code keep working.
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deriva.bag.cache_index import BagCacheIndex
+
 from deriva_ml.core.logging_config import get_logger
 
+if TYPE_CHECKING:
+    from deriva_ml.core.storage import CachedBag
+
 logger = get_logger(__name__)
+
+
+def _utc(ts: datetime) -> datetime:
+    """Attach UTC to a naive datetime; pass tz-aware through unchanged.
+
+    ``BagCacheIndex.record()`` defaults to tz-aware UTC timestamps,
+    but accepts naive ones — normalize so ``CachedBag.built_at`` is
+    always comparable.
+    """
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
 
 
 class CacheStatus(StrEnum):
@@ -147,6 +163,127 @@ class BagCache:
             "cache_path": cache_path,
             "versions_cached": list(checksums),
         }
+
+    def list_bags(self) -> "list[CachedBag]":
+        """List every dataset-anchored bag in the local cache.
+
+        Joins the index's bag rows with the ``bag_anchor_rids``
+        reverse index: one :class:`~deriva_ml.core.storage.CachedBag`
+        per (bag, Dataset-anchor) pair, most-recently-built first.
+        Purely local — no catalog access.
+
+        Returns:
+            List of ``CachedBag`` records (empty when nothing cached).
+
+        Example:
+            >>> from deriva_ml.dataset.bag_cache import BagCache  # doctest: +SKIP
+            >>> with BagCache(cache_dir) as cache:  # doctest: +SKIP
+            ...     for bag in cache.list_bags():  # doctest: +SKIP
+            ...         print(bag.dataset_rid, bag.version, bag.status.value)  # doctest: +SKIP
+        """
+        # Lazy import: core.storage imports CacheStatus from this
+        # module at module level; importing the record lazily here
+        # keeps the import graph acyclic.
+        from deriva_ml.core.storage import CachedBag, _dir_size
+
+        anchors = self._dataset_anchors()
+        bags: list[CachedBag] = []
+        for row in self._index.list_bags():
+            checksum = row["checksum"]
+            version = (row.get("anchor_summary") or {}).get("version")
+            for rid in anchors.get(checksum, []):
+                bag_dir = self._index.bag_dir_for(checksum) / f"Dataset_{rid}"
+                status = self._determine_index_status(checksum, bag_dir)
+                bags.append(
+                    CachedBag(
+                        dataset_rid=rid,
+                        version=version,
+                        checksum=checksum,
+                        status=status,
+                        built_at=_utc(datetime.fromisoformat(row["built_at"])),
+                        size_bytes=row.get("size_bytes") or _dir_size(bag_dir) or None,
+                        path=bag_dir,
+                    )
+                )
+        return bags
+
+    def purge_dataset(self, dataset_rid: str, version: str | None = None) -> dict[str, int]:
+        """Delete cached bags for a dataset (all versions, or one).
+
+        Each matching bag is removed via
+        :meth:`~deriva.bag.cache_index.BagCacheIndex.purge`, which
+        drops the index row and the on-disk directory together — the
+        index never outlives its referent.
+
+        Caution: a content-addressed bag anchored by *several*
+        datasets is removed for all of them (the cache is always
+        re-downloadable, so this is at worst a re-fetch).
+
+        Args:
+            dataset_rid: Dataset RID whose cached bags to remove.
+            version: When given, only the bag(s) whose recorded
+                ``anchor_summary['version']`` matches. ``None``
+                removes every cached version.
+
+        Returns:
+            ``{"bags_removed": n, "bytes_freed": n}``. Unknown RID
+            (or version) yields zeros — deletion is idempotent.
+            OS-level failures purging individual bags are logged and
+            skipped; the loop continues to the next entry.
+
+        Example:
+            >>> with BagCache(cache_dir) as cache:  # doctest: +SKIP
+            ...     cache.purge_dataset("1ABC", version="1.2.0")  # doctest: +SKIP
+            {'bags_removed': 1, 'bytes_freed': 52431}
+        """
+        from deriva_ml.core.storage import _dir_size
+
+        stats = {"bags_removed": 0, "bytes_freed": 0}
+        for checksum in self._index.find_bags_for_rid(table="Dataset", rid=dataset_rid):
+            if version is not None:
+                row = self._index.get(checksum) or {}
+                recorded = (row.get("anchor_summary") or {}).get("version")
+                if recorded != str(version):
+                    continue
+            bag_root = self._index.bag_dir_for(checksum)
+            freed = _dir_size(bag_root)
+            try:
+                purged = self._index.purge(checksum)
+            except (OSError, PermissionError) as e:
+                logger.warning("Failed to purge cached bag %s: %s", checksum, e)
+                continue
+            if purged:
+                stats["bags_removed"] += 1
+                stats["bytes_freed"] += freed
+        return stats
+
+    def _dataset_anchors(self) -> dict[str, list[str]]:
+        """Map checksum -> Dataset RIDs from the reverse index.
+
+        ``BagCacheIndex`` exposes rid->checksums
+        (:meth:`~deriva.bag.cache_index.BagCacheIndex.find_bags_for_rid`)
+        but not the reverse, so read ``bag_anchor_rids`` directly with
+        a read-only sqlite3 connection. Safe against schema drift:
+        ``self._index`` was constructed first, and its schema-version
+        guard raises before this query can see an unexpected layout.
+        (Follow-up: a public ``anchors_for()`` upstream would replace
+        this.)
+        """
+        db = self._cache_dir / "index.sqlite"
+        if not db.exists():
+            return {}
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            rows = conn.execute(
+                'SELECT checksum, rid FROM bag_anchor_rids WHERE "table" = ?',
+                ("Dataset",),
+            ).fetchall()
+        finally:
+            conn.close()
+        anchors: dict[str, list[str]] = {}
+        for checksum, rid in rows:
+            anchors.setdefault(checksum, []).append(rid)
+        return anchors
 
     # ------------------------------------------------------------------
     # Status detection helpers

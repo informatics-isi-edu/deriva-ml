@@ -665,6 +665,45 @@ See the "How to restructure assets for ML frameworks" section above for the full
 - `DatasetBag.feature_values` docstring — selector callable shape, multi-annotator patterns, and the `missing=` policy interaction.
 - `split_dataset` docstring — stratified train/val/test split that composes upstream of all three framework paths: split the catalog dataset, download each partition as its own bag, then call the appropriate adapter on each bag independently.
 
+## What's in my cache?
+
+DerivaML keeps three kinds of local storage. Each has a direct
+inspect call and a matching delete:
+
+| What | Inspect | Delete |
+|---|---|---|
+| Cached dataset bags | `ml.list_cached_bags()` | `ml.delete_cached_bag(rid, version=None)` |
+| Cached input assets | `ml.list_cached_assets()` | `ml.delete_cached_asset(rid, md5=None)` |
+| Execution working dirs | `ml.list_execution_dirs()` | `ml.clean_execution_dirs(...)` |
+
+```python
+# Every cached bag, newest first
+for bag in ml.list_cached_bags():
+    print(bag.dataset_rid, bag.version, bag.status.value, bag.size_bytes)
+
+# Cached input assets (written by AssetSpec(cache=True))
+for asset in ml.list_cached_assets():
+    print(asset.rid, asset.md5, asset.size_bytes)
+
+# One summary across all three species
+summary = ml.get_storage_summary()
+print(summary["bag_count"], summary["asset_count"], summary["total_size_mb"])
+
+# Targeted cleanup
+ml.delete_cached_bag("1-ABC", version="1.2.0")  # one version
+ml.delete_cached_bag("1-ABC")                   # all versions
+ml.delete_cached_asset("2-XYZ")                 # all cached copies
+
+# Whole-cache cleanup (bags removed through the index, so the
+# cache index always agrees with the disk)
+ml.clear_cache(older_than_days=30)
+```
+
+Deletion is idempotent — removing something that isn't cached
+returns zero counts rather than raising. Everything here is local
+and re-downloadable; deleting a cached bag never touches the
+catalog.
+
 ## Common pitfalls
 
 !!! warning "restructure_assets returns a dict, not a Path"
