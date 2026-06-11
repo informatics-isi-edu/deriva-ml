@@ -228,6 +228,8 @@ class BagCache:
         Returns:
             ``{"bags_removed": n, "bytes_freed": n}``. Unknown RID
             (or version) yields zeros — deletion is idempotent.
+            OS-level failures purging individual bags are logged and
+            skipped; the loop continues to the next entry.
 
         Example:
             >>> with BagCache(cache_dir) as cache:  # doctest: +SKIP
@@ -245,7 +247,12 @@ class BagCache:
                     continue
             bag_root = self._index.bag_dir_for(checksum)
             freed = _dir_size(bag_root)
-            if self._index.purge(checksum):
+            try:
+                purged = self._index.purge(checksum)
+            except (OSError, PermissionError) as e:
+                logger.warning("Failed to purge cached bag %s: %s", checksum, e)
+                continue
+            if purged:
                 stats["bags_removed"] += 1
                 stats["bytes_freed"] += freed
         return stats

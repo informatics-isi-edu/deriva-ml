@@ -1707,9 +1707,7 @@ class DerivaML(
         assets = self.list_cached_assets()
         # A multi-anchor bag appears once per dataset RID in the
         # listing; size it once per checksum for the summary.
-        bag_bytes = sum(
-            {b.checksum: (b.size_bytes or 0) for b in bags}.values()
-        )
+        bag_bytes = sum({b.checksum: (b.size_bytes or 0) for b in bags}.values())
         asset_bytes = sum(a.size_bytes for a in assets)
 
         return {

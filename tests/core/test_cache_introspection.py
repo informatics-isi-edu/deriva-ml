@@ -260,6 +260,30 @@ class TestPurgeDataset:
         with BagCache(tmp_path / "cache") as cache:
             assert cache.purge_dataset("NOPE") == {"bags_removed": 0, "bytes_freed": 0}
 
+    def test_purge_continues_past_failing_entry(self, tmp_path: Path, monkeypatch):
+        """An OSError purging one bag must not abort the loop or lose stats."""
+        from deriva.bag.cache_index import BagCacheIndex  # noqa: E402
+
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="x1", dataset_rid="RID-ERR", version="1.0.0")
+        _record_bag(cache_dir, checksum="x2", dataset_rid="RID-ERR", version="2.0.0")
+
+        original_purge = BagCacheIndex.purge
+
+        def flaky_purge(self, checksum):
+            if checksum == "x1":
+                raise OSError("simulated rmtree failure")
+            return original_purge(self, checksum)
+
+        monkeypatch.setattr(BagCacheIndex, "purge", flaky_purge)
+
+        with BagCache(cache_dir) as cache:
+            stats = cache.purge_dataset("RID-ERR")
+
+        assert stats["bags_removed"] == 1   # x2 succeeded despite x1 failing
+
 
 # ---------------------------------------------------------------------------
 # Asset cache: list_cached_assets / delete_cached_asset

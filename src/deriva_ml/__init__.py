@@ -160,6 +160,7 @@ __all__ = [
     "DerivaMLMaterializeLimitExceeded",
     "DerivaMLTableTypeError",
     # Definitions
+    "BuiltinTypes",
     "CachedAsset",
     "CachedBag",
     "ColumnDefinition",
