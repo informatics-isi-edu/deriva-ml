@@ -33,10 +33,14 @@ import sqlite3
 from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deriva.bag.cache_index import BagCacheIndex
+
 from deriva_ml.core.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from deriva_ml.core.storage import CachedBag
 
 logger = get_logger(__name__)
 

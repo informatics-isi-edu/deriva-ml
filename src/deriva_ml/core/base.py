@@ -47,7 +47,6 @@ from deriva_ml.core.exceptions import (
     DerivaMLConfigurationError,
     DerivaMLException,
     DerivaMLOfflineError,
-    DerivaMLReadOnlyError,
     DerivaMLSchemaPinned,
     DerivaMLSchemaRefreshBlocked,
 )

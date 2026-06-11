@@ -72,15 +72,11 @@ def _record_bag(
         if holey:
             # A fetch.txt entry referencing a file that was never
             # fetched marks the bag holey.
-            (bag_dir / "fetch.txt").write_text(
-                "https://example.org/x\t10\tdata/missing.bin\n"
-            )
+            (bag_dir / "fetch.txt").write_text("https://example.org/x\t10\tdata/missing.bin\n")
     return bag_dir
 
 
-def _make_cached_asset(
-    cache_dir: Path, rid: str, md5: str, n_files: int = 1
-) -> Path:
+def _make_cached_asset(cache_dir: Path, rid: str, md5: str, n_files: int = 1) -> Path:
     """Create a synthetic cached asset dir ``assets/{rid}_{md5}``."""
     asset_dir = cache_dir / "assets" / f"{rid}_{md5}"
     asset_dir.mkdir(parents=True, exist_ok=True)
@@ -371,7 +367,7 @@ class TestClearCacheCoherent:
         assert stats["dirs_removed"] >= 2  # the bag dir + the asset dir
         assert stats["bytes_freed"] > 0
         with BagCache(cache_dir) as cache:
-            assert cache.list_bags() == []           # index agrees: nothing cached
+            assert cache.list_bags() == []  # index agrees: nothing cached
         assert list((cache_dir / "assets").iterdir()) == []
         assert not (cache_dir / "stray.txt").exists()
 
@@ -408,9 +404,7 @@ class TestClearCacheCoherent:
         index = BagCacheIndex(cache_dir)
         try:
             for row in index.list_bags():
-                assert index.bag_dir_for(row["checksum"]).exists(), (
-                    f"index references removed bag {row['checksum']}"
-                )
+                assert index.bag_dir_for(row["checksum"]).exists(), f"index references removed bag {row['checksum']}"
         finally:
             index.dispose()
 
@@ -450,7 +444,7 @@ class TestClearCacheCoherent:
 
         stats = clear_cache(cache_dir)
 
-        assert stats["errors"] >= 1                    # the unusable index
+        assert stats["errors"] >= 1  # the unusable index
         assert not (cache_dir / "stray.txt").exists()
         assert list((cache_dir / "assets").iterdir()) == []
 
@@ -486,6 +480,7 @@ class TestDerivaMLSurface:
 
     def test_clear_cache_is_index_coherent_via_derivaml(self, harness):
         from deriva.bag.cache_index import BagCacheIndex
+
         from deriva_ml.core.base import DerivaML
 
         _record_bag(harness.cache_dir, checksum="l1", dataset_rid="RID-W")
@@ -514,8 +509,13 @@ class TestDerivaMLSurface:
 
         # Existing keys unchanged
         for key in (
-            "working_dir", "cache_dir", "cache_size_mb", "cache_file_count",
-            "execution_dir_count", "execution_size_mb", "total_size_mb",
+            "working_dir",
+            "cache_dir",
+            "cache_size_mb",
+            "cache_file_count",
+            "execution_dir_count",
+            "execution_size_mb",
+            "total_size_mb",
         ):
             assert key in summary
         # New per-species keys
@@ -523,3 +523,13 @@ class TestDerivaMLSurface:
         assert summary["asset_count"] == 1
         assert summary["bag_size_mb"] > 0
         assert summary["asset_size_mb"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Exports
+# ---------------------------------------------------------------------------
+
+
+class TestExports:
+    def test_records_importable_from_top_level(self):
+        from deriva_ml import CachedAsset, CachedBag  # noqa: F401

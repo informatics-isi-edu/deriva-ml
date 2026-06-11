@@ -223,9 +223,7 @@ def delete_cached_asset(cache_dir: Path, rid: str, md5: str | None = None) -> di
 # Cache-dir entries owned by the bag index / asset cache machinery.
 # clear_cache handles these through their own coherent paths; only
 # entries outside this set get the legacy mtime-walk treatment.
-_PROTECTED_CACHE_ENTRIES = frozenset(
-    {"bags", "assets", "index.sqlite", "index.sqlite-wal", "index.sqlite-shm"}
-)
+_PROTECTED_CACHE_ENTRIES = frozenset({"bags", "assets", "index.sqlite", "index.sqlite-wal", "index.sqlite-shm"})
 
 
 def clear_cache(
