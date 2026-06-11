@@ -29,7 +29,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _vocabulary_test_isolation(request, catalog_manager):
+def _vocabulary_test_isolation(request):
     """Reset the catalog before every test in ``test_vocabulary.py``.
 
     Per audit §C.S2(a): vocabulary tests create N domain-schema
@@ -41,5 +41,7 @@ def _vocabulary_test_isolation(request, catalog_manager):
     No-op for every other test file in ``tests/core/``.
     """
     if request.node.fspath.basename == "test_vocabulary.py":
+        # Get catalog_manager from fixtures only if needed
+        catalog_manager = request.getfixturevalue("catalog_manager")
         catalog_manager.reset()
     yield

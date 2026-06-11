@@ -1,0 +1,113 @@
+"""Local cache & storage introspection records and helpers.
+
+Owns the typed records returned by the DerivaML storage-introspection
+surface (``list_cached_bags`` / ``list_cached_assets``), the asset-
+cache list/delete functions, and the index-coherent ``clear_cache``
+engine. Bag listing/purging logic lives on
+:class:`deriva_ml.dataset.bag_cache.BagCache`, which owns the
+underlying :class:`~deriva.bag.cache_index.BagCacheIndex`.
+
+Import-cycle rule: this module may import from
+``deriva_ml.dataset.bag_cache`` at module level (it has no deriva-ml
+dependencies beyond logging); ``bag_cache`` imports the records
+defined here lazily inside method bodies only.
+
+Example:
+    >>> from deriva_ml.core.storage import CachedAsset
+    >>> CachedAsset.model_fields["md5"].annotation
+    <class 'str'>
+"""
+
+from __future__ import annotations
+
+import shutil
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
+from deriva_ml.core.logging_config import get_logger
+from deriva_ml.dataset.bag_cache import CacheStatus
+
+logger = get_logger(__name__)
+
+# MD5 hex digest length — used to validate "{rid}_{md5}" asset-cache
+# directory names.
+_MD5_HEX_LEN = 32
+
+
+class CachedBag(BaseModel):
+    """One dataset-anchored bag in the local cache.
+
+    A single content-addressed bag may be anchored by more than one
+    dataset RID (e.g. shared content via clone-via-bag); each
+    (bag, Dataset-anchor) pair produces one ``CachedBag``, so two
+    entries may share a ``checksum``.
+
+    Example:
+        >>> from datetime import datetime, timezone
+        >>> from pathlib import Path
+        >>> from deriva_ml.dataset.bag_cache import CacheStatus
+        >>> bag = CachedBag(
+        ...     dataset_rid="1ABC", version="1.0.0", checksum="deadbeef",
+        ...     status=CacheStatus.cached_materialized,
+        ...     built_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        ...     size_bytes=2048, path=Path("/tmp/bags/deadbeef/Dataset_1ABC"),
+        ... )
+        >>> bag.status.value
+        'cached_materialized'
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    dataset_rid: str
+    version: str | None
+    checksum: str
+    status: CacheStatus
+    built_at: datetime
+    size_bytes: int | None
+    path: Path
+
+
+class CachedAsset(BaseModel):
+    """One cached input-asset directory (``assets/{rid}_{md5}/``).
+
+    Written by ``Execution.download_asset(use_cache=True)``; the
+    directory name encodes the asset RID and the file's MD5.
+
+    Example:
+        >>> from datetime import datetime, timezone
+        >>> from pathlib import Path
+        >>> a = CachedAsset(
+        ...     rid="2XYZ", md5="d41d8cd98f00b204e9800998ecf8427e",
+        ...     file_count=1, size_bytes=100,
+        ...     modified=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        ...     path=Path("/tmp/assets/2XYZ_d41d8cd98f00b204e9800998ecf8427e"),
+        ... )
+        >>> a.file_count
+        1
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    rid: str
+    md5: str
+    file_count: int
+    size_bytes: int
+    modified: datetime
+    path: Path
+
+
+def _dir_size(path: Path) -> int:
+    """Total bytes of all files under ``path`` (0 if missing).
+
+    Example:
+        >>> from pathlib import Path
+        >>> _dir_size(Path("/nonexistent/anywhere"))
+        0
+    """
+    if not path.exists():
+        return 0
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
