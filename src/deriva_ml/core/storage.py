@@ -110,4 +110,106 @@ def _dir_size(path: Path) -> int:
     """
     if not path.exists():
         return 0
-    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+    total = 0
+    for f in path.rglob("*"):
+        try:
+            if f.is_file():
+                total += f.stat().st_size
+        except FileNotFoundError:
+            # Entry vanished mid-walk (concurrent cleanup) — skip it.
+            continue
+    return total
+
+
+def _parse_asset_dir_name(name: str) -> tuple[str, str] | None:
+    """Split ``{rid}_{md5}`` (last underscore, md5 = 32 hex chars)."""
+    rid, sep, md5 = name.rpartition("_")
+    if not sep or not rid or len(md5) != _MD5_HEX_LEN:
+        return None
+    if any(c not in "0123456789abcdef" for c in md5.lower()):
+        return None
+    return rid, md5
+
+
+def list_cached_assets(cache_dir: Path) -> list[CachedAsset]:
+    """List cached input assets under ``{cache_dir}/assets/``.
+
+    Each conforming ``{rid}_{md5}`` directory yields one
+    :class:`CachedAsset`. Non-conforming entries are skipped with a
+    debug log — the directory is deriva-ml's, but listing tolerates
+    foreign droppings rather than erroring.
+
+    Args:
+        cache_dir: The DerivaML cache directory.
+
+    Returns:
+        ``CachedAsset`` records sorted by directory name; empty list
+        when the assets directory does not exist.
+
+    Example:
+        >>> from pathlib import Path
+        >>> list_cached_assets(Path("/nonexistent"))
+        []
+    """
+    assets_dir = Path(cache_dir) / "assets"
+    if not assets_dir.exists():
+        return []
+    assets: list[CachedAsset] = []
+    for entry in sorted(assets_dir.iterdir()):
+        if not entry.is_dir():
+            logger.debug("Skipping non-directory in asset cache: %s", entry)
+            continue
+        parsed = _parse_asset_dir_name(entry.name)
+        if parsed is None:
+            logger.debug("Skipping non-conforming asset-cache entry: %s", entry)
+            continue
+        rid, md5 = parsed
+        files = [f for f in entry.rglob("*") if f.is_file()]
+        assets.append(
+            CachedAsset(
+                rid=rid,
+                md5=md5,
+                file_count=len(files),
+                size_bytes=sum(f.stat().st_size for f in files),
+                modified=datetime.fromtimestamp(entry.stat().st_mtime, tz=timezone.utc),
+                path=entry,
+            )
+        )
+    return assets
+
+
+def delete_cached_asset(cache_dir: Path, rid: str, md5: str | None = None) -> dict[str, int]:
+    """Delete cached asset directories for a RID.
+
+    Args:
+        cache_dir: The DerivaML cache directory.
+        rid: Asset RID whose cache entries to remove.
+        md5: When given, only the ``{rid}_{md5}`` entry; ``None``
+            removes every cached copy of the asset.
+
+    Returns:
+        ``{"assets_removed": n, "bytes_freed": n}``; zeros when
+        nothing matched (idempotent).
+
+    Example:
+        >>> from pathlib import Path
+        >>> delete_cached_asset(Path("/nonexistent"), "1ABC")
+        {'assets_removed': 0, 'bytes_freed': 0}
+    """
+    assets_dir = Path(cache_dir) / "assets"
+    stats = {"assets_removed": 0, "bytes_freed": 0}
+    if not assets_dir.exists():
+        return stats
+    pattern = f"{rid}_{md5}" if md5 else f"{rid}_*"
+    for entry in assets_dir.glob(pattern):
+        if not entry.is_dir() or _parse_asset_dir_name(entry.name) is None:
+            continue
+        freed = _dir_size(entry)
+        try:
+            shutil.rmtree(entry)
+        except (OSError, PermissionError) as e:
+            logger.warning("Failed to remove cached asset %s: %s", entry, e)
+            continue
+        stats["assets_removed"] += 1
+        stats["bytes_freed"] += freed
+    return stats

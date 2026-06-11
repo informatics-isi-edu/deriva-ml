@@ -256,9 +256,81 @@ class TestPurgeDataset:
         assert stats["bags_removed"] == 1
         assert kept.exists()
         assert [b.version for b in remaining] == ["2.0.0"]
+        assert not (cache_dir / "bags" / "f1").exists()
 
     def test_purge_unknown_rid_is_idempotent_zero(self, tmp_path: Path):
         from deriva_ml.dataset.bag_cache import BagCache
 
         with BagCache(tmp_path / "cache") as cache:
             assert cache.purge_dataset("NOPE") == {"bags_removed": 0, "bytes_freed": 0}
+
+
+# ---------------------------------------------------------------------------
+# Asset cache: list_cached_assets / delete_cached_asset
+# ---------------------------------------------------------------------------
+
+MD5_A = "d41d8cd98f00b204e9800998ecf8427e"
+MD5_B = "9e107d9d372bb6826bd81d3542a419d6"
+
+
+class TestCachedAssets:
+    def test_empty_or_missing_assets_dir(self, tmp_path: Path):
+        from deriva_ml.core.storage import list_cached_assets
+
+        assert list_cached_assets(tmp_path / "cache") == []
+
+    def test_lists_assets_with_parsed_rid_md5(self, tmp_path: Path):
+        from deriva_ml.core.storage import list_cached_assets
+
+        cache_dir = tmp_path / "cache"
+        _make_cached_asset(cache_dir, "RID-1", MD5_A, n_files=2)
+        _make_cached_asset(cache_dir, "RID-2", MD5_B)
+
+        assets = list_cached_assets(cache_dir)
+        assert {(a.rid, a.md5) for a in assets} == {("RID-1", MD5_A), ("RID-2", MD5_B)}
+        by_rid = {a.rid: a for a in assets}
+        assert by_rid["RID-1"].file_count == 2
+        assert by_rid["RID-1"].size_bytes == 200
+
+    def test_nonconforming_entry_skipped(self, tmp_path: Path):
+        from deriva_ml.core.storage import list_cached_assets
+
+        cache_dir = tmp_path / "cache"
+        _make_cached_asset(cache_dir, "RID-1", MD5_A)
+        (cache_dir / "assets" / "not-an-asset").mkdir()
+        (cache_dir / "assets" / "stray.txt").write_text("x")
+
+        assets = list_cached_assets(cache_dir)
+        assert [a.rid for a in assets] == ["RID-1"]
+
+    def test_delete_specific_md5(self, tmp_path: Path):
+        from deriva_ml.core.storage import delete_cached_asset
+
+        cache_dir = tmp_path / "cache"
+        gone = _make_cached_asset(cache_dir, "RID-1", MD5_A)
+        kept = _make_cached_asset(cache_dir, "RID-1", MD5_B)
+
+        stats = delete_cached_asset(cache_dir, "RID-1", md5=MD5_A)
+        assert stats["assets_removed"] == 1
+        assert stats["bytes_freed"] == 100
+        assert not gone.exists() and kept.exists()
+
+    def test_delete_all_for_rid(self, tmp_path: Path):
+        from deriva_ml.core.storage import delete_cached_asset
+
+        cache_dir = tmp_path / "cache"
+        _make_cached_asset(cache_dir, "RID-1", MD5_A)
+        _make_cached_asset(cache_dir, "RID-1", MD5_B)
+        other = _make_cached_asset(cache_dir, "RID-2", MD5_A)
+
+        stats = delete_cached_asset(cache_dir, "RID-1")
+        assert stats["assets_removed"] == 2
+        assert other.exists()
+
+    def test_delete_missing_is_idempotent_zero(self, tmp_path: Path):
+        from deriva_ml.core.storage import delete_cached_asset
+
+        assert delete_cached_asset(tmp_path / "cache", "NOPE") == {
+            "assets_removed": 0,
+            "bytes_freed": 0,
+        }
