@@ -20,11 +20,11 @@ Example:
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -231,7 +231,7 @@ _PROTECTED_CACHE_ENTRIES = frozenset(
 def clear_cache(
     cache_dir: Path,
     older_than_days: int | None = None,
-    log: Any | None = None,
+    log: logging.Logger | None = None,
 ) -> dict[str, int]:
     """Clear the dataset cache directory, index-coherently.
 
@@ -275,24 +275,33 @@ def clear_cache(
     if (cache_dir / "index.sqlite").exists():
         from deriva.bag.cache_index import BagCacheIndex
 
-        index = BagCacheIndex(cache_dir)
         try:
-            for row in index.list_bags():
-                if cutoff is not None:
-                    built = datetime.fromisoformat(row["built_at"]).timestamp()
-                    if built > cutoff:
+            index = BagCacheIndex(cache_dir)
+        except Exception as e:  # corrupt index / schema-version mismatch
+            log.warning("Bag index unusable, skipping bag pass: %s", e)
+            stats["errors"] += 1
+            index = None
+        if index is not None:
+            try:
+                for row in index.list_bags():
+                    if cutoff is not None:
+                        built = datetime.fromisoformat(row["built_at"]).timestamp()
+                        if built > cutoff:
+                            continue
+                    bag_root = index.bag_dir_for(row["checksum"])
+                    dir_existed = bag_root.exists()
+                    freed = _dir_size(bag_root)
+                    try:
+                        index.purge(row["checksum"])
+                    except (OSError, PermissionError) as e:
+                        log.warning("Failed to purge cached bag %s: %s", row["checksum"], e)
+                        stats["errors"] += 1
                         continue
-                freed = _dir_size(index.bag_dir_for(row["checksum"]))
-                try:
-                    index.purge(row["checksum"])
-                except (OSError, PermissionError) as e:
-                    log.warning("Failed to purge cached bag %s: %s", row["checksum"], e)
-                    stats["errors"] += 1
-                    continue
-                stats["dirs_removed"] += 1
-                stats["bytes_freed"] += freed
-        finally:
-            index.dispose()
+                    if dir_existed:
+                        stats["dirs_removed"] += 1
+                        stats["bytes_freed"] += freed
+            finally:
+                index.dispose()
 
     # Pass 2: assets, by mtime.
     assets_dir = cache_dir / "assets"

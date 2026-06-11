@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------
@@ -193,6 +192,7 @@ class TestListBags:
 
     def test_multi_anchor_bag_yields_one_entry_per_dataset(self, tmp_path: Path):
         from deriva.bag.cache_index import BagCacheIndex
+
         from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
 
         cache_dir = tmp_path / "cache"
@@ -368,6 +368,7 @@ class TestClearCacheCoherent:
         stats = clear_cache(cache_dir)
 
         assert stats["errors"] == 0
+        assert stats["dirs_removed"] >= 2  # the bag dir + the asset dir
         assert stats["bytes_freed"] > 0
         with BagCache(cache_dir) as cache:
             assert cache.list_bags() == []           # index agrees: nothing cached
@@ -395,6 +396,7 @@ class TestClearCacheCoherent:
         """Regression: the pre-rewrite clear_cache could delete bag
         dirs while the index still listed them (spec section 1)."""
         from deriva.bag.cache_index import BagCacheIndex
+
         from deriva_ml.core.storage import clear_cache
 
         cache_dir = tmp_path / "cache"
@@ -417,3 +419,21 @@ class TestClearCacheCoherent:
 
         stats = clear_cache(tmp_path / "nope")
         assert stats == {"files_removed": 0, "dirs_removed": 0, "bytes_freed": 0, "errors": 0}
+
+    def test_index_only_row_purged_without_inflating_dirs_removed(self, tmp_path: Path):
+        from deriva.bag.cache_index import BagCacheIndex
+
+        from deriva_ml.core.storage import clear_cache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="j9", dataset_rid="RID-GONE", on_disk=False)
+
+        stats = clear_cache(cache_dir)
+
+        assert stats["dirs_removed"] == 0
+        assert stats["errors"] == 0
+        index = BagCacheIndex(cache_dir)
+        try:
+            assert index.list_bags() == []  # stale row repaired
+        finally:
+            index.dispose()
