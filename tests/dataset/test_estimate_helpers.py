@@ -42,22 +42,13 @@ class TestExtractPath:
     """``_extract_path`` strips the catalog-server prefix."""
 
     def test_entity_uri(self):
-        assert (
-            _extract_path("https://srv/ermrest/catalog/3/entity/X:Y")
-            == "/entity/X:Y"
-        )
+        assert _extract_path("https://srv/ermrest/catalog/3/entity/X:Y") == "/entity/X:Y"
 
     def test_aggregate_uri(self):
-        assert (
-            _extract_path("https://srv/ermrest/catalog/3/aggregate/X:Y/cnt(RID)")
-            == "/aggregate/X:Y/cnt(RID)"
-        )
+        assert _extract_path("https://srv/ermrest/catalog/3/aggregate/X:Y/cnt(RID)") == "/aggregate/X:Y/cnt(RID)"
 
     def test_attribute_uri(self):
-        assert (
-            _extract_path("https://srv/ermrest/catalog/3/attribute/X:Y/RID,Length")
-            == "/attribute/X:Y/RID,Length"
-        )
+        assert _extract_path("https://srv/ermrest/catalog/3/attribute/X:Y/RID,Length") == "/attribute/X:Y/RID,Length"
 
     def test_unrecognised_uri_raises(self):
         with pytest.raises(ValueError, match="Cannot extract"):
@@ -194,7 +185,7 @@ class TestRunEstimateQueries:
             QueryItem("T", "/p1", "csv"),
             QueryItem("T", "/p2", "csv"),
         ]
-        rids, lengths, samples = asyncio.run(run_estimate_queries(cat, items))
+        rids, lengths, samples, _failed = asyncio.run(run_estimate_queries(cat, items))
         # Union, not concat.
         assert rids == {"T": {"A", "B", "C"}}
         assert lengths == {}
@@ -211,7 +202,7 @@ class TestRunEstimateQueries:
             }
         )
         items = [QueryItem("T", "/p1", "fetch")]
-        rids, lengths, samples = asyncio.run(run_estimate_queries(cat, items))
+        rids, lengths, samples, _failed = asyncio.run(run_estimate_queries(cat, items))
         assert lengths == {"T": {"A": 100, "B": 200}}
 
     def test_fetch_first_occurrence_wins(self):
@@ -226,7 +217,7 @@ class TestRunEstimateQueries:
             QueryItem("T", "/p1", "fetch"),
             QueryItem("T", "/p2", "fetch"),
         ]
-        rids, lengths, samples = asyncio.run(run_estimate_queries(cat, items))
+        rids, lengths, samples, _failed = asyncio.run(run_estimate_queries(cat, items))
         assert lengths == {"T": {"A": 100}}
 
     def test_sample_only_keeps_first_per_table(self):
@@ -240,11 +231,13 @@ class TestRunEstimateQueries:
             QueryItem("T", "/p1", "sample"),
             QueryItem("T", "/p2", "sample"),
         ]
-        rids, lengths, samples = asyncio.run(run_estimate_queries(cat, items))
+        rids, lengths, samples, _failed = asyncio.run(run_estimate_queries(cat, items))
         assert samples == {"T": [{"row": 1}]}
 
-    def test_per_query_failure_is_swallowed_with_debug_log(self):
-        """A failing query produces an empty-list result; other queries succeed."""
+    def test_per_query_failure_is_tolerated_and_recorded(self):
+        """A failing query doesn't abort the estimate; it is recorded
+        in failed_by_table (visibility contract — see
+        TestFailureVisibility for the full surface)."""
 
         def _boom():
             raise RuntimeError("query failed")
@@ -254,10 +247,10 @@ class TestRunEstimateQueries:
             QueryItem("T", "/good", "csv"),
             QueryItem("T", "/bad", "csv"),
         ]
-        rids, lengths, samples = asyncio.run(run_estimate_queries(cat, items))
-        # The good query landed; the bad one returned an empty list,
-        # contributing zero RIDs to the union.
+        rids, lengths, samples, failed = asyncio.run(run_estimate_queries(cat, items))
+        # The good query landed; the failure is visible, not silent.
         assert rids == {"T": {"A"}}
+        assert failed == {"T": 1}
 
     def test_close_runs_even_on_partial_failure(self):
         """``catalog.close()`` is awaited even when individual queries failed."""
@@ -372,3 +365,145 @@ class TestAssembleEstimate:
         assert result["total_asset_size"] == "~0!"
         assert result["total_csv_size"] == "~0!"
         assert result["total_estimated_size"] == "~0!"
+
+
+# ---------------------------------------------------------------------------
+# Failure visibility + bounded concurrency (fix for the silent-zeros bug:
+# 1,599 of 1,699 estimate queries died on httpx PoolTimeout and were
+# reported as row_count=0 — eye-ai 2-277G, 2026-06-11)
+# ---------------------------------------------------------------------------
+
+
+class _RecordingLogger:
+    """Minimal logger stand-in capturing warning/debug calls."""
+
+    def __init__(self):
+        self.warnings: list[str] = []
+        self.debugs: list[str] = []
+
+    def warning(self, msg, *args):
+        self.warnings.append(msg % args if args else msg)
+
+    def debug(self, msg, *args):
+        self.debugs.append(msg % args if args else msg)
+
+
+class TestFailureVisibility:
+    def test_failed_queries_reported_per_table(self):
+        """Failures land in failed_by_table, not silently as empty results."""
+
+        def _boom():
+            raise RuntimeError("pool timeout")
+
+        cat = _FakeAsyncCatalog({"/good": [{"RID": "A"}], "/bad": _boom, "/bad2": _boom})
+        items = [
+            QueryItem("T", "/good", "csv"),
+            QueryItem("T", "/bad", "csv"),
+            QueryItem("U", "/bad2", "csv"),
+        ]
+        rids, lengths, samples, failed = asyncio.run(run_estimate_queries(cat, items))
+        assert rids["T"] == {"A"}
+        assert failed == {"T": 1, "U": 2} or failed == {"T": 1, "U": 1}
+        # U had exactly one query and it failed:
+        assert failed["U"] == 1
+        # A fully-failed table must NOT appear as an empty success:
+        assert "U" not in rids or rids["U"] == set()
+
+    def test_no_failures_yields_empty_failed_map(self):
+        cat = _FakeAsyncCatalog({"/p": [{"RID": "A"}]})
+        items = [QueryItem("T", "/p", "csv")]
+        *_, failed = asyncio.run(run_estimate_queries(cat, items))
+        assert failed == {}
+
+    def test_warning_logged_once_when_queries_fail(self):
+        def _boom():
+            raise RuntimeError("nope")
+
+        cat = _FakeAsyncCatalog({"/bad": _boom, "/good": [{"RID": "A"}]})
+        items = [QueryItem("T", "/bad", "csv"), QueryItem("V", "/good", "csv")]
+        log = _RecordingLogger()
+        asyncio.run(run_estimate_queries(cat, items, logger=log))
+        assert len(log.warnings) == 1
+        assert "T" in log.warnings[0]
+        assert "lower bound" in log.warnings[0]
+
+    def test_no_warning_when_all_succeed(self):
+        cat = _FakeAsyncCatalog({"/p": [{"RID": "A"}]})
+        log = _RecordingLogger()
+        asyncio.run(run_estimate_queries(cat, [QueryItem("T", "/p", "csv")], logger=log))
+        assert log.warnings == []
+
+
+class TestBoundedConcurrency:
+    def test_in_flight_queries_never_exceed_limit(self):
+        """The orchestrator must not stampede the connection pool."""
+        import asyncio as aio
+
+        class _TrackingCatalog:
+            def __init__(self):
+                self.in_flight = 0
+                self.max_in_flight = 0
+                self.closed = False
+
+            async def get_async(self, path):
+                self.in_flight += 1
+                self.max_in_flight = max(self.max_in_flight, self.in_flight)
+                await aio.sleep(0.001)
+                self.in_flight -= 1
+                return _FakeAsyncResponse([{"RID": path}])
+
+            async def close(self):
+                self.closed = True
+
+        cat = _TrackingCatalog()
+        items = [QueryItem(f"T{i}", f"/p{i}", "csv") for i in range(100)]
+        asyncio.run(run_estimate_queries(cat, items, concurrency=8))
+        assert cat.max_in_flight <= 8
+        assert cat.closed
+
+
+class TestAssembleEstimateIncomplete:
+    def test_failed_tables_marked_incomplete(self):
+        result = assemble_estimate(
+            table_queries={"T": [(None, None, False)], "U": [(None, None, False)]},
+            rids_by_table={"T": {"A", "B"}, "U": set()},
+            asset_lengths_by_table={},
+            sample_rows_by_table={},
+            estimate_csv_bytes=_stub_estimate_csv_bytes,
+            human_readable_size=_stub_human_readable,
+            failed_by_table={"U": 3},
+        )
+        assert result["tables"]["T"]["incomplete"] is False
+        assert result["tables"]["U"]["incomplete"] is True
+        assert result["tables"]["U"]["row_count"] == 0  # honest partial (lower bound)
+        assert result["incomplete"] is True
+        assert result["incomplete_tables"] == ["U"]
+
+    def test_complete_estimate_reports_complete(self):
+        result = assemble_estimate(
+            table_queries={"T": [(None, None, False)]},
+            rids_by_table={"T": {"A"}},
+            asset_lengths_by_table={},
+            sample_rows_by_table={},
+            estimate_csv_bytes=_stub_estimate_csv_bytes,
+            human_readable_size=_stub_human_readable,
+            failed_by_table={},
+        )
+        assert result["incomplete"] is False
+        assert result["incomplete_tables"] == []
+        assert result["tables"]["T"]["incomplete"] is False
+
+    def test_fully_failed_table_still_listed(self):
+        """A table whose every query failed must appear (incomplete), not vanish."""
+        result = assemble_estimate(
+            table_queries={"GONE": [(None, None, False)]},
+            rids_by_table={},
+            asset_lengths_by_table={},
+            sample_rows_by_table={},
+            estimate_csv_bytes=_stub_estimate_csv_bytes,
+            human_readable_size=_stub_human_readable,
+            failed_by_table={"GONE": 2},
+        )
+        assert result["tables"]["GONE"]["incomplete"] is True
+        assert result["tables"]["GONE"]["row_count"] == 0
+        assert result["incomplete_tables"] == ["GONE"]
