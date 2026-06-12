@@ -31,7 +31,7 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterable
 
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
@@ -641,3 +641,26 @@ class ExecutionRecord(BaseModel):
     def __repr__(self) -> str:
         """Return repr of the execution record."""
         return f"ExecutionRecord(execution_rid={self.execution_rid!r}, status={self.status!r})"
+
+
+class MultirunStatusSummary(BaseModel):
+    """Status counts across all executions of one workflow.
+
+    Produced by :meth:`DerivaML.multirun_status_summary` -- the
+    one-query answer to "is the sweep done?". Null catalog ``Status``
+    values are counted under ``"Created"``, matching
+    :meth:`lookup_execution`'s read contract.
+
+    Attributes:
+        workflow_rid: RID of the summarized workflow.
+        counts: Mapping of status name (e.g. ``"Uploaded"``,
+            ``"Running"``, ``"Failed"``) to execution count.
+        total: Total executions of the workflow (the sum of
+            ``counts`` values).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_rid: str
+    counts: dict[str, int]
+    total: int

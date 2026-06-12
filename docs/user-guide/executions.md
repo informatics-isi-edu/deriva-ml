@@ -659,6 +659,53 @@ no recorded producer" is a valid answer to "how did this come to exist?".
 For the full method signature and the Pydantic model definitions, see
 [API Reference — Lineage](../api-reference/lineage.md).
 
+## How to check a sweep's progress (multirun status summary)
+
+One query answers "is the sweep done?" — status counts across all of a
+workflow's executions:
+
+```python
+summary = ml.multirun_status_summary(workflow_rid)
+summary.counts   # {'Uploaded': 18, 'Running': 2, 'Failed': 1}
+summary.total    # 21
+```
+
+Null catalog `Status` values are counted under `"Created"` (matching
+`lookup_execution`'s read contract). An unknown workflow RID raises
+rather than returning a misleading empty summary. For the full records
+behind a count (e.g. the two still-Running runs), follow up with
+`find_executions(workflow=workflow_rid, status=...)`.
+
+## How to find what consumed an artifact (forward lineage)
+
+`lookup_lineage` walks **backward** (what produced this?).
+`find_executions_consuming` walks **forward**: which executions took
+this Dataset or asset as an *input*?
+
+```python
+consumers = ml.find_executions_consuming(dataset_rid)
+[e.execution_rid for e in consumers]   # ['2-EXE9', ...]
+```
+
+The headline use case is **"is it safe to delete this dataset
+version?"**:
+
+```python
+if not ml.find_executions_consuming(old_dataset_rid):
+    # Nothing recorded ever consumed it -- no downstream run's
+    # provenance breaks if it goes.
+    ...
+```
+
+Two honesty notes: an empty result means no **recorded** consumption —
+runs that fetched data outside the execution machinery are invisible;
+and producers are not consumers (the execution that *created* a dataset
+is excluded). Dataset RIDs route through the input
+`Dataset_Execution` edge; asset RIDs route through the asset's
+`Execution` association with `Asset_Role="Input"`; any other RID kind
+raises (`Workflow` rows and plain domain rows have no consumption
+edges).
+
 ## See also
 
 - [Chapter 3 — Defining and using features](features.md): creating feature definitions, `FeatureRecord` classes, and asset-based features.
