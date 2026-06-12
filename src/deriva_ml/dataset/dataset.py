@@ -2637,7 +2637,7 @@ class Dataset:
         Returns:
             dict with keys:
                 - tables: dict mapping table name to
-                  {row_count, is_asset, asset_bytes, csv_bytes}
+                  {row_count, is_asset, asset_bytes, csv_bytes, incomplete}
                 - total_rows: total row count across all tables
                 - total_asset_bytes: total size of asset files in bytes
                 - total_asset_size: human-readable asset size (e.g., "1.2 GB")
@@ -2645,6 +2645,10 @@ class Dataset:
                 - total_csv_size: human-readable CSV size
                 - total_estimated_bytes: asset + CSV bytes combined
                 - total_estimated_size: human-readable combined size
+                - incomplete: True when at least one estimate query
+                  failed — every count/size is then a lower bound
+                - incomplete_tables: sorted names of affected tables
+                  (their per-table dicts also carry incomplete=True)
         """
         # Post Ds-est extraction this method composes three free
         # functions in ``dataset/_estimate.py``: query construction,
@@ -2693,7 +2697,7 @@ class Dataset:
         # ``run_async`` is the notebook-loop-fallback bridge used
         # elsewhere in the codebase (e.g. bag-commit's
         # ``BagCatalogLoader.arun``).
-        rids_by_table, asset_lengths_by_table, sample_rows_by_table = run_async(
+        rids_by_table, asset_lengths_by_table, sample_rows_by_table, failed_by_table = run_async(
             run_estimate_queries(catalog, items, logger=self._logger)
         )
 
@@ -2705,6 +2709,7 @@ class Dataset:
             sample_rows_by_table=sample_rows_by_table,
             estimate_csv_bytes=self._estimate_csv_bytes,
             human_readable_size=self._human_readable_size,
+            failed_by_table=failed_by_table,
         )
 
     @validate_call(config=VALIDATION_CONFIG)

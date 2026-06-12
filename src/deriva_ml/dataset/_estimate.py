@@ -178,34 +178,52 @@ def build_estimate_queries(
     return items
 
 
+# Default cap on in-flight estimate queries. Must stay well under
+# httpx's connection-pool limit (100): an unbounded gather over
+# O(1000) items starves the pool, whose *acquisition* timeout is only
+# 6 s — on eye-ai 2-277G, 1,599 of 1,699 queries died with PoolTimeout
+# before reaching the server and were silently reported as 0 rows
+# (2026-06-11). Bounded concurrency keeps ADR-0008's load-bearing
+# parallelism without the stampede.
+DEFAULT_ESTIMATE_CONCURRENCY = 16
+
+
 async def run_estimate_queries(
     catalog: "AsyncErmrestCatalog | AsyncErmrestSnapshot",
     items: list[QueryItem],
     *,
     logger: Any = None,
+    concurrency: int = DEFAULT_ESTIMATE_CONCURRENCY,
 ) -> tuple[
     dict[str, set[str]],
     dict[str, dict[str, int]],
     dict[str, list[dict]],
+    dict[str, int],
 ]:
-    """Fire every query concurrently; group results by table + type.
+    """Fire every query concurrently (bounded); group results by table.
 
-    Single failure per query is **swallowed with a debug log**
-    rather than aborting the whole estimate — partial estimates
-    are still useful and matches the pre-extraction contract.
-    Caller-side failures (e.g. credential resolution, snapshot
-    resolution) still propagate.
+    Per-query failures do not abort the whole estimate — partial
+    estimates are still useful — but they are **never silent**:
+    each failure is recorded in ``failed_by_table`` (so callers can
+    mark affected tables incomplete) and a single WARNING summarises
+    the damage. Caller-side failures (e.g. credential resolution,
+    snapshot resolution) still propagate.
 
     Args:
         catalog: A snapshot-scoped async catalog connection. The
             function calls ``catalog.get_async`` for each item
             and then closes the connection on its way out.
         items: Output of :func:`build_estimate_queries`.
-        logger: Optional logger for per-query failure debug
-            lines. Defaults to the dataset module logger.
+        logger: Optional logger for the failure-summary warning and
+            per-query debug lines. Defaults to the dataset module
+            logger.
+        concurrency: Maximum in-flight queries. Keep well below the
+            HTTP client's connection-pool size — see
+            :data:`DEFAULT_ESTIMATE_CONCURRENCY` for the failure
+            mode this guards against.
 
     Returns:
-        Three dicts in a tuple:
+        Four dicts in a tuple:
 
         - ``rids_by_table`` — table name → set of RIDs from
           ``csv`` queries (union across FK paths).
@@ -217,6 +235,9 @@ async def run_estimate_queries(
           rows from the ``sample`` query (only one sample per
           table; subsequent ``sample`` results for the same
           table are ignored).
+        - ``failed_by_table`` — table name → count of queries that
+          raised. Tables present here have **lower-bound** counts
+          assembled from whichever paths succeeded.
 
     Example:
         >>> # See test_estimate_helpers.py for a mock-catalog
@@ -230,18 +251,23 @@ async def run_estimate_queries(
 
         logger = get_logger(__name__)
 
+    semaphore = asyncio.Semaphore(max(1, concurrency))
+
     async def _run_one(item: QueryItem) -> tuple[str, QueryType, Any]:
-        try:
-            response = await catalog.get_async(item.path)
-            return item.table_name, item.query_type, response.json()
-        except Exception as exc:
-            logger.debug(
-                "estimate_bag_size query failed for %s (%s): %s",
-                item.table_name,
-                item.path,
-                exc,
-            )
-            return item.table_name, item.query_type, []
+        async with semaphore:
+            try:
+                response = await catalog.get_async(item.path)
+                return item.table_name, item.query_type, response.json()
+            except Exception as exc:
+                logger.debug(
+                    "estimate_bag_size query failed for %s (%s): %s",
+                    item.table_name,
+                    item.path,
+                    exc,
+                )
+                # ``None`` (not ``[]``) so failures are
+                # distinguishable from genuinely empty results.
+                return item.table_name, item.query_type, None
 
     try:
         results = await asyncio.gather(*[_run_one(it) for it in items])
@@ -251,8 +277,12 @@ async def run_estimate_queries(
     rids_by_table: dict[str, set[str]] = defaultdict(set)
     asset_lengths_by_table: dict[str, dict[str, int]] = defaultdict(dict)
     sample_rows_by_table: dict[str, list[dict]] = {}
+    failed_by_table: dict[str, int] = defaultdict(int)
 
     for table_name, query_type, rows in results:
+        if rows is None:
+            failed_by_table[table_name] += 1
+            continue
         if query_type == "csv":
             rids_by_table[table_name].update(r["RID"] for r in rows if "RID" in r)
         elif query_type == "fetch":
@@ -267,7 +297,20 @@ async def run_estimate_queries(
             if table_name not in sample_rows_by_table and rows:
                 sample_rows_by_table[table_name] = rows
 
-    return rids_by_table, asset_lengths_by_table, sample_rows_by_table
+    if failed_by_table:
+        n_failed = sum(failed_by_table.values())
+        names = sorted(failed_by_table)
+        shown = ", ".join(names[:5]) + ("…" if len(names) > 5 else "")
+        logger.warning(
+            "estimate incomplete: %d of %d queries failed across %d table(s) "
+            "(%s); affected row counts are lower bounds",
+            n_failed,
+            len(items),
+            len(names),
+            shown,
+        )
+
+    return rids_by_table, asset_lengths_by_table, sample_rows_by_table, dict(failed_by_table)
 
 
 def assemble_estimate(
@@ -278,6 +321,7 @@ def assemble_estimate(
     sample_rows_by_table: dict[str, list[dict]],
     estimate_csv_bytes: Any,
     human_readable_size: Any,
+    failed_by_table: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Assemble the final estimate dict from orchestrator outputs.
 
@@ -302,11 +346,18 @@ def assemble_estimate(
             ``human_readable_size``.
         human_readable_size: Callable ``(bytes) -> str`` —
             :meth:`Dataset._human_readable_size`.
+        failed_by_table: Fourth output of
+            :func:`run_estimate_queries` — tables with at least one
+            failed query are marked ``incomplete`` (their counts are
+            lower bounds), and tables whose *every* query failed
+            still appear (``row_count: 0, incomplete: True``)
+            instead of masquerading as empty.
 
     Returns:
-        The full estimate dict — same shape and keys as the
-        pre-extraction :meth:`Dataset.estimate_bag_size` return
-        value.
+        The full estimate dict — the pre-extraction
+        :meth:`Dataset.estimate_bag_size` keys plus, per table, an
+        ``incomplete`` bool, and top-level ``incomplete`` /
+        ``incomplete_tables`` keys.
 
     Example:
         >>> from deriva_ml.dataset._estimate import assemble_estimate
@@ -323,6 +374,8 @@ def assemble_estimate(
         >>> result["total_estimated_size"]
         '0B'
     """
+    failed_by_table = failed_by_table or {}
+
     # CSV bytes from samples.
     csv_bytes_by_table: dict[str, int] = {}
     for table_name, sample_rows in sample_rows_by_table.items():
@@ -331,9 +384,7 @@ def assemble_estimate(
 
     # Which tables are assets (any FK path declared it so).
     asset_tables = {
-        table_name
-        for table_name, entries in table_queries.items()
-        if any(is_asset for _, _, is_asset in entries)
+        table_name for table_name, entries in table_queries.items() if any(is_asset for _, _, is_asset in entries)
     }
 
     table_estimates: dict[str, dict[str, Any]] = {}
@@ -357,6 +408,7 @@ def assemble_estimate(
             "is_asset": is_asset,
             "asset_bytes": asset_bytes,
             "csv_bytes": csv_bytes,
+            "incomplete": table_name in failed_by_table,
         }
         total_rows += row_count
         total_asset_bytes += asset_bytes
@@ -373,10 +425,26 @@ def assemble_estimate(
                 "is_asset": True,
                 "asset_bytes": sum(lengths.values()),
                 "csv_bytes": csv_bytes,
+                "incomplete": table_name in failed_by_table,
             }
             total_rows += len(lengths)
             total_asset_bytes += sum(lengths.values())
             total_csv_bytes += csv_bytes
+
+    # Tables whose *every* query failed have no successful result to
+    # land under — surface them explicitly rather than letting them
+    # vanish (or, worse, appear as confidently-zero rows).
+    for table_name in failed_by_table:
+        if table_name not in table_estimates:
+            table_estimates[table_name] = {
+                "row_count": 0,
+                "is_asset": table_name in asset_tables,
+                "asset_bytes": 0,
+                "csv_bytes": 0,
+                "incomplete": True,
+            }
+
+    incomplete_tables = sorted(t for t, d in table_estimates.items() if d["incomplete"])
 
     total_size = total_asset_bytes + total_csv_bytes
     return {
@@ -388,10 +456,15 @@ def assemble_estimate(
         "total_csv_size": human_readable_size(total_csv_bytes),
         "total_estimated_bytes": total_size,
         "total_estimated_size": human_readable_size(total_size),
+        # Failure visibility: when True, counts/sizes are lower
+        # bounds — at least one estimate query failed.
+        "incomplete": bool(incomplete_tables),
+        "incomplete_tables": incomplete_tables,
     }
 
 
 __all__ = [
+    "DEFAULT_ESTIMATE_CONCURRENCY",
     "QueryItem",
     "QueryType",
     "assemble_estimate",
