@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from deriva_ml.asset.aux_classes import AssetSpec
     from deriva_ml.dataset.aux_classes import DatasetSpec
     from deriva_ml.execution.execution import Execution
-    from deriva_ml.execution.execution_record import ExecutionRecord
+    from deriva_ml.execution.execution_record import ExecutionRecord, MultirunStatusSummary
     from deriva_ml.execution.lineage import (
         LineageNode,
         LineageResult,
@@ -730,6 +730,110 @@ class ExecutionMixin:
                 continue
             yield self.lookup_execution(exec_record["RID"])
 
+    def find_executions_consuming(self, rid: RID) -> list["ExecutionRecord"]:
+        """Forward lineage: the executions that CONSUMED the given artifact.
+
+        The forward complement of :meth:`lookup_lineage` (which walks
+        backward from an artifact to its producers). Given a Dataset or
+        asset RID, returns the executions that took it as an INPUT --
+        the "is it safe to delete this?" question: an empty result
+        means nothing recorded ever consumed it.
+
+        Dispatch is by resolved RID kind:
+
+        - **Dataset** -- executions with an input ``Dataset_Execution``
+          edge to it (same edge :meth:`find_executions` uses for
+          ``dataset_role="input"``).
+        - **Asset** (any asset-table row) -- executions linked through
+          the asset's ``<Asset>_Execution`` association with
+          ``Asset_Role="Input"``.
+
+        Other RID kinds are not consumption-shaped and raise.
+
+        Args:
+            rid: RID of a Dataset or an asset-table row.
+
+        Returns:
+            List of :class:`ExecutionRecord` for the consuming
+            executions (empty when nothing consumed the artifact --
+            note this means "no RECORDED consumption"; producers are
+            not consumers and are excluded).
+
+        Raises:
+            DerivaMLException: If ``rid`` does not exist, or resolves
+                to a table kind that has no consumption edges (e.g. a
+                Workflow or a plain domain row).
+
+        Example:
+            >>> consumers = ml.find_executions_consuming("1-DS01")  # doctest: +SKIP
+            >>> [e.execution_rid for e in consumers]  # doctest: +SKIP
+            ['2-EXE9']
+            >>> ml.find_executions_consuming("1-LEAF")  # doctest: +SKIP
+            []
+        """
+        if not rid:
+            raise DerivaMLException("find_executions_consuming requires a non-empty RID")
+        resolved = self.resolve_rid(rid)
+        table = resolved.table
+        if table.schema.name == self.ml_schema and table.name == "Dataset":
+            return list(self.find_executions(dataset=rid, dataset_role="input"))
+        if self.model.is_asset(table):
+            return self.list_asset_executions(rid, asset_role="Input")
+        raise DerivaMLException(
+            f"RID {rid} resolves to {table.schema.name}:{table.name}, which has no "
+            "consumption edges -- forward lineage is defined for Dataset and "
+            "asset-table RIDs."
+        )
+
+    def multirun_status_summary(self, workflow_rid: RID) -> "MultirunStatusSummary":
+        """Status counts across all executions of one workflow, in one query.
+
+        The "is the sweep done?" question: instead of listing every
+        execution record and counting client-side, fetch only the
+        ``Status`` column for the workflow's executions and aggregate.
+
+        Null ``Status`` values are counted under ``"Created"``,
+        matching :meth:`lookup_execution`'s read contract
+        (``Status or "Created"``).
+
+        Args:
+            workflow_rid: RID of the workflow to summarize.
+
+        Returns:
+            :class:`MultirunStatusSummary` with ``workflow_rid``,
+            ``counts`` (status name -> execution count), and ``total``.
+
+        Raises:
+            DerivaMLException: If ``workflow_rid`` is not a workflow
+                (propagated from :meth:`lookup_workflow`).
+
+        Example:
+            >>> summary = ml.multirun_status_summary("1-WF01")  # doctest: +SKIP
+            >>> summary.counts  # doctest: +SKIP
+            {'Uploaded': 18, 'Running': 2, 'Failed': 1}
+            >>> summary.total  # doctest: +SKIP
+            21
+        """
+        # Import here to avoid a circular import at module load
+        # (execution_record imports from this package's neighbors).
+        from deriva_ml.execution.execution_record import MultirunStatusSummary
+
+        # Validate the RID names a real workflow so a typo'd RID fails
+        # loudly instead of returning an empty (and misleading) summary.
+        self.lookup_workflow(workflow_rid)
+
+        pb = self.pathBuilder()
+        epath = pb.schemas[self.ml_schema].Execution
+        counts: dict[str, int] = {}
+        for row in epath.filter(epath.Workflow == workflow_rid).attributes(epath.Status).fetch():
+            status = row["Status"] or "Created"
+            counts[status] = counts.get(status, 0) + 1
+        return MultirunStatusSummary(
+            workflow_rid=workflow_rid,
+            counts=counts,
+            total=sum(counts.values()),
+        )
+
     def lookup_experiment(self, execution_rid: RID) -> "Experiment":
         """Look up an experiment by execution RID.
 
@@ -1039,6 +1143,8 @@ class ExecutionMixin:
         """
         from deriva_ml.execution.lineage import RootDescriptor
 
+        if not rid:
+            raise DerivaMLException("find_executions_consuming requires a non-empty RID")
         resolved = self.resolve_rid(rid)
         table = resolved.table
         table_name = table.name
