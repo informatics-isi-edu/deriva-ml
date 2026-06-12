@@ -18,6 +18,7 @@ from pydantic import validate_call
 from deriva_ml.core.definitions import ColumnDefinition, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLException, DerivaMLMaterializeLimitExceeded
 from deriva_ml.core.validation import VALIDATION_CONFIG
+from deriva_ml.dataset.aux_classes import FeatureReference
 from deriva_ml.feature import Feature, FeatureRecord
 
 if TYPE_CHECKING:
@@ -352,6 +353,65 @@ class FeatureMixin:
                 >>> print([f.feature_name for f in image_features])  # doctest: +SKIP
         """
         return list(self.model.find_features(table))
+
+    def find_features_referencing(self, table: str | Table, column: str | None = None) -> list[FeatureReference]:
+        """Find the features impacted by a change to ``table`` (schema-evolution impact analysis).
+
+        Answers the catalog-evolver question "what breaks if I change
+        this table / column?" for the feature layer: a feature's
+        association table carries FKs to its target table (the
+        self-FK), to vocabulary tables (term columns), and to asset
+        tables (asset columns). Any feature whose association-table FK
+        lands on ``table`` (and, when ``column`` is given, on that
+        referenced column) is reported with the FK column names doing
+        the referencing.
+
+        Note that FKs reference key columns -- almost always ``RID`` --
+        so ``column=`` narrows by the *referenced* column name. Pair
+        with :meth:`find_datasets_referencing` for a full impact
+        report.
+
+        Args:
+            table: Name of the table (str) or ``Table`` object to check.
+            column: Optional referenced-column filter; only FKs whose
+                referenced columns include this name count.
+
+        Returns:
+            One :class:`FeatureReference` per impacted feature
+            (``feature_name``, ``target_table``, ``feature_table``,
+            ``referencing_columns``), sorted by (target_table,
+            feature_name). Empty list when nothing references the
+            table.
+
+        Raises:
+            DerivaMLTableNotFound: If ``table`` does not exist.
+
+        Example:
+            >>> refs = ml.find_features_referencing("Image")  # doctest: +SKIP
+            >>> [r.feature_name for r in refs]  # doctest: +SKIP
+            ['BoundingBox', 'Quality']
+        """
+        target = self.model.name_to_table(table)
+        target_key = (target.schema.name, target.name)
+        refs: list[FeatureReference] = []
+        for feature in self.model.find_features():
+            cols: set[str] = set()
+            for fk in feature.feature_table.foreign_keys:
+                if (fk.pk_table.schema.name, fk.pk_table.name) != target_key:
+                    continue
+                if column is not None and column not in {c.name for c in fk.referenced_columns}:
+                    continue
+                cols.update(c.name for c in fk.foreign_key_columns)
+            if cols:
+                refs.append(
+                    FeatureReference(
+                        feature_name=feature.feature_name,
+                        target_table=feature.target_table.name,
+                        feature_table=feature.feature_table.name,
+                        referencing_columns=sorted(cols),
+                    )
+                )
+        return sorted(refs, key=lambda r: (r.target_table, r.feature_name))
 
     def add_features(self, *args, **kwargs) -> int:
         """Retired — use ``exe.add_features(records)`` inside an execution context.

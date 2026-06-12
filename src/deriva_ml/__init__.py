@@ -74,6 +74,14 @@ def __getattr__(name: str) -> type:
         from deriva_ml.dataset.aux_classes import DatasetSpecConfig
 
         return DatasetSpecConfig
+    elif name == "DatasetReference":
+        from deriva_ml.dataset.aux_classes import DatasetReference
+
+        return DatasetReference
+    elif name == "FeatureReference":
+        from deriva_ml.dataset.aux_classes import FeatureReference
+
+        return FeatureReference
     elif name == "Asset":
         from deriva_ml.asset.asset import Asset
 
@@ -135,6 +143,7 @@ __all__ = [
     "Workflow",
     # Dataset classes (lazy-loaded)
     "Dataset",
+    "DatasetReference",
     "DatasetSpec",
     "DatasetSpecConfig",
     # Asset classes (lazy-loaded)

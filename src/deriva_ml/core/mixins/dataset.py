@@ -37,10 +37,14 @@ from deriva_ml.config.validation import (
     ConfigValidationReport,
 )
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.exceptions import DerivaMLException, DerivaMLTableTypeError
+from deriva_ml.core.exceptions import (
+    DerivaMLException,
+    DerivaMLTableTypeError,
+    NoAssociationException,
+)
 from deriva_ml.core.sort import SortSpec, resolve_sort
 from deriva_ml.core.validation import VALIDATION_CONFIG
-from deriva_ml.dataset.aux_classes import DatasetSpec
+from deriva_ml.dataset.aux_classes import DatasetReference, DatasetSpec
 from deriva_ml.dataset.validation import (
     AssetSpecResult,
     CrossSpecIssue,
@@ -262,6 +266,63 @@ class DatasetMixin:
             >>> print([t.name for t in types])  # doctest: +SKIP
         """
         return self.model.list_dataset_element_types()
+
+    def find_datasets_referencing(self, table: str | Table, column: str | None = None) -> list[DatasetReference]:
+        """Find the datasets impacted by a change to ``table`` (schema-evolution impact analysis).
+
+        Answers the catalog-evolver question "what breaks if I change
+        this table?": every dataset currently holding member rows of
+        ``table`` is reported, with its member count. Datasets reference
+        tables through their member associations (``Dataset_<Table>``),
+        so impact is **table-granular** -- membership is row-level, and
+        any column change on the member table affects every dataset
+        holding rows of that table. The ``column`` argument is accepted
+        for symmetry with :meth:`find_features_referencing` but does not
+        narrow the result; pair the two methods for a full impact
+        report.
+
+        One bulk query per call: the association table's dataset FK
+        column is fetched once and grouped in memory (same pattern as
+        the asset bulk reads).
+
+        Args:
+            table: Name of the table (str) or ``Table`` object to check.
+            column: Optional column name, accepted for API symmetry.
+                Dataset impact is table-granular, so this does not
+                narrow the result.
+
+        Returns:
+            One :class:`DatasetReference` per dataset with members in
+            ``table`` (``dataset_rid``, ``element_table``,
+            ``member_count``), sorted by dataset RID. Empty list when
+            the table is not a dataset element type anywhere.
+
+        Raises:
+            DerivaMLTableNotFound: If ``table`` does not exist.
+
+        Example:
+            >>> refs = ml.find_datasets_referencing("Image")  # doctest: +SKIP
+            >>> [(r.dataset_rid, r.member_count) for r in refs]  # doctest: +SKIP
+            [('1-AAAA', 550), ('1-BBBB', 110)]
+        """
+        target = self.model.name_to_table(table)
+        try:
+            _assoc, target_col, dataset_col = self.model.find_association(target, self._dataset_table)
+        except NoAssociationException:
+            # The table is not registered as a dataset element type
+            # anywhere -- no dataset can reference it.
+            return []
+        assoc_table = _assoc
+        pb = self.pathBuilder()
+        apath = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
+        counts: dict[str, int] = {}
+        for row in apath.attributes(apath.columns[dataset_col]).fetch():
+            rid = row[dataset_col]
+            counts[rid] = counts.get(rid, 0) + 1
+        return [
+            DatasetReference(dataset_rid=rid, element_table=target.name, member_count=n)
+            for rid, n in sorted(counts.items())
+        ]
 
     @validate_call(config=VALIDATION_CONFIG)
     def add_dataset_element_type(self, element: str | Table) -> Table:
@@ -631,7 +692,7 @@ class DatasetMixin:
         Example:
             Validate two specs, one good and one with a typo'd version::
 
-                >>> from deriva_ml.dataset.aux_classes import DatasetSpec  # doctest: +SKIP
+                >>> from deriva_ml.dataset.aux_classes import DatasetReference, DatasetSpec  # doctest: +SKIP
                 >>> report = ml.validate_dataset_specs(specs=[  # doctest: +SKIP
                 ...     DatasetSpec(rid="2-B4C8", version="0.4.0"),
                 ...     DatasetSpec(rid="2-B4C8", version="9.9.9"),
@@ -703,7 +764,7 @@ class DatasetMixin:
             Validate a config before invoking ``deriva-ml-run``::
 
                 >>> from deriva_ml.execution import ExecutionConfiguration  # doctest: +SKIP
-                >>> from deriva_ml.dataset.aux_classes import DatasetSpec  # doctest: +SKIP
+                >>> from deriva_ml.dataset.aux_classes import DatasetReference, DatasetSpec  # doctest: +SKIP
                 >>> from deriva_ml.asset.aux_classes import AssetSpec  # doctest: +SKIP
                 >>> config = ExecutionConfiguration(  # doctest: +SKIP
                 ...     workflow=workflow,
@@ -792,9 +853,7 @@ class DatasetMixin:
                 ...         print(r.entry.file, r.entry.line, r.reasons)
         """
         entries, parse_error = parse_config_file(path)
-        parse_errors: list[ConfigFileParseError] = (
-            [parse_error] if parse_error is not None else []
-        )
+        parse_errors: list[ConfigFileParseError] = [parse_error] if parse_error is not None else []
         results = self._validate_config_entries(entries)
         return ConfigValidationReport(
             file_count=1 if parse_error is None else 0,
@@ -949,12 +1008,16 @@ class DatasetMixin:
                 >>> for s in report.suggestions:  # doctest: +SKIP
                 ...     print(s.kind, s.config_name, s.spec_string)
         """
-        requested_kinds = set(kinds) if kinds is not None else {
-            "deriva_ml",
-            "datasets",
-            "assets",
-            "workflow",
-        }
+        requested_kinds = (
+            set(kinds)
+            if kinds is not None
+            else {
+                "deriva_ml",
+                "datasets",
+                "assets",
+                "workflow",
+            }
+        )
         if dataset_type_filter is None:
             type_filter = set(DEFAULT_DATASET_TYPE_FILTER)
         else:
@@ -974,8 +1037,7 @@ class DatasetMixin:
                         str(getattr(self, "catalog_id", "")),
                     ),
                     description=(
-                        f"Connection to {getattr(self, 'host_name', '?')} "
-                        f"catalog {getattr(self, 'catalog_id', '?')}"
+                        f"Connection to {getattr(self, 'host_name', '?')} catalog {getattr(self, 'catalog_id', '?')}"
                     ),
                     rationale="Connection group; pin this DerivaML instance.",
                 )
@@ -992,10 +1054,7 @@ class DatasetMixin:
                         BootstrapSkipped(
                             kind="datasets",
                             rid=ds_rid,
-                            reason=(
-                                f"dataset_types={ds_types} -- not in filter "
-                                f"{sorted(type_filter)}"
-                            ),
+                            reason=(f"dataset_types={ds_types} -- not in filter {sorted(type_filter)}"),
                         )
                     )
                     continue
@@ -1031,10 +1090,7 @@ class DatasetMixin:
                     if type_filter
                     else (ds_types[0] if ds_types else "Dataset")
                 )
-                rationale = (
-                    f"Dataset type {primary_type or '?'}; latest released "
-                    f"version {version_str}."
-                )
+                rationale = f"Dataset type {primary_type or '?'}; latest released version {version_str}."
                 suggestions.append(
                     BootstrapSuggestion(
                         kind="datasets",
@@ -1078,10 +1134,7 @@ class DatasetMixin:
                             rid=asset_rid,
                             spec_string=_format_asset_spec(asset_rid),
                             description=filename or None,
-                            rationale=(
-                                f"Asset in {table.name}"
-                                + (f" ({filename})" if filename else "")
-                            ),
+                            rationale=(f"Asset in {table.name}" + (f" ({filename})" if filename else "")),
                         )
                     )
 
@@ -1100,10 +1153,7 @@ class DatasetMixin:
                         rid=wf_rid,
                         spec_string=_format_workflow_spec(wf_rid),
                         description=wf_name or None,
-                        rationale=(
-                            "Existing Workflow row; pin by RID to reuse "
-                            "across executions."
-                        ),
+                        rationale=("Existing Workflow row; pin by RID to reuse across executions."),
                     )
                 )
 
@@ -1483,11 +1533,7 @@ class DatasetMixin:
                 entry=entry,
                 valid=not reasons,
                 reasons=reasons,
-                resolved_name=(
-                    f"{self_hostname or '?'}/{self_catalog_id or '?'}"
-                    if not reasons
-                    else None
-                ),
+                resolved_name=(f"{self_hostname or '?'}/{self_catalog_id or '?'}" if not reasons else None),
             )
 
         # Replace any leftover Nones with an internal-error result.

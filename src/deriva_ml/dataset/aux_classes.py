@@ -13,6 +13,7 @@ from hydra_zen import hydrated_dataclass
 from packaging.version import Version
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     computed_field,
     conlist,
@@ -434,3 +435,53 @@ class DatasetSpecConfig:
     exclude_tables: list[str] | None = None
     timeout: list[int] | None = None
     fetch_concurrency: int = 8
+
+
+class DatasetReference(BaseModel):
+    """One dataset that references a table through its member association.
+
+    Produced by :meth:`DerivaML.find_datasets_referencing` for
+    schema-evolution impact analysis ("what breaks if I change this
+    table?"). Dataset impact is table-granular: membership is row-level,
+    so any column change on the member table affects every dataset
+    holding rows of that table.
+
+    Attributes:
+        dataset_rid: RID of the referencing dataset.
+        element_table: Name of the referenced member table.
+        member_count: Number of rows of ``element_table`` currently in
+            the dataset (unversioned, current membership).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_rid: RID
+    element_table: str
+    member_count: int
+
+
+class FeatureReference(BaseModel):
+    """One feature that references a table via its association-table FKs.
+
+    Produced by :meth:`DerivaML.find_features_referencing`. A feature's
+    association table carries FKs to its target table (the self-FK),
+    to vocabulary tables (term columns), and to asset tables (asset
+    columns) -- dropping any referenced table or key column breaks the
+    feature.
+
+    Attributes:
+        feature_name: Name of the referencing feature.
+        target_table: Table the feature is defined ON.
+        feature_table: The feature's association table (where the FK
+            lives).
+        referencing_columns: FK column names on ``feature_table`` that
+            land on the queried table (filtered to FKs referencing the
+            queried column when ``column=`` was given).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    feature_name: str
+    target_table: str
+    feature_table: str
+    referencing_columns: list[str]
