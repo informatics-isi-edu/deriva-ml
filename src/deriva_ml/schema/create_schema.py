@@ -13,6 +13,7 @@ ERMrest catalog. The main entry points are:
 
 import subprocess
 import sys
+from collections.abc import Sequence
 from importlib.resources import files
 from typing import Any, Optional
 
@@ -183,9 +184,7 @@ def create_dataset_table(
     # step — mirrors `dataset_table.create_reference(("Version", True, ...))`
     # above. NULL means the consumed version is unknown (e.g. legacy rows).
     dv_cols, _ = dataset_execution.create_reference(("Dataset_Version", True, dataset_version))
-    dv_cols[0].alter(
-        comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown)."
-    )
+    dv_cols[0].alter(comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown).")
     return dataset_table
 
 
@@ -434,6 +433,7 @@ def create_asset_table(
     asset_role_table: Table,
     use_hatrac: bool = True,
     comment: Optional[str] = None,
+    additional_columns: Sequence[ColumnDef] = (),
 ) -> Table:
     """Create an asset table with associated type and execution associations.
 
@@ -458,6 +458,11 @@ def create_asset_table(
             distinguish the three asset tables (Execution_Asset,
             Execution_Metadata, File) which otherwise share the
             same generic shape.
+        additional_columns: Optional domain-specific columns appended
+            to the standard hatrac shape (``URL`` / ``Filename`` /
+            ``Length`` / ``MD5`` / ``Description``). Used by the
+            public ``DerivaML.create_asset_table`` wrapper; the
+            bootstrap call sites leave it empty.
 
     Returns:
         The created asset Table object.
@@ -471,6 +476,7 @@ def create_asset_table(
         AssetTableDef(
             schema_name=schema.name,
             name=asset_name,
+            columns=list(additional_columns),
             hatrac_template=hatrac_template,
             comment=comment,
         )
