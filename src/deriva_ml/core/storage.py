@@ -240,6 +240,10 @@ def clear_cache(
        :meth:`~deriva.bag.cache_index.BagCacheIndex.purge`, dropping
        the index row and the on-disk directory together. The index
        can never claim a bag whose directory this function removed.
+       A pass 1b then sweeps **orphan** ``bags/*`` entries (no index
+       row — e.g. debris from the pre-1.46 blind-walk cleaner) by
+       mtime; skipped entirely when the index is unusable, since
+       orphans can't be told apart from indexed bags.
     2. **Assets by mtime** — ``assets/*`` entries older than the
        cutoff are removed.
     3. **Stray top-level entries** (anything not in
@@ -270,6 +274,11 @@ def clear_cache(
     cutoff = time.time() - older_than_days * 86400 if older_than_days is not None else None
 
     # Pass 1: bags, through the index (never orphan the index).
+    # ``indexed_checksums`` doubles as the orphan-sweep allowlist for
+    # pass 1b: None means the index was unusable (can't tell orphans
+    # from indexed bags — leave bags/ alone); empty set means no index
+    # exists, so everything under bags/ is an orphan.
+    indexed_checksums: set[str] | None = set()
     if (cache_dir / "index.sqlite").exists():
         from deriva.bag.cache_index import BagCacheIndex
 
@@ -279,9 +288,11 @@ def clear_cache(
             log.warning("Bag index unusable, skipping bag pass: %s", e)
             stats["errors"] += 1
             index = None
+            indexed_checksums = None
         if index is not None:
             try:
                 for row in index.list_bags():
+                    indexed_checksums.add(row["checksum"])
                     if cutoff is not None:
                         built = datetime.fromisoformat(row["built_at"]).timestamp()
                         if built > cutoff:
@@ -300,6 +311,31 @@ def clear_cache(
                         stats["bytes_freed"] += freed
             finally:
                 index.dispose()
+
+    # Pass 1b: orphan bag directories — entries under bags/ with no
+    # index row (e.g. left behind by the pre-1.46 blind-rmtree
+    # clear_cache, which could delete index.sqlite while bags/
+    # survived an age filter). Purged bags' directories are already
+    # gone, so allowlisting every checksum seen in pass 1 is safe.
+    bags_dir = cache_dir / "bags"
+    if indexed_checksums is not None and bags_dir.exists():
+        for entry in bags_dir.iterdir():
+            if entry.name in indexed_checksums:
+                continue
+            try:
+                if cutoff is not None and entry.stat().st_mtime > cutoff:
+                    continue
+                freed = _dir_size(entry) if entry.is_dir() else entry.stat().st_size
+                if entry.is_dir():
+                    shutil.rmtree(entry)
+                    stats["dirs_removed"] += 1
+                else:
+                    entry.unlink()
+                    stats["files_removed"] += 1
+                stats["bytes_freed"] += freed
+            except (OSError, PermissionError) as e:
+                log.warning("Failed to remove orphan bag entry %s: %s", entry, e)
+                stats["errors"] += 1
 
     # Pass 2: assets, by mtime.
     assets_dir = cache_dir / "assets"

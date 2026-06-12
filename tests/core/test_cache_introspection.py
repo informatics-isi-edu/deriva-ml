@@ -282,7 +282,7 @@ class TestPurgeDataset:
         with BagCache(cache_dir) as cache:
             stats = cache.purge_dataset("RID-ERR")
 
-        assert stats["bags_removed"] == 1   # x2 succeeded despite x1 failing
+        assert stats["bags_removed"] == 1  # x2 succeeded despite x1 failing
 
 
 # ---------------------------------------------------------------------------
@@ -557,3 +557,103 @@ class TestDerivaMLSurface:
 class TestExports:
     def test_records_importable_from_top_level(self):
         from deriva_ml import CachedAsset, CachedBag  # noqa: F401
+
+
+# ---------------------------------------------------------------------------
+# PR #286 review follow-ups: orphan-dir sweep, summary denominators,
+# listing order
+# ---------------------------------------------------------------------------
+
+
+class TestClearCacheOrphanSweep:
+    def test_orphan_bag_dir_removed(self, tmp_path: Path):
+        """A bags/ directory with no index row (e.g. left by the old
+        blind-rmtree clear_cache) must be collected, not kept forever."""
+        from deriva.bag.cache_index import BagCacheIndex
+
+        from deriva_ml.core.storage import clear_cache
+
+        cache_dir = tmp_path / "cache"
+        indexed = _record_bag(cache_dir, checksum="ok1", dataset_rid="RID-OK")
+        orphan = cache_dir / "bags" / "orphan-cafe" / "Dataset_RID-GONE"
+        orphan.mkdir(parents=True)
+        (orphan / "stale.csv").write_text("x" * 64)
+
+        # A generous age filter keeps the fresh orphan (mtime-based,
+        # same semantics the dedicated age test pins):
+        clear_cache(cache_dir, older_than_days=3650)
+        assert (cache_dir / "bags" / "orphan-cafe").exists()
+
+        # With no age filter everything goes, orphan included:
+        stats = clear_cache(cache_dir)
+        assert not (cache_dir / "bags" / "orphan-cafe").exists()
+        assert not indexed.exists()
+        assert stats["errors"] == 0
+        index = BagCacheIndex(cache_dir)
+        try:
+            assert index.list_bags() == []
+        finally:
+            index.dispose()
+
+    def test_orphan_sweep_respects_age_filter(self, tmp_path: Path):
+        import os
+        import time as _time
+
+        from deriva_ml.core.storage import clear_cache
+
+        cache_dir = tmp_path / "cache"
+        old_orphan = cache_dir / "bags" / "old-orphan" / "data"
+        old_orphan.mkdir(parents=True)
+        (old_orphan / "f.bin").write_bytes(b"x" * 32)
+        fresh_orphan = cache_dir / "bags" / "fresh-orphan"
+        fresh_orphan.mkdir(parents=True)
+        (fresh_orphan / "f.bin").write_bytes(b"y" * 32)
+        old_ts = _time.time() - 40 * 86400
+        os.utime(cache_dir / "bags" / "old-orphan", (old_ts, old_ts))
+
+        stats = clear_cache(cache_dir, older_than_days=30)
+
+        assert not (cache_dir / "bags" / "old-orphan").exists()
+        assert fresh_orphan.exists()
+        assert stats["dirs_removed"] == 1
+
+
+class TestSummaryDenominators:
+    def test_multi_anchor_bag_sized_once_at_max(self, harness):
+        """A bag with two dataset anchors: counted per anchor in
+        bag_count, but sized once — and at the REAL size, not the
+        last anchor's (whose Dataset_{rid} dir may not exist)."""
+        from deriva.bag.cache_index import BagCacheIndex
+
+        from deriva_ml.core.base import DerivaML
+
+        harness.get_cache_size = lambda: DerivaML.get_cache_size(harness)
+        harness.list_execution_dirs = lambda: DerivaML.list_execution_dirs(harness)
+        harness.list_cached_bags = lambda: DerivaML.list_cached_bags(harness)
+        harness.list_cached_assets = lambda: DerivaML.list_cached_assets(harness)
+
+        _record_bag(harness.cache_dir, checksum="mm1", dataset_rid="RID-A")
+        index = BagCacheIndex(harness.cache_dir)
+        try:
+            index.record(checksum="mm1", anchors=[("Dataset", "RID-B")])  # no dir on disk
+        finally:
+            index.dispose()
+
+        summary = DerivaML.get_storage_summary(harness)
+        assert summary["bag_count"] == 2  # two dataset-anchored entries
+        assert summary["bag_size_mb"] > 0  # sized from the anchor that exists
+
+
+class TestListBagsOrdering:
+    def test_most_recently_built_first(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        older = datetime.now(timezone.utc) - timedelta(days=2)
+        _record_bag(cache_dir, checksum="ord1", dataset_rid="RID-OLDER", built_at=older)
+        _record_bag(cache_dir, checksum="ord2", dataset_rid="RID-NEWER")
+
+        with BagCache(cache_dir) as cache:
+            bags = cache.list_bags()
+
+        assert [b.dataset_rid for b in bags] == ["RID-NEWER", "RID-OLDER"]
