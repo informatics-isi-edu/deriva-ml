@@ -15,6 +15,7 @@ from __future__ import annotations  # noqa: I001
 
 # Standard library imports
 import logging
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, cast, TYPE_CHECKING, Any
@@ -42,7 +43,14 @@ DEFAULT_LOGGER_OVERRIDES = _core_utils.DEFAULT_LOGGER_OVERRIDES
 from deriva_ml.core.catalog_stub import CatalogStub
 from deriva_ml.core.config import DerivaMLConfig
 from deriva_ml.core.connection_mode import ConnectionMode
-from deriva_ml.core.definitions import DRY_RUN_RID, ML_SCHEMA, RID, TableDefinition, VocabularyTableDef
+from deriva_ml.core.definitions import (
+    DRY_RUN_RID,
+    ML_SCHEMA,
+    RID,
+    ColumnDefinition,
+    TableDefinition,
+    VocabularyTableDef,
+)
 from deriva_ml.core.exceptions import (
     DerivaMLConfigurationError,
     DerivaMLException,
@@ -1230,6 +1238,100 @@ class DerivaML(
             self.apply_catalog_annotations()
 
         return vocab_table
+
+    def create_asset_table(
+        self,
+        asset_name: str,
+        additional_columns: Sequence[ColumnDefinition] = (),
+        comment: str | None = None,
+        schema: str | None = None,
+        use_hatrac: bool = True,
+        update_navbar: bool = True,
+    ) -> Table:
+        """Creates an asset table with the canonical DerivaML asset shape.
+
+        One call builds everything an asset table needs, so the shape can
+        never drift from the canonical form (validation-by-construction --
+        the result always satisfies ``model.is_asset``):
+
+        - The five standard hatrac columns: ``URL``, ``Filename``,
+          ``Length``, ``MD5``, ``Description`` (with the standard NOT NULL
+          constraints and the ``asset`` annotation on ``URL``).
+        - The ``<asset_name>_Asset_Type`` association to the deriva-ml
+          ``Asset_Type`` vocabulary (an asset can carry multiple type tags,
+          e.g. ``Model_File`` + ``Output_File``).
+        - The ``<asset_name>_Execution`` association to ``Execution``,
+          carrying the ``Asset_Role`` FK (``Input`` / ``Output``) that the
+          execution upload machinery writes.
+        - The standard Chaise display annotations for asset tables.
+
+        This replaces the manual recipe (generic ``create_table`` with
+        hand-written hatrac columns) that was verbose and easy to get
+        subtly wrong (issue #74).
+
+        Args:
+            asset_name: Name for the new asset table. Must be a valid SQL
+                identifier.
+            additional_columns: Optional domain-specific columns appended to
+                the standard hatrac shape (e.g. a ``Scanner_Model`` text
+                column on a ``Scan_File`` table). Use ``ColumnDefinition``
+                with ``BuiltinTypes`` from ``deriva_ml``.
+            comment: Description of the asset table's purpose.
+            schema: Schema name to create the table in. If None, uses the
+                domain schema.
+            use_hatrac: When True (default) the ``URL`` column is wired with
+                the Hatrac upload template so Chaise's file-upload UI
+                deposits bytes into Hatrac. When False the ``URL`` column is
+                a plain string (for assets whose bytes live elsewhere).
+            update_navbar: If True (default), refresh the navigation bar to
+                include the new table. Set to False during batch creation,
+                then call ``apply_catalog_annotations()`` once at the end.
+
+        Returns:
+            Table: ERMrest table object for the newly created asset table.
+
+        Raises:
+            DerivaMLException: If ``asset_name`` already exists.
+
+        Examples:
+            Create an asset table for raw scanner output:
+
+                >>> from deriva_ml import ColumnDefinition, BuiltinTypes
+                >>> table = ml.create_asset_table(  # doctest: +SKIP
+                ...     "Scan_File",
+                ...     additional_columns=[
+                ...         ColumnDefinition(name="Scanner_Model", type=BuiltinTypes.text),
+                ...     ],
+                ...     comment="Raw scanner output files.",
+                ... )
+                >>> ml.model.is_asset("Scan_File")  # doctest: +SKIP
+                True
+        """
+        # Lazy import: schema.create_schema owns the canonical wiring (it
+        # builds the same shape at catalog bootstrap); importing it at
+        # module load would cycle through the schema package.
+        from deriva_ml.core.definitions import MLTable, MLVocab
+        from deriva_ml.schema.create_schema import create_asset_table as _create_asset_table
+
+        schema = schema or self.model._require_default_schema()
+        try:
+            asset_table = _create_asset_table(
+                self.model.schemas[schema],
+                asset_name,
+                execution_table=self.model.name_to_table(MLTable.execution),
+                asset_type_table=self.model.name_to_table(MLVocab.asset_type),
+                asset_role_table=self.model.name_to_table(MLVocab.asset_role),
+                use_hatrac=use_hatrac,
+                comment=comment,
+                additional_columns=additional_columns,
+            )
+        except ValueError:
+            raise DerivaMLException(f"Table {asset_name} already exist")
+
+        if update_navbar:
+            self.apply_catalog_annotations()
+
+        return asset_table
 
     def create_table(self, table: TableDefinition, schema: str | None = None, update_navbar: bool = True) -> Table:
         """Creates a new table in the domain schema.

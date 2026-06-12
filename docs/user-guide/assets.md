@@ -145,6 +145,39 @@ models = [a for a in ml.list_assets("Model") if a.asset_types == ["Model_File"]]
   diffs against the current tags). Do not use raw `update_entities` on asset
   rows; it bypasses the tag-diff and provenance handling.
 
+## How to create a new asset table
+
+Use `ml.create_asset_table(...)` — never hand-build asset tables with the
+generic `create_table`. One call creates the full canonical shape, so the
+result always satisfies `model.is_asset` (validation-by-construction):
+
+- the five standard hatrac columns (`URL`, `Filename`, `Length`, `MD5`,
+  `Description`) with the standard constraints and the `asset` annotation;
+- the `<name>_Asset_Type` association (an asset can carry multiple type
+  tags, e.g. `Model_File` + `Output_File`);
+- the `<name>_Execution` association with the `Asset_Role` FK
+  (`Input` / `Output`) that the execution upload machinery writes;
+- the standard Chaise display annotations.
+
+```python
+from deriva_ml import ColumnDefinition, BuiltinTypes
+
+table = ml.create_asset_table(
+    "Scan_File",
+    additional_columns=[
+        ColumnDefinition(name="Scanner_Model", type=BuiltinTypes.text),
+    ],
+    comment="Raw scanner output files.",
+)
+assert ml.model.is_asset("Scan_File")
+```
+
+`additional_columns` appends domain-specific metadata columns to the
+standard shape. Pass `use_hatrac=False` for assets whose bytes live outside
+Hatrac (the `URL` column becomes a plain string and no upload UI is wired).
+When creating several tables in a batch, pass `update_navbar=False` and call
+`ml.apply_catalog_annotations()` once at the end.
+
 ## Summary
 
 | Task | Use | Provenance edge? |
