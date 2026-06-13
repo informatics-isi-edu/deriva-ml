@@ -61,7 +61,7 @@ from deriva.bag.traversal import FKTraversalPolicy, VocabExport
 from deriva.core.ermrest_model import Table
 from deriva.core.utils.core_utils import tag as deriva_tags
 
-from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, RID
+from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, PROVENANCE_TERMINAL_TABLES, RID
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
@@ -804,6 +804,12 @@ class DatasetBagBuilder:
         return FKTraversalPolicy(
             exclude_tables=exclude_tables,
             vocab_export=vocab_export,
+            # Provenance tables are entered but not traversed outward —
+            # otherwise the walk fans out across the whole catalog
+            # provenance graph (see core/constants.py
+            # :PROVENANCE_TERMINAL_TABLES). Same protection clone_via_bag
+            # applies.
+            terminal_tables=set(PROVENANCE_TERMINAL_TABLES),
             # Silence WARNING-level "Breaking cycle in FK
             # dependencies" log spam for the known
             # Dataset ↔ Dataset_Version cycle. See

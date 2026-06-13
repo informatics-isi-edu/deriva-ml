@@ -76,12 +76,31 @@ INTENTIONAL_FK_CYCLES: frozenset[frozenset[str]] = frozenset({
     frozenset({f"{ML_SCHEMA}.Dataset", f"{ML_SCHEMA}.Dataset_Version"}),
 })
 
+# Provenance tables the dataset-bag walk ENTERS but does not traverse
+# outward. ``Execution`` and ``Workflow`` describe *how* rows came to
+# be, not *what they are*; one Execution aggregates state across every
+# Subject/Image/Dataset its run touched and has many inbound FKs (every
+# ``*_Execution`` association, plus self-loops via ``Execution_Execution``
+# and back-edges to feature tables like ``Annotation``). Following those
+# inbound FKs makes the walk fan out across the entire catalog provenance
+# graph — an 18-minute hang on large nested datasets (eye-ai 2-277G).
+# Marking them terminal keeps the provenance *link* in the bag while
+# severing the fan-out. Shared by ``DatasetBagBuilder.build_policy`` and
+# ``clone_via_bag`` so the two bag-producing paths cannot diverge.
+PROVENANCE_TERMINAL_TABLES: frozenset[tuple[str, str]] = frozenset(
+    {
+        (ML_SCHEMA, "Execution"),
+        (ML_SCHEMA, "Workflow"),
+    }
+)
+
 
 __all__ = [
     "ML_SCHEMA",
     "DRY_RUN_RID",
     "SYSTEM_SCHEMAS",
     "INTENTIONAL_FK_CYCLES",
+    "PROVENANCE_TERMINAL_TABLES",
     "RID",
     "DerivaSystemColumns",
     "DerivaAssetColumns",
