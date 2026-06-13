@@ -50,6 +50,32 @@ readable by both humans and the LLM — for these operations.
   estimate/clone/drift; NOT cache/MINID/download-tiers (covered
   elsewhere — `offline.md`, `manage-deriva-storage`).
 
+## 3a. Discoverability requirement (MCP RAG + Claude Code)
+
+The docs must be discoverable by both the deriva-ml MCP server's RAG
+search and a Claude Code session. **Verified:** the
+`deriva-ml-mcp-plugin` RAG indexer
+(`resources/rag.py:register_rag_sources`) crawls the
+`informatics-isi-edu/deriva-ml` repo at `main` with `path_prefix=""`
+and `glob="**/*.md"` (deriva-mcp-core `GitHubCrawler`), tagging every
+`.md` as `doc_type="ml-docs"`. Therefore:
+
+- Placing the three docs under `docs/reference/` (inside the repo) is
+  sufficient — they are automatically indexed as `ml-docs`, searchable
+  via `rag_search(query=..., doc_type="ml-docs")`, with **no special
+  registration**. (The crawler has no exclude-paths filter; everything
+  under the repo root that ends in `.md` is indexed.)
+- **Index timing:** the RAG source tracks `main`, so the docs become
+  MCP-searchable only **after the PR merges to `main`** (and the next
+  index pass runs) — not from the feature branch. State this in the PR.
+- **Claude Code:** the docs are on disk in the repo, so a Claude Code
+  session reads them directly. To make the assistant *aware* they exist,
+  add a one-line pointer in the repo-root `deriva-ml/CLAUDE.md` (e.g.
+  under a "Reference docs" note) directing it to
+  `docs/reference/{fk-traversal,bag-export,denormalization}.md` for
+  exact traversal/export/denorm behavior. This is the one CLAUDE.md edit
+  in scope.
+
 ## 4. Deliverables
 
 Three new files under `docs/reference/` (joining the existing
@@ -165,6 +191,8 @@ a few rows), a multi-table `via` example, a feature `selector` example.
   `user-guide/offline.md` (cache) → bag-export for "what's in the bag".
 - Each doc header: a one-line "verified against demo catalog, deriva-ml
   vX.Y" provenance note + a "Quick answers" index.
+- `deriva-ml/CLAUDE.md` (repo root): a one-line "Reference docs" pointer
+  to the three files (§3a) so a Claude Code session knows they exist.
 
 ## 5. Authoring method (how the examples stay honest)
 
