@@ -8,9 +8,13 @@ verified excerpts from these — every numeric/structural claim in a
 "Worked examples" section traces here.
 
 - `traversal.txt` — reached-table sets for dataset 5D0 (with/without terminal tables)
-- `term_paths.txt` — FK paths to Execution_Asset (shows terminal made no
-  reached-set difference on THIS catalog; the eye-ai explosion topology
-  is not reproducible here — see fk-traversal.md's illustrative note)
+- `traversal.txt` — reached-table sets WITH vs WITHOUT terminal tables
+  for dataset 5D0. The fix (PR #297, now on main) severs 12 tables: the
+  Execution_Asset / Execution_Metadata / File / Execution_Execution
+  provenance closure (EXTRA_WITHOUT_TERMINAL). This IS the verified
+  demo-catalog contrast — the fk-traversal doc uses these real numbers.
+- `term_paths.txt` — earlier path-level probe (superseded by the
+  reached-set contrast in traversal.txt)
 - `export.txt` — anchors / excluded-empty-associations / member counts for flat dataset 5D0
 - `nested_b2.txt` — nested datasets 5CT/5CM: recursive anchors + the
   descendant-member rule (5CM has 0 own Image members but Dataset_Image
