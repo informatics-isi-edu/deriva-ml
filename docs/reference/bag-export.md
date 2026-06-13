@@ -168,7 +168,7 @@ image in its subtree.
 
 <a id="b3"></a>
 **B3 — The provenance hub is terminal: `{Execution, Workflow}` are
-entered but not traversed outward.** `build_policy` sets
+entered but their inbound FKs are not followed.** `build_policy` sets
 `terminal_tables=set(PROVENANCE_TERMINAL_TABLES)`
 (`bag_builder.py:812`), sourcing the set from the shared
 `src/deriva_ml/core/constants.py::PROVENANCE_TERMINAL_TABLES` =
