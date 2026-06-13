@@ -1,0 +1,35 @@
+=== WITH terminal: paths to Execution_Asset ===
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Version:=deriva-ml:Dataset_Version/Execution:=deriva-ml:Execution/Execution_Asset_Executio
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Execution:=deriva-ml:Dataset_Execution/Execution:=deriva-ml:Execution/Execution_Asset_Exec
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Version:=deriva-ml:Dataset_Version/Dataset_Execution:=deriva-ml:Dataset_Execution/Executio
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Execution:=deriva-ml:Dataset_Execution/Dataset_Version:=deriva-ml:Dataset_Version/Executio
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Image_Execution:=d
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Execution_Image_Bo
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Execution_Image_Qu
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Execution_Subject_Health
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Subject:=demo-sche
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Image:=demo-schema:Image
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Image:=demo-schema:Image
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Image:=demo-schema:Image
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Observation:=demo-
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Execution_Image_Bo
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Observation:=demo-schema
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Observation:=demo-schema
+=== WITHOUT terminal: paths to Execution_Asset ===
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Version:=deriva-ml:Dataset_Version/Execution:=deriva-ml:Execution/Execution_Asset_Executio
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Execution:=deriva-ml:Dataset_Execution/Execution:=deriva-ml:Execution/Execution_Asset_Exec
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Version:=deriva-ml:Dataset_Version/Dataset_Execution:=deriva-ml:Dataset_Execution/Executio
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Execution:=deriva-ml:Dataset_Execution/Dataset_Version:=deriva-ml:Dataset_Version/Executio
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Image_Execution:=d
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Execution_Image_Bo
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Execution_Image_Qu
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Execution_Subject_Health
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Subject:=demo-sche
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Image:=demo-schema:Image
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Image:=demo-schema:Image
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Image:=demo-schema:Image
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Observation:=demo-
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Image_Dataset_Legacy:=demo-schema:Image_Dataset_Legacy/Image:=demo-schema:Image/Execution_Image_Bo
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Observation:=demo-schema
+   entity/Dataset:=deriva-ml:Dataset/RID=5D0/Dataset_Subject:=demo-schema:Dataset_Subject/Subject:=demo-schema:Subject/Observation:=demo-schema
+PATH_COUNT_WITH 16 PATH_COUNT_WITHOUT 16

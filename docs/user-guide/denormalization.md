@@ -11,6 +11,16 @@ DerivaML's denormalization is designed around one principle:
 > **Give me a table where each row is one ML observation, with every
 > column I asked for filled in from related rows via FK traversal.**
 
+!!! note "Looking for exact rules?"
+    This page is the example-led introduction. For the **formal rules**
+    — precise `row_per` / `via` / selector behavior and exact return
+    types — see the
+    [Denormalization Reference](../reference/denormalization.md). (The
+    "FK traversal" here means the local column-hoisting join over a
+    downloaded bag, which is a *different* operation from the
+    catalog-side [FK traversal](../reference/fk-traversal.md) that
+    produces a bag.)
+
 The user names the tables they want columns from; DerivaML decides
 the shape of the output from the schema's FK graph.
 

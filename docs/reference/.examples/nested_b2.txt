@@ -1,0 +1,8 @@
+RID=5CT own={'Dataset': 2, 'Image': 2} children=['5D0', '5DA'] descendant_members={'Subject': 4}
+  anchors=["RIDAnchor:['5CT']", "RIDAnchor:['5D0']", "RIDAnchor:['5DA']"]
+  excluded_empty=['deriva-ml.Dataset_File']
+  Dataset_Image_excluded=False
+RID=5CM own={'Dataset': 2} children=['5CT', '5DY'] descendant_members={'Dataset': 4, 'Image': 4}
+  anchors=["RIDAnchor:['5CM']", "RIDAnchor:['5CT']", "RIDAnchor:['5D0']", "RIDAnchor:['5DA']", "RIDAnchor:['5DY']", "RIDAnchor:['5EE']", "RIDAnchor:['5E4']"]
+  excluded_empty=['deriva-ml.Dataset_File']
+  Dataset_Image_excluded=False

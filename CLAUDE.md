@@ -614,3 +614,26 @@ A workspace-wide grep for these names returns zero hits inside
 See `docs/adr/0007-annotation-builders-public-api.md` for the full
 contract and `tests/model/test_annotations.py::TestExternalConsumerContract`
 for the regression coverage that pins the surface in CI.
+
+### Reference manual for traversal / export / denormalization
+
+The exact behavior of FK traversal, bag export, and denormalization is
+documented formally in `docs/reference/`:
+
+- `docs/reference/fk-traversal.md` — `FKTraversalPolicy` fields
+  (walk-phase vs load-phase) + the walker rules (bidirectional walk,
+  terminal tables, vocab leaves, `max_depth`).
+- `docs/reference/bag-export.md` — how `DatasetBagBuilder` drives the
+  engine: nested-descendant anchors, empty-association pruning, the
+  `{Execution, Workflow}` terminal-tables guard, and the export-spec
+  shape.
+- `docs/reference/denormalization.md` — the wide-table
+  (`get_denormalized_*`) rules (`row_per` / `via` / selector / return
+  types).
+
+Each rule is tagged `[engine: deriva-py]` (enforced upstream in
+`deriva/bag/`) or `[deriva-ml]`, and every worked example is verified
+against a demo catalog. These docs are RAG-indexed as `ml-docs`
+(searchable via `rag_search(doc_type="ml-docs")`) once on `main` —
+consult them when answering questions about what a bag includes or how
+denormalization shapes a frame.

@@ -51,6 +51,11 @@ nav:
       - Reproducibility: user-guide/reproducibility.md
       - Integrating with hydra-zen: user-guide/hydra-zen.md
       - Migrating from previous versions: user-guide/migration.md
+  - Reference Manual:
+      - FK Traversal: reference/fk-traversal.md
+      - Bag Export: reference/bag-export.md
+      - Denormalization (formal): reference/denormalization.md
+      - Schema: reference/schema.md
   - Configuration:
       - Overview: configuration/overview.md
       - Configuration Groups: configuration/groups.md
