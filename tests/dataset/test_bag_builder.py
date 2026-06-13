@@ -171,6 +171,21 @@ class TestAnchorsAndPolicy:
         )
         assert policy.vocab_export is VocabExport.REFERENCED_ONLY
 
+    def test_build_policy_marks_execution_workflow_terminal(
+        self, catalog_with_datasets
+    ) -> None:
+        """Execution and Workflow are terminal so the walk doesn't fan
+        out across the catalog provenance graph (the 2-277G 18-min hang)."""
+        ml, _ = catalog_with_datasets
+        datasets = list(ml.find_datasets())
+        if not datasets:
+            pytest.skip("Need at least one dataset.")
+        dataset = ml.lookup_dataset(datasets[0].dataset_rid)
+        builder = DatasetBagBuilder(ml_instance=ml)
+        policy = builder.build_policy(dataset)
+        assert ("deriva-ml", "Execution") in policy.terminal_tables
+        assert ("deriva-ml", "Workflow") in policy.terminal_tables
+
     def test_build_policy_includes_user_exclude_tables(
         self, catalog_with_datasets
     ) -> None:
