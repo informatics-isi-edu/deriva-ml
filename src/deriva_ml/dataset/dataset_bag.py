@@ -224,6 +224,57 @@ class DatasetBag:
         """
         return self.model.bag_path
 
+    def materialize(self, *, fetch_concurrency: int = 1) -> Self:
+        """Fetch any not-yet-downloaded files for this bag, in place.
+
+        A :class:`DatasetBag` may be downloaded metadata-only (via
+        ``download_dataset_bag(..., materialize=False)``) or be left
+        partially materialized (``cached_holey``) after an interrupted
+        fetch. This method completes it: it reads the bag's ``fetch.txt``
+        (which carries absolute Hatrac/S3 URLs) and downloads every
+        referenced file into the bag directory. No catalog connection is
+        used — materialization is a pure local operation over the bag
+        already on disk.
+
+        The bag's :attr:`path` is unchanged; only the directory contents
+        grow. The SQLite mirror is unaffected (it is built from the CSV
+        tables already present in a metadata-only bag).
+
+        The call is idempotent: a fully-materialized bag returns
+        immediately without fetching.
+
+        Args:
+            fetch_concurrency: Maximum number of concurrent file
+                downloads.
+
+        Returns:
+            Self: this same bag (its assets are now present on disk),
+            so the call can be chained, e.g.
+            ``bag = ml.download_dataset_bag(spec).materialize()``.
+
+        Raises:
+            Exception: Propagates any error raised by the underlying
+                ``bdbag`` fetch — e.g. a ``fetch.txt`` URL that is
+                unreachable (source store down, or asset bytes never
+                uploaded to a reachable store). The bag is left
+                partially materialized in that case.
+
+        Example:
+            >>> spec = DatasetSpec(rid="1-abc123", materialize=False)  # doctest: +SKIP
+            >>> bag = ml.download_dataset_bag(spec)  # metadata only      # doctest: +SKIP
+            >>> bag.materialize()  # fetch the asset bytes in place       # doctest: +SKIP
+            <deriva_ml.DatasetBag object ...>
+        """
+        from deriva_ml.core.logging_config import get_logger
+        from deriva_ml.dataset.bag_download import materialize_bag_dir
+
+        materialize_bag_dir(
+            self.path,
+            fetch_concurrency=fetch_concurrency,
+            logger=get_logger(__name__),
+        )
+        return self
+
     def list_tables(self) -> list[str]:
         """List all tables available in the bag's SQLite database.
 

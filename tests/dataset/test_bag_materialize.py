@@ -122,3 +122,31 @@ def test_materialize_bag_dir_idempotent_noop(tmp_path: Path, monkeypatch):
         assert result == bag_dir
     finally:
         httpd.shutdown()
+
+
+class _StubModel:
+    """Minimal stand-in for DatabaseModel exposing only ``bag_path``."""
+
+    def __init__(self, bag_path: Path):
+        self.bag_path = bag_path
+
+
+def test_datasetbag_materialize_fetches_in_place(tmp_path: Path):
+    """DatasetBag.materialize() fetches missing files and returns self."""
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+
+    bag_dir, target, httpd = _make_holey_bag(tmp_path)
+    try:
+        # Build a DatasetBag without running its catalog-touching __init__.
+        bag = DatasetBag.__new__(DatasetBag)
+        bag.model = _StubModel(bag_dir)
+
+        assert not target.exists()
+        result = bag.materialize()
+
+        assert result is bag
+        assert target.exists()
+        assert target.read_bytes() == b"hello-materialize"
+        assert BagCache._is_fully_materialized(bag_dir)
+    finally:
+        httpd.shutdown()
