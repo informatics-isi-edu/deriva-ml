@@ -52,6 +52,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from logging import Logger
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
@@ -72,8 +73,11 @@ from deriva.transfer.download import (
 from deriva.transfer.download.deriva_export import DerivaExport
 
 from deriva_ml.core.exceptions import DerivaMLException
+from deriva_ml.core.logging_config import get_logger
 from deriva_ml.dataset.aux_classes import DatasetMinid, DatasetVersion
 from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+_module_logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from deriva_ml.dataset.dataset import Dataset
@@ -741,6 +745,78 @@ def get_dataset_minid(
     )
 
 
+def materialize_bag_dir(
+    bag_path: Path,
+    *,
+    fetch_concurrency: int = 1,
+    logger: "Logger | None" = None,
+) -> Path:
+    """Fetch every ``fetch.txt`` entry for an already-extracted bag dir.
+
+    Path-only — needs no catalog connection. ``fetch.txt`` carries
+    absolute (Hatrac/S3) URLs, so materialization is a pure local
+    operation over a bag that is already on disk. Idempotent: if the
+    bag is already fully materialized, returns immediately without
+    fetching.
+
+    This is the shared fetch tail used by both
+    :func:`materialize_dataset_bag` (after it has downloaded/extracted
+    the bag) and :meth:`~deriva_ml.dataset.dataset_bag.DatasetBag.materialize`
+    (which operates on a bag already on disk).
+
+    Args:
+        bag_path: Path to the extracted BDBag directory (parent of
+            ``data/``).
+        fetch_concurrency: Maximum number of concurrent file downloads.
+        logger: Logger for progress messages. Defaults to this module's
+            logger.
+
+    Returns:
+        ``Path`` to the bag directory (unchanged; only its contents grow).
+
+    Raises:
+        Exception: Propagates any error raised by ``bdb.materialize`` —
+            e.g. a ``fetch.txt`` URL that is unreachable. The bag is
+            left partially materialized in that case.
+    """
+    from deriva_ml.dataset.bag_cache import BagCache
+
+    log = logger if logger is not None else _module_logger
+    bag_path = Path(bag_path)
+
+    def fetch_progress_callback(current, total):
+        log.info(f"Materializing bag: {current} of {total} file(s) downloaded.")
+        return True
+
+    def validation_progress_callback(current, total):
+        log.info(f"Validating bag: {current} of {total} file(s) validated.")
+        return True
+
+    # If the bag already has every fetch.txt entry resolved, skip the
+    # materialize call — there's nothing to download.
+    if BagCache._is_fully_materialized(bag_path):
+        log.info(f"Bag at {bag_path} already materialized.")
+        return bag_path
+
+    log.info(f"Materializing bag at {bag_path}")
+    # Ensure parent directories exist for all fetch entries.
+    fetch_file = bag_path / "fetch.txt"
+    if fetch_file.exists():
+        with fetch_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split("\t")
+                if len(parts) >= 3:
+                    rel_path = parts[2]
+                    (bag_path / rel_path).parent.mkdir(parents=True, exist_ok=True)
+    bdb.materialize(
+        bag_path.as_posix(),
+        fetch_callback=fetch_progress_callback,
+        validation_callback=validation_progress_callback,
+        fetch_concurrency=fetch_concurrency,
+    )
+    return bag_path
+
+
 def materialize_dataset_bag(
     dataset: "Dataset",
     minid: DatasetMinid,
@@ -773,46 +849,12 @@ def materialize_dataset_bag(
     Returns:
         Path to the fully materialized bag directory.
     """
-
-    def fetch_progress_callback(current, total):
-        msg = f"Materializing bag: {current} of {total} file(s) downloaded."
-        dataset._logger.info(msg)
-        return True
-
-    def validation_progress_callback(current, total):
-        msg = f"Validating bag: {current} of {total} file(s) validated."
-        dataset._logger.info(msg)
-        return True
-
     bag_path = download_dataset_minid(dataset, minid, use_minid)
-
-    # If the bag already has every fetch.txt entry resolved, skip the
-    # materialize call — there's nothing to download.
-    from deriva_ml.dataset.bag_cache import BagCache
-
-    if BagCache._is_fully_materialized(bag_path):
-        dataset._logger.info(
-            f"Cached bag {minid.dataset_rid} Version:{minid.dataset_version} already materialized."
-        )
-        return Path(bag_path)
-
-    dataset._logger.info(f"Materializing bag {minid.dataset_rid} Version:{minid.dataset_version}")
-    # Ensure parent directories exist for all fetch entries
-    fetch_file = bag_path / "fetch.txt"
-    if fetch_file.exists():
-        with fetch_file.open("r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split("\t")
-                if len(parts) >= 3:
-                    rel_path = parts[2]
-                    (bag_path / rel_path).parent.mkdir(parents=True, exist_ok=True)
-    bdb.materialize(
-        bag_path.as_posix(),
-        fetch_callback=fetch_progress_callback,
-        validation_callback=validation_progress_callback,
+    return materialize_bag_dir(
+        bag_path,
         fetch_concurrency=fetch_concurrency,
+        logger=dataset._logger,
     )
-    return Path(bag_path)
 
 
 __all__ = [
@@ -820,5 +862,6 @@ __all__ = [
     "download_dataset_minid",
     "fetch_minid_metadata",
     "get_dataset_minid",
+    "materialize_bag_dir",
     "materialize_dataset_bag",
 ]
