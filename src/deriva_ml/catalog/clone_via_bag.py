@@ -73,7 +73,7 @@ from deriva_ml.catalog.provenance import (
     CloneDetails,
     set_catalog_provenance,
 )
-from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES
+from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, PROVENANCE_TERMINAL_TABLES
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.core.validation import VALIDATION_CONFIG
 
@@ -84,6 +84,10 @@ if TYPE_CHECKING:
     from deriva.core import ErmrestCatalog
 
 logger = get_logger(__name__)
+
+# Module-level alias so tests can assert clone_via_bag and bag_builder
+# share one terminal set (core/constants.py:PROVENANCE_TERMINAL_TABLES).
+_DEFAULT_TERMINAL_TABLES: set[tuple[str, str]] = set(PROVENANCE_TERMINAL_TABLES)
 
 
 def _materialize_bag_dir(bag_path: Path) -> Path:
@@ -357,10 +361,7 @@ def clone_via_bag(
     # follow their outbound or inbound FKs. Same semantics the
     # walker already applies to controlled-vocabulary tables; see
     # :attr:`FKTraversalPolicy.terminal_tables`.
-    default_terminal_tables: set[tuple[str, str]] = {
-        ("deriva-ml", "Execution"),
-        ("deriva-ml", "Workflow"),
-    }
+    default_terminal_tables = set(_DEFAULT_TERMINAL_TABLES)
     if policy is None:
         policy = FKTraversalPolicy(
             vocab_export=VocabExport.FULL,
