@@ -408,9 +408,7 @@ def _resolve_version_record(dataset: "Dataset", version: DatasetVersion) -> Any:
     try:
         return next(v for v in dataset.dataset_history() if str(v.dataset_version) == version_str)
     except StopIteration:
-        raise DerivaMLException(
-            f"Version {version_str} does not exist for RID {dataset.dataset_rid}"
-        ) from None
+        raise DerivaMLException(f"Version {version_str} does not exist for RID {dataset.dataset_rid}") from None
 
 
 def _build_version_rid(dataset_rid: str, snapshot: str | None) -> str:
@@ -482,8 +480,7 @@ def _tier1_local_cache_lookup(
 
     # Re-open the index in a short scope to compute the bag path.
     cached_bag_path = (
-        BagCacheIndex(dataset._ml_instance.cache_dir).bag_dir_for(cache_suffix)
-        / f"Dataset_{dataset.dataset_rid}"
+        BagCacheIndex(dataset._ml_instance.cache_dir).bag_dir_for(cache_suffix) / f"Dataset_{dataset.dataset_rid}"
     )
     if not cached_bag_path.exists():
         return None
