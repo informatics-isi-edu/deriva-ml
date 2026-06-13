@@ -101,8 +101,10 @@ auto-inference raises and you must pass `row_per=` explicitly. Setting
 rejected (tutorial Rule 5: that would require aggregation).
 `[deriva-ml]`
 `src/deriva_ml/local_db/denormalizer.py::Denormalizer.as_dataframe`
-(`row_per` argument; sink-finding in `_find_sinks`); surfaced through
-each `DatasetBag` method's `row_per` keyword.
+(`row_per` argument; the sink-finding logic is
+`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner._find_sinks`,
+invoked through `Denormalizer`); surfaced through each `DatasetBag`
+method's `row_per` keyword.
 
 <a id="d2"></a>
 **D2 — Upstream columns are hoisted and duplicated across rows that
