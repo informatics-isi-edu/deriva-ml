@@ -100,29 +100,33 @@ working policy. The fields, with their exact code defaults:
 
 ### deriva-ml's chosen configurations
 
-`[deriva-ml]` deriva-ml builds the policy differently for its two main
-consumers:
+`[deriva-ml]` Both of deriva-ml's main consumers mark the provenance
+hub terminal, sourcing the set from a single shared constant —
+`src/deriva_ml/core/constants.py::PROVENANCE_TERMINAL_TABLES`, the
+`frozenset({("deriva-ml", "Execution"), ("deriva-ml", "Workflow")})`:
 
 - **Dataset bag export** —
   `src/deriva_ml/dataset/bag_builder.py::DatasetBagBuilder.build_policy`.
-  Sets `vocab_export=VocabExport.FULL` (consumers need the complete
-  controlled vocabulary), `exclude_tables` = the `Dataset_X`
-  association tables whose element type has no members in *this*
-  dataset, and `intentional_cycles` to silence the known
-  `Dataset ↔ Dataset_Version` cycle warning. It does **not** set
-  `terminal_tables` — see the honest caveat in [T3](#t3) for why that
-  is harmless on a typical catalog.
+  Sets `terminal_tables=set(PROVENANCE_TERMINAL_TABLES)`
+  (`bag_builder.py:812`), `vocab_export=VocabExport.FULL` (consumers
+  need the complete controlled vocabulary), `exclude_tables` = the
+  `Dataset_X` association tables whose element type has no members in
+  *this* dataset, and `intentional_cycles` to silence the known
+  `Dataset ↔ Dataset_Version` cycle warning.
 - **Catalog clone** —
-  `src/deriva_ml/catalog/clone_via_bag.py`. Sets
-  `vocab_export=VocabExport.FULL`,
-  `dangling_fk_strategy=DanglingFKStrategy.DELETE`, and
-  `terminal_tables = {("deriva-ml", "Execution"), ("deriva-ml",
-  "Workflow")}` — defined inline as the local
-  `default_terminal_tables` set
-  (`clone_via_bag.py:360`). When the caller passes their own
-  `FKTraversalPolicy`, these clone-required settings are merged in only
-  for fields the caller left unset (`model_fields_set`-based merge), so
-  an explicit caller choice always wins.
+  `src/deriva_ml/catalog/clone_via_bag.py`. Marks the same set terminal
+  via the module-level
+  `_DEFAULT_TERMINAL_TABLES = set(PROVENANCE_TERMINAL_TABLES)`
+  (`clone_via_bag.py:90`), plus `vocab_export=VocabExport.FULL` and
+  `dangling_fk_strategy=DanglingFKStrategy.DELETE`. When the caller
+  passes their own `FKTraversalPolicy`, these clone-required settings
+  are merged in only for fields the caller left unset
+  (`model_fields_set`-based merge), so an explicit caller choice always
+  wins.
+
+Both consumers therefore mark `{Execution, Workflow}` terminal by
+default. The reached-set effect of that choice is the verified contrast
+in the [Worked examples](#worked-examples).
 
 ## Formal rules
 
@@ -165,21 +169,23 @@ From a terminal `Execution` row, inbound would otherwise reach every
 scope that shares the `Execution`.
 `[engine: deriva-py]` is the mechanism
 (`SchemaPathWalker`, the `is_terminal` check at
-`path_walker.py:226`/`241`); `[deriva-ml]` chooses the set —
-`clone_via_bag.py:360` sets `{Execution, Workflow}` for clones.
+`path_walker.py:226`/`241`); `[deriva-ml]` chooses the set — both
+`bag_builder.build_policy` (dataset export) and `clone_via_bag` source
+`{Execution, Workflow}` from
+`core/constants.py::PROVENANCE_TERMINAL_TABLES`.
 
-**Honest caveat — terminal tables don't always change the reached
-*set*.** On a topology where nothing fans back out *through* the hub,
-marking a table terminal bounds the walk's *continuation past* the hub
-without removing any table from the reached set. On the demo catalog
-this is exactly what happens: the reached-table set and the FK-path
-count to `Execution_Asset` are **identical with and without** terminal
-tables (see [Worked examples](#worked-examples) — 16 paths either way,
-`EXTRA_WITHOUT_TERMINAL []`). The terminal rule's payoff is a
-**row-count / path-fanout** effect on *hub-heavy* catalogs: it prevents
-one execution's slice from sweeping in *other* executions' rows. See
-the illustrative example below for the topology where the difference is
-real.
+On the demo catalog this rule severs **12 tables** from dataset `5D0`'s
+walk — the `Execution_Asset` / `Execution_Metadata` / `File` /
+`Execution_Execution` provenance closure plus the `Workflow_*` tail.
+With the hub terminal the walk reaches **30** tables; without it, **42**
+(see [Worked examples](#worked-examples) for the exact severed set).
+That is the *reached-set* effect. On a hub-heavy topology such as the
+eye-ai catalog the same rule additionally prevents a *row-count*
+explosion (the original bug): one execution's slice would otherwise
+sweep in *other* executions' rows through the shared `Execution`. The
+reached-set contrast is the verified, demonstrable effect; the
+row-count blow-up is the larger-scale consequence on catalogs whose
+feature tables point into `Execution`.
 
 <a id="t4"></a>
 **T4 — Vocabularies are always leaves.** Independent of
@@ -259,23 +265,21 @@ chooses the values per operation (export and clone set
 
 This is the **verified** reached-table set for a real dataset (RID
 `5D0`) on the demo catalog, anchored on that one Dataset RID, with the
-clone's terminal-tables configuration applied
-(`docs/reference/.examples/traversal.txt`, field `REACHED_WITH_FIX`):
+default terminal-tables configuration applied (the post-#297 reality —
+`Execution` / `Workflow` terminal). Source:
+`docs/reference/.examples/traversal.txt`, field `REACHED_WITH_FIX` —
+**30 tables**:
 
 ```
 Asset_Role, Asset_Type, BoundingBox, BoundingBox_Asset_Type,
 BoundingBox_Execution, ClinicalRecord, ClinicalRecord_Observation,
 Dataset, Dataset_Dataset_Type, Dataset_Execution, Dataset_Subject,
-Dataset_Type, Dataset_Version, Execution, Execution_Asset,
-Execution_Asset_Asset_Type, Execution_Asset_Execution,
-Execution_Execution, Execution_Image_BoundingBox,
-Execution_Image_Quality, Execution_Metadata,
-Execution_Metadata_Asset_Type, Execution_Metadata_Execution,
-Execution_Status, Execution_Subject_Health, Feature_Name, File,
-File_Asset_Type, File_Execution, Image, ImageQuality,
-Image_Asset_Type, Image_Dataset_Legacy, Image_Execution, OCR_Report,
-Observation, Report, Subject, SubjectHealth, Workflow, Workflow_Type,
-Workflow_Workflow_Type
+Dataset_Type, Dataset_Version, Execution,
+Execution_Image_BoundingBox, Execution_Image_Quality,
+Execution_Status, Execution_Subject_Health, Feature_Name, Image,
+ImageQuality, Image_Asset_Type, Image_Dataset_Legacy,
+Image_Execution, OCR_Report, Observation, Report, Subject,
+SubjectHealth, Workflow
 ```
 
 Reading the shape:
@@ -288,46 +292,63 @@ Reading the shape:
   by FK-following from the member rows; no separate policy field is
   needed ([T2](#t2)).
 - **Vocabularies** — `Asset_Role`, `Asset_Type`, `Dataset_Type`,
-  `Feature_Name`, `Workflow_Type` are reached and entered, but the walk
-  stops there ([T4](#t4)).
+  `Feature_Name` are reached and entered, but the walk stops there
+  ([T4](#t4)).
 - **Provenance hub** — `Execution` and `Workflow` are present (their
-  rows are emitted), but they're terminal, so the walk does not fan back
-  out through them ([T3](#t3)).
+  rows are emitted, so other rows' FKs into them resolve), but they're
+  terminal, so the walk does not fan back out through them ([T3](#t3)).
+  This is exactly why the execution-asset/metadata closure
+  (`Execution_Asset`, `Execution_Metadata`, `File`, …) and the
+  `Workflow_Type` tail are **absent** from this set — see the contrast
+  below.
 
 ### Terminal tables in action (the provenance-hub rule)
 
-*Illustrative — the demo catalog cannot exhibit this; based on the
-eye-ai catalog where the bug was found (PR #297).*
+Marking `{Execution, Workflow}` terminal ([T3](#t3)) is the post-#297
+default for both dataset export and clone. On the demo catalog, dataset
+`5D0`'s walk shows a **real, verified reached-set contrast** between the
+two configurations (`docs/reference/.examples/traversal.txt`):
 
-On the demo catalog, marking `Execution` terminal made **no difference
-at all** to the reached set. The capture compares the walk with and
-without terminal tables and finds them identical:
+| Configuration | Field | Reached tables |
+|---|---|---|
+| **With terminal** (current default) | `REACHED_WITH_FIX` | **30** |
+| **Without terminal** | `REACHED_NO_TERMINAL` | **42** |
+
+`EXECUTION_ASSET_IN` is `False` with the terminal rule — `Execution_Asset`
+is **not** reached when the hub is terminal. The **12 tables** that the
+terminal rule severs (`EXTRA_WITHOUT_TERMINAL`) are exactly the
+provenance closure reached by walking *inbound* from `Execution` /
+`Workflow`:
 
 ```
-EXTRA_WITHOUT_TERMINAL []          # docs/reference/.examples/traversal.txt
-PATH_COUNT_WITH 16 PATH_COUNT_WITHOUT 16   # docs/reference/.examples/term_paths.txt
+Execution_Asset, Execution_Asset_Asset_Type, Execution_Asset_Execution,
+Execution_Execution, Execution_Metadata, Execution_Metadata_Asset_Type,
+Execution_Metadata_Execution, File, File_Asset_Type, File_Execution,
+Workflow_Type, Workflow_Workflow_Type
 ```
 
-16 FK paths to `Execution_Asset` with terminal tables, 16 without — and
-no table appears in one walk but not the other. This is the honest
-finding of [T3](#t3): on a catalog where nothing fans back out *through*
-the `Execution` hub, the terminal rule changes nothing about the reached
-*set*.
+These are the `Execution_Asset` / `Execution_Metadata` / `File`
+asset-and-metadata tables (and their `*_Execution` / `*_Asset_Type`
+associations), the `Execution_Execution` self-association, and the
+`Workflow_Type` / `Workflow_Workflow_Type` vocabulary tail. With
+`Execution` and `Workflow` terminal, the walk emits their rows but does
+not follow their inbound FKs ([T3](#t3)), so this entire closure drops
+out of the slice — 42 tables shrink to 30.
 
-Where the rule earns its keep is the **eye-ai topology**, which the demo
-catalog lacks. There a *feature table* (`Annotation`) carries an FK that
-points **into** `Execution`. Walking inbound from `Execution`
-(`table.referenced_by`, [T2](#t2)) then reaches every `*_Execution`
-association, and from there fans out to **other datasets' executions and
-their uploaded assets** — sweeping unrelated executions' output bytes
-into a single dataset's slice. Marking `Execution` terminal
-([T3](#t3)) cuts that inbound expansion: the hub's rows are still
-emitted (so FKs into `Execution` resolve), but the walk does not follow
-`Execution`'s inbound FKs out to the rest of the catalog. The effect is
-a **row-count / path-fanout** reduction on that hub-heavy topology — not
-a change to the table set on a simple catalog. (Schematically:
-`Annotation → Execution → [inbound] → Other_Execution_Asset` is the
-chain that terminal tables sever.)
+**The mechanism, and why it matters at scale.** Each severed table is
+reached *only* by inbound traversal from the hub: e.g.
+`Execution → [inbound, referenced_by] → Execution_Asset_Execution →
+Execution_Asset`. That inbound edge is precisely what [T3](#t3) cuts.
+On the demo catalog the effect is the reached-set contrast above. On a
+*hub-heavy* topology such as the eye-ai catalog — where a feature table
+(`Annotation`) carries an FK pointing **into** `Execution` — the same
+inbound edge additionally triggers a **row-count explosion** (the
+original bug PR #297 fixed): one execution's slice would sweep in
+*other* executions' rows through the shared `Execution`, because every
+`*_Execution` association fans out to every anchor scope that touched
+that execution. The reached-set contrast shown here is the directly
+demonstrable, verified effect; the row-count blow-up is the
+larger-scale consequence the same rule prevents.
 
 ### `max_depth` truncation
 
