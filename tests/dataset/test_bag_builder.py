@@ -213,3 +213,23 @@ class TestAnchorsAndPolicy:
             table_name == "Dataset"
             for _schema, table_name in policy.exclude_tables
         )
+
+    def test_walk_excludes_execution_asset_closure(
+        self, catalog_with_datasets
+    ) -> None:
+        """With Execution terminal, aggregate_queries reaches Execution
+        (provenance link) and member/feature tables, but NOT the
+        Execution_Asset closure the inbound fan-out used to pull in."""
+        ml, _ = catalog_with_datasets
+        datasets = list(ml.find_datasets())
+        if not datasets:
+            pytest.skip("Need at least one dataset.")
+        dataset = ml.lookup_dataset(datasets[0].dataset_rid)
+        reached = set(DatasetBagBuilder(ml_instance=ml).aggregate_queries(dataset))
+
+        # Provenance link kept:
+        assert "Execution" in reached
+        # Explosion arm severed (these are reached ONLY by following
+        # Execution's inbound FKs outward, which terminal_tables blocks):
+        assert "Execution_Asset" not in reached
+        assert "Execution_Asset_Execution" not in reached
