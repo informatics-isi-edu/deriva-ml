@@ -55,9 +55,12 @@ Root structural facts (source-confirmed):
 
 ## 2. Goals
 
-- Cut the descendant-walk GET count from ~1,500 to a few hundred, dropping
-  `estimate_bag_size(2-277G)` and the bag-download spec-gen from ~460 s toward
-  **well under a minute** (target: re-measure; aim < 60 s, ideally < 30 s).
+- Cut the **descendant-enumeration** cost from ~760 GETs / ~230 s to **2
+  GETs** (one `Dataset_Dataset` + one `Dataset` full-table fetch, ~0.2 s
+  total), and the **member-presence scan** from ~765 GETs to ~9 (Part B). The
+  remaining cost is the genuine per-table estimate queries. Target: drop
+  `estimate_bag_size(2-277G)` and the bag-download spec-gen from ~460 s to
+  **well under a minute** — re-measure to find the true floor; aim < 30 s.
 - **No change to results.** Same anchor RID set, same `exclude_tables`
   decisions, same estimate dict. Pure de-duplication / query-shape change.
 - Benefit is **shared**: `estimate_bag_size` and `download_dataset_bag` both
@@ -67,24 +70,46 @@ Root structural facts (source-confirmed):
 
 ## 3. The fix — three coordinated changes, all in deriva-ml
 
-### Part A — `_iter_descendant_rids`: one recursive fetch, RIDs only
+### Part A — fetch the whole (tiny) nesting + Dataset tables once, assemble the tree client-side
 
-`_iter_descendant_rids` should obtain the full descendant-RID set from a
-**single** `Dataset_Dataset` fetch, without per-node `lookup_dataset`.
+**Measured (2026-06-14, www.eye-ai.org):** the *entire* `Dataset_Dataset`
+table is **174 rows / 0.08 s** to fetch, and the *entire* `Dataset` table is
+**159 rows**. These are dataset-*metadata* tables (datasets, not data rows), so
+they are inherently small catalog-wide. **One full-table fetch of each replaces
+the ~760 per-node round-trips (~230 s)** the current walk uses to enumerate
+descendants.
 
-- Add a RID-only descendant accessor. Two clean options (plan picks one):
-  - **A1 (recommended):** a `Dataset.list_dataset_children_rids(recurse=True)`
-    that runs the same `find_children` logic over the one full-table fetch but
-    returns **RIDs** (skips the `lookup_dataset` hydration at `dataset.py:2405`).
-  - **A2:** a `lookup: bool = True` (or `rids_only`) flag on
-    `list_dataset_children` that, when False, returns RIDs instead of `Dataset`
-    objects. (More API surface on a public method; A1 keeps the public method
-    unchanged.)
-- `_iter_descendant_rids` calls the recursive RID accessor **once** and returns
-  its result, instead of manual per-node recursion.
+So the right primitive is: **fetch `Dataset_Dataset` once, build the nesting
+graph in memory, traverse from the root client-side.** No per-node round-trips.
 
-Effect: 170 `Dataset_Dataset` fetches → **1**; ~592 `lookup_dataset` → **~0**
-for the walk.
+- Add a descendant-RID accessor that:
+  1. fetches the full `Dataset_Dataset` table once (snapshot-scoped),
+  2. builds `parent → [child]` adjacency in memory,
+  3. traverses from the root RID (with a `visited` cycle guard) to produce the
+     full descendant-RID set.
+  - **A1 (recommended):** a new `Dataset.list_dataset_children_rids(recurse=True,
+    version=...)` returning RIDs, built on this one-fetch-assemble approach.
+    Keeps the public `list_dataset_children` signature unchanged.
+  - (`list_dataset_children` itself can later be refactored to share this
+    one-fetch core and only hydrate `Dataset` objects when its caller actually
+    needs them — out of scope here, noted for follow-up.)
+- `_iter_descendant_rids` calls the RID accessor **once** and returns its set,
+  instead of manual per-node recursion.
+- **Eliminate `lookup_dataset` round-trips in the walk:** the walk needs RIDs,
+  not `Dataset` objects. Where a dataset row *is* needed (e.g. the root, or for
+  `_exclude_empty_associations`), resolve it from a **single** full `Dataset`
+  fetch built into a `{rid: row}` map, rather than one `lookup_dataset` GET per
+  RID. (159 rows / one fetch vs. ~592 GETs.)
+
+Effect: ~760 descendant-enumeration GETs → **2** (one `Dataset_Dataset`, one
+`Dataset`), independent of descendant count.
+
+> Safety note: fetching the *whole* table is appropriate **only because these
+> specific tables are small** (catalog-wide dataset metadata). Do NOT generalize
+> "fetch whole table" to data tables (e.g. `Image`, 30k rows). The accessor
+> documents this assumption; if a catalog ever had a pathological number of
+> datasets the count is one cheap `cnt(RID)` away from a guard, but YAGNI until
+> that appears.
 
 ### Part B — `_exclude_empty_associations`: aggregate member-presence, not per-descendant lists
 
@@ -140,9 +165,11 @@ Effect: the walk runs **once**, not twice.
 ## 4. Deliverables
 
 - `src/deriva_ml/dataset/dataset.py`:
-  - a RID-only recursive descendant accessor (Part A1) —
-    `list_dataset_children_rids(recurse=True, version=...)` (or the chosen A2
-    flag), sharing `find_children` with `list_dataset_children`.
+  - a descendant-RID accessor (Part A1) —
+    `list_dataset_children_rids(recurse=True, version=...)` — that fetches the
+    full `Dataset_Dataset` table once, assembles the nesting graph in memory,
+    and traverses from the root (cycle-guarded), returning RIDs with **zero
+    per-node round-trips**.
 - `src/deriva_ml/dataset/bag_builder.py`:
   - `_iter_descendant_rids` uses the recursive RID accessor once (Part A);
   - a memoized descendant-set helper used by both `anchors_for` and
