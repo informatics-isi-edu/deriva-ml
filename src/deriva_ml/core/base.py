@@ -261,6 +261,7 @@ class DerivaML(
         use_minid: bool | None = None,
         clean_execution_dir: bool = True,
         mode: ConnectionMode | str = ConnectionMode.online,
+        reuse_schema_json: dict | None = None,
     ) -> None:
         """Initializes a DerivaML instance.
 
@@ -296,6 +297,13 @@ class DerivaML(
                 writes into local SQLite for later upload. Accepts the string
                 literals ``"online"`` or ``"offline"``; any other value raises
                 ``ValueError``. See spec §2.1.
+            reuse_schema_json: Internal. A pre-parsed ermrest ``/schema``
+                dict to build the model from, skipping the live
+                ``getCatalogSchema()`` fetch. Used by
+                :meth:`catalog_snapshot` to avoid re-introspecting a
+                schema already held in memory (a snapshot's schema is
+                structurally identical to the live catalog's). Not for
+                general use.
         """
         # Store connection mode (see spec §2.1).
         # Done before catalog connection so subclasses/mixins can read
@@ -335,6 +343,7 @@ class DerivaML(
                 ml_schema=ml_schema,
                 domain_schemas=domain_schemas,
                 default_schema=default_schema,
+                reuse_schema_json=reuse_schema_json,
             )
         else:
             self._init_offline(
@@ -424,6 +433,7 @@ class DerivaML(
         ml_schema: str,
         domain_schemas: "str | set[str] | None",
         default_schema: "str | None",
+        reuse_schema_json: dict | None = None,
     ) -> None:
         """Online init: connect to server, fetch the live schema, build the model.
 
@@ -457,24 +467,30 @@ class DerivaML(
         )
         self.catalog = server.connect_ermrest(catalog_id)
 
-        # Fetch the live schema. deriva-py caches the parsed dict on
-        # the catalog instance and auto-invalidates on schema-mutating
-        # POST/PUT/DELETE through the same catalog, so subsequent
-        # reads in the same process are O(1) and always current.
-        # The disk cache write below is purely for offline mode.
-        schema_json = self.catalog.getCatalogSchema()
-        # Retain the parsed schema so catalog_snapshot() can reuse it
-        # instead of re-fetching /schema for every snapshot view (the
-        # snapshot's schema is structurally identical to live).
+        if reuse_schema_json is not None:
+            # Caller (catalog_snapshot) handed us a schema already parsed
+            # by the live instance — a snapshot's schema is structurally
+            # identical to live, so re-fetching /schema is pure waste.
+            # Skip the getCatalogSchema() round-trip and the offline-cache
+            # write (the live instance already wrote it).
+            schema_json = reuse_schema_json
+        else:
+            # Fetch the live schema. deriva-py caches the parsed dict on
+            # the catalog instance and auto-invalidates on schema-mutating
+            # POST/PUT/DELETE through the same catalog, so subsequent
+            # reads in the same process are O(1) and always current.
+            # The disk cache write below is purely for offline mode.
+            schema_json = self.catalog.getCatalogSchema()
+            live_snapshot_id = self.catalog.get("/").json()["snaptime"]
+            cache.write(
+                snapshot_id=live_snapshot_id,
+                hostname=hostname,
+                catalog_id=str(catalog_id),
+                ml_schema=ml_schema,
+                schema=schema_json,
+            )
+        # Retain the parsed schema so catalog_snapshot() can reuse it.
         self._schema_json = schema_json
-        live_snapshot_id = self.catalog.get("/").json()["snaptime"]
-        cache.write(
-            snapshot_id=live_snapshot_id,
-            hostname=hostname,
-            catalog_id=str(catalog_id),
-            ml_schema=ml_schema,
-            schema=schema_json,
-        )
 
         self.model = DerivaModel.from_cached(
             schema_json,
