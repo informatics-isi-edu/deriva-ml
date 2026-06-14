@@ -93,3 +93,42 @@ def test_catalog_snapshot_cache_holds_one_entry_per_id(live_ml):
     b = live_ml.catalog_snapshot(sid)
     assert a is b
     assert len(live_ml._snapshot_cache) == 1
+
+
+def _model_fingerprint(model) -> dict:
+    """A structural fingerprint: {schema: {table: sorted(column names)}}."""
+    fp: dict[str, dict[str, list[str]]] = {}
+    for sname, schema in model.model.schemas.items():
+        fp[sname] = {
+            tname: sorted(c.name for c in table.columns)
+            for tname, table in schema.tables.items()
+        }
+    return fp
+
+
+def test_reused_schema_model_matches_fetched(live_ml):
+    """The schema-reusing snapshot model is structurally identical to a fetched one."""
+    from deriva.core.ermrest_catalog import ErmrestSnapshot
+
+    raw_snaptime = _a_snapshot_id(live_ml)
+    # catalog_snapshot expects the compound "<catalog_id>@<snaptime>" form
+    # (what _version_snapshot_catalog_id produces in production); a bare
+    # snaptime has no '@' and deriva-py would treat it as a catalog id.
+    compound_sid = f"{live_ml.catalog_id}@{raw_snaptime}"
+
+    reused = live_ml.catalog_snapshot(compound_sid)
+
+    # Build the same snapshot WITHOUT reuse — force a real getCatalogSchema.
+    fetched = DerivaML(
+        live_ml.host_name,
+        compound_sid,
+        working_dir=live_ml.working_dir,
+        ml_schema=live_ml.ml_schema,
+        credential=live_ml.credential,
+    )
+
+    # Both must be genuinely snapshot-pinned, not live-catalog connections.
+    assert isinstance(reused.catalog, ErmrestSnapshot)
+    assert isinstance(fetched.catalog, ErmrestSnapshot)
+
+    assert _model_fingerprint(reused.model) == _model_fingerprint(fetched.model)
