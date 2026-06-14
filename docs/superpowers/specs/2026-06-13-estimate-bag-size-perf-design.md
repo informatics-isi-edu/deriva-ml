@@ -155,34 +155,69 @@ On the demo catalog this measured **~12 `/schema` GETs per descendant**
 does **not** fix this — it is live-instance refetching, not snapshot
 construction.
 
-### 3.1b Lever C — cache the live instance's pathBuilder on the DerivaML instance
+### 3.1b Lever C — build the pathBuilder from the held model (REVISED 2026-06-14)
 
-deriva-ml already holds the authoritative parsed schema (`self._schema_json`,
-`self.model`) for the instance's lifetime; the per-call `/schema` refetch is
-pure waste regardless of server 304 support. Fix: **`DerivaML.pathBuilder()`
-caches the deriva-py wrapper on the DerivaML instance** and returns the cached
-wrapper on subsequent calls, instead of calling `self.catalog.getPathBuilder()`
-(which re-fetches `/schema`) every time.
+> **Revision note.** Lever C was first implemented as "cache deriva-py's
+> `getPathBuilder()` result on the DerivaML instance, keyed on inner-model
+> identity." That was **buggy**: `create_table`/`create_vocabulary` mutate the
+> deriva-py `Model` **in place** (object identity unchanged), so the
+> identity-keyed cache returned a **stale wrapper missing the new table** →
+> `KeyError: 'SubjectHealth'` in the `ensure_features` fixture (3 core tests).
+> Root cause confirmed empirically. The corrected design below replaces it.
 
-- **Invalidation contract:** deriva-ml does **not** auto-refresh the model
-  after schema-mutating writes — callers explicitly call `refresh_model()` /
-  `refresh_schema()` to pick up changes (the model is a deliberate snapshot
-  until refreshed). So the instance's schema is stable between explicit
-  refreshes, and caching the pathBuilder is safe **provided the cache is
-  cleared in `refresh_model()` and `refresh_schema()`** (and on
-  `pin_schema`/`unpin_schema`, which also re-fetch). Add that invalidation.
-- **Scope:** this is the `_ml_instance.pathBuilder()` used pervasively
-  (77 call sites); caching it fixes the live-instance refetch for *every*
-  caller, not just the estimate — a broad correctness/perf win. The risk is
-  staleness after an un-refreshed mutation, which the invalidation hooks
-  prevent and which matches the existing `refresh_model` contract.
-- **Snapshot instances** also benefit: a snapshot `DerivaML`'s pathBuilder is
-  likewise cached on its instance (snapshots are immutable, so it never needs
-  invalidation).
+**Root finding (source-verified).** The path-builder wrapper
+(`_CatalogWrapper`) is built **entirely from `catalog.getCatalogModel().schemas`**;
+the `/schema` dict that `getPathBuilder()` fetches is used **only as an
+`is`-identity freshness cache key and is never read for content**. The reason
+`pathBuilder()` re-fetches `/schema` at all is that deriva-py's
+`getCatalogModel()` is **uncached** — it rebuilds the `Model` from `/schema`
+every call. deriva-ml already holds an **up-to-date** `Model`
+(`self.model.model`): `create_table` mutates it in place; `refresh_model()` /
+`refresh_schema()` rebind it. So the wrapper can be built from the held model
+with **zero `/schema` GETs**, and it correctly reflects in-place table creation
+(it reads the current `self.model.model.schemas` at build time).
 
-With Lever C, `_iter_descendant_rids`'s N `lookup_dataset` calls share **one**
-pathBuilder on the live instance — collapsing the O(N) live-instance
-`/schema` refetch to O(1).
+**Fix: `DerivaML.pathBuilder()` builds the wrapper from the held model** via a
+new public deriva-py helper `datapath.from_model(catalog, model)` (which adds an
+optional `model=` param to `_CatalogWrapper`, defaulting to the historical
+`getCatalogModel()` fetch). The wrapper is cached on the DerivaML instance
+keyed on inner-model identity (so `refresh_model`'s rebind invalidates it); on a
+cache miss it rebuilds from the *current* `self.model.model`, so an in-place
+`create_table` is reflected. **HTTP — reads AND writes — still routes through
+`self.catalog`** (the wrapper's `_wrapped_catalog`), so writes, datapath joins,
+snapshot-pinning, and offline behavior are unchanged.
+
+This is the correct layer per the cross-repo rule: the redundant fetch is a
+deriva-py inefficiency (`getCatalogModel` uncached), so the reusable primitive
+(`from_model`) lands in deriva-py; deriva-ml consumes it. A **7-axis
+blast-radius audit (2026-06-14)** verified SAFE on: writes, query/FK-join
+execution, identity/caching, snapshot catalogs, offline (CatalogStub),
+cross-instance staleness (no new risk vs. the documented "model is a snapshot
+until refresh" contract), and all 77 `pathBuilder()` call sites. Residual risk
+is implementation-only (the wrapper-construction seam must keep
+`_wrapped_catalog` = the real catalog and preserve offline `DerivaMLReadOnlyError`),
+guarded by write-through + snapshot-pinning + offline tests.
+
+- **Freshness contract:** because the wrapper is built from the *current*
+  `self.model.model` on each cache miss, it reflects in-place `create_table`
+  mutations; because the cache is keyed on inner-model identity, a
+  `refresh_model()` / `refresh_schema()` rebind invalidates it. deriva-ml's
+  documented contract is that the model is a per-instance snapshot updated
+  only via explicit refresh — the audit confirmed no flow does
+  create-then-read-via-pathBuilder without an intervening refresh. (If a
+  future flow needs that, the create choke point clears the cache — a
+  one-liner, not a redesign.)
+- **Scope:** `_ml_instance.pathBuilder()` is used pervasively (77 call sites);
+  building from the held model eliminates the live-instance refetch for
+  *every* caller, not just the estimate — a broad perf win with no behavior
+  change (HTTP still routes through the real catalog).
+- **Snapshot instances** also benefit: a snapshot `DerivaML` holds its
+  (schema-reused) model, so its pathBuilder builds from that model and reads
+  route to the `@snaptime` endpoint via the snapshot catalog.
+
+With this, `_iter_descendant_rids`'s N `lookup_dataset` calls issue **zero**
+`/schema` GETs on the live instance — collapsing the O(N) live-instance
+refetch to O(1) (in fact O(0) `/schema`).
 
 **Lever A (revised — eliminate, don't memoize) — reuse the live model when
 building a snapshot catalog.** `catalog_snapshot()` threads the live
