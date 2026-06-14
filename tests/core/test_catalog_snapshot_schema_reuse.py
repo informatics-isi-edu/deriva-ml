@@ -132,3 +132,96 @@ def test_reused_schema_model_matches_fetched(live_ml):
     assert isinstance(fetched.catalog, ErmrestSnapshot)
 
     assert _model_fingerprint(reused.model) == _model_fingerprint(fetched.model)
+
+
+# ---------------------------------------------------------------------------
+# pathBuilder cache invalidation at in-place create sites
+#
+# pathBuilder() builds its wrapper from the held model (self.model.model) and
+# caches it keyed on inner-model identity. deriva-py's getPathBuilder() purges
+# its own schema cache on every schema-mutating POST; by bypassing it we take
+# on the obligation to invalidate self._path_builder_cache at EVERY site that
+# mutates the inner model in place. These tests pin that obligation for the
+# create methods that warm the cache (via add_term -> pathBuilder) BEFORE the
+# in-place create_table: without the invalidation, a later same-instance read
+# of the new table through pathBuilder returns a stale wrapper -> KeyError.
+# ---------------------------------------------------------------------------
+
+
+def _pathbuilder_table_names(ml) -> set[str]:
+    """All table names visible through a fresh pathBuilder() wrapper."""
+    pb = ml.pathBuilder()
+    return {t for s in pb.schemas.values() for t in s.tables}
+
+
+def test_pathbuilder_cache_invalidated_after_create_feature(populated_catalog):
+    """create_feature must invalidate the warmed pathBuilder cache.
+
+    Warm the cache, create a feature on the demo ``Subject`` table (which
+    runs ``add_term`` -> pathBuilder, then an in-place ``create_table`` for
+    the feature association table), then read through a fresh pathBuilder.
+    The new feature association table must be visible — a stale cached
+    wrapper would omit it.
+    """
+    import uuid
+
+    ml = populated_catalog
+    # Warm the cache so a stale wrapper would be returned without invalidation.
+    ml.pathBuilder()
+
+    suffix = uuid.uuid4().hex[:6].upper()
+    vocab_name = f"PbVocab{suffix}"
+    feature_name = f"PbFeat{suffix}"
+    ml.create_vocabulary(vocab_name, "Vocab for pathBuilder invalidation test")
+    ml.add_term(vocab_name, "Good", description="ok")
+
+    ml.create_feature("Subject", feature_name, terms=[vocab_name])
+
+    # The feature association table is Execution_Subject_<feature_name>.
+    all_tables = _pathbuilder_table_names(ml)
+    assert any(feature_name in t for t in all_tables), (
+        f"feature table for {feature_name} not visible through pathBuilder "
+        "-> stale cache (create_feature did not invalidate _path_builder_cache)"
+    )
+
+
+def test_pathbuilder_cache_invalidated_after_create_asset(populated_catalog):
+    """create_asset must invalidate the warmed pathBuilder cache.
+
+    Same property as create_feature, exercised through the simpler
+    create_asset API: add_term warms the cache, then in-place create_table
+    calls add the asset table and its association tables.
+    """
+    import uuid
+
+    ml = populated_catalog
+    ml.pathBuilder()  # warm
+
+    asset_name = f"PbAsset{uuid.uuid4().hex[:6].upper()}"
+    ml.create_asset(asset_name, comment="Asset for pathBuilder invalidation test")
+
+    all_tables = _pathbuilder_table_names(ml)
+    assert asset_name in all_tables, (
+        f"asset table {asset_name} not visible through pathBuilder "
+        "-> stale cache (create_asset did not invalidate _path_builder_cache)"
+    )
+
+
+def test_pathbuilder_cache_invalidated_after_add_dataset_element_type(populated_catalog):
+    """add_dataset_element_type must invalidate the warmed pathBuilder cache.
+
+    The no-workspace branch neither refreshes nor (previously) invalidated;
+    the unconditional clear after the in-place create_table covers both the
+    workspace and no-workspace paths.
+    """
+    ml = populated_catalog
+    ml.pathBuilder()  # warm
+
+    ml.add_dataset_element_type("Subject")
+
+    # The association table linking Dataset to Subject must be reachable.
+    all_tables = _pathbuilder_table_names(ml)
+    assert any("Dataset" in t and "Subject" in t for t in all_tables), (
+        "Dataset_Subject association not visible through pathBuilder "
+        "-> stale cache (add_dataset_element_type did not invalidate cache)"
+    )

@@ -174,6 +174,12 @@ class AssetMixin:
         # Add asset annotations
         asset_annotation(asset_table)
 
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # (add_term above warmed the cache, the create_table/create_reference
+        # calls changed it without changing identity), so the cached wrapper
+        # is stale.
+        self._path_builder_cache = None
+
         # Update navbar to include the new asset table
         if update_navbar:
             self.apply_catalog_annotations()

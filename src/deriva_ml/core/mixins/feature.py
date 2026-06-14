@@ -183,6 +183,10 @@ class FeatureMixin:
                 comment=comment,
             )
         )
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # (add_term above warmed the cache, create_table changed it without
+        # changing identity), so the cached wrapper is stale.
+        self._path_builder_cache = None
         # Configure optional columns and default feature name
         for c in optional:
             atable.columns[c].alter(nullok=True)

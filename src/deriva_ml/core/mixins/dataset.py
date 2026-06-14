@@ -366,6 +366,14 @@ class DatasetMixin:
             else:
                 raise e
 
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # (create_table changed it without changing identity), so the cached
+        # wrapper is stale. The workspace branch below also calls
+        # refresh_model() (which rebinds the model and would invalidate via
+        # identity), but the no-workspace branch does not — clear here
+        # unconditionally so both paths are covered.
+        self._path_builder_cache = None
+
         # Rebuild the workspace ORM so it can resolve the new association table.
         # The workspace ORM is built eagerly at init time from the schema snapshot;
         # DDL applied after that point (like this new association table) is not

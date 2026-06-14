@@ -1276,6 +1276,9 @@ class DerivaML(
             )
         except ValueError:
             raise DerivaMLException(f"Table {vocab_name} already exist")
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # so the identity hasn't changed, but the cached wrapper is stale.
+        self._path_builder_cache = None
 
         # Update navbar to include the new vocabulary table
         if update_navbar:
@@ -1371,6 +1374,9 @@ class DerivaML(
             )
         except ValueError:
             raise DerivaMLException(f"Table {asset_name} already exist")
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # so the identity hasn't changed, but the cached wrapper is stale.
+        self._path_builder_cache = None
 
         if update_navbar:
             self.apply_catalog_annotations()
@@ -1493,6 +1499,9 @@ class DerivaML(
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts
         table_dict = table.to_dict() if hasattr(table, "to_dict") else table
         new_table = self.model.schemas[schema].create_table(table_dict)
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # so the identity hasn't changed, but the cached wrapper is stale.
+        self._path_builder_cache = None
 
         # Update navbar to include the new table
         if update_navbar:

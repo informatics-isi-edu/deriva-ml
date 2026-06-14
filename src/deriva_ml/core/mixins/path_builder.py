@@ -73,7 +73,31 @@ class PathBuilderMixin:
             >>> path = pb.schemas['my_schema'].tables['my_table']  # doctest: +SKIP
             >>> results = path.entities().fetch()  # doctest: +SKIP
         """
-        return self.catalog.getPathBuilder()
+        # Build the path-builder wrapper from the model deriva-ml already
+        # holds (self.model.model) instead of letting deriva-py re-fetch
+        # /schema on every call. The wrapper's schema structure comes
+        # entirely from the model; HTTP (reads AND writes) still routes
+        # through self.catalog (the wrapper's _wrapped_catalog), so
+        # writes, datapath joins, and snapshot-pinning are unchanged.
+        #
+        # Correctness under schema changes: self.model.model is the
+        # authoritative in-memory Model. create_table mutates it in place
+        # (a wrapper built afterward, on a cache MISS, sees the new
+        # table); refresh_model()/refresh_schema() REBIND it to a new
+        # object. We cache the wrapper keyed on the inner-model object
+        # identity, so a rebind (refresh) invalidates the cache and the
+        # next call rebuilds from the current model. The previous approach
+        # cached deriva-py's getPathBuilder() result and went stale after
+        # an in-place create_table (same identity, stale wrapper); building
+        # from the held model via datapath.from_model avoids both the
+        # staleness and the redundant /schema fetch.
+        inner_model = self.model.model
+        cached = getattr(self, "_path_builder_cache", None)
+        if cached is not None and cached[0] is inner_model:
+            return cached[1]
+        wrapper = datapath.from_model(self.catalog, inner_model)
+        self._path_builder_cache = (inner_model, wrapper)
+        return wrapper
 
     def _domain_path(self, schema: str | None = None) -> datapath.DataPath:
         """Returns path builder for a domain schema.
