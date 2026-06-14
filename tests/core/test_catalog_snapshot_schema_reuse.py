@@ -132,3 +132,43 @@ def test_reused_schema_model_matches_fetched(live_ml):
     assert isinstance(fetched.catalog, ErmrestSnapshot)
 
     assert _model_fingerprint(reused.model) == _model_fingerprint(fetched.model)
+
+
+def test_live_pathbuilder_cached_across_calls(live_ml, monkeypatch):
+    """Repeated ml.pathBuilder() triggers getPathBuilder() at most once."""
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
+    calls = {"n": 0}
+    real = ErmrestCatalog.getPathBuilder
+
+    def counting(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(ErmrestCatalog, "getPathBuilder", counting)
+
+    live_ml.pathBuilder()
+    live_ml.pathBuilder()
+    live_ml.pathBuilder()
+    assert calls["n"] <= 1, f"pathBuilder() rebuilt {calls['n']} times; expected <= 1 (cached)"
+
+
+def test_live_pathbuilder_invalidated_on_refresh(live_ml, monkeypatch):
+    """After refresh_model(), the next pathBuilder() rebuilds (cache cleared)."""
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
+    calls = {"n": 0}
+    real = ErmrestCatalog.getPathBuilder
+
+    def counting(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(ErmrestCatalog, "getPathBuilder", counting)
+
+    live_ml.pathBuilder()          # build (n -> 1)
+    live_ml.pathBuilder()          # cached (n stays 1)
+    assert calls["n"] == 1
+    live_ml.model.refresh_model()  # rebinds the inner model -> cache must invalidate
+    live_ml.pathBuilder()          # must rebuild (n -> 2)
+    assert calls["n"] == 2, "pathBuilder() must rebuild after refresh_model()"
