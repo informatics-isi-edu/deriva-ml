@@ -2379,7 +2379,38 @@ class Dataset:
             >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
             >>> children = ds.list_dataset_children()  # doctest: +SKIP
         """
-        # Initialize visited set for recursion guard
+        # Compute the descendant RID set (one Dataset_Dataset fetch,
+        # in-memory traversal) and hydrate Dataset objects.
+        version_snapshot_catalog, child_rids = self._descendant_child_rids(
+            recurse=recurse, _visited=_visited, version=version
+        )
+        return [version_snapshot_catalog.lookup_dataset(rid) for rid in child_rids]
+
+    def _descendant_child_rids(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        *,
+        version: DatasetVersion | str | None = None,
+    ) -> tuple[Any, list[RID]]:
+        """Core of list_dataset_children: one Dataset_Dataset fetch + in-memory traversal.
+
+        Fetches the (small) full Dataset_Dataset table once, builds the
+        nesting adjacency in memory, and traverses from this dataset's RID
+        with a ``_visited`` cycle guard. No per-node round-trips.
+
+        Args:
+            recurse: If True, traverse the full descendant subtree; otherwise
+                only direct children.
+            _visited: Cycle-guard set of already-visited RIDs (internal;
+                callers normally leave None for a fresh guard).
+            version: Dataset version snapshot to query against.
+
+        Returns:
+            tuple[Any, list[RID]]: ``(version_snapshot_catalog, child_rids)``.
+                The snapshot catalog is returned so callers that need Dataset
+                objects can hydrate via its ``lookup_dataset``.
+        """
         if _visited is None:
             _visited = set()
 
@@ -2391,18 +2422,44 @@ class Dataset:
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
         def find_children(rid: RID) -> list[RID]:
-            # Prevent infinite recursion by checking if we've already visited this dataset
             if rid in _visited:
                 return []
             _visited.add(rid)
-
             children = [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
             if recurse:
                 for child in children.copy():
                     children.extend(find_children(child))
             return children
 
-        return [version_snapshot_catalog.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
+        return version_snapshot_catalog, find_children(self.dataset_rid)
+
+    def list_dataset_children_rids(
+        self,
+        recurse: bool = False,
+        *,
+        version: DatasetVersion | str | None = None,
+    ) -> list[RID]:
+        """Return descendant dataset RIDs without hydrating Dataset objects.
+
+        Same traversal as :meth:`list_dataset_children` but returns RIDs
+        directly — one ``Dataset_Dataset`` fetch and in-memory traversal,
+        with zero per-node ``lookup_dataset`` round-trips. Use this when you
+        only need the RID set (e.g. building the bag-walk anchor list).
+
+        Args:
+            recurse: If True, return all descendant RIDs (children of
+                children, etc.); otherwise only direct children.
+            version: Dataset version snapshot to query against.
+
+        Returns:
+            list[RID]: descendant dataset RIDs (depth-first order).
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> rids = ds.list_dataset_children_rids(recurse=True)  # doctest: +SKIP
+        """
+        _, child_rids = self._descendant_child_rids(recurse=recurse, version=version)
+        return child_rids
 
     def list_executions(self) -> list["Execution"]:
         """List all executions associated with this dataset.
