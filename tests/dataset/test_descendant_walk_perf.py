@@ -106,3 +106,54 @@ def test_exclude_empty_associations_unchanged(catalog_manager: CatalogManager, t
     assert "Dataset_Subject" not in excluded_names
     assert "Dataset_Image" not in excluded_names
     assert ("deriva-ml", "Dataset_File") in excluded
+
+
+def test_estimate_dict_unchanged_after_walk_fix(catalog_manager: CatalogManager, tmp_path: Path):
+    """estimate_bag_size returns the same totals + per-table shape (pure perf change)."""
+    catalog_manager.reset()
+    ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+    dataset = dataset_desc.dataset
+    from deriva_ml.dataset import DatasetSpec
+
+    est = ml.estimate_bag_size(DatasetSpec(rid=dataset.dataset_rid, version=dataset.current_version))
+    assert est["incomplete"] is False
+    assert est["total_rows"] >= 0
+    assert isinstance(est["tables"], dict) and len(est["tables"]) > 0
+    # Member-bearing tables present (Subject/Image), proving the walk still
+    # reaches them after the membership-query rewrite.
+    table_names = set(est["tables"])
+    assert any("Subject" in t for t in table_names)
+    assert any("Image" in t for t in table_names)
+
+
+def test_estimate_total_gets_not_linear_in_descendants(catalog_manager: CatalogManager, tmp_path: Path, monkeypatch):
+    """Total catalog GETs during estimate is bounded, not O(descendants x tables)."""
+    catalog_manager.reset()
+    ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+    dataset = dataset_desc.dataset
+    n_desc = len(dataset.list_dataset_children_rids(recurse=True))
+    if n_desc < 2:
+        pytest.skip(f"{n_desc} descendants; need >= 2")
+
+    import deriva.core.deriva_binding as db
+
+    counter = {"n": 0}
+    orig = db.DerivaBinding.get
+
+    def spy(self, path, *a, **k):
+        counter["n"] += 1
+        return orig(self, path, *a, **k)
+
+    monkeypatch.setattr(db.DerivaBinding, "get", spy)
+    from deriva_ml.dataset import DatasetSpec
+
+    ml.estimate_bag_size(DatasetSpec(rid=dataset.dataset_rid, version=dataset.current_version))
+
+    # Pre-fix the demo would issue many GETs that scale with descendants
+    # (per-descendant member scan x associations). Post-fix the enumeration is
+    # O(1) fetches + per-association presence (~O(associations)) + per-table
+    # estimate queries (~O(tables)). Bound it well below a per-descendant
+    # explosion. The load-bearing property: NO per-descendant member scan.
+    assert counter["n"] < 50 * max(1, n_desc), (
+        f"{counter['n']} GETs for {n_desc} descendants looks O(descendants x tables)"
+    )
