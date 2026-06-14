@@ -728,8 +728,10 @@ class DatasetBagBuilder:
 
         The dataset's root row is the primary anchor; each nested
         child dataset becomes an additional :class:`RIDAnchor`.
-        The traversal depth is bounded by
-        :meth:`DatasetLike.list_dataset_children` chains.
+        Descendants are enumerated by :meth:`_iter_descendant_rids`
+        (the memoized RID accessor over
+        :meth:`DatasetLike.list_dataset_children_rids`), so the
+        traversal depth is bounded by the nested-dataset chain.
 
         This is the bag-pipeline-shaped representation of "what
         rows does the walker start from for this dataset?". When
@@ -857,21 +859,12 @@ class DatasetBagBuilder:
         ml_schema_name = self._ml_instance.ml_schema
         dataset_table = model.schemas[ml_schema_name].tables["Dataset"]
 
-        # Element types that have members anywhere in the dataset
-        # tree — root or any nested descendant. Excluding by root
-        # alone would prune Dataset_X for element types X that
-        # only appear under a nested child, dropping their rows
-        # from the bag (see #94: child Image members disappearing).
-        dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
-        rids_to_scan: list[RID] = [dataset.dataset_rid]
-        rids_to_scan.extend(self._iter_descendant_rids(dataset))
-
-        member_element_types: set[Table] = set()
-        for rid in rids_to_scan:
-            ds = self._ml_instance.lookup_dataset(rid) if rid != dataset.dataset_rid else dataset_obj
-            for name, members in ds.list_dataset_members().items():
-                if members:
-                    member_element_types.add(model.name_to_table(name))
+        # Descendant RID set (root + all nested descendants), one fetch.
+        # Descendants matter because the walker anchors at every
+        # descendant dataset RID (via ``anchors_for``): an association
+        # empty at the root but populated under a nested child must
+        # stay in the walk (see #94: child Image members disappearing).
+        rid_set = [dataset.dataset_rid] + list(self._iter_descendant_rids(dataset))
 
         # Every vocabulary table in any schema — associations into
         # vocabularies always come along for the ride.
@@ -879,16 +872,27 @@ class DatasetBagBuilder:
             table for schema in model.schemas.values() for table in schema.tables.values() if model.is_vocabulary(table)
         }
 
-        # Walk every Dataset_X association. The association links
-        # to one or more "other" tables via ``other_fkeys``; include
-        # the association only when at least one of those tables
-        # is a member element type or a vocabulary.
+        pb = self._ml_instance.pathBuilder()
+
+        # Equivalence with the former member-scan: an association row IS the
+        # membership record, so "Dataset_X has a row with Dataset in rid_set"
+        # equals "some dataset in the tree has a member of type X". This relies
+        # on find_associations(pure=True) excluding impure tables (e.g.
+        # Dataset_Execution), which the loop therefore never considers.
         excluded: set[tuple[str, str]] = set()
         for assoc in dataset_table.find_associations():
             assoc_table = assoc.table
-            links_to_member = any(fk.pk_table in member_element_types for fk in assoc.other_fkeys)
-            links_to_vocab = any(fk.pk_table in vocab_tables for fk in assoc.other_fkeys)
-            if not (links_to_member or links_to_vocab):
+            # Vocab-linked associations are always included.
+            if any(fk.pk_table in vocab_tables for fk in assoc.other_fkeys):
+                continue
+            # Non-empty iff the association has any row whose Dataset FK is in
+            # the tree. One presence query per association table (limit=1),
+            # independent of descendant count. Every Dataset_X association
+            # carries a literal ``Dataset`` FK column (the convention
+            # ``list_dataset_members`` relies on at dataset.py:1670).
+            assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
+            has_member = bool(list(assoc_path.filter(assoc_path.Dataset.in_(rid_set)).entities().fetch(limit=1)))
+            if not has_member:
                 excluded.add((assoc_table.schema.name, assoc_table.name))
         return excluded
 
