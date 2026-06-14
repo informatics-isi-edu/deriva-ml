@@ -463,6 +463,10 @@ class DerivaML(
         # reads in the same process are O(1) and always current.
         # The disk cache write below is purely for offline mode.
         schema_json = self.catalog.getCatalogSchema()
+        # Retain the parsed schema so catalog_snapshot() can reuse it
+        # instead of re-fetching /schema for every snapshot view (the
+        # snapshot's schema is structurally identical to live).
+        self._schema_json = schema_json
         live_snapshot_id = self.catalog.get("/").json()["snaptime"]
         cache.write(
             snapshot_id=live_snapshot_id,
