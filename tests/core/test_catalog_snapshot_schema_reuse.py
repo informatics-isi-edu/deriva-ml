@@ -225,3 +225,86 @@ def test_pathbuilder_cache_invalidated_after_add_dataset_element_type(populated_
         "Dataset_Subject association not visible through pathBuilder "
         "-> stale cache (add_dataset_element_type did not invalidate cache)"
     )
+
+
+# ---------------------------------------------------------------------------
+# P4: perf + identity guards
+#
+# pathBuilder() is built from the held model via datapath.from_model — no
+# /schema fetch on every call.  The wrapper is cached keyed on inner-model
+# identity; refresh_model() rebinds the inner model, invalidating the cache.
+# ---------------------------------------------------------------------------
+
+
+def _count_schema_gets(monkeypatch) -> dict:
+    """Patch DerivaBinding.get to count /schema requests."""
+    import deriva.core.deriva_binding as db
+
+    counter = {"schema": 0}
+    orig = db.DerivaBinding.get
+
+    def spy(self, path, *a, **k):
+        if isinstance(path, str) and path.split("?")[0].endswith("/schema"):
+            counter["schema"] += 1
+        return orig(self, path, *a, **k)
+
+    monkeypatch.setattr(db.DerivaBinding, "get", spy)
+    return counter
+
+
+def test_live_pathbuilder_no_schema_fetch(live_ml, monkeypatch):
+    """ml.pathBuilder() builds from the held model with zero /schema GETs."""
+    counter = _count_schema_gets(monkeypatch)
+    live_ml.pathBuilder()
+    live_ml.pathBuilder()
+    live_ml.pathBuilder()
+    assert counter["schema"] == 0, (
+        f"pathBuilder() issued {counter['schema']} /schema GETs; expected 0 "
+        "(wrapper is built from the in-memory model)"
+    )
+
+
+def test_live_pathbuilder_cached_identity(live_ml):
+    """Repeated pathBuilder() returns the same wrapper until the model rebinds."""
+    pb1 = live_ml.pathBuilder()
+    pb2 = live_ml.pathBuilder()
+    assert pb1 is pb2  # cached on inner-model identity
+    live_ml.model.refresh_model()  # rebinds inner model -> cache invalidates
+    pb3 = live_ml.pathBuilder()
+    assert pb3 is not pb1  # rebuilt after refresh
+
+
+# ---------------------------------------------------------------------------
+# P5: write-through + snapshot-pinning guards
+# ---------------------------------------------------------------------------
+
+
+def test_model_built_wrapper_writes_reach_catalog(populated_catalog):
+    """An insert via the model-built pathBuilder lands a real row."""
+    import uuid
+
+    ml = populated_catalog
+    vname = "WriteVocab" + uuid.uuid4().hex[:6].upper()
+    ml.create_vocabulary(vname, "write-through test")
+    term = "term_" + uuid.uuid4().hex[:6]
+    # add_term goes through pathBuilder().schemas[schema_name].tables[vname].insert(...)
+    # where schema_name is resolved from the vocab table's own schema attribute.
+    ml.add_term(vname, term, description="x")
+    # Locate the vocab table's schema so we read back through the correct path.
+    vocab_table = ml.model.name_to_table(vname)
+    schema_name = vocab_table.schema.name
+    # Read it back through a fresh pathBuilder.
+    pb = ml.pathBuilder()
+    rows = list(pb.schemas[schema_name].tables[vname].entities().fetch())
+    names = {r.get("Name") for r in rows}
+    assert term in names, f"inserted term {term!r} not found in {names}"
+
+
+def test_snapshot_pathbuilder_reads_are_snapshot_pinned(live_ml):
+    """A snapshot instance's pathBuilder routes data reads to the @snaptime URI."""
+    raw = _a_snapshot_id(live_ml)
+    compound = f"{live_ml.catalog_id}@{raw}"
+    snap = live_ml.catalog_snapshot(compound)
+    pb = snap.pathBuilder()
+    base = pb._wrapped_catalog._server_uri
+    assert "@" in base, f"snapshot pathBuilder base URI not pinned: {base}"
