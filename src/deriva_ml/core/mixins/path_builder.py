@@ -73,26 +73,7 @@ class PathBuilderMixin:
             >>> path = pb.schemas['my_schema'].tables['my_table']  # doctest: +SKIP
             >>> results = path.entities().fetch()  # doctest: +SKIP
         """
-        # Cache the deriva-py path-builder wrapper on this DerivaML
-        # instance, keyed by the identity of the inner ERMrest Model.
-        # deriva-py's own getPathBuilder() re-fetches /schema on every
-        # call unless the server returns HTTP 304 (conditional GET) — and
-        # the catalogs deriva-ml talks to return 200 every time, so that
-        # cache never engages. We hold the authoritative parsed schema
-        # (self.model) for the instance's lifetime, so re-fetching is pure
-        # waste. Keying on self.model.model (the inner deriva-py Model,
-        # which every refresh path replaces) makes the cache
-        # self-invalidate: refresh_model() / refresh_schema() /
-        # pin_schema() / unpin_schema() all rebind the model, so the next
-        # pathBuilder() call sees a new identity and rebuilds. See the
-        # estimate-bag-size perf spec §3.1b (Lever C).
-        inner_model = self.model.model
-        cached = getattr(self, "_path_builder_cache", None)
-        if cached is not None and cached[0] is inner_model:
-            return cached[1]
-        wrapper = self.catalog.getPathBuilder()
-        self._path_builder_cache = (inner_model, wrapper)
-        return wrapper
+        return self.catalog.getPathBuilder()
 
     def _domain_path(self, schema: str | None = None) -> datapath.DataPath:
         """Returns path builder for a domain schema.
