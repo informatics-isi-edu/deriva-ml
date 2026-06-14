@@ -52,3 +52,44 @@ def test_init_online_skips_fetch_when_schema_supplied(live_ml, monkeypatch):
         reuse_schema_json=live_ml._schema_json,
     )
     assert calls["n"] == 0, "getCatalogSchema must not be called when schema is reused"
+
+
+def _a_snapshot_id(live_ml):
+    """Resolve a real snapshot id from the live catalog's current snaptime."""
+    return live_ml.catalog.get("/").json()["snaptime"]
+
+
+def test_catalog_snapshot_does_no_schema_fetch(live_ml, monkeypatch):
+    """catalog_snapshot() builds the snapshot instance with zero getCatalogSchema calls."""
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
+    calls = {"n": 0}
+    real = ErmrestCatalog.getCatalogSchema
+
+    def counting(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(ErmrestCatalog, "getCatalogSchema", counting)
+
+    snap = live_ml.catalog_snapshot(_a_snapshot_id(live_ml))
+    assert snap is not None
+    assert calls["n"] == 0, "catalog_snapshot must not fetch /schema"
+
+
+def test_catalog_snapshot_memoized_per_id(live_ml):
+    """Repeated catalog_snapshot() for the same snapshot id returns the same object."""
+    sid = _a_snapshot_id(live_ml)
+    first = live_ml.catalog_snapshot(sid)
+    second = live_ml.catalog_snapshot(sid)
+    assert first is second
+
+
+def test_catalog_snapshot_cache_holds_one_entry_per_id(live_ml):
+    """catalog_snapshot caches exactly one instance per snapshot id."""
+    sid = _a_snapshot_id(live_ml)
+    a = live_ml.catalog_snapshot(sid)
+    assert len(live_ml._snapshot_cache) == 1
+    b = live_ml.catalog_snapshot(sid)
+    assert a is b
+    assert len(live_ml._snapshot_cache) == 1

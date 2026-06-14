@@ -385,6 +385,11 @@ class DerivaML(
         self.ml_schema = ml_schema
         self.configuration = None
         self._execution: Execution | None = None
+        # Memoize snapshot DerivaML instances by snapshot id so the
+        # many Dataset call sites that build a snapshot view within one
+        # operation share a single instance (and its cached schema).
+        # Snapshots are immutable, so entries never go stale.
+        self._snapshot_cache: dict[str, "DerivaML"] = {}
         self.domain_schemas = self.model.domain_schemas
         self.default_schema = self.model.default_schema
         self.project_name = project_name or self.default_schema or "deriva-ml"
@@ -802,6 +807,18 @@ class DerivaML(
         (which can pick differently from the snapshot than the live
         catalog did) — both observable behaviour drifts.
 
+        The snapshot reuses this instance's already-parsed schema
+        (``self._schema_json``) rather than re-fetching ``/schema`` — a
+        snapshot's schema is structurally identical to the live
+        catalog's. The constructed instance is memoized by
+        ``version_snapshot`` so repeated calls share one object.
+
+        Precondition: the snapshot's schema must match the live
+        catalog's. This holds for deriva-ml's use (pinning a recent
+        dataset-version snaptime on a catalog whose schema has not been
+        migrated since). Do not use for a snapshot taken *before* a
+        schema migration — its structure would differ from live.
+
         Args:
             version_snapshot: Snapshot identifier string (e.g., ``"2T-SXEH-JH4A"``),
                 usually the ``snapshot`` field from a :class:`DatasetHistory` entry.
@@ -810,7 +827,11 @@ class DerivaML(
             A new DerivaML instance connected to the specified catalog snapshot,
             inheriting every connection-shaping kwarg from ``self``.
         """
-        return DerivaML(
+        cached = self._snapshot_cache.get(version_snapshot)
+        if cached is not None:
+            return cached
+
+        snapshot = DerivaML(
             self.host_name,
             version_snapshot,
             domain_schemas=self.domain_schemas,
@@ -826,7 +847,10 @@ class DerivaML(
             use_minid=self.use_minid,
             clean_execution_dir=self.clean_execution_dir,
             mode=self._mode,
+            reuse_schema_json=self._schema_json,
         )
+        self._snapshot_cache[version_snapshot] = snapshot
+        return snapshot
 
     @property
     def mode(self) -> ConnectionMode:
