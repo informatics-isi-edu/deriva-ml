@@ -20,8 +20,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from deriva_ml import DerivaML
-from deriva_ml.dataset.aux_classes import DatasetVersion, VersionPart
+from deriva_ml.dataset.aux_classes import DatasetVersion
 from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
 from tests.catalog_manager import CatalogManager
 
@@ -348,7 +347,7 @@ class TestCacheDeletionAndRedownload:
         version = dataset.current_version
 
         # Download to populate cache
-        bag1 = dataset.download_dataset_bag(version=version, use_minid=False)
+        dataset.download_dataset_bag(version=version, use_minid=False)
         info1 = dataset.bag_info(version=version)
         assert info1["status"] == CacheStatus.cached_materialized.value
 
@@ -410,3 +409,43 @@ class TestNonMaterializedBagAccess:
         # Use single table to avoid FK path ambiguity
         df = bag.get_denormalized_as_dataframe(include_tables=["Image"])
         assert isinstance(df, pd.DataFrame)
+
+
+class TestBagMaterializeInPlace:
+    """Tests for DatasetBag.materialize() against a live catalog."""
+
+    def test_materialize_flips_metadata_only_to_materialized(self, catalog_manager: CatalogManager, tmp_path: Path):
+        """A metadata-only bag becomes fully materialized in place."""
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+        version = dataset.current_version
+
+        # Download metadata-only.
+        bag = dataset.download_dataset_bag(version=version, use_minid=False, materialize=False)
+
+        if BagCache._is_fully_materialized(bag.path):
+            pytest.skip("Demo bag has no remote fetch.txt entries; nothing to materialize.")
+
+        # Materialize in place; must return the same object.
+        result = bag.materialize()
+        assert result is bag
+        assert BagCache._is_fully_materialized(bag.path)
+
+        # Cache status flips to materialized.
+        info = dataset.bag_info(version=version)
+        assert info["status"] == CacheStatus.cached_materialized.value
+
+    def test_materialize_idempotent_on_materialized_bag(self, catalog_manager: CatalogManager, tmp_path: Path):
+        """materialize() on an already-materialized bag is a safe no-op."""
+        catalog_manager.reset()
+        ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
+        dataset = dataset_desc.dataset
+        version = dataset.current_version
+
+        bag = dataset.download_dataset_bag(version=version, use_minid=False)  # materialize=True default
+        assert BagCache._is_fully_materialized(bag.path)
+
+        result = bag.materialize()
+        assert result is bag
+        assert BagCache._is_fully_materialized(bag.path)
