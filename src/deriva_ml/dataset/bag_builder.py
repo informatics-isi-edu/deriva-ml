@@ -829,14 +829,25 @@ class DatasetBagBuilder:
     def _exclude_empty_associations(self, dataset: DatasetLike | None) -> set[tuple[str, str]]:
         """Return ``{(schema, table)}`` for associations with no members.
 
-        For each ``Dataset_X`` association table, include it in
-        the walk only when the dataset (or any of its nested
-        descendants) has at least one member of element type X
-        (or when the association links to a vocabulary table —
-        those carry dataset metadata and must always be included).
-        Empty associations are added to the
+        Membership is keyed on the element TYPE, not the individual
+        association table. A ``Dataset_X`` association is kept in the
+        walk when element type X has at least one member anywhere in
+        the tree (root or any nested descendant) — even if that member
+        was recorded via a *different*, parallel association — or when
+        the association links to a vocabulary table (those carry
+        dataset metadata and must always be included). Empty
+        associations are added to the
         :attr:`FKTraversalPolicy.exclude_tables` set so the
         generic walker prunes them.
+
+        The element-type keying is load-bearing for schemas with
+        PARALLEL associations for the same type. On eye-ai, Subject
+        membership is recorded in ``Subject_Dataset`` while
+        ``Dataset_Subject`` is an empty parallel association. A
+        per-assoc-table row check would wrongly exclude
+        ``Dataset_Subject`` (it has no rows of its own); keying on the
+        ``Subject`` element type keeps both, because Subject is a
+        populated member type.
 
         Descendants matter because the walker anchors at every
         descendant dataset RID (via :meth:`anchors_for`). An
@@ -874,25 +885,36 @@ class DatasetBagBuilder:
 
         pb = self._ml_instance.pathBuilder()
 
-        # Equivalence with the former member-scan: an association row IS the
-        # membership record, so "Dataset_X has a row with Dataset in rid_set"
-        # equals "some dataset in the tree has a member of type X". This relies
-        # on find_associations(pure=True) excluding impure tables (e.g.
-        # Dataset_Execution), which the loop therefore never considers.
+        # Pass 1: which element TYPES have a member anywhere in the tree?
+        # An association row IS the membership record, so an element type X has
+        # members iff SOME association reaching X has a row with Dataset in the
+        # tree. We must key on the element TYPE (not the individual association
+        # table) because a schema may have PARALLEL associations for the same
+        # type: e.g. eye-ai records Subject membership in ``Subject_Dataset``
+        # while ``Dataset_Subject`` is an empty parallel association. Keying on
+        # the assoc table alone would wrongly exclude ``Dataset_Subject``;
+        # keying on the type keeps both because ``Subject`` is a member type.
+        # One presence query per association (limit=1), independent of
+        # descendant count. Every Dataset_X association carries a literal
+        # ``Dataset`` FK column (the convention ``list_dataset_members`` relies
+        # on at dataset.py:1670).
+        member_element_types: set[Table] = set()
+        for assoc in dataset_table.find_associations():
+            assoc_table = assoc.table
+            assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
+            has_rows = bool(list(assoc_path.filter(assoc_path.Dataset.in_(rid_set)).entities().fetch(limit=1)))
+            if has_rows:
+                member_element_types.update(fk.pk_table for fk in assoc.other_fkeys)
+
+        # Pass 2: exclude an association iff none of its member element types is
+        # populated in the tree AND it doesn't link to a vocabulary. Pure set
+        # logic on the results of pass 1 — no further queries.
         excluded: set[tuple[str, str]] = set()
         for assoc in dataset_table.find_associations():
             assoc_table = assoc.table
-            # Vocab-linked associations are always included.
-            if any(fk.pk_table in vocab_tables for fk in assoc.other_fkeys):
-                continue
-            # Non-empty iff the association has any row whose Dataset FK is in
-            # the tree. One presence query per association table (limit=1),
-            # independent of descendant count. Every Dataset_X association
-            # carries a literal ``Dataset`` FK column (the convention
-            # ``list_dataset_members`` relies on at dataset.py:1670).
-            assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
-            has_member = bool(list(assoc_path.filter(assoc_path.Dataset.in_(rid_set)).entities().fetch(limit=1)))
-            if not has_member:
+            links_to_member = any(fk.pk_table in member_element_types for fk in assoc.other_fkeys)
+            links_to_vocab = any(fk.pk_table in vocab_tables for fk in assoc.other_fkeys)
+            if not (links_to_member or links_to_vocab):
                 excluded.add((assoc_table.schema.name, assoc_table.name))
         return excluded
 
