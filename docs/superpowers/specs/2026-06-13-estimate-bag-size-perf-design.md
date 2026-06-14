@@ -198,6 +198,23 @@ is implementation-only (the wrapper-construction seam must keep
 `_wrapped_catalog` = the real catalog and preserve offline `DerivaMLReadOnlyError`),
 guarded by write-through + snapshot-pinning + offline tests.
 
+- **Invalidation ownership (load-bearing, found in P3 review).** By building
+  the wrapper ourselves (not via `self.catalog.getPathBuilder()`), we **opt out
+  of deriva-py's own auto-invalidation** — deriva-py purges its path-builder
+  cache on every schema-mutating POST/PUT/DELETE, but our DerivaML-level cache
+  never sees those. So **deriva-ml now owns invalidation at every in-place
+  model-mutation site.** In-place `create_table` keeps the inner-Model identity
+  unchanged, so an identity-keyed cache that was *warmed before* the mutation
+  returns a stale wrapper missing the new table → `KeyError`. Therefore EVERY
+  DerivaML method that does an in-place `model.schemas[...].create_table(...)`
+  (or column/association add) **must** set `self._path_builder_cache = None`
+  right after the mutation — unless it already calls `refresh_model()` (which
+  rebinds the inner model and self-invalidates). The known sites:
+  `create_vocabulary`, `create_table`, `create_asset_table` (base.py),
+  `create_feature` (feature mixin), `create_asset` (asset mixin), and
+  `add_dataset_element_type`'s no-`_workspace` branch (dataset mixin). A
+  same-instance create-then-read regression test pins this (a create site that
+  forgets to invalidate fails it).
 - **Freshness contract:** because the wrapper is built from the *current*
   `self.model.model` on each cache miss, it reflects in-place `create_table`
   mutations; because the cache is keyed on inner-model identity, a
