@@ -159,6 +159,9 @@ class DatasetBagBuilder:
         # MINID only works when an S3 bucket is configured.
         self._use_minid = use_minid and s3_bucket is not None
         self._exclude_tables = exclude_tables or set()
+        # Memoize the descendant-RID set per root RID for one builder op so
+        # anchors_for and _exclude_empty_associations share a single tree walk.
+        self._descendant_rids_cache: dict[RID, list[RID]] = {}
 
     # ------------------------------------------------------------------
     # Public surface — drives :class:`CatalogBagBuilder`
@@ -890,18 +893,27 @@ class DatasetBagBuilder:
         return excluded
 
     def _iter_descendant_rids(self, dataset: DatasetLike) -> Iterable[RID]:
-        """Yield every descendant Dataset RID, depth-first.
+        """Yield every descendant Dataset RID.
 
-        Walks ``DatasetLike.list_dataset_children`` recursively.
-        Used by :meth:`anchors_for` to build the anchor list.
-        Depth-first traversal so the anchor list reflects the
-        dataset's nesting structure as encountered.
+        Memoized per root RID for the lifetime of this builder so the
+        nested-dataset tree is walked once per operation. Delegates to
+        :meth:`Dataset.list_dataset_children_rids` (one ``Dataset_Dataset``
+        fetch, in-memory traversal, no per-node lookups).
+
+        Args:
+            dataset: The dataset whose descendants to enumerate.
+
+        Returns:
+            Iterable[RID]: descendant dataset RIDs (depth-first order),
+            excluding the root.
         """
-        dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
-        for child in dataset_obj.list_dataset_children():
-            yield child.dataset_rid
-            child_proxy = self._ml_instance.lookup_dataset(child.dataset_rid)
-            yield from self._iter_descendant_rids(child_proxy)
+        root = dataset.dataset_rid
+        cached = self._descendant_rids_cache.get(root)
+        if cached is None:
+            dataset_obj = self._ml_instance.lookup_dataset(root)
+            cached = list(dataset_obj.list_dataset_children_rids(recurse=True))
+            self._descendant_rids_cache[root] = cached
+        return cached
 
 
 __all__ = ["DatasetBagBuilder"]
