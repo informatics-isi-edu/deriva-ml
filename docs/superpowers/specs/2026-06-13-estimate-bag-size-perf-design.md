@@ -71,7 +71,11 @@ double tree-walk. The fix is deriva-ml-side.
 
 - `estimate_bag_size(2-277G)` and `bag_info(2-277G)` drop from ~8.5 min to
   **seconds** (target: < 30 s; the irreducible work is ~the bottom-of-profile
-  estimate queries plus one `/schema` and one tree walk).
+  estimate queries plus one `/schema` and one tree walk). **Requires both**
+  Lever A (snapshot construction, §3.1) **and** Lever C (live-instance
+  pathBuilder caching, §3.1b) — A1/A2 alone leaves an O(N) live-instance
+  `/schema` refetch (discovered during implementation; servers don't honor
+  304).
 - **No change to what the estimate computes** — exact row counts and exact
   asset bytes, identical numbers, byte-for-byte. (User decision: "keep exact,
   just make it fast.")
@@ -115,14 +119,70 @@ either:
   each call `purge_cache_by_prefix("/schema")` before re-fetching — that is
   their job).
 
-So fixing `catalog_snapshot()` cures the entire class — there is no second
-hidden offender to chase. But the one offender is amplified two ways:
-**(i)** the nesting walk calls it once per descendant dataset (85× for
-2-277G), and **(ii)** even within a *single* operation, **8 distinct
-`Dataset` call sites** (`list_dataset_members`, `list_dataset_children`,
-denormalization, etc.) each build their own snapshot catalog and none reuse
-it — so one `list_members + list_children + denorm` on a versioned dataset
-already issues 3 separate `/schema` fetches before the nesting multiplier.
+So fixing `catalog_snapshot()` cures the snapshot-construction class. The one
+offender is amplified two ways: **(i)** the nesting walk calls it once per
+descendant dataset (85× for 2-277G), and **(ii)** even within a *single*
+operation, **8 distinct `Dataset` call sites** (`list_dataset_members`,
+`list_dataset_children`, denormalization, etc.) each build their own snapshot
+catalog and none reuse it.
+
+### 3.1a CORRECTION (2026-06-13, found during implementation): the audit's "HARMLESS" claim is false on non-304 servers
+
+The audit's "HARMLESS" bucket above assumed deriva-py caches the parsed
+`/schema` per catalog object, so repeated `pathBuilder()` /
+`getCatalogSchema()` on the same live `_ml_instance.catalog` cost **one**
+fetch. **That assumption is wrong for the servers deriva-ml actually talks
+to.** deriva-py's cache is *conditional-revalidation*-based:
+`getCatalogSchema()` calls `self.get('/schema')` every time and only returns
+the memoized parsed dict when the binding reports a **304 Not Modified**
+(`cached[0] is r` — same `Response` object). `getPathBuilder()` likewise
+re-derives from `getCatalogSchema()` and only hits its wrapper cache when the
+returned schema dict is the *same object* — which again only happens on a
+304.
+
+**Measured 2026-06-13:** both the localhost Deriva Docker stack **and
+production `www.eye-ai.org`** return **HTTP 200 (not 304)** on a conditional
+`/schema` GET (`If-None-Match` is sent but ignored). Therefore deriva-py's
+schema/pathbuilder cache **never engages** on these servers — every
+`pathBuilder()` call re-fetches and re-parses the full `/schema`.
+
+Consequence: there is a **second, independent O(N) source** the original
+audit missed. During an estimate, `bag_builder._iter_descendant_rids` calls
+`self._ml_instance.lookup_dataset(rid)` for **every** descendant, and
+`lookup_dataset` → `pathBuilder()` → `getCatalogSchema()` → a `/schema` GET.
+On the demo catalog this measured **~12 `/schema` GETs per descendant**
+(76 for 6 descendants; 16 for a leaf). A1/A2 alone (snapshot construction)
+does **not** fix this — it is live-instance refetching, not snapshot
+construction.
+
+### 3.1b Lever C — cache the live instance's pathBuilder on the DerivaML instance
+
+deriva-ml already holds the authoritative parsed schema (`self._schema_json`,
+`self.model`) for the instance's lifetime; the per-call `/schema` refetch is
+pure waste regardless of server 304 support. Fix: **`DerivaML.pathBuilder()`
+caches the deriva-py wrapper on the DerivaML instance** and returns the cached
+wrapper on subsequent calls, instead of calling `self.catalog.getPathBuilder()`
+(which re-fetches `/schema`) every time.
+
+- **Invalidation contract:** deriva-ml does **not** auto-refresh the model
+  after schema-mutating writes — callers explicitly call `refresh_model()` /
+  `refresh_schema()` to pick up changes (the model is a deliberate snapshot
+  until refreshed). So the instance's schema is stable between explicit
+  refreshes, and caching the pathBuilder is safe **provided the cache is
+  cleared in `refresh_model()` and `refresh_schema()`** (and on
+  `pin_schema`/`unpin_schema`, which also re-fetch). Add that invalidation.
+- **Scope:** this is the `_ml_instance.pathBuilder()` used pervasively
+  (77 call sites); caching it fixes the live-instance refetch for *every*
+  caller, not just the estimate — a broad correctness/perf win. The risk is
+  staleness after an un-refreshed mutation, which the invalidation hooks
+  prevent and which matches the existing `refresh_model` contract.
+- **Snapshot instances** also benefit: a snapshot `DerivaML`'s pathBuilder is
+  likewise cached on its instance (snapshots are immutable, so it never needs
+  invalidation).
+
+With Lever C, `_iter_descendant_rids`'s N `lookup_dataset` calls share **one**
+pathBuilder on the live instance — collapsing the O(N) live-instance
+`/schema` refetch to O(1).
 
 **Lever A (revised — eliminate, don't memoize) — reuse the live model when
 building a snapshot catalog.** `catalog_snapshot()` threads the live
@@ -211,12 +271,26 @@ don't build B speculatively if A alone hits the goal.)
 - `src/deriva_ml/core/base.py`:
   - an internal opt-in on the online init path to skip `getCatalogSchema()`
     and build the model from a supplied parsed schema via
-    `DerivaModel.from_cached` (Lever A1);
+    `DerivaModel.from_cached` (Lever A1); **[DONE]**
   - `catalog_snapshot()` threads the live instance's parsed `schema_json`
     through that opt-in so snapshot construction performs **0** `/schema`
     fetches (A1), and memoizes the constructed snapshot instance by resolved
     snapshot id so the 8 `Dataset` call sites share one instance (A2).
-- (Conditional, only if post-A re-measure misses target)
+    **[DONE]**
+- `src/deriva_ml/core/mixins/path_builder.py` (Lever C — the live-instance
+  refetch fix, §3.1b):
+  - `DerivaML.pathBuilder()` caches the deriva-py wrapper on the DerivaML
+    instance (e.g. `self._path_builder` set on first call) and returns it on
+    subsequent calls, instead of calling `self.catalog.getPathBuilder()` (a
+    `/schema` refetch) every time.
+- `src/deriva_ml/core/base.py` + `src/deriva_ml/model/catalog.py` (Lever C
+  invalidation):
+  - `refresh_model()` / `refresh_schema()` / `pin_schema()` /
+    `unpin_schema()` clear the cached `pathBuilder` so a deliberate schema
+    refresh is observed by the next `pathBuilder()` call. (Match the existing
+    refresh contract — these are the only paths that legitimately change the
+    instance's schema.)
+- (Conditional, only if post-A+C re-measure misses target)
   `src/deriva_ml/dataset/bag_builder.py`:
   - single-tree-walk wiring for `aggregate_queries` (Lever B1).
 - Tests (below).
@@ -240,6 +314,17 @@ schema-reusing `catalog_snapshot()`, (b) by forcing a real
 `getCatalogSchema()` fetch for the same snaptime. Assert the two
 `DerivaModel`s are structurally identical (same schemas, tables, columns,
 FKs). This pins the load-bearing assumption from §3.1.
+
+### 5.1c Unit — live `pathBuilder()` is cached + invalidated on refresh (Lever C)
+
+Spy on `ErmrestCatalog.getPathBuilder` (or `/schema` GET). Assert:
+- repeated `ml.pathBuilder()` calls on a live instance trigger
+  `getPathBuilder()` / a `/schema` GET **once**, not per call (the wrapper is
+  cached on the DerivaML instance);
+- after `ml.refresh_model()` (or `refresh_schema()`), the **next**
+  `pathBuilder()` call rebuilds (cache cleared) — so a deliberate schema
+  refresh is still observed. This pins the invalidation contract so the cache
+  can't mask a real schema change.
 
 ### 5.2 Integration — GET-count regression guard (live catalog)
 
