@@ -495,6 +495,146 @@ EOF
 
 ---
 
+## Task 4.5: Lever C — cache the live instance's `pathBuilder` (the real O(N) fix)
+
+**Why this task exists:** Implementation of Tasks 1–4 + the Task 5 guard revealed that A1/A2 (snapshot construction) is **necessary but not sufficient**. `estimate_bag_size` still issues O(N) `/schema` fetches because `bag_builder._iter_descendant_rids` → `lookup_dataset()` → `pathBuilder()` → `getCatalogSchema()` re-fetches `/schema` per descendant on the **live** instance. deriva-py's schema/pathbuilder cache is gated on an HTTP **304**, and **both localhost and production www.eye-ai.org return 200** on a conditional `/schema` GET (measured 2026-06-13), so the cache never engages. Lever C caches the pathBuilder on the DerivaML instance so the N `lookup_dataset` calls share one wrapper. See spec §3.1a/§3.1b.
+
+**Design — self-invalidating via model identity:** key the cache on the identity of `self.model`. deriva-ml rebinds `self.model` on every legitimate schema refresh (`refresh_schema`, `pin_schema`, `unpin_schema` each do `self.model = DerivaModel.from_cached(...)`; `DerivaModel.refresh_model()` rebinds the inner model). By caching `(self.model, wrapper)` and returning the wrapper only when `cached[0] is self.model`, a model swap auto-invalidates the cache — no need to thread explicit cache-clears through every refresh site. This mirrors how `DerivaModel._asset_execution_tables_cache` self-invalidates (per its `refresh_model` docstring).
+
+> Note: `DerivaModel.refresh_model()` rebinds the *inner* deriva-py Model but may keep the same `DerivaModel` wrapper object. To be safe, key on `self.model.model` (the inner deriva-py Model identity), which `refresh_model` definitely replaces (`self.model = self.catalog.getCatalogModel()`). Verify this in Step 3.
+
+**Files:**
+- Modify: `src/deriva_ml/core/mixins/path_builder.py` (`pathBuilder`, lines 59–76)
+- Test: `tests/core/test_catalog_snapshot_schema_reuse.py` (append)
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/core/test_catalog_snapshot_schema_reuse.py`:
+
+```python
+def test_live_pathbuilder_cached_across_calls(live_ml, monkeypatch):
+    """Repeated ml.pathBuilder() triggers getPathBuilder() at most once."""
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
+    calls = {"n": 0}
+    real = ErmrestCatalog.getPathBuilder
+
+    def counting(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(ErmrestCatalog, "getPathBuilder", counting)
+
+    # Warm + repeat; the wrapper must be cached on the DerivaML instance.
+    live_ml.pathBuilder()
+    live_ml.pathBuilder()
+    live_ml.pathBuilder()
+    assert calls["n"] <= 1, f"pathBuilder() rebuilt {calls['n']} times; expected <= 1 (cached)"
+
+
+def test_live_pathbuilder_invalidated_on_refresh(live_ml, monkeypatch):
+    """After refresh_model(), the next pathBuilder() rebuilds (cache cleared)."""
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
+    calls = {"n": 0}
+    real = ErmrestCatalog.getPathBuilder
+
+    def counting(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(ErmrestCatalog, "getPathBuilder", counting)
+
+    live_ml.pathBuilder()          # build (n -> 1)
+    live_ml.pathBuilder()          # cached (n stays 1)
+    assert calls["n"] == 1
+    live_ml.model.refresh_model()  # rebinds the inner model -> cache must invalidate
+    live_ml.pathBuilder()          # must rebuild (n -> 2)
+    assert calls["n"] == 2, "pathBuilder() must rebuild after refresh_model()"
+```
+
+- [ ] **Step 2: Run them to verify they fail**
+
+```bash
+cd /Users/carl/GitHub/DerivaML/deriva-ml && DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/core/test_catalog_snapshot_schema_reuse.py -k "pathbuilder" -q
+```
+Expected: `test_live_pathbuilder_cached_across_calls` FAILS (calls["n"] == 3, no caching yet). The invalidation test may pass or fail depending on current behavior — the important one to see fail is the caching test.
+
+- [ ] **Step 3: Verify the model-identity invalidation key**
+
+Before implementing, confirm `DerivaModel.refresh_model()` replaces `self.model.model` (the inner deriva-py Model). Read `src/deriva_ml/model/catalog.py` `refresh_model`: it does `self.model = self.catalog.getCatalogModel()` (rebinds the inner Model). So keying the cache on `self.model.model` (identity) self-invalidates on refresh. Note the outer `DerivaModel` wrapper (`self.model`) is NOT replaced by `refresh_model`, so keying on `self.model` (the wrapper) would NOT invalidate — you MUST key on `self.model.model` (the inner Model). For `refresh_schema`/`pin_schema`/`unpin_schema`, the whole `DerivaModel` wrapper is replaced (`self.model = DerivaModel.from_cached(...)`), which also replaces `self.model.model`, so keying on the inner model covers all four refresh paths.
+
+- [ ] **Step 4: Implement the cached `pathBuilder`**
+
+In `src/deriva_ml/core/mixins/path_builder.py`, replace the `pathBuilder` method body (currently `return self.catalog.getPathBuilder()`, line 76) with a model-identity-keyed cache. Replace:
+
+```python
+        return self.catalog.getPathBuilder()
+```
+
+with:
+
+```python
+        # Cache the deriva-py path-builder wrapper on this DerivaML
+        # instance, keyed by the identity of the inner ERMrest Model.
+        # deriva-py's own getPathBuilder() re-fetches /schema on every
+        # call unless the server returns HTTP 304 (conditional GET) — and
+        # the catalogs deriva-ml talks to return 200 every time, so that
+        # cache never engages. We hold the authoritative parsed schema
+        # (self.model) for the instance's lifetime, so re-fetching is pure
+        # waste. Keying on self.model.model (the inner deriva-py Model,
+        # which every refresh path replaces) makes the cache
+        # self-invalidate: refresh_model() / refresh_schema() /
+        # pin_schema() / unpin_schema() all rebind the model, so the next
+        # pathBuilder() call sees a new identity and rebuilds. See the
+        # estimate-bag-size perf spec §3.1b (Lever C).
+        inner_model = self.model.model
+        cached = getattr(self, "_path_builder_cache", None)
+        if cached is not None and cached[0] is inner_model:
+            return cached[1]
+        wrapper = self.catalog.getPathBuilder()
+        self._path_builder_cache = (inner_model, wrapper)
+        return wrapper
+```
+
+- [ ] **Step 5: Run the pathbuilder tests to verify they pass**
+
+```bash
+cd /Users/carl/GitHub/DerivaML/deriva-ml && DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/core/test_catalog_snapshot_schema_reuse.py -k "pathbuilder" -q
+```
+Expected: both pathbuilder tests PASS (cached once; rebuilds after refresh).
+
+- [ ] **Step 6: Run the WHOLE core test dir — Lever C touches a pervasive method (77 call sites), so make sure nothing regressed**
+
+```bash
+cd /Users/carl/GitHub/DerivaML/deriva-ml && DERIVA_ML_ALLOW_DIRTY=true DERIVA_HOST=localhost uv run pytest tests/core/ -q
+```
+Expected: all pass. If anything fails because a test mutated schema and didn't refresh the model, that's surfacing a real latent reliance — investigate: a correct caller does `refresh_model()` after a schema mutation, which now also clears the pathBuilder cache. If a test mutated schema WITHOUT refreshing and previously got fresh schema by luck (because pathBuilder re-fetched every time), the fix is to add the missing `refresh_model()` in that test/code path, not to weaken Lever C. Report any such case.
+
+- [ ] **Step 7: Lint + commit**
+
+```bash
+cd /Users/carl/GitHub/DerivaML/deriva-ml && uv run ruff check src/deriva_ml/core/mixins/path_builder.py tests/core/test_catalog_snapshot_schema_reuse.py
+```
+then:
+```bash
+cd /Users/carl/GitHub/DerivaML/deriva-ml && git add src/deriva_ml/core/mixins/path_builder.py tests/core/test_catalog_snapshot_schema_reuse.py && git commit -m "$(cat <<'EOF'
+perf(core): cache live pathBuilder on DerivaML instance (Lever C)
+
+deriva-py's getPathBuilder re-fetches /schema on every call unless the
+server returns HTTP 304 — and both localhost and www.eye-ai.org return 200
+on conditional /schema GETs, so that cache never engages. Cache the wrapper
+on the DerivaML instance keyed by inner-model identity (self-invalidating on
+refresh_model/refresh_schema/pin/unpin). Collapses the O(N) per-descendant
+/schema refetch in estimate_bag_size's nesting walk to O(1).
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
 ## Task 5: Integration guard — `/schema` count does not scale with nesting
 
 **Files:**
