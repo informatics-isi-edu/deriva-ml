@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from deriva_ml.dataset._reachability import _fk_join_columns
+from deriva_ml.dataset._reachability import _fk_join_columns, _needed_columns
 
 
 def _col(name):
@@ -41,3 +41,48 @@ def test_fk_join_columns_no_edge_returns_empty():
     model = _make_model()
     # Parent has no FK to itself.
     assert _fk_join_columns(("S", "Parent"), ("S", "Parent"), model) == []
+
+
+def _make_vocab_model():
+    """Asset_Role(Name) <- Child.role_fk -> Asset_Role.Name (vocab FK to Name)."""
+    role = SimpleNamespace(foreign_keys=[], column_definitions=SimpleNamespace(elements={}))
+    vocab_fk = SimpleNamespace(
+        foreign_key_columns=[_col("role_fk")],
+        referenced_columns=[_col("Name")],  # references Name, NOT RID
+    )
+    child = SimpleNamespace(
+        foreign_keys=[vocab_fk],
+        referenced_by=[],
+        column_definitions=SimpleNamespace(elements={}),
+    )
+    vocab_fk.pk_table = role
+    role.referenced_by = [vocab_fk]
+    role.foreign_keys = []
+    child.is_asset = lambda: False
+    role.is_asset = lambda: False
+    schemas = {"S": SimpleNamespace(tables={"Asset_Role": role, "Child": child})}
+    return SimpleNamespace(schemas=schemas)
+
+
+def test_needed_columns_includes_inbound_referenced_name():
+    model = _make_vocab_model()
+    # Asset_Role is the FK TARGET of an inbound vocab FK on Name. The engine
+    # must project Name or the in-memory join silently drops rows.
+    cols = _needed_columns(("S", "Asset_Role"), model)
+    assert "Name" in cols
+    assert "RID" in cols
+
+
+def test_needed_columns_includes_outbound_fk_and_length():
+    """Asset table with an outbound FK and a Length column."""
+    length_col = SimpleNamespace(name="Length")
+    fk = SimpleNamespace(foreign_key_columns=[_col("parent_fk")], referenced_columns=[_col("RID")])
+    asset = SimpleNamespace(
+        foreign_keys=[fk],
+        referenced_by=[],
+        column_definitions=SimpleNamespace(elements={"Length": length_col}),
+    )
+    asset.is_asset = lambda: True
+    model = SimpleNamespace(schemas={"S": SimpleNamespace(tables={"A": asset})})
+    cols = _needed_columns(("S", "A"), model)
+    assert cols == {"RID", "parent_fk", "Length"}

@@ -65,3 +65,41 @@ def _fk_join_columns(
             ]
             constraints.append({"fk_on": "cur", "pairs": pairs})
     return constraints
+
+
+def _needed_columns(seg: tuple[str, str], model: Any) -> set[str]:
+    """Minimal column projection to fetch for one table in the walk.
+
+    Returns ``RID`` plus every column the in-memory join needs:
+
+    - **Outbound FK columns** (this table -> parent): needed when this table
+      is the FK-holder for a hop.
+    - **Inbound-FK *referenced* columns** (child -> this table): needed when
+      this table is the FK TARGET. Critically, a vocabulary FK references the
+      target's ``Name`` (e.g. ``*_Execution.Asset_Role -> Asset_Role.Name``),
+      not ``RID`` -- omitting ``Name`` silently undercounts vocab-leaf tables
+      (the prototype was off by 817 rows until this was added).
+    - **Asset ``Length``**: for asset-byte summation.
+
+    Args:
+        seg: ``(schema, table)``.
+        model: deriva-py Model.
+
+    Returns:
+        Set of column names to project in the table fetch.
+
+    Example:
+        >>> ...  # doctest: +SKIP  (needs a Model)
+    """
+    s, t = seg
+    tbl = model.schemas[s].tables[t]
+    cols = {"RID"}
+    for fk in tbl.foreign_keys:
+        for c in fk.foreign_key_columns:
+            cols.add(c.name)
+    for fk in tbl.referenced_by:
+        for c in fk.referenced_columns:
+            cols.add(c.name)
+    if tbl.is_asset() and "Length" in tbl.column_definitions.elements:
+        cols.add("Length")
+    return cols
