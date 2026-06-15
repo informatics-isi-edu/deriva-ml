@@ -261,6 +261,26 @@ class DatasetBagBuilder:
         holds: any future change to the bag pipeline's walker is
         immediately reflected here.
 
+        **Format B (issue #305).** The spec is generated with the
+        per-table reachable RID sets, so its non-vocab CSV
+        processors are rid-set processors — one clean
+        ``data/{schema}/{table}.csv`` per reached table — identical
+        to what :meth:`build_bag` (the direct-download arm)
+        produces. This unifies the MINID / server-export bag format
+        with the directly-downloaded format: the two arms now drive
+        the same upstream emission with the same ``rid_sets`` map.
+
+        Server dependency: rid-set CSV processors are honored by the
+        deriva-py client (:meth:`get_as_file(rid_set=...)`) but
+        require the ERMrest export *service* to support rid-set
+        processors as well. Until the server gains that support,
+        live MINID downloads against the production export service
+        will fail; the directly-downloaded (``build_bag``) arm,
+        which runs the client engine locally, is unaffected. The
+        spec's content hash changes with this format, so any
+        cached MINID with the old (Format-A) hash regenerates
+        automatically — see ``get_dataset_minid``'s spec-hash gate.
+
         Args:
             dataset: The dataset to generate the spec for. Must
                 expose ``dataset_rid``.
@@ -268,7 +288,13 @@ class DatasetBagBuilder:
         Returns:
             The export-engine spec dict.
         """
-        builder = self._catalog_bag_builder(dataset=dataset)
+        # Compute the per-table reachable RID sets so the upstream
+        # engine emits one rid-set csv processor per non-vocab reached
+        # table (Format B) — matching the direct-download arm
+        # (:meth:`build_bag`) — instead of one csv processor per FK
+        # path (Format A).
+        rid_sets = self._compute_rid_sets(dataset).rid_sets
+        builder = self._catalog_bag_builder(dataset=dataset, rid_sets=rid_sets)
         spec = builder.get_export_spec()
 
         # Pull the bag-pipeline catalog block — we keep its
