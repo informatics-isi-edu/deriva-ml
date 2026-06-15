@@ -68,6 +68,46 @@ from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 logger = get_logger(__name__)
 
 
+def _rid_sets_from_reachability(
+    reached: dict[tuple[str, str], Any],
+    rids_by_table: dict[str, set[str]],
+    vocab_tables: set[tuple[str, str]],
+) -> dict[tuple[str, str], list[str]]:
+    """Map compute_reachability output to the upstream rid_sets shape.
+
+    ``compute_reachability`` returns ``rids_by_table`` keyed by bare table
+    name; ``CatalogBagBuilder(rid_sets=...)`` wants ``{(schema, table):
+    [RID,...]}``. This re-keys using ``reached``'s ``(schema, table)`` keys,
+    drops vocab tables (the upstream rid-set branch skips them -- vocab keeps
+    its full/per-path query), and sorts each RID list for deterministic specs
+    (sets are not JSON-serializable; the spec must be reproducible).
+
+    Args:
+        reached: ``{(schema, table): [fk_path, ...]}`` -- the reached-paths map
+            (its keys enumerate the tables to consider).
+        rids_by_table: ``{table_name: set(RID)}`` from compute_reachability.
+        vocab_tables: ``(schema, table)`` pairs that are vocabulary tables.
+
+    Returns:
+        ``{(schema, table): [RID, ...]}`` for every non-vocab reached table.
+
+    Example:
+        >>> _rid_sets_from_reachability(
+        ...     {("S", "T"): [()], ("S", "V"): [()]},
+        ...     {"T": {"b", "a"}},
+        ...     {("S", "V")},
+        ... )
+        {('S', 'T'): ['a', 'b']}
+    """
+    result: dict[tuple[str, str], list[str]] = {}
+    for key in reached:
+        if key in vocab_tables:
+            continue
+        table_name = key[1]
+        result[key] = sorted(rids_by_table.get(table_name, set()))
+    return result
+
+
 class _SnapshotAwareCatalogBagBuilder(CatalogBagBuilder):
     """``CatalogBagBuilder`` that honors the catalog's snapshot in exports.
 
