@@ -275,13 +275,19 @@ load-bearing invariant rather than an aspiration
 (`aggregate_queries` docstring: *"the drift walk is the bag walk"*).
 
 - **`estimate_bag_size`** shares the *walk* but bypasses the *export
-  engine*. It calls `DatasetBagBuilder.aggregate_queries(dataset)` — the
-  same anchors and policy as the export — but instead of generating an
-  export spec it runs live datapath aggregate queries against the
-  reached tables and computes exact RID-union counts client-side. It
-  never builds a bag or contacts the export engine. This deliberate
-  bypass is ADR-0008
-  (`docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md`).
+  engine*. It reuses the same `iter_reached_paths()` traversal and
+  descendant anchors as the export (so it sees exactly the tables the
+  bag would carry), but instead of generating an export spec — or
+  issuing per-FK-path aggregate queries against the server — it fetches
+  each reached table's edge columns **once** (a projected whole-table
+  scan) and reconstructs FK reachability **in memory**: a client-side
+  BFS over the symbolic FK paths that yields exact per-table RID-union
+  counts. No deep server joins, no bag, no export engine
+  (`src/deriva_ml/dataset/_reachability.py::compute_reachability`). The
+  decision to bypass the export engine is ADR-0008
+  (`docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md`); only the
+  bypass *mechanism* changed — from live per-path aggregate queries to
+  the client-side reachability engine.
 
 - **`clone_via_bag`** uses the *same policy shape* — including the same
   `terminal_tables={Execution, Workflow}` and `vocab_export=FULL` — but

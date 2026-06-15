@@ -28,6 +28,7 @@ Typical usage example:
 
 from __future__ import annotations
 
+import importlib
 from collections import defaultdict
 
 # Standard library imports
@@ -36,19 +37,19 @@ from graphlib import TopologicalSorter
 # Local imports
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Iterator, Self
 
-# Deriva imports
-from deriva.core.asyncio import AsyncErmrestCatalog
-from deriva.core.asyncio.async_catalog import AsyncErmrestSnapshot
-
 if TYPE_CHECKING:
     from deriva_ml.execution.execution import Execution
 
 # Third-party imports
 import pandas as pd
 from deriva.core.ermrest_model import Table
+
+# Import datapath via importlib to avoid shadowing by local 'deriva.py' files
+# (same convention as core/mixins/path_builder.py). Used to build a path
+# builder from an explicit model in estimate_bag_size.
+datapath = importlib.import_module("deriva.core.datapath")
 from pydantic import validate_call
 
-from deriva_ml.core.async_helpers import run_async
 from deriva_ml.core.constants import RID
 from deriva_ml.core.definitions import (
     MLVocab,
@@ -2379,7 +2380,38 @@ class Dataset:
             >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
             >>> children = ds.list_dataset_children()  # doctest: +SKIP
         """
-        # Initialize visited set for recursion guard
+        # Compute the descendant RID set (one Dataset_Dataset fetch,
+        # in-memory traversal) and hydrate Dataset objects.
+        version_snapshot_catalog, child_rids = self._descendant_child_rids(
+            recurse=recurse, _visited=_visited, version=version
+        )
+        return [version_snapshot_catalog.lookup_dataset(rid) for rid in child_rids]
+
+    def _descendant_child_rids(
+        self,
+        recurse: bool = False,
+        _visited: set[RID] | None = None,
+        *,
+        version: DatasetVersion | str | None = None,
+    ) -> tuple[Any, list[RID]]:
+        """Core of list_dataset_children: one Dataset_Dataset fetch + in-memory traversal.
+
+        Fetches the (small) full Dataset_Dataset table once, builds the
+        nesting adjacency in memory, and traverses from this dataset's RID
+        with a ``_visited`` cycle guard. No per-node round-trips.
+
+        Args:
+            recurse: If True, traverse the full descendant subtree; otherwise
+                only direct children.
+            _visited: Cycle-guard set of already-visited RIDs (internal;
+                callers normally leave None for a fresh guard).
+            version: Dataset version snapshot to query against.
+
+        Returns:
+            tuple[Any, list[RID]]: ``(version_snapshot_catalog, child_rids)``.
+                The snapshot catalog is returned so callers that need Dataset
+                objects can hydrate via its ``lookup_dataset``.
+        """
         if _visited is None:
             _visited = set()
 
@@ -2391,18 +2423,44 @@ class Dataset:
         nested_datasets = list(dataset_dataset_path.entities().fetch())
 
         def find_children(rid: RID) -> list[RID]:
-            # Prevent infinite recursion by checking if we've already visited this dataset
             if rid in _visited:
                 return []
             _visited.add(rid)
-
             children = [child["Nested_Dataset"] for child in nested_datasets if child["Dataset"] == rid]
             if recurse:
                 for child in children.copy():
                     children.extend(find_children(child))
             return children
 
-        return [version_snapshot_catalog.lookup_dataset(rid) for rid in find_children(self.dataset_rid)]
+        return version_snapshot_catalog, find_children(self.dataset_rid)
+
+    def list_dataset_children_rids(
+        self,
+        recurse: bool = False,
+        *,
+        version: DatasetVersion | str | None = None,
+    ) -> list[RID]:
+        """Return descendant dataset RIDs without hydrating Dataset objects.
+
+        Same traversal as :meth:`list_dataset_children` but returns RIDs
+        directly — one ``Dataset_Dataset`` fetch and in-memory traversal,
+        with zero per-node ``lookup_dataset`` round-trips. Use this when you
+        only need the RID set (e.g. building the bag-walk anchor list).
+
+        Args:
+            recurse: If True, return all descendant RIDs (children of
+                children, etc.); otherwise only direct children.
+            version: Dataset version snapshot to query against.
+
+        Returns:
+            list[RID]: descendant dataset RIDs (depth-first order).
+
+        Example:
+            >>> ds = ml.lookup_dataset("1-ABC")  # doctest: +SKIP
+            >>> rids = ds.list_dataset_children_rids(recurse=True)  # doctest: +SKIP
+        """
+        _, child_rids = self._descendant_child_rids(recurse=recurse, version=version)
+        return child_rids
 
     def list_executions(self) -> list["Execution"]:
         """List all executions associated with this dataset.
@@ -2602,31 +2660,41 @@ class Dataset:
     ) -> dict[str, Any]:
         """Estimate the size of a dataset bag before downloading.
 
-        Uses :meth:`DatasetBagBuilder.aggregate_queries` to build datapath
-        objects for every FK path that reaches each table, then fetches RID
-        lists from the snapshot catalog and computes the exact union across
-        all paths.
+        Uses the bag walk (:meth:`DatasetBagBuilder._catalog_bag_builder`
+        -> :meth:`~deriva.bag.catalog_builder.CatalogBagBuilder.iter_reached_paths`)
+        to discover the reachable tables, fetches each reached table's edge
+        columns **once** via a projected whole-table scan, and reconstructs
+        FK reachability **in memory** (client-side). No deep server-side FK
+        joins are issued. Exact per-table RID unions are computed from the
+        in-memory reachability graph.
 
-        When the same table is reachable via multiple FK paths, **all** paths
-        are queried and the RID sets are unioned to get the exact row count.
-        For asset tables, ``(RID, Length)`` pairs are fetched and deduplicated
-        by RID so that ``asset_bytes`` reflects the true total.
+        When the same table is reachable via multiple FK paths, the
+        client-side reachability walk unions the matching RID sets to get the
+        exact row count. For asset tables, ``Length`` is summed over the
+        reached RIDs from the same single projected fetch (no separate
+        ``(RID, Length)`` pair fetch) so that ``asset_bytes`` reflects the
+        true total.
 
         Note:
             This is the one place in ``dataset/`` that bypasses
             :class:`~deriva.bag.catalog_builder.CatalogBagBuilder` for
             execution (it still shares the walker via
-            :meth:`~DatasetBagBuilder.aggregate_queries`). The bypass
-            is **deliberate** — see
+            :meth:`~DatasetBagBuilder._catalog_bag_builder` /
+            :meth:`~deriva.bag.catalog_builder.CatalogBagBuilder.iter_reached_paths`
+            — the same walk, a different entry point). The bypass is
+            **deliberate** — see
             :doc:`docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline`
             for the design decision, the rejected alternatives
             (lifting parallelism upstream vs. leaving the divergence
-            undocumented), and practical contributor guidance. Do
+            undocumented), and practical contributor guidance. Only the
+            bypass *mechanism* changed (to client-side reachability); the
+            decision to bypass the bag **export** engine is unchanged. Do
             not "fix" the duplication without reading the ADR first.
 
-        Note: this fetches complete RID lists rather than using server-side
-        aggregates, which gives exact union counts but uses O(N) memory where
-        N is the total rows across all paths.  This is suitable for datasets
+        Note: the engine fetches each reached table's edge columns as a
+        whole-table projected scan rather than using server-side aggregates,
+        which gives exact union counts but uses O(N) memory where N is the
+        total rows across all reached tables.  This is suitable for datasets
         with up to hundreds of thousands of rows per table.
 
         Args:
@@ -2645,71 +2713,79 @@ class Dataset:
                 - total_csv_size: human-readable CSV size
                 - total_estimated_bytes: asset + CSV bytes combined
                 - total_estimated_size: human-readable combined size
-                - incomplete: True when at least one estimate query
-                  failed — every count/size is then a lower bound
-                - incomplete_tables: sorted names of affected tables
-                  (their per-table dicts also carry incomplete=True)
+                - incomplete: retained for backward-compatible output
+                  shape; always ``False`` under the client-side engine. A
+                  whole-table fetch either succeeds wholesale or raises, so
+                  there are no per-query failures that would mark a count as
+                  a lower bound.
+                - incomplete_tables: retained for backward-compatible output
+                  shape; always an empty list under the client-side engine
+                  (no per-table query failures can occur).
         """
-        # Post Ds-est extraction this method composes three free
-        # functions in ``dataset/_estimate.py``: query construction,
-        # async orchestration, and final assembly. The async-from-
-        # sync bridge (``run_async``) still lives here because it's
-        # the one piece tied to deriva-ml internals.
-        from deriva_ml.dataset._estimate import (
-            assemble_estimate,
-            build_estimate_queries,
-            run_estimate_queries,
+        from deriva_ml.dataset._estimate import assemble_estimate
+        from deriva_ml.dataset._reachability import (
+            compute_reachability,
+            sample_rows_from_fetched,
         )
 
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
-        # Build a DatasetBagBuilder on the version snapshot and collect
-        # aggregate datapath objects grouped by target table.
+        # Build a DatasetBagBuilder on the version snapshot. The walk (which
+        # tables are reachable, via which FK paths) is shared with the bag
+        # export; only the *execution* differs -- see docs/adr/0008.
         version_snapshot_catalog = self._version_snapshot_catalog(version)
         builder = DatasetBagBuilder(
             ml_instance=version_snapshot_catalog,
             exclude_tables=exclude_tables,
         )
-        table_queries = builder.aggregate_queries(self)
+        cb = builder._catalog_bag_builder(dataset=self)
+        reached = cb.iter_reached_paths()
+        anchor_rids = [self.dataset_rid] + list(builder._iter_descendant_rids(self))
+        model = cb._get_model()
 
-        # Connect to the snapshot catalog for queries using the async catalog,
-        # which uses httpx.AsyncClient with connection pooling and is safe for
-        # concurrent requests (unlike the sync ErmrestCatalog).
-        snapshot_catalog_id = self._version_snapshot_catalog_id(version)
-        from deriva.core import get_credential
+        # Fetch closure: whole-table projected scan. Cheap relative to deep FK
+        # joins (a 240k-row scan is ~0.3s; the join through it was 16-60s).
+        #
+        # Build the path builder from the SAME model the walk used
+        # (``cb._get_model()``), not ``version_snapshot_catalog.pathBuilder()``.
+        # The walk reaches tables named in deriva-py's freshly-fetched snapshot
+        # model; the deriva-ml instance's held model can legitimately differ
+        # (e.g. a snapshot reusing the live instance's schema_json, or any
+        # held-model staleness) and would be missing tables the walk reached,
+        # raising KeyError here. Sharing one model keeps walk and fetch in
+        # lockstep and adds no /schema fetch -- the walk already fetched it.
+        pb = datapath.from_model(version_snapshot_catalog.catalog, model)
 
-        hostname = self._ml_instance.catalog.deriva_server.server
-        protocol = self._ml_instance.catalog.deriva_server.scheme
-        credentials = get_credential(hostname)
+        def _fetch(schema: str, table: str, columns: set[str]) -> list[dict]:
+            tpb = pb.schemas[schema].tables[table]
+            try:
+                attrs = [getattr(tpb, c) for c in sorted(columns)]
+                return list(tpb.attributes(*attrs).fetch())
+            except Exception as exc:  # noqa: BLE001
+                # Defensive fallback: a projection naming a column the table
+                # lacks (model/data skew) degrades to a full-entity fetch
+                # rather than dropping the table from the estimate.
+                self._logger.debug(
+                    "estimate projected fetch for %s:%s fell back to full-entity scan: %s",
+                    schema,
+                    table,
+                    exc,
+                )
+                return list(tpb.entities().fetch())
 
-        # Parse snapshot catalog ID (format: "catalog_id@snaptime" or just "catalog_id")
-        if "@" in snapshot_catalog_id:
-            cat_id, snaptime = snapshot_catalog_id.split("@", 1)
-            catalog = AsyncErmrestSnapshot(protocol, hostname, cat_id, snaptime, credentials)
-        else:
-            catalog = AsyncErmrestCatalog(protocol, hostname, snapshot_catalog_id, credentials)
-
-        # 1. Build the query plan (pure).
-        items = build_estimate_queries(table_queries)
-
-        # 2. Execute the queries concurrently against the snapshot.
-        # ``run_async`` is the notebook-loop-fallback bridge used
-        # elsewhere in the codebase (e.g. bag-commit's
-        # ``BagCatalogLoader.arun``).
-        rids_by_table, asset_lengths_by_table, sample_rows_by_table, failed_by_table = run_async(
-            run_estimate_queries(catalog, items, logger=self._logger)
+        rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
+            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
         )
+        sample_rows_by_table = sample_rows_from_fetched(reached=reached, fetched_rows=fetched_rows)
 
-        # 3. Assemble the final dict (pure).
         return assemble_estimate(
-            table_queries=table_queries,
+            asset_tables={key[1] for key in reached if model.schemas[key[0]].tables[key[1]].is_asset()},
             rids_by_table=rids_by_table,
             asset_lengths_by_table=asset_lengths_by_table,
             sample_rows_by_table=sample_rows_by_table,
             estimate_csv_bytes=self._estimate_csv_bytes,
             human_readable_size=self._human_readable_size,
-            failed_by_table=failed_by_table,
         )
 
     @validate_call(config=VALIDATION_CONFIG)

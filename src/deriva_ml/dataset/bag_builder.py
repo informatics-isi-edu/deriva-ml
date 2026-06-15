@@ -159,6 +159,9 @@ class DatasetBagBuilder:
         # MINID only works when an S3 bucket is configured.
         self._use_minid = use_minid and s3_bucket is not None
         self._exclude_tables = exclude_tables or set()
+        # Memoize the descendant-RID set per root RID for one builder op so
+        # anchors_for and _exclude_empty_associations share a single tree walk.
+        self._descendant_rids_cache: dict[RID, list[RID]] = {}
 
     # ------------------------------------------------------------------
     # Public surface — drives :class:`CatalogBagBuilder`
@@ -408,9 +411,15 @@ class DatasetBagBuilder:
         Drives a :class:`CatalogBagBuilder` (per-dataset when
         ``dataset`` is given, catalog-wide otherwise) and returns
         its :meth:`~CatalogBagBuilder.iter_table_datapaths` output
-        rekeyed by terminal table name — the shape callers like
-        :meth:`Dataset.estimate_bag_size` and :meth:`Dataset.is_dirty`
-        expect.
+        rekeyed by terminal table name — the shape the drift path
+        (:meth:`Dataset.is_dirty`, via ``_iter_drift_counts``) expects.
+
+        Note: :meth:`Dataset.estimate_bag_size` no longer drives this
+        method. It now uses the client-side reachability engine
+        (:func:`deriva_ml.dataset._reachability.compute_reachability`),
+        which shares the same walker via ``_catalog_bag_builder`` /
+        ``iter_reached_paths`` but reconstructs FK reachability in
+        memory rather than issuing per-path aggregate queries.
 
         Per CONTEXT.md ("Dirty"), the drift walk *is* the bag
         walk. Sharing the walker (via ``CatalogBagBuilder``) makes
@@ -725,8 +734,10 @@ class DatasetBagBuilder:
 
         The dataset's root row is the primary anchor; each nested
         child dataset becomes an additional :class:`RIDAnchor`.
-        The traversal depth is bounded by
-        :meth:`DatasetLike.list_dataset_children` chains.
+        Descendants are enumerated by :meth:`_iter_descendant_rids`
+        (the memoized RID accessor over
+        :meth:`DatasetLike.list_dataset_children_rids`), so the
+        traversal depth is bounded by the nested-dataset chain.
 
         This is the bag-pipeline-shaped representation of "what
         rows does the walker start from for this dataset?". When
@@ -824,14 +835,25 @@ class DatasetBagBuilder:
     def _exclude_empty_associations(self, dataset: DatasetLike | None) -> set[tuple[str, str]]:
         """Return ``{(schema, table)}`` for associations with no members.
 
-        For each ``Dataset_X`` association table, include it in
-        the walk only when the dataset (or any of its nested
-        descendants) has at least one member of element type X
-        (or when the association links to a vocabulary table —
-        those carry dataset metadata and must always be included).
-        Empty associations are added to the
+        Membership is keyed on the element TYPE, not the individual
+        association table. A ``Dataset_X`` association is kept in the
+        walk when element type X has at least one member anywhere in
+        the tree (root or any nested descendant) — even if that member
+        was recorded via a *different*, parallel association — or when
+        the association links to a vocabulary table (those carry
+        dataset metadata and must always be included). Empty
+        associations are added to the
         :attr:`FKTraversalPolicy.exclude_tables` set so the
         generic walker prunes them.
+
+        The element-type keying is load-bearing for schemas with
+        PARALLEL associations for the same type. On eye-ai, Subject
+        membership is recorded in ``Subject_Dataset`` while
+        ``Dataset_Subject`` is an empty parallel association. A
+        per-assoc-table row check would wrongly exclude
+        ``Dataset_Subject`` (it has no rows of its own); keying on the
+        ``Subject`` element type keeps both, because Subject is a
+        populated member type.
 
         Descendants matter because the walker anchors at every
         descendant dataset RID (via :meth:`anchors_for`). An
@@ -854,21 +876,12 @@ class DatasetBagBuilder:
         ml_schema_name = self._ml_instance.ml_schema
         dataset_table = model.schemas[ml_schema_name].tables["Dataset"]
 
-        # Element types that have members anywhere in the dataset
-        # tree — root or any nested descendant. Excluding by root
-        # alone would prune Dataset_X for element types X that
-        # only appear under a nested child, dropping their rows
-        # from the bag (see #94: child Image members disappearing).
-        dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
-        rids_to_scan: list[RID] = [dataset.dataset_rid]
-        rids_to_scan.extend(self._iter_descendant_rids(dataset))
-
-        member_element_types: set[Table] = set()
-        for rid in rids_to_scan:
-            ds = self._ml_instance.lookup_dataset(rid) if rid != dataset.dataset_rid else dataset_obj
-            for name, members in ds.list_dataset_members().items():
-                if members:
-                    member_element_types.add(model.name_to_table(name))
+        # Descendant RID set (root + all nested descendants), one fetch.
+        # Descendants matter because the walker anchors at every
+        # descendant dataset RID (via ``anchors_for``): an association
+        # empty at the root but populated under a nested child must
+        # stay in the walk (see #94: child Image members disappearing).
+        rid_set = [dataset.dataset_rid] + list(self._iter_descendant_rids(dataset))
 
         # Every vocabulary table in any schema — associations into
         # vocabularies always come along for the ride.
@@ -876,10 +889,32 @@ class DatasetBagBuilder:
             table for schema in model.schemas.values() for table in schema.tables.values() if model.is_vocabulary(table)
         }
 
-        # Walk every Dataset_X association. The association links
-        # to one or more "other" tables via ``other_fkeys``; include
-        # the association only when at least one of those tables
-        # is a member element type or a vocabulary.
+        pb = self._ml_instance.pathBuilder()
+
+        # Pass 1: which element TYPES have a member anywhere in the tree?
+        # An association row IS the membership record, so an element type X has
+        # members iff SOME association reaching X has a row with Dataset in the
+        # tree. We must key on the element TYPE (not the individual association
+        # table) because a schema may have PARALLEL associations for the same
+        # type: e.g. eye-ai records Subject membership in ``Subject_Dataset``
+        # while ``Dataset_Subject`` is an empty parallel association. Keying on
+        # the assoc table alone would wrongly exclude ``Dataset_Subject``;
+        # keying on the type keeps both because ``Subject`` is a member type.
+        # One presence query per association (limit=1), independent of
+        # descendant count. Every Dataset_X association carries a literal
+        # ``Dataset`` FK column (the convention ``list_dataset_members`` relies
+        # on at dataset.py:1670).
+        member_element_types: set[Table] = set()
+        for assoc in dataset_table.find_associations():
+            assoc_table = assoc.table
+            assoc_path = pb.schemas[assoc_table.schema.name].tables[assoc_table.name]
+            has_rows = bool(list(assoc_path.filter(assoc_path.Dataset.in_(rid_set)).entities().fetch(limit=1)))
+            if has_rows:
+                member_element_types.update(fk.pk_table for fk in assoc.other_fkeys)
+
+        # Pass 2: exclude an association iff none of its member element types is
+        # populated in the tree AND it doesn't link to a vocabulary. Pure set
+        # logic on the results of pass 1 — no further queries.
         excluded: set[tuple[str, str]] = set()
         for assoc in dataset_table.find_associations():
             assoc_table = assoc.table
@@ -890,18 +925,27 @@ class DatasetBagBuilder:
         return excluded
 
     def _iter_descendant_rids(self, dataset: DatasetLike) -> Iterable[RID]:
-        """Yield every descendant Dataset RID, depth-first.
+        """Yield every descendant Dataset RID.
 
-        Walks ``DatasetLike.list_dataset_children`` recursively.
-        Used by :meth:`anchors_for` to build the anchor list.
-        Depth-first traversal so the anchor list reflects the
-        dataset's nesting structure as encountered.
+        Memoized per root RID for the lifetime of this builder so the
+        nested-dataset tree is walked once per operation. Delegates to
+        :meth:`Dataset.list_dataset_children_rids` (one ``Dataset_Dataset``
+        fetch, in-memory traversal, no per-node lookups).
+
+        Args:
+            dataset: The dataset whose descendants to enumerate.
+
+        Returns:
+            Iterable[RID]: descendant dataset RIDs (depth-first order),
+            excluding the root.
         """
-        dataset_obj = self._ml_instance.lookup_dataset(dataset.dataset_rid)
-        for child in dataset_obj.list_dataset_children():
-            yield child.dataset_rid
-            child_proxy = self._ml_instance.lookup_dataset(child.dataset_rid)
-            yield from self._iter_descendant_rids(child_proxy)
+        root = dataset.dataset_rid
+        cached = self._descendant_rids_cache.get(root)
+        if cached is None:
+            dataset_obj = self._ml_instance.lookup_dataset(root)
+            cached = list(dataset_obj.list_dataset_children_rids(recurse=True))
+            self._descendant_rids_cache[root] = cached
+        return cached
 
 
 __all__ = ["DatasetBagBuilder"]

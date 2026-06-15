@@ -261,6 +261,7 @@ class DerivaML(
         use_minid: bool | None = None,
         clean_execution_dir: bool = True,
         mode: ConnectionMode | str = ConnectionMode.online,
+        reuse_schema_json: dict | None = None,
     ) -> None:
         """Initializes a DerivaML instance.
 
@@ -296,6 +297,13 @@ class DerivaML(
                 writes into local SQLite for later upload. Accepts the string
                 literals ``"online"`` or ``"offline"``; any other value raises
                 ``ValueError``. See spec §2.1.
+            reuse_schema_json: Internal. A pre-parsed ermrest ``/schema``
+                dict to build the model from, skipping the live
+                ``getCatalogSchema()`` fetch. Used by
+                :meth:`catalog_snapshot` to avoid re-introspecting a
+                schema already held in memory (a snapshot's schema is
+                structurally identical to the live catalog's). Not for
+                general use.
         """
         # Store connection mode (see spec §2.1).
         # Done before catalog connection so subclasses/mixins can read
@@ -335,6 +343,7 @@ class DerivaML(
                 ml_schema=ml_schema,
                 domain_schemas=domain_schemas,
                 default_schema=default_schema,
+                reuse_schema_json=reuse_schema_json,
             )
         else:
             self._init_offline(
@@ -376,6 +385,11 @@ class DerivaML(
         self.ml_schema = ml_schema
         self.configuration = None
         self._execution: Execution | None = None
+        # Memoize snapshot DerivaML instances by snapshot id so the
+        # many Dataset call sites that build a snapshot view within one
+        # operation share a single instance (and its cached schema).
+        # Snapshots are immutable, so entries never go stale.
+        self._snapshot_cache: dict[str, "DerivaML"] = {}
         self.domain_schemas = self.model.domain_schemas
         self.default_schema = self.model.default_schema
         self.project_name = project_name or self.default_schema or "deriva-ml"
@@ -424,6 +438,7 @@ class DerivaML(
         ml_schema: str,
         domain_schemas: "str | set[str] | None",
         default_schema: "str | None",
+        reuse_schema_json: dict | None = None,
     ) -> None:
         """Online init: connect to server, fetch the live schema, build the model.
 
@@ -457,20 +472,30 @@ class DerivaML(
         )
         self.catalog = server.connect_ermrest(catalog_id)
 
-        # Fetch the live schema. deriva-py caches the parsed dict on
-        # the catalog instance and auto-invalidates on schema-mutating
-        # POST/PUT/DELETE through the same catalog, so subsequent
-        # reads in the same process are O(1) and always current.
-        # The disk cache write below is purely for offline mode.
-        schema_json = self.catalog.getCatalogSchema()
-        live_snapshot_id = self.catalog.get("/").json()["snaptime"]
-        cache.write(
-            snapshot_id=live_snapshot_id,
-            hostname=hostname,
-            catalog_id=str(catalog_id),
-            ml_schema=ml_schema,
-            schema=schema_json,
-        )
+        if reuse_schema_json is not None:
+            # Caller (catalog_snapshot) handed us a schema already parsed
+            # by the live instance — a snapshot's schema is structurally
+            # identical to live, so re-fetching /schema is pure waste.
+            # Skip the getCatalogSchema() round-trip and the offline-cache
+            # write (the live instance already wrote it).
+            schema_json = reuse_schema_json
+        else:
+            # Fetch the live schema. deriva-py caches the parsed dict on
+            # the catalog instance and auto-invalidates on schema-mutating
+            # POST/PUT/DELETE through the same catalog, so subsequent
+            # reads in the same process are O(1) and always current.
+            # The disk cache write below is purely for offline mode.
+            schema_json = self.catalog.getCatalogSchema()
+            live_snapshot_id = self.catalog.get("/").json()["snaptime"]
+            cache.write(
+                snapshot_id=live_snapshot_id,
+                hostname=hostname,
+                catalog_id=str(catalog_id),
+                ml_schema=ml_schema,
+                schema=schema_json,
+            )
+        # Retain the parsed schema so catalog_snapshot() can reuse it.
+        self._schema_json = schema_json
 
         self.model = DerivaModel.from_cached(
             schema_json,
@@ -782,6 +807,18 @@ class DerivaML(
         (which can pick differently from the snapshot than the live
         catalog did) — both observable behaviour drifts.
 
+        The snapshot reuses this instance's already-parsed schema
+        (``self._schema_json``) rather than re-fetching ``/schema`` — a
+        snapshot's schema is structurally identical to the live
+        catalog's. The constructed instance is memoized by
+        ``version_snapshot`` so repeated calls share one object.
+
+        Precondition: the snapshot's schema must match the live
+        catalog's. This holds for deriva-ml's use (pinning a recent
+        dataset-version snaptime on a catalog whose schema has not been
+        migrated since). Do not use for a snapshot taken *before* a
+        schema migration — its structure would differ from live.
+
         Args:
             version_snapshot: Snapshot identifier string (e.g., ``"2T-SXEH-JH4A"``),
                 usually the ``snapshot`` field from a :class:`DatasetHistory` entry.
@@ -789,8 +826,23 @@ class DerivaML(
         Returns:
             A new DerivaML instance connected to the specified catalog snapshot,
             inheriting every connection-shaping kwarg from ``self``.
+
+        Note:
+            The reused ``schema_json`` can lag the live catalog within a
+            session — e.g. tables created after this connection was opened
+            are absent from the held model. Any caller that mixes this
+            snapshot's ``pathBuilder()`` (held, possibly-stale model) with a
+            freshly-fetched deriva-py model (e.g. a ``CatalogBagBuilder``
+            walk that calls ``_get_model()``) must build its path builder
+            from the **same** fresh model via
+            ``datapath.from_model(snapshot.catalog, model)`` — otherwise a
+            ``KeyError`` is raised on tables the held model lacks.
         """
-        return DerivaML(
+        cached = self._snapshot_cache.get(version_snapshot)
+        if cached is not None:
+            return cached
+
+        snapshot = DerivaML(
             self.host_name,
             version_snapshot,
             domain_schemas=self.domain_schemas,
@@ -806,7 +858,10 @@ class DerivaML(
             use_minid=self.use_minid,
             clean_execution_dir=self.clean_execution_dir,
             mode=self._mode,
+            reuse_schema_json=self._schema_json,
         )
+        self._snapshot_cache[version_snapshot] = snapshot
+        return snapshot
 
     @property
     def mode(self) -> ConnectionMode:
@@ -1232,6 +1287,9 @@ class DerivaML(
             )
         except ValueError:
             raise DerivaMLException(f"Table {vocab_name} already exist")
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # so the identity hasn't changed, but the cached wrapper is stale.
+        self._path_builder_cache = None
 
         # Update navbar to include the new vocabulary table
         if update_navbar:
@@ -1327,6 +1385,9 @@ class DerivaML(
             )
         except ValueError:
             raise DerivaMLException(f"Table {asset_name} already exist")
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # so the identity hasn't changed, but the cached wrapper is stale.
+        self._path_builder_cache = None
 
         if update_navbar:
             self.apply_catalog_annotations()
@@ -1449,6 +1510,9 @@ class DerivaML(
         # Handle both TableDefinition (dataclass with to_dict) and plain dicts
         table_dict = table.to_dict() if hasattr(table, "to_dict") else table
         new_table = self.model.schemas[schema].create_table(table_dict)
+        # Invalidate the pathBuilder cache: the model was mutated in-place
+        # so the identity hasn't changed, but the cached wrapper is stale.
+        self._path_builder_cache = None
 
         # Update navbar to include the new table
         if update_navbar:

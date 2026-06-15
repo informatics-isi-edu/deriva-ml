@@ -154,6 +154,39 @@ without realising the perf consequences.
    future ADR may revisit if/when the deriva-py async-catalog
    surface stabilises and the cross-repo discussion is ready.
 
+## Update — 2026-06-14: bypass mechanism changed (decision unchanged)
+
+The **decision** this ADR records — `estimate_bag_size` deliberately
+bypasses the `CatalogBagBuilder` *export engine* — is **unchanged**.
+What changed is the bypass *mechanism*, an implementation evolution:
+
+- **Before:** the estimator issued per-FK-path live aggregate queries
+  executed async against the snapshot
+  (`build_estimate_queries` + `run_estimate_queries`, fanned out via
+  `AsyncErmrestCatalog` + `asyncio.gather`). Each reached table cost one
+  or more deep server-side FK-join queries.
+- **After:** the estimator runs a **client-side FK-reachability** engine
+  (`src/deriva_ml/dataset/_reachability.py::compute_reachability`). It
+  still shares the export *walk* (`iter_reached_paths()` + descendant
+  anchors), but instead of asking the server to join, it fetches each
+  reached table's edge columns **once** (a projected whole-table scan)
+  and reconstructs FK reachability **in memory** (BFS over the symbolic
+  FK paths), computing exact per-table RID-union counts. The deep
+  server joins — and the async transport — are gone; the
+  `build_estimate_queries` / `run_estimate_queries` functions were
+  deleted.
+
+The "share the walk, not the execution" consequence above still holds:
+walker changes propagate; the estimator's transport is now in-memory
+reachability rather than `AsyncErmrestCatalog`. Alternative A ("lift
+parallelism upstream") is moot — there is no longer a parallel async
+query phase to lift. The Open-question about `_extract_path` URI parsing
+is likewise resolved by removal: the reachability engine works on
+fetched rows, not parsed datapath URIs.
+
+This change is part of the connected portable-bag CSV-contract design —
+see `docs/superpowers/specs/2026-06-14-portable-bag-csv-contract.md`.
+
 ## References
 
 - ADR-0006 — bag-oriented data movement (the producer/consumer

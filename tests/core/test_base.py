@@ -318,6 +318,11 @@ def test_catalog_snapshot_forwards_connection_kwargs():
     parent.use_minid = True
     parent.clean_execution_dir = False
     parent._mode = ConnectionMode.online
+    # Attributes catalog_snapshot reads for the schema-reuse + memoization
+    # fast path (perf spec §3.1): the parsed schema it forwards, and the
+    # per-instance snapshot cache.
+    parent._schema_json = {"schemas": {}}
+    parent._snapshot_cache = {}
 
     # Capture the kwargs passed to the inner DerivaML(...) call.
     captured: dict = {}
@@ -359,3 +364,6 @@ def test_catalog_snapshot_forwards_connection_kwargs():
     assert captured["use_minid"] is True
     assert captured["clean_execution_dir"] is False
     assert captured["mode"] is ConnectionMode.online
+    # The schema-reuse fast path (perf spec §3.1) forwards the parent's
+    # already-parsed schema so the snapshot skips its own /schema fetch.
+    assert captured["reuse_schema_json"] == {"schemas": {}}

@@ -853,7 +853,7 @@ wheels = [
 [[package]]
 name = "deriva"
 version = "2.0.0.dev0"
-source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=deriva-ml#9501c2b1854e0d14c1404c69aa323e2fe367b747" }
+source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=deriva-ml#f897051534db94217f3ca584e1d04f18b59e5939" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },
@@ -863,7 +863,10 @@ dependencies = [
     { name = "packaging" },
     { name = "pika" },
     { name = "portalocker" },
+    { name = "pydantic" },
+    { name = "python-dateutil" },
     { name = "requests" },
+    { name = "sqlalchemy" },
     { name = "urllib3" },
 ]
 
