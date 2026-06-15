@@ -14,6 +14,7 @@ synthetic in-memory catalog with no live server.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import Any, Callable
 
 ReachedPaths = dict[tuple[str, str], list[tuple[tuple[str, str], ...]]]
@@ -103,3 +104,96 @@ def _needed_columns(seg: tuple[str, str], model: Any) -> set[str]:
     if tbl.is_asset() and "Length" in tbl.column_definitions.elements:
         cols.add("Length")
     return cols
+
+
+def _reached_rids_for_path(
+    fk_path: tuple[tuple[str, str], ...],
+    *,
+    anchor_rids: set[str],
+    fetched_rows: dict[tuple[str, str], list[dict]],
+    model: Any,
+) -> set[str] | None:
+    """RIDs of the terminal table reachable along one FK path.
+
+    Walks the path hop-by-hop from the anchor RIDs, maintaining the set of
+    in-scope RIDs of the current table. Each hop advances the scope using the
+    FK constraint(s) between adjacent segments, hash-indexed for O(n) probes.
+
+    Args:
+        fk_path: Anchor-first tuple of ``(schema, table)`` segments.
+        anchor_rids: RIDs of ``fk_path[0]`` that seed the walk.
+        fetched_rows: ``{(schema, table): [row dict, ...]}`` -- the once-fetched
+            projected rows for every involved table.
+        model: deriva-py Model (for FK resolution).
+
+    Returns:
+        Set of reachable terminal-table RIDs, or ``None`` if any hop has no
+        resolvable FK (an unfollowable path -- caller treats as no contribution).
+
+    Example:
+        >>> ...  # doctest: +SKIP  (needs fetched rows + Model)
+    """
+    cur_seg = fk_path[0]
+    if len(fk_path) == 1:
+        all_rids = {r["RID"] for r in fetched_rows.get(cur_seg, [])}
+        return all_rids & anchor_rids
+
+    cur_scope: set[str] = set(anchor_rids)
+    prev_seg = fk_path[0]
+    # Local FK-value index cache: (seg, col) -> {fk_value: {RID, ...}}.
+    fk_index_cache: dict[tuple[tuple[str, str], str], dict] = {}
+
+    def _fk_index(seg: tuple[str, str], col: str) -> dict:
+        keyc = (seg, col)
+        idx = fk_index_cache.get(keyc)
+        if idx is None:
+            idx = defaultdict(set)
+            for r in fetched_rows.get(seg, []):
+                v = r.get(col)
+                if v is not None:
+                    idx[v].add(r["RID"])
+            fk_index_cache[keyc] = idx
+        return idx
+
+    for nxt_seg in fk_path[1:]:
+        constraints = _fk_join_columns(prev_seg, nxt_seg, model)
+        if not constraints:
+            return None
+        new_scope: set[str] = set()
+        for con in constraints:
+            pairs = con["pairs"]
+            if con["fk_on"] == "cur":
+                if len(pairs) == 1 and pairs[0][0] == "RID":
+                    cur_col = pairs[0][1]
+                    idx = _fk_index(nxt_seg, cur_col)
+                    for pv in cur_scope:
+                        hit = idx.get(pv)
+                        if hit:
+                            new_scope |= hit
+                else:
+                    prev_rows = fetched_rows.get(prev_seg, [])
+                    allowed = {tuple(r.get(pc) for pc, _cc in pairs) for r in prev_rows if r["RID"] in cur_scope}
+                    for r in fetched_rows.get(nxt_seg, []):
+                        if tuple(r.get(cc) for _pc, cc in pairs) in allowed:
+                            new_scope.add(r["RID"])
+            else:  # fk_on == "prev"
+                prev_rows = fetched_rows.get(prev_seg, [])
+                if len(pairs) == 1 and pairs[0][1] == "RID":
+                    prev_col = pairs[0][0]
+                    for r in prev_rows:
+                        if r["RID"] in cur_scope:
+                            v = r.get(prev_col)
+                            if v is not None:
+                                new_scope.add(v)
+                else:
+                    # Composite / non-RID FK held on prev: match nxt rows whose
+                    # full referenced-column tuple appears among the in-scope
+                    # prev rows' FK-column tuples. Matching on pairs[0] alone
+                    # would over-count rows that share only the first column.
+                    allowed = {tuple(r.get(pc) for pc, _cc in pairs) for r in prev_rows if r["RID"] in cur_scope}
+                    for r in fetched_rows.get(nxt_seg, []):
+                        if tuple(r.get(cc) for _pc, cc in pairs) in allowed:
+                            new_scope.add(r["RID"])
+        cur_scope = new_scope
+        prev_seg = nxt_seg
+    return cur_scope
