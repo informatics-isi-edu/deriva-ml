@@ -2,7 +2,12 @@
 
 from types import SimpleNamespace
 
-from deriva_ml.dataset._reachability import _fk_join_columns, _needed_columns, _reached_rids_for_path
+from deriva_ml.dataset._reachability import (
+    _fk_join_columns,
+    _needed_columns,
+    _reached_rids_for_path,
+    compute_reachability,
+)
 
 
 def _col(name):
@@ -188,3 +193,70 @@ def test_reached_rids_composite_fk_on_cur_no_overcount():
         model=model,
     )
     assert result == {"o1"}  # NOT {"o1", "o2"}
+
+
+def test_compute_reachability_unions_paths_and_sums_assets():
+    """Two FK paths reach Child; union the RID sets. Child is an asset table;
+    sum Length over reached RIDs only."""
+    # Model: Parent <- Child (parent_fk), and an Alt parent <- Child (alt_fk).
+    parent = SimpleNamespace(foreign_keys=[], column_definitions=SimpleNamespace(elements={}))
+    alt = SimpleNamespace(foreign_keys=[], column_definitions=SimpleNamespace(elements={}))
+    fk1 = SimpleNamespace(foreign_key_columns=[_col("parent_fk")], referenced_columns=[_col("RID")])
+    fk2 = SimpleNamespace(foreign_key_columns=[_col("alt_fk")], referenced_columns=[_col("RID")])
+    length_col = SimpleNamespace(name="Length")
+    child = SimpleNamespace(
+        foreign_keys=[fk1, fk2],
+        referenced_by=[],
+        column_definitions=SimpleNamespace(elements={"Length": length_col}),
+    )
+    fk1.pk_table = parent
+    fk2.pk_table = alt
+    parent.referenced_by = [fk1]
+    alt.referenced_by = [fk2]
+    parent.is_asset = lambda: False
+    alt.is_asset = lambda: False
+    child.is_asset = lambda: True
+    model = SimpleNamespace(schemas={"S": SimpleNamespace(tables={"Parent": parent, "Alt": alt, "Child": child})})
+
+    rows = {
+        ("S", "Parent"): [{"RID": "p1"}],
+        ("S", "Alt"): [{"RID": "a1"}],
+        ("S", "Child"): [
+            {"RID": "c1", "parent_fk": "p1", "alt_fk": None, "Length": 100},
+            {"RID": "c2", "parent_fk": None, "alt_fk": "a1", "Length": 200},
+            {"RID": "c3", "parent_fk": None, "alt_fk": None, "Length": 999},  # unreachable
+        ],
+    }
+
+    def fake_fetch(schema, table, columns):
+        return rows[(schema, table)]
+
+    reached = {
+        ("S", "Child"): [
+            (("S", "Parent"), ("S", "Child")),
+            (("S", "Alt"), ("S", "Child")),
+        ],
+    }
+    rids_by_table, asset_lengths_by_table, _fetched = compute_reachability(
+        reached=reached, anchor_rids=["p1", "a1"], model=model, fetch=fake_fetch
+    )
+    # c1 reached via Parent, c2 via Alt; c3 via neither. Union = {c1, c2}.
+    assert rids_by_table["Child"] == {"c1", "c2"}
+    # Asset bytes only over reached RIDs: 100 + 200 = 300 (c3's 999 excluded).
+    assert asset_lengths_by_table["Child"] == {"c1": 100, "c2": 200}
+
+
+def test_compute_reachability_empty_reached_returns_empty():
+    """A dataset that reaches nothing yields three empty dicts (degenerate
+    public contract)."""
+    model = SimpleNamespace(schemas={})
+
+    def fake_fetch(schema, table, columns):  # pragma: no cover - never called
+        raise AssertionError("fetch should not be called for empty reached")
+
+    rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
+        reached={}, anchor_rids=[], model=model, fetch=fake_fetch
+    )
+    assert rids_by_table == {}
+    assert asset_lengths_by_table == {}
+    assert fetched_rows == {}
