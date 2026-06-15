@@ -29,9 +29,12 @@ The behavior splits across two layers, the same split as in
 - **deriva-py decides *fetch mechanics*.** `CatalogBagBuilder`
   (`.venv/.../deriva/bag/catalog_builder.py`) runs the FK walk under
   that policy and translates the reachable-table set into an export
-  spec — one CSV `query_processor` per FK path, one `fetch` processor
-  per asset table. The ERMrest export engine executes that spec
-  server-side.
+  spec, then fetches the rows. On the **client-side build path** — what
+  `download_dataset_bag` uses by default — deriva-ml hands it a
+  precomputed per-table RID set (`rid_sets=`) and it emits **one
+  rid-set CSV processor per reached non-vocab table** plus one `fetch`
+  processor per asset table (**Format B**, [B4](#b4)). The ERMrest
+  export engine executes that spec.
 
 For the FK walk itself — the bidirectional traversal, terminal tables,
 vocabulary leaves, depth bounds — see [FK Traversal](fk-traversal.md);
@@ -46,7 +49,7 @@ documents the dataset-export *scope decisions* layered on top.
 | Why does my flat dataset's bag omit `Dataset_Image`? | [B2](#b2) (empty-association pruning) |
 | My dataset has no images — why is `Dataset_Image` in the bag anyway? | [B2](#b2) (a nested child has images) |
 | Why doesn't the bag carry the producing executions' assets? | [B3](#b3) (provenance terminal) → [T3](fk-traversal.md#t3) |
-| What does the export spec actually look like? | [B4](#b4) (one processor per FK path + fetch) |
+| What does the export spec actually look like? | [B4](#b4) (client-side build: one rid-set CSV per table + fetch — Format B) |
 | What lands in the bag, and what doesn't? | [B5](#b5) |
 | Does `estimate_bag_size` use this same walk? | [Same engine](#same-engine-different-consumer) (ADR-0008) |
 
@@ -71,9 +74,12 @@ DatasetLike  ──► DatasetBagBuilder ──► CatalogBagBuilder ──► E
 2. **Mechanics (deriva-py).** `CatalogBagBuilder` runs the
    [FK walk](fk-traversal.md) under that policy to discover the
    reachable `(schema, table)` set, then emits an **export spec**: a
-   list of `query_processors`, one CSV query per FK path to each
-   reached table, plus a `fetch` processor per asset table
-   ([B4](#b4)).
+   list of `query_processors`. On the client-side build path it is
+   handed a per-table RID set (`rid_sets=`, computed by deriva-ml's
+   reachability engine) and emits **one rid-set CSV processor per
+   reached non-vocab table** — one clean `data/{schema}/{table}.csv`
+   each — plus a `fetch` processor per asset table (**Format B**,
+   [B4](#b4)).
 3. **Execution (server-side).** The ERMrest export engine runs the
    spec, writing one CSV per processor under `data/{schema}/` and
    downloading asset bytes under `asset/{rid}/`. The result is
@@ -203,40 +209,67 @@ exact 12-table severed set — is documented in
 was captured on dataset `5D0` of this same demo catalog.
 
 <a id="b4"></a>
-**B4 — The export spec is one CSV `query_processor` per FK path, plus a
-`fetch` processor per asset table.** After the walk discovers the
-reachable `(schema, table)` set, `CatalogBagBuilder._build_export_spec`
-translates it into a deriva-py export spec — a list of `query_processors`
-under `catalog`:
+**B4 — The client-side build path emits one rid-set CSV processor per
+reached non-vocab table (Format B); vocabularies and asset `fetch`
+processors are unchanged.** deriva-ml's default bag-build arm — the
+client-side `build_bag` path that `download_dataset_bag` takes when
+`use_minid=False` (its default) — does **not** ask the server to
+re-discover reachability via deep FK joins. Instead `DatasetBagBuilder`
+computes the per-table reachable RID sets *up front* with its own
+[client-side reachability engine](#same-engine-different-consumer)
+(`_compute_rid_sets` → `compute_reachability`), then hands them to
+`CatalogBagBuilder(rid_sets=...)`. After the walk discovers the reachable
+`(schema, table)` set, the export spec under `catalog` becomes:
 
 - A leading **`json`** processor writes `data/schema.json` (the catalog
   schema).
-- For each reached table, **one `csv` processor per FK path** that the
-  walker found to it (`_fk_paths_for` → `_table_query_path`). Each
-  carries `"paged_query": True` (cursor pagination over RID) and an
-  `output_path` that encodes the path's table chain, so multiple FK
-  routes to the same table land at distinct on-disk locations; the
-  bag's loader unions their rows by RID. A `vocab_export=FULL` vocabulary
-  table is the exception — it gets a single unfiltered
-  `/entity/{schema}:{table}` query (the whole controlled vocabulary),
-  not one-per-path.
+- For each reached **non-vocab** table, **one `csv` processor carrying
+  that table's RID set** (`rid_table` + the RID list). It produces one
+  clean `data/{schema}/{table}.csv` — complete, RID-distinct, flat: the
+  CSV *is* the table's full reachable set, with no per-FK-path
+  fragmentation and no out-of-band union-by-basename/dedup-by-RID for
+  the loader to perform. `Image.csv` is THE complete reachable `Image`
+  set. The fetch is a set of direct
+  `/entity/{schema}:{table}/RID=any(...)` reads (one per ~500-RID chunk),
+  not deep multi-hop FK joins. (Note: this changes the *shape* of the
+  query, not necessarily the end-to-end wall-clock — for datasets with
+  very large tables the chunked rid-set fetch can be slow; faster
+  generation is a tracked follow-up.)
+- A `vocab_export=FULL` **vocabulary** table is the exception — it keeps
+  its single unfiltered `/entity/{schema}:{table}` query (the whole
+  controlled vocabulary), **not** a rid-set processor. So a vocab CSV
+  carries every term in that vocabulary, and its row count can **exceed**
+  the reachable-subset count the estimate reports for the same table.
+  This is by design, not a bug — the live test
+  `test_format_b_bag_one_csv_per_table_matches_estimate` asserts the
+  non-vocab count-match and exempts vocab tables for exactly this reason.
 - For each reached table that **`is_asset()`**, one additional
-  **`fetch`** processor that reads `URL` / `Length` / `Filename` / `MD5`
-  / `RID` from each asset row and downloads the bytes to
-  `asset/{asset_rid}/{table}`.
+  **`fetch`** processor (unchanged) that reads `URL` / `Length` /
+  `Filename` / `MD5` / `RID` from each asset row and downloads the bytes
+  to `asset/{asset_rid}/{table}`. The rid-set `csv` query returns those
+  columns just as the per-path join query did, so the `fetch` processor
+  is identical to before.
 
-`[engine: deriva-py]`
-`deriva/bag/catalog_builder.py::_build_export_spec`,
-`::_table_query_path` (the spec is retrievable without running via
-`::get_export_spec`).
+`[deriva-ml]` computes the RID sets
+(`src/deriva_ml/dataset/bag_builder.py::_compute_rid_sets`,
+`::build_bag`); `[engine: deriva-py]` emits the rid-set processors and
+fetches them (`deriva/bag/catalog_builder.py`, the `rid_sets=`
+constructor path).
 
 The spec is *declarative* — it describes the queries; the ERMrest export
-engine executes them server-side. `_table_query_path` scopes each query
-to rows reachable from the anchor RIDs: an anchor table filters on its
-RID list (`/entity/{schema}:{table}/RID=any(...)`), and a non-anchor
-table reached via FK gets a chained path
-(`/entity/{anchor}/RID=any(...)/{step2}/...`) that ERMrest joins along
-its natural FKs.
+engine executes them. Each rid-set query scopes its table directly by RID
+(`/entity/{schema}:{table}/RID=any(...)`), with the RID list chunked into
+URL-safe batches and appended to one CSV (no 414 URL-length blow-up).
+
+> **The server-side MINID/S3 export arm is *not* Format B.** When
+> `download_dataset_bag` is called with `use_minid=True`, deriva-ml takes
+> a different arm: it asks the server-side ERMrest export engine to
+> produce the bag from a Chaise export spec, where each reached table is
+> reached by **one CSV query per FK path** (the older per-path emission)
+> and the bag's loader unions rows by RID. Only the **client-side build
+> arm** (`use_minid=False`) emits Format B. The two arms agree on
+> *scope* — same anchors ([B1](#b1)), same policy ([B2](#b2),
+> [B3](#b3)) — and differ only in the spec's CSV-processor shape.
 
 <a id="b5"></a>
 **B5 — What lands in the bag.** Combining [B1](#b1)–[B4](#b4), a dataset
@@ -251,7 +284,11 @@ bag contains:
 - **Referenced (and, by deriva-ml's choice, *full*) vocabularies** —
   `build_policy` defaults to `vocab_export=VocabExport.FULL`, so each
   reached vocabulary table exports *every* term ([B4](#b4)), and the
-  walk stops at vocab tables ([T4](fk-traversal.md#t4)).
+  walk stops at vocab tables ([T4](fk-traversal.md#t4)). Because the
+  vocab CSV is the whole controlled vocabulary — not the rid-set subset
+  the rest of Format B emits — its row count can be **larger** than the
+  reachable-subset count `estimate_bag_size` reports for that table.
+  Don't mistake the larger vocab count for a bug ([B4](#b4)).
 - **Provenance *link* rows** — `Dataset_Execution`, the `Execution` and
   `Workflow` rows, and the feature `*_Execution` associations, so the
   bag records which executions produced its contents ([B3](#b3)).
@@ -287,7 +324,13 @@ load-bearing invariant rather than an aspiration
   decision to bypass the export engine is ADR-0008
   (`docs/adr/0008-estimate-bag-size-bypasses-bag-pipeline.md`); only the
   bypass *mechanism* changed — from live per-path aggregate queries to
-  the client-side reachability engine.
+  the client-side reachability engine. The **client-side bag build**
+  ([B4](#b4)) now reuses that very engine: `_compute_rid_sets` runs the
+  same `compute_reachability` assembly the estimate does, then feeds the
+  resulting per-table RID sets to `CatalogBagBuilder(rid_sets=...)`. So
+  the estimate and the Format-B bag are computed from one shared
+  reachability pass — the count the estimate reports is the count the
+  bag's per-table CSV carries (vocab tables excepted; see [B4](#b4)).
 
 - **`clone_via_bag`** uses the *same policy shape* — including the same
   `terminal_tables={Execution, Workflow}` and `vocab_export=FULL` — but

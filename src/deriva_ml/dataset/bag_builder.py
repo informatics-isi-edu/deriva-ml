@@ -50,10 +50,11 @@ CONTEXT.md is preserved by construction.
 
 from __future__ import annotations
 
+import importlib
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterable
+from typing import Any, Iterable, NamedTuple
 
 from deriva.bag.anchors import Anchor, RIDAnchor, TableAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
@@ -65,7 +66,76 @@ from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, PROVENANCE_TERMINAL_
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
+# Import datapath via importlib to avoid shadowing by local 'deriva.py' files
+# (mirrors dataset.py's pattern).
+datapath = importlib.import_module("deriva.core.datapath")
+
 logger = get_logger(__name__)
+
+
+class RidSetComputation(NamedTuple):
+    """Result of :meth:`DatasetBagBuilder._compute_rid_sets`.
+
+    Bundles the per-table RID sets (for Format-B bag generation) with the
+    auxiliary reachability data the estimate consumes — all from one walk.
+
+    Attributes:
+        rid_sets: ``{(schema, table): [RID,...]}`` for non-vocab reached
+            tables — the shape ``CatalogBagBuilder(rid_sets=...)`` consumes
+            (vocab excluded, lists sorted).
+        rids_by_table: bare-name ``{table: set(RID)}`` (row counts).
+        asset_lengths_by_table: ``{table: {RID: Length}}`` (asset bytes).
+        fetched_rows: ``{(schema, table): rows}`` (CSV-byte sampling source).
+        sample_rows_by_table: ``{table: [row,...]}`` derived sample.
+        asset_tables: bare table names that are asset tables.
+    """
+
+    rid_sets: dict[tuple[str, str], list[str]]
+    rids_by_table: dict[str, set[str]]
+    asset_lengths_by_table: dict[str, dict[str, int]]
+    fetched_rows: dict[tuple[str, str], list[dict]]
+    sample_rows_by_table: dict[str, list[dict]]
+    asset_tables: set[str]
+
+
+def _rid_sets_from_reachability(
+    reached: dict[tuple[str, str], Any],
+    rids_by_table: dict[str, set[str]],
+    vocab_tables: set[tuple[str, str]],
+) -> dict[tuple[str, str], list[str]]:
+    """Map compute_reachability output to the upstream rid_sets shape.
+
+    ``compute_reachability`` returns ``rids_by_table`` keyed by bare table
+    name; ``CatalogBagBuilder(rid_sets=...)`` wants ``{(schema, table):
+    [RID,...]}``. This re-keys using ``reached``'s ``(schema, table)`` keys,
+    drops vocab tables (the upstream rid-set branch skips them -- vocab keeps
+    its full/per-path query), and sorts each RID list for deterministic specs
+    (sets are not JSON-serializable; the spec must be reproducible).
+
+    Args:
+        reached: ``{(schema, table): [fk_path, ...]}`` -- the reached-paths map
+            (its keys enumerate the tables to consider).
+        rids_by_table: ``{table_name: set(RID)}`` from compute_reachability.
+        vocab_tables: ``(schema, table)`` pairs that are vocabulary tables.
+
+    Returns:
+        ``{(schema, table): [RID, ...]}`` for every non-vocab reached table.
+
+    Example:
+        >>> _rid_sets_from_reachability(
+        ...     {("S", "T"): [()], ("S", "V"): [()]},
+        ...     {"T": {"b", "a"}},
+        ...     {("S", "V")},
+        ... )
+        {('S', 'T'): ['a', 'b']}
+    """
+    result: dict[tuple[str, str], list[str]] = {}
+    for key in reached:
+        if key in vocab_tables:
+            continue
+        table_name = key[1]
+        result[key] = sorted(rids_by_table.get(table_name, set()))
+    return result
 
 
 class _SnapshotAwareCatalogBagBuilder(CatalogBagBuilder):
@@ -295,6 +365,10 @@ class DatasetBagBuilder:
 
         anchors = self.anchors_for(dataset)
         policy = self.build_policy(dataset)
+        # Compute the per-table reachable RID sets so the upstream engine
+        # emits one rid-set csv processor per non-vocab reached table
+        # (Format-B) instead of one csv processor per FK path.
+        rid_sets = self._compute_rid_sets(dataset).rid_sets
 
         catalog = self._ml_instance.catalog
         prior_config = getattr(catalog, "_session_config", None)
@@ -313,6 +387,7 @@ class DatasetBagBuilder:
                 anchors=anchors,
                 output_dir=cb_output_dir,
                 policy=policy,
+                rid_sets=rid_sets,
             )
             unpacked_path = builder.build()
         finally:
@@ -446,13 +521,17 @@ class DatasetBagBuilder:
     # Internal driver — constructs a :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
-    def _catalog_bag_builder(self, dataset: DatasetLike | None) -> CatalogBagBuilder:
+    def _catalog_bag_builder(
+        self,
+        dataset: DatasetLike | None,
+        rid_sets: dict[tuple[str, str], list[str]] | None = None,
+    ) -> CatalogBagBuilder:
         """Construct a :class:`CatalogBagBuilder` for this dataset.
 
-        Three callers (:meth:`generate_dataset_download_spec`,
+        Four callers (:meth:`generate_dataset_download_spec`,
         :meth:`generate_dataset_download_annotations`,
-        :meth:`aggregate_queries`) share this construction so all
-        three drive off the same walker.
+        :meth:`aggregate_queries`, :meth:`_compute_rid_sets`) share
+        this construction so they all drive off the same walker.
 
         Args:
             dataset: Per-dataset scoping. When non-``None``, the
@@ -462,6 +541,13 @@ class DatasetBagBuilder:
                 ``deriva-ml:Dataset`` table — the catalog-wide
                 view used by annotation generation and by
                 :meth:`aggregate_queries` with no dataset filter.
+            rid_sets: Opt-in per-table reachable RID sets. When
+                supplied, the upstream engine emits one rid-set csv
+                processor per non-vocab reached table (Format-B) instead
+                of one csv processor per FK path. ``None`` (the default,
+                used by every share-the-walker caller above) keeps
+                per-path emission unchanged; only the download/build
+                path supplies it (via a separately-constructed builder).
         """
         if dataset is not None:
             anchors = self.anchors_for(dataset)
@@ -479,6 +565,7 @@ class DatasetBagBuilder:
             anchors=anchors,
             output_dir=output_dir,
             policy=policy,
+            rid_sets=rid_sets,
         )
         # Stash the tmp on the builder so it lives until the
         # builder is garbage-collected. The annotation/aggregate
@@ -487,6 +574,75 @@ class DatasetBagBuilder:
         # :meth:`CatalogBagBuilder.build`.
         builder._datasetbag_output_tmp = tmp  # type: ignore[attr-defined]
         return builder
+
+    def _compute_rid_sets(self, dataset: DatasetLike) -> RidSetComputation:
+        """Compute per-table reachable RID sets for a dataset, client-side.
+
+        Factored from estimate_bag_size's reachability assembly so the
+        bag-build path and the estimate share one implementation -- and one
+        copy of the ``from_model`` snapshot-staleness fix (the walk's fresh
+        model and the fetch's path builder must be the same model, or the
+        fetch raises KeyError on tables the held model lacks).
+
+        Args:
+            dataset: The dataset to analyze. Must expose ``dataset_rid``.
+
+        Returns:
+            A :class:`RidSetComputation` bundling the per-table RID sets
+            (for Format-B bag generation) with the auxiliary reachability
+            data the estimate consumes; see that NamedTuple's attribute docs
+            for the per-field shapes.
+        """
+        from deriva_ml.dataset._reachability import (
+            compute_reachability,
+            sample_rows_from_fetched,
+        )
+
+        cb = self._catalog_bag_builder(dataset=dataset)
+        reached = cb.iter_reached_paths()
+        anchor_rids = [dataset.dataset_rid] + list(self._iter_descendant_rids(dataset))
+        model = cb._get_model()
+
+        # Build the path builder from the SAME model the walk used -- not the
+        # held-model pathBuilder(). The walk reaches tables in deriva-py's
+        # freshly-fetched snapshot model; the instance's held model can lag
+        # (reused schema_json) and would be missing them, raising KeyError.
+        # Sharing one model keeps walk and fetch in lockstep, no /schema fetch.
+        pb = datapath.from_model(self._ml_instance.catalog, model)
+
+        def _fetch(schema: str, table: str, columns: set[str]) -> list[dict]:
+            tpb = pb.schemas[schema].tables[table]
+            try:
+                attrs = [getattr(tpb, c) for c in sorted(columns)]
+                return list(tpb.attributes(*attrs).fetch())
+            except Exception as exc:  # noqa: BLE001
+                # Defensive fallback: a projection naming a column the table
+                # lacks (model/data skew) degrades to a full-entity fetch.
+                logger.debug(
+                    "rid-set projected fetch for %s:%s fell back to full-entity scan: %s",
+                    schema,
+                    table,
+                    exc,
+                )
+                return list(tpb.entities().fetch())
+
+        rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
+            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
+        )
+        sample_rows_by_table = sample_rows_from_fetched(reached=reached, fetched_rows=fetched_rows)
+
+        vocab_tables = {key for key in reached if model.schemas[key[0]].tables[key[1]].is_vocabulary()}
+        rid_sets = _rid_sets_from_reachability(reached, rids_by_table, vocab_tables)
+        asset_tables = {key[1] for key in reached if model.schemas[key[0]].tables[key[1]].is_asset()}
+
+        return RidSetComputation(
+            rid_sets,
+            rids_by_table,
+            asset_lengths_by_table,
+            fetched_rows,
+            sample_rows_by_table,
+            asset_tables,
+        )
 
     @property
     def _ml_schema(self) -> str:
