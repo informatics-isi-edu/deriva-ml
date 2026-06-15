@@ -62,6 +62,7 @@ import deriva.core.utils.hash_utils as hash_utils
 import requests
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
+from deriva.bag.cache_index import BagCacheIndex
 from deriva.core.utils.core_utils import format_exception
 from deriva.transfer.download import (
     DerivaDownloadAuthenticationError,
@@ -80,8 +81,6 @@ from deriva_ml.dataset.bag_builder import DatasetBagBuilder
 _module_logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from deriva.bag.cache_index import BagCacheIndex
-
     from deriva_ml.dataset.dataset import Dataset
 
 
@@ -246,8 +245,6 @@ def download_dataset_minid(dataset: "Dataset", minid: DatasetMinid, use_minid: b
         Path to the extracted bag directory:
         ``{cache_root}/bags/{checksum}/Dataset_{rid}``.
     """
-    from deriva.bag.cache_index import BagCacheIndex
-
     index = BagCacheIndex(dataset._ml_instance.cache_dir)
     try:
         # Tier-1 hit: the index lookup in get_dataset_minid set minid.checksum;
@@ -316,8 +313,9 @@ def create_dataset_minid(
     exclude_tables: set[str] | None = None,
     spec: dict | None = None,
     spec_hash: str | None = None,
+    cache_suffix: str | None = None,
     timeout: tuple[int, int] | None = None,
-) -> str:
+) -> str | Path:
     """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
     This function generates a BDBag export of the dataset and optionally
@@ -334,12 +332,19 @@ def create_dataset_minid(
             generated from the snapshot catalog.
         spec_hash: Optional pre-computed SHA-256 hash of the spec. If None and
             spec is provided, it is computed from the spec.
+        cache_suffix: Deterministic cache key (``{spec_hash[:16]}_{snapshot}``)
+            for the client arm (``use_minid=False``). When provided, the
+            client-side bag is extracted into the cache under this key — kept
+            identical to the key Tier 1 looks up so existing cached bags hit.
+            If None on the client arm, it is derived from ``spec_hash`` + the
+            version's snapshot. Ignored on the MINID arm.
         timeout: Optional (connect_timeout, read_timeout) in seconds for network
             requests. Defaults to (10, 610).
 
     Returns:
-        URL to the MINID landing page (if ``use_minid=True``) or
-        the direct bag download URL (``file://`` URI).
+        On the MINID arm (``use_minid=True``): the MINID landing-page URL
+        (``str``). On the client arm (``use_minid=False``): the :class:`Path`
+        to the extracted bag directory in the local cache.
     """
     with TemporaryDirectory() as tmp_dir:
         # Generate spec if not supplied (allows callers to reuse a spec they already computed).
@@ -406,13 +411,19 @@ def create_dataset_minid(
             # anchors/policy); we keep the parameter on the function
             # signature because the MINID arm above still consumes it.
             #
-            # The bag is built into a working subdirectory under
-            # ``working_dir/client_export/`` (NOT ``tmp_dir``) so the zip
-            # survives the ``TemporaryDirectory`` cleanup at the end of
-            # this function — the caller (:func:`download_dataset_minid`)
-            # consumes the file:// URI returned here. The cleanup path in
-            # :func:`download_dataset_minid` recognizes ``client_export`` in
-            # the archive's parent and removes it after extraction.
+            # The bag is built into a ``TemporaryDirectory`` rooted at
+            # ``cache_dir`` and extracted straight into the cache. The staging
+            # zip never touches ``working_dir`` and is removed on every exit
+            # path (success or exception) by the context manager — no
+            # cross-function ``file://`` hand-off, no manual cleanup. Staging
+            # on the cache filesystem also makes the staging→cache move a cheap
+            # same-device rename.
+            if cache_suffix is None:
+                # Defensive: derive the cache key the way Tier 1 does, so the
+                # extracted bag is found on the next lookup.
+                snapshot = _resolve_version_record(dataset, version).snapshot
+                cache_suffix = f"{spec_hash[:16]}_{snapshot}"
+
             version_snapshot_catalog = dataset._version_snapshot_catalog(version)
             builder = DatasetBagBuilder(
                 ml_instance=version_snapshot_catalog,
@@ -420,31 +431,42 @@ def create_dataset_minid(
                 use_minid=False,
                 exclude_tables=exclude_tables,
             )
-            client_export_dir = Path(dataset._ml_instance.working_dir) / "client_export" / spec_hash[:8]
-            client_export_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                zip_path = builder.build_bag(dataset, output_dir=client_export_dir, timeout=timeout)
-            except (
-                DerivaDownloadError,
-                DerivaDownloadConfigurationError,
-                DerivaDownloadAuthenticationError,
-                DerivaDownloadAuthorizationError,
-                DerivaDownloadTimeoutError,
-            ) as e:
-                # Preserve the actionable-message contract callers relied on
-                # from the legacy _create_dataset_bag_client. The original
-                # advice (add direct dataset members for tables whose deep
-                # FK joins timed out) still applies — surface it alongside
-                # the deriva-py error so users have a fix to try.
-                raise DerivaMLException(
-                    f"Dataset bag export failed: {format_exception(e)}. "
-                    "This typically happens when deep multi-table joins "
-                    "exceed server query time limits. To fix this, add the "
-                    "desired records as direct dataset members using "
-                    "add_dataset_members() with the relevant table's RIDs."
-                )
+            cache_dir = Path(dataset._ml_instance.cache_dir)
+            with TemporaryDirectory(dir=cache_dir) as staging:
+                try:
+                    zip_path = builder.build_bag(dataset, output_dir=Path(staging), timeout=timeout)
+                except (
+                    DerivaDownloadError,
+                    DerivaDownloadConfigurationError,
+                    DerivaDownloadAuthenticationError,
+                    DerivaDownloadAuthorizationError,
+                    DerivaDownloadTimeoutError,
+                ) as e:
+                    # Preserve the actionable-message contract callers relied
+                    # on from the legacy _create_dataset_bag_client. The
+                    # original advice (add direct dataset members for tables
+                    # whose deep FK joins timed out) still applies — surface it
+                    # alongside the deriva-py error so users have a fix to try.
+                    raise DerivaMLException(
+                        f"Dataset bag export failed: {format_exception(e)}. "
+                        "This typically happens when deep multi-table joins "
+                        "exceed server query time limits. To fix this, add the "
+                        "desired records as direct dataset members using "
+                        "add_dataset_members() with the relevant table's RIDs."
+                    )
 
-            return zip_path.as_uri()
+                index = BagCacheIndex(cache_dir)
+                try:
+                    bag_dir = _extract_archive_to_cache(
+                        index=index,
+                        archive_path=str(zip_path),
+                        checksum=cache_suffix,
+                        dataset_rid=dataset.dataset_rid,
+                        dataset_version=str(version),
+                    )
+                finally:
+                    index.dispose()
+            return bag_dir
 
 
 def _resolve_version_record(dataset: "Dataset", version: DatasetVersion) -> Any:
@@ -524,8 +546,6 @@ def _tier1_local_cache_lookup(
         :class:`DatasetMinid` pointing at the cached bag, or
         ``None`` when no matching bag is on disk.
     """
-    from deriva.bag.cache_index import BagCacheIndex
-
     index = BagCacheIndex(dataset._ml_instance.cache_dir)
     try:
         cached_checksums = index.find_bags_for_rid(table="Dataset", rid=dataset.dataset_rid)
