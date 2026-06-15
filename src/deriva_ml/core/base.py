@@ -473,12 +473,29 @@ class DerivaML(
         self.catalog = server.connect_ermrest(catalog_id)
 
         if reuse_schema_json is not None:
-            # Caller (catalog_snapshot) handed us a schema already parsed
-            # by the live instance — a snapshot's schema is structurally
-            # identical to live, so re-fetching /schema is pure waste.
-            # Skip the getCatalogSchema() round-trip and the offline-cache
-            # write (the live instance already wrote it).
-            schema_json = reuse_schema_json
+            # Caller (catalog_snapshot) handed us a schema parsed by the live
+            # instance. It is USUALLY identical to this catalog's schema, but
+            # NOT always: a snapshot pinned to a snaptime that predates a
+            # schema migration has a different schema than the live instance
+            # the reuse came from. Trusting the reused dict blindly would put
+            # tables in the model that this (snapshot) catalog does not have,
+            # and a later pathBuilder query against the snapshot would 409.
+            #
+            # So VALIDATE: fetch this catalog's own /schema. getCatalogSchema
+            # is ETag-revalidated (a cheap 304 when the snapshot schema equals
+            # live — the common case), and a real fetch only when they genuinely
+            # differ — exactly when reuse would be incorrect. Use the catalog's
+            # real schema so the model always matches the catalog it queries.
+            actual_schema = self.catalog.getCatalogSchema()
+            if actual_schema == reuse_schema_json:
+                schema_json = reuse_schema_json
+            else:
+                logger.info(
+                    "reuse_schema_json differs from the connected catalog's "
+                    "schema (likely a snapshot predating a schema change); "
+                    "using the catalog's own schema instead"
+                )
+                schema_json = actual_schema
         else:
             # Fetch the live schema. deriva-py caches the parsed dict on
             # the catalog instance and auto-invalidates on schema-mutating
