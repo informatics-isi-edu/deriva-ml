@@ -228,11 +228,11 @@ def compute_reachability(
         ``(rids_by_table, asset_lengths_by_table, fetched_rows)``:
 
         - ``rids_by_table`` -- table name -> set of reachable RIDs (exact
-          union across all FK paths). Shape matches the retired
-          ``run_estimate_queries`` first output so ``assemble_estimate``
-          consumes it unchanged.
+          union across all FK paths). This is the per-table RID-set shape
+          ``assemble_estimate`` consumes unchanged.
         - ``asset_lengths_by_table`` -- table name -> ``{RID: Length}`` for
-          asset tables (second retired output shape).
+          asset tables -- the asset-byte map ``assemble_estimate``
+          consumes for the size totals.
         - ``fetched_rows`` -- ``{(schema, table): rows}``, the once-fetched
           projected rows, returned so the caller can derive CSV-byte samples
           without a second fetch (see :func:`sample_rows_from_fetched`).

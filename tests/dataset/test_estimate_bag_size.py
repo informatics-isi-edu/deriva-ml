@@ -51,8 +51,9 @@ def test_reachability_matches_server_union(catalog_with_datasets):
             nested = ds_obj
             break
     if nested is None:
-        # Fall back to any dataset if the fixture has no nested one.
-        nested = datasets[0]
+        # A non-nested dataset wouldn't exercise the multi-path RID union
+        # this test exists to guard — a green pass there is false comfort.
+        pytest.skip("fixture has no nested dataset to exercise multi-path union")
 
     version = nested.current_version
 

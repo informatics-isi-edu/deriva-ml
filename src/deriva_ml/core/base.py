@@ -826,6 +826,17 @@ class DerivaML(
         Returns:
             A new DerivaML instance connected to the specified catalog snapshot,
             inheriting every connection-shaping kwarg from ``self``.
+
+        Note:
+            The reused ``schema_json`` can lag the live catalog within a
+            session — e.g. tables created after this connection was opened
+            are absent from the held model. Any caller that mixes this
+            snapshot's ``pathBuilder()`` (held, possibly-stale model) with a
+            freshly-fetched deriva-py model (e.g. a ``CatalogBagBuilder``
+            walk that calls ``_get_model()``) must build its path builder
+            from the **same** fresh model via
+            ``datapath.from_model(snapshot.catalog, model)`` — otherwise a
+            ``KeyError`` is raised on tables the held model lacks.
         """
         cached = self._snapshot_cache.get(version_snapshot)
         if cached is not None:

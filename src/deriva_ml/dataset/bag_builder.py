@@ -411,9 +411,15 @@ class DatasetBagBuilder:
         Drives a :class:`CatalogBagBuilder` (per-dataset when
         ``dataset`` is given, catalog-wide otherwise) and returns
         its :meth:`~CatalogBagBuilder.iter_table_datapaths` output
-        rekeyed by terminal table name — the shape callers like
-        :meth:`Dataset.estimate_bag_size` and :meth:`Dataset.is_dirty`
-        expect.
+        rekeyed by terminal table name — the shape the drift path
+        (:meth:`Dataset.is_dirty`, via ``_iter_drift_counts``) expects.
+
+        Note: :meth:`Dataset.estimate_bag_size` no longer drives this
+        method. It now uses the client-side reachability engine
+        (:func:`deriva_ml.dataset._reachability.compute_reachability`),
+        which shares the same walker via ``_catalog_bag_builder`` /
+        ``iter_reached_paths`` but reconstructs FK reachability in
+        memory rather than issuing per-path aggregate queries.
 
         Per CONTEXT.md ("Dirty"), the drift walk *is* the bag
         walk. Sharing the walker (via ``CatalogBagBuilder``) makes

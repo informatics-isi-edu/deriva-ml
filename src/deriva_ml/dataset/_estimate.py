@@ -139,8 +139,9 @@ def assemble_estimate(
         "total_csv_size": human_readable_size(total_csv_bytes),
         "total_estimated_bytes": total_size,
         "total_estimated_size": human_readable_size(total_size),
-        # Failure visibility: when True, counts/sizes are lower
-        # bounds — at least one estimate query failed.
+        # Retained for backward-compatible output shape; always False
+        # under the client-side reachability engine (no per-query
+        # failures, so no table is ever incomplete).
         "incomplete": bool(incomplete_tables),
         "incomplete_tables": incomplete_tables,
     }
