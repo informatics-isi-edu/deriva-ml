@@ -90,7 +90,8 @@ def _needed_columns(seg: tuple[str, str], model: Any) -> set[str]:
         Set of column names to project in the table fetch.
 
     Example:
-        >>> ...  # doctest: +SKIP  (needs a Model)
+        >>> # Needs a Model object -- see tests/dataset/test_reachability.py.
+        >>> ...  # doctest: +SKIP
     """
     s, t = seg
     tbl = model.schemas[s].tables[t]
@@ -131,7 +132,8 @@ def _reached_rids_for_path(
         resolvable FK (an unfollowable path -- caller treats as no contribution).
 
     Example:
-        >>> ...  # doctest: +SKIP  (needs fetched rows + Model)
+        >>> # Needs fetched rows + a Model -- see tests/dataset/test_reachability.py.
+        >>> ...  # doctest: +SKIP
     """
     cur_seg = fk_path[0]
     if len(fk_path) == 1:
@@ -236,7 +238,8 @@ def compute_reachability(
           without a second fetch (see :func:`sample_rows_from_fetched`).
 
     Example:
-        >>> ...  # doctest: +SKIP  (needs a live walk + Model)
+        >>> # Needs a live walk + a Model -- see tests/dataset/test_reachability.py.
+        >>> ...  # doctest: +SKIP
     """
     # 1. Every distinct (schema, table) that appears as a hop in any path.
     edge_tables: set[tuple[str, str]] = set()
@@ -285,4 +288,39 @@ def compute_reachability(
     return rids_by_table, asset_lengths_by_table, fetched_rows
 
 
-__all__ = ["ReachedPaths", "FetchFn", "compute_reachability"]
+def sample_rows_from_fetched(
+    *,
+    reached: ReachedPaths,
+    fetched_rows: dict[tuple[str, str], list[dict]],
+    limit: int = 100,
+) -> dict[str, list[dict]]:
+    """Take up to ``limit`` sample rows per reached table from fetched rows.
+
+    The CSV-byte estimator needs a few representative rows per table to gauge
+    serialised size. Because the engine already fetched every table's rows,
+    the sample is a slice -- no extra query (the old path issued one
+    ``?limit=100`` query per table).
+
+    Args:
+        reached: The reached-paths map (keys identify the tables to sample).
+        fetched_rows: ``{(schema, table): rows}`` from the engine fetch.
+        limit: Max sample rows per table.
+
+    Returns:
+        ``{table_name: [row, ...]}`` -- tables with zero fetched rows are omitted.
+
+    Example:
+        >>> rows = {("S", "T"): [{"RID": "r0"}]}
+        >>> sample_rows_from_fetched(reached={("S", "T"): [(("S", "T"),)]},
+        ...                          fetched_rows=rows, limit=10)
+        {'T': [{'RID': 'r0'}]}
+    """
+    samples: dict[str, list[dict]] = {}
+    for key in reached:
+        rows = fetched_rows.get(key, [])
+        if rows:
+            samples[key[1]] = rows[:limit]
+    return samples
+
+
+__all__ = ["ReachedPaths", "FetchFn", "compute_reachability", "sample_rows_from_fetched"]

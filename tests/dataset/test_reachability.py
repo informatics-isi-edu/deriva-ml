@@ -7,6 +7,7 @@ from deriva_ml.dataset._reachability import (
     _needed_columns,
     _reached_rids_for_path,
     compute_reachability,
+    sample_rows_from_fetched,
 )
 
 
@@ -260,3 +261,18 @@ def test_compute_reachability_empty_reached_returns_empty():
     assert rids_by_table == {}
     assert asset_lengths_by_table == {}
     assert fetched_rows == {}
+
+
+def test_sample_rows_from_fetched_caps_at_100():
+    fetched = {("S", "T"): [{"RID": f"r{i}", "x": i} for i in range(250)]}
+    reached = {("S", "T"): [(("S", "T"),)]}
+    samples = sample_rows_from_fetched(reached=reached, fetched_rows=fetched, limit=100)
+    assert len(samples["T"]) == 100
+    assert samples["T"][0] == {"RID": "r0", "x": 0}
+
+
+def test_sample_rows_from_fetched_empty_table_absent():
+    fetched = {("S", "T"): []}
+    reached = {("S", "T"): [(("S", "T"),)]}
+    samples = sample_rows_from_fetched(reached=reached, fetched_rows=fetched, limit=100)
+    assert "T" not in samples
