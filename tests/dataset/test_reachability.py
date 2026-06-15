@@ -288,3 +288,13 @@ def test_estimate_no_longer_imports_deep_join_helpers():
     assert "build_estimate_queries" not in src
     assert "run_estimate_queries" not in src
     assert "compute_reachability" in src
+
+
+def test_deep_join_helpers_are_deleted():
+    """The retired deep-join estimate functions must be gone."""
+    import deriva_ml.dataset._estimate as est
+
+    assert not hasattr(est, "build_estimate_queries")
+    assert not hasattr(est, "run_estimate_queries")
+    assert not hasattr(est, "QueryItem")
+    assert hasattr(est, "assemble_estimate")  # kept

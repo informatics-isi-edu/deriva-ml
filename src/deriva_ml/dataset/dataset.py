@@ -2766,7 +2766,7 @@ class Dataset:
         sample_rows_by_table = sample_rows_from_fetched(reached=reached, fetched_rows=fetched_rows)
 
         return assemble_estimate(
-            table_queries={key[1]: [(None, None, model.schemas[key[0]].tables[key[1]].is_asset())] for key in reached},
+            asset_tables={key[1] for key in reached if model.schemas[key[0]].tables[key[1]].is_asset()},
             rids_by_table=rids_by_table,
             asset_lengths_by_table=asset_lengths_by_table,
             sample_rows_by_table=sample_rows_by_table,
