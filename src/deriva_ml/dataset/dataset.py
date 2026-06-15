@@ -28,6 +28,7 @@ Typical usage example:
 
 from __future__ import annotations
 
+import importlib
 from collections import defaultdict
 
 # Standard library imports
@@ -42,6 +43,11 @@ if TYPE_CHECKING:
 # Third-party imports
 import pandas as pd
 from deriva.core.ermrest_model import Table
+
+# Import datapath via importlib to avoid shadowing by local 'deriva.py' files
+# (same convention as core/mixins/path_builder.py). Used to build a path
+# builder from an explicit model in estimate_bag_size.
+datapath = importlib.import_module("deriva.core.datapath")
 from pydantic import validate_call
 
 from deriva_ml.core.constants import RID
@@ -2738,10 +2744,18 @@ class Dataset:
         anchor_rids = [self.dataset_rid] + list(builder._iter_descendant_rids(self))
         model = cb._get_model()
 
-        # Fetch closure: whole-table projected scan via the snapshot path
-        # builder. Cheap relative to deep FK joins (a 240k-row scan is ~0.3s;
-        # the join through it was 16-60s). Bound to the version snapshot.
-        pb = version_snapshot_catalog.pathBuilder()
+        # Fetch closure: whole-table projected scan. Cheap relative to deep FK
+        # joins (a 240k-row scan is ~0.3s; the join through it was 16-60s).
+        #
+        # Build the path builder from the SAME model the walk used
+        # (``cb._get_model()``), not ``version_snapshot_catalog.pathBuilder()``.
+        # The walk reaches tables named in deriva-py's freshly-fetched snapshot
+        # model; the deriva-ml instance's held model can legitimately differ
+        # (e.g. a snapshot reusing the live instance's schema_json, or any
+        # held-model staleness) and would be missing tables the walk reached,
+        # raising KeyError here. Sharing one model keeps walk and fetch in
+        # lockstep and adds no /schema fetch -- the walk already fetched it.
+        pb = datapath.from_model(version_snapshot_catalog.catalog, model)
 
         def _fetch(schema: str, table: str, columns: set[str]) -> list[dict]:
             tpb = pb.schemas[schema].tables[table]
