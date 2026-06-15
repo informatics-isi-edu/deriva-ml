@@ -276,3 +276,15 @@ def test_sample_rows_from_fetched_empty_table_absent():
     reached = {("S", "T"): [(("S", "T"),)]}
     samples = sample_rows_from_fetched(reached=reached, fetched_rows=fetched, limit=100)
     assert "T" not in samples
+
+
+def test_estimate_no_longer_imports_deep_join_helpers():
+    """The deep-join path is deleted; estimate must not import it."""
+    import inspect
+
+    from deriva_ml.dataset import dataset as dataset_mod
+
+    src = inspect.getsource(dataset_mod.Dataset.estimate_bag_size)
+    assert "build_estimate_queries" not in src
+    assert "run_estimate_queries" not in src
+    assert "compute_reachability" in src

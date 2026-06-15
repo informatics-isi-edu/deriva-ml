@@ -321,7 +321,6 @@ def assemble_estimate(
     sample_rows_by_table: dict[str, list[dict]],
     estimate_csv_bytes: Any,
     human_readable_size: Any,
-    failed_by_table: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Assemble the final estimate dict from orchestrator outputs.
 
@@ -346,18 +345,15 @@ def assemble_estimate(
             ``human_readable_size``.
         human_readable_size: Callable ``(bytes) -> str`` —
             :meth:`Dataset._human_readable_size`.
-        failed_by_table: Fourth output of
-            :func:`run_estimate_queries` — tables with at least one
-            failed query are marked ``incomplete`` (their counts are
-            lower bounds), and tables whose *every* query failed
-            still appear (``row_count: 0, incomplete: True``)
-            instead of masquerading as empty.
 
     Returns:
         The full estimate dict — the pre-extraction
         :meth:`Dataset.estimate_bag_size` keys plus, per table, an
         ``incomplete`` bool, and top-level ``incomplete`` /
-        ``incomplete_tables`` keys.
+        ``incomplete_tables`` keys. The client-side reachability
+        engine has no per-query failures, so ``incomplete`` is
+        always ``False`` and ``incomplete_tables`` always ``[]`` —
+        the keys are retained for backward-compatible output shape.
 
     Example:
         >>> from deriva_ml.dataset._estimate import assemble_estimate
@@ -374,8 +370,6 @@ def assemble_estimate(
         >>> result["total_estimated_size"]
         '0B'
     """
-    failed_by_table = failed_by_table or {}
-
     # CSV bytes from samples.
     csv_bytes_by_table: dict[str, int] = {}
     for table_name, sample_rows in sample_rows_by_table.items():
@@ -408,7 +402,7 @@ def assemble_estimate(
             "is_asset": is_asset,
             "asset_bytes": asset_bytes,
             "csv_bytes": csv_bytes,
-            "incomplete": table_name in failed_by_table,
+            "incomplete": False,
         }
         total_rows += row_count
         total_asset_bytes += asset_bytes
@@ -425,25 +419,15 @@ def assemble_estimate(
                 "is_asset": True,
                 "asset_bytes": sum(lengths.values()),
                 "csv_bytes": csv_bytes,
-                "incomplete": table_name in failed_by_table,
+                "incomplete": False,
             }
             total_rows += len(lengths)
             total_asset_bytes += sum(lengths.values())
             total_csv_bytes += csv_bytes
 
-    # Tables whose *every* query failed have no successful result to
-    # land under — surface them explicitly rather than letting them
-    # vanish (or, worse, appear as confidently-zero rows).
-    for table_name in failed_by_table:
-        if table_name not in table_estimates:
-            table_estimates[table_name] = {
-                "row_count": 0,
-                "is_asset": table_name in asset_tables,
-                "asset_bytes": 0,
-                "csv_bytes": 0,
-                "incomplete": True,
-            }
-
+    # The client-side reachability engine has no per-query failures, so no
+    # table is ever incomplete. The comprehension still yields [] and the
+    # output keys are retained for backward-compatible shape.
     incomplete_tables = sorted(t for t, d in table_estimates.items() if d["incomplete"])
 
     total_size = total_asset_bytes + total_csv_bytes
