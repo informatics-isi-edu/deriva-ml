@@ -23,8 +23,25 @@
 > documents the Format-B client-side build path. Plan B1 (the deriva-py
 > `get_as_file` rid-set chunk-append + `CatalogBagBuilder(rid_sets=)`
 > emission + loader simplification) shipped upstream first, per D4.
-> **Live 2-277G bag-gen wall-clock: <to be filled by the controller's
-> re-measure>** (target: tens of seconds vs ~280s deep-join).
+>
+> **Speed result (HONEST — B2 ships portability, NOT the speed win yet).**
+> Live 2-277G bag-gen measured **~1120s** over a WAN link — *slower* than the
+> prior ~280s per-path baseline. Phase-profiling (2026-06-15) shows the
+> rid-set fetch is **88%** of the build (987s), dominated by a few large
+> tables (Dataset_Image: 107k RIDs = 534s; rate collapses ~9× with table
+> size, 1,700 → 200 RIDs/s). The dominant cost is **not** concurrency-gap
+> alone: investigation refuted snapshot cost, `_read_last_csv_record`,
+> chunk-size (capped at 500 by a server URL-length 404 at 600), `@sort(RID)`
+> overhead, the download-engine session config, and a cursor bug — the
+> root of the rate-collapse is still **unconfirmed** (likely server-side
+> `RID=any(...)` query cost on large tables, partly WAN-latency-amplified —
+> ~84% of a small request is network RTT, so a local/fast network would
+> lower the absolute numbers substantially). The "Goals: tens of seconds"
+> target is therefore **deferred to a follow-up** with the perf data above
+> attached as a tracked deriva-py issue. **B2 ships the architectural win —
+> portable one-clean-CSV-per-table bags — not a bag-gen speedup.** See the
+> "Non-goals" note (concurrency was always deferred) and the memory record
+> `csv-ridset-chunk-append-proto.md` for the full measurement trail.
 
 ## Problem
 
@@ -45,15 +62,25 @@ the bag exporter so generation becomes a set of cheap direct
 
 ## Goals
 
-- Bag generation drops from ~280s toward tens of seconds (join
-  elimination, same as the estimate win).
-- One clean `data/{schema}/{table}.csv` per reached table — complete,
-  RID-distinct, flat. Trivially consumable by plain `bdbag` CLI (no
-  union/dedup contract to know).
-- The SQLite loader simplifies (one file → one table; no `ON CONFLICT`
-  union needed).
-- deriva-py stays domain-agnostic — it consumes RID sets, it does not
-  learn FK-reachability. The scope/mechanics split (ADR-0006/0008) holds.
+> **What B2 actually delivered:** the portability + architecture goals below
+> (one clean CSV per table, simplified loader, domain-agnostic deriva-py).
+> The *speed* goal was **not** achieved — see the honest speed result in the
+> Status header. Join elimination was real (no deep FK joins), but the
+> per-table `RID=any(...)` fetch is itself slow at scale on large tables, so
+> end-to-end bag-gen did not drop to "tens of seconds." Speed is deferred.
+
+- **(DEFERRED)** Bag generation drops from ~280s toward tens of seconds.
+  Join elimination landed, but the rid-set fetch is the new bottleneck at
+  scale (88% of build; one 107k-row table = 534s on WAN). Root cause
+  unconfirmed; tracked as a follow-up. See the Status header.
+- **(SHIPPED)** One clean `data/{schema}/{table}.csv` per reached table —
+  complete, RID-distinct, flat. Trivially consumable by plain `bdbag` CLI
+  (no union/dedup contract to know).
+- **(SHIPPED)** The SQLite loader simplifies (one file → one table; no
+  `ON CONFLICT` union needed).
+- **(SHIPPED)** deriva-py stays domain-agnostic — it consumes RID sets, it
+  does not learn FK-reachability. The scope/mechanics split (ADR-0006/0008)
+  holds.
 
 ## Non-goals
 

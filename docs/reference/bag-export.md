@@ -229,8 +229,12 @@ computes the per-table reachable RID sets *up front* with its own
   CSV *is* the table's full reachable set, with no per-FK-path
   fragmentation and no out-of-band union-by-basename/dedup-by-RID for
   the loader to perform. `Image.csv` is THE complete reachable `Image`
-  set. The fetch is a set of cheap direct
-  `/entity/{schema}:{table}/RID=any(...)` reads, not deep joins.
+  set. The fetch is a set of direct
+  `/entity/{schema}:{table}/RID=any(...)` reads (one per ~500-RID chunk),
+  not deep multi-hop FK joins. (Note: this changes the *shape* of the
+  query, not necessarily the end-to-end wall-clock — for datasets with
+  very large tables the chunked rid-set fetch can be slow; faster
+  generation is a tracked follow-up.)
 - A `vocab_export=FULL` **vocabulary** table is the exception — it keeps
   its single unfiltered `/entity/{schema}:{table}` query (the whole
   controlled vocabulary), **not** a rid-set processor. So a vocab CSV
