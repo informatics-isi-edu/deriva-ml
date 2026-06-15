@@ -28,7 +28,6 @@ Typical usage example:
 
 from __future__ import annotations
 
-import importlib
 from collections import defaultdict
 
 # Standard library imports
@@ -43,11 +42,6 @@ if TYPE_CHECKING:
 # Third-party imports
 import pandas as pd
 from deriva.core.ermrest_model import Table
-
-# Import datapath via importlib to avoid shadowing by local 'deriva.py' files
-# (same convention as core/mixins/path_builder.py). Used to build a path
-# builder from an explicit model in estimate_bag_size.
-datapath = importlib.import_module("deriva.core.datapath")
 from pydantic import validate_call
 
 from deriva_ml.core.constants import RID
@@ -2723,67 +2717,28 @@ class Dataset:
                   (no per-table query failures can occur).
         """
         from deriva_ml.dataset._estimate import assemble_estimate
-        from deriva_ml.dataset._reachability import (
-            compute_reachability,
-            sample_rows_from_fetched,
-        )
 
         if isinstance(version, str):
             version = DatasetVersion.parse(version)
 
         # Build a DatasetBagBuilder on the version snapshot. The walk (which
         # tables are reachable, via which FK paths) is shared with the bag
-        # export; only the *execution* differs -- see docs/adr/0008.
+        # export; only the *execution* differs -- see docs/adr/0008. The
+        # reachability assembly (walk -> from_model fetch -> compute_reachability)
+        # lives in DatasetBagBuilder._compute_rid_sets so the bag-build path and
+        # this estimate share one implementation and one from_model fix.
         version_snapshot_catalog = self._version_snapshot_catalog(version)
         builder = DatasetBagBuilder(
             ml_instance=version_snapshot_catalog,
             exclude_tables=exclude_tables,
         )
-        cb = builder._catalog_bag_builder(dataset=self)
-        reached = cb.iter_reached_paths()
-        anchor_rids = [self.dataset_rid] + list(builder._iter_descendant_rids(self))
-        model = cb._get_model()
-
-        # Fetch closure: whole-table projected scan. Cheap relative to deep FK
-        # joins (a 240k-row scan is ~0.3s; the join through it was 16-60s).
-        #
-        # Build the path builder from the SAME model the walk used
-        # (``cb._get_model()``), not ``version_snapshot_catalog.pathBuilder()``.
-        # The walk reaches tables named in deriva-py's freshly-fetched snapshot
-        # model; the deriva-ml instance's held model can legitimately differ
-        # (e.g. a snapshot reusing the live instance's schema_json, or any
-        # held-model staleness) and would be missing tables the walk reached,
-        # raising KeyError here. Sharing one model keeps walk and fetch in
-        # lockstep and adds no /schema fetch -- the walk already fetched it.
-        pb = datapath.from_model(version_snapshot_catalog.catalog, model)
-
-        def _fetch(schema: str, table: str, columns: set[str]) -> list[dict]:
-            tpb = pb.schemas[schema].tables[table]
-            try:
-                attrs = [getattr(tpb, c) for c in sorted(columns)]
-                return list(tpb.attributes(*attrs).fetch())
-            except Exception as exc:  # noqa: BLE001
-                # Defensive fallback: a projection naming a column the table
-                # lacks (model/data skew) degrades to a full-entity fetch
-                # rather than dropping the table from the estimate.
-                self._logger.debug(
-                    "estimate projected fetch for %s:%s fell back to full-entity scan: %s",
-                    schema,
-                    table,
-                    exc,
-                )
-                return list(tpb.entities().fetch())
-
-        rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
-            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
-        )
-        sample_rows_by_table = sample_rows_from_fetched(reached=reached, fetched_rows=fetched_rows)
+        rid_data = builder._compute_rid_sets(self)
 
         return assemble_estimate(
-            asset_tables={key[1] for key in reached if model.schemas[key[0]].tables[key[1]].is_asset()},
-            rids_by_table=rids_by_table,
-            asset_lengths_by_table=asset_lengths_by_table,
-            sample_rows_by_table=sample_rows_by_table,
+            asset_tables=rid_data.asset_tables,
+            rids_by_table=rid_data.rids_by_table,
+            asset_lengths_by_table=rid_data.asset_lengths_by_table,
+            sample_rows_by_table=rid_data.sample_rows_by_table,
             estimate_csv_bytes=self._estimate_csv_bytes,
             human_readable_size=self._human_readable_size,
         )

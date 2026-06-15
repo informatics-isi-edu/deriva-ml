@@ -50,10 +50,11 @@ CONTEXT.md is preserved by construction.
 
 from __future__ import annotations
 
+import importlib
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Iterable
+from typing import Any, Iterable, NamedTuple
 
 from deriva.bag.anchors import Anchor, RIDAnchor, TableAnchor
 from deriva.bag.catalog_builder import CatalogBagBuilder
@@ -65,7 +66,36 @@ from deriva_ml.core.constants import INTENTIONAL_FK_CYCLES, PROVENANCE_TERMINAL_
 from deriva_ml.core.logging_config import get_logger
 from deriva_ml.interfaces import DatasetLike, DerivaMLCatalog
 
+# Import datapath via importlib to avoid shadowing by local 'deriva.py' files
+# (mirrors dataset.py's pattern).
+datapath = importlib.import_module("deriva.core.datapath")
+
 logger = get_logger(__name__)
+
+
+class RidSetComputation(NamedTuple):
+    """Result of :meth:`DatasetBagBuilder._compute_rid_sets`.
+
+    Bundles the per-table RID sets (for Format-B bag generation) with the
+    auxiliary reachability data the estimate consumes — all from one walk.
+
+    Attributes:
+        rid_sets: ``{(schema, table): [RID,...]}`` for non-vocab reached
+            tables — the shape ``CatalogBagBuilder(rid_sets=...)`` consumes
+            (vocab excluded, lists sorted).
+        rids_by_table: bare-name ``{table: set(RID)}`` (row counts).
+        asset_lengths_by_table: ``{table: {RID: Length}}`` (asset bytes).
+        fetched_rows: ``{(schema, table): rows}`` (CSV-byte sampling source).
+        sample_rows_by_table: ``{table: [row,...]}`` derived sample.
+        asset_tables: bare table names that are asset tables.
+    """
+
+    rid_sets: dict[tuple[str, str], list[str]]
+    rids_by_table: dict[str, set[str]]
+    asset_lengths_by_table: dict[str, dict[str, int]]
+    fetched_rows: dict[tuple[str, str], list[dict]]
+    sample_rows_by_table: dict[str, list[dict]]
+    asset_tables: set[str]
 
 
 def _rid_sets_from_reachability(
@@ -527,6 +557,75 @@ class DatasetBagBuilder:
         # :meth:`CatalogBagBuilder.build`.
         builder._datasetbag_output_tmp = tmp  # type: ignore[attr-defined]
         return builder
+
+    def _compute_rid_sets(self, dataset: DatasetLike) -> RidSetComputation:
+        """Compute per-table reachable RID sets for a dataset, client-side.
+
+        Factored from estimate_bag_size's reachability assembly so the
+        bag-build path and the estimate share one implementation -- and one
+        copy of the ``from_model`` snapshot-staleness fix (the walk's fresh
+        model and the fetch's path builder must be the same model, or the
+        fetch raises KeyError on tables the held model lacks).
+
+        Args:
+            dataset: The dataset to analyze. Must expose ``dataset_rid``.
+
+        Returns:
+            A :class:`RidSetComputation` bundling the per-table RID sets
+            (for Format-B bag generation) with the auxiliary reachability
+            data the estimate consumes; see that NamedTuple's attribute docs
+            for the per-field shapes.
+        """
+        from deriva_ml.dataset._reachability import (
+            compute_reachability,
+            sample_rows_from_fetched,
+        )
+
+        cb = self._catalog_bag_builder(dataset=dataset)
+        reached = cb.iter_reached_paths()
+        anchor_rids = [dataset.dataset_rid] + list(self._iter_descendant_rids(dataset))
+        model = cb._get_model()
+
+        # Build the path builder from the SAME model the walk used -- not the
+        # held-model pathBuilder(). The walk reaches tables in deriva-py's
+        # freshly-fetched snapshot model; the instance's held model can lag
+        # (reused schema_json) and would be missing them, raising KeyError.
+        # Sharing one model keeps walk and fetch in lockstep, no /schema fetch.
+        pb = datapath.from_model(self._ml_instance.catalog, model)
+
+        def _fetch(schema: str, table: str, columns: set[str]) -> list[dict]:
+            tpb = pb.schemas[schema].tables[table]
+            try:
+                attrs = [getattr(tpb, c) for c in sorted(columns)]
+                return list(tpb.attributes(*attrs).fetch())
+            except Exception as exc:  # noqa: BLE001
+                # Defensive fallback: a projection naming a column the table
+                # lacks (model/data skew) degrades to a full-entity fetch.
+                logger.debug(
+                    "rid-set projected fetch for %s:%s fell back to full-entity scan: %s",
+                    schema,
+                    table,
+                    exc,
+                )
+                return list(tpb.entities().fetch())
+
+        rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
+            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
+        )
+        sample_rows_by_table = sample_rows_from_fetched(reached=reached, fetched_rows=fetched_rows)
+
+        vocab_tables = {key for key in reached if model.schemas[key[0]].tables[key[1]].is_vocabulary()}
+        rid_sets = _rid_sets_from_reachability(reached, rids_by_table, vocab_tables)
+        asset_tables = {key[1] for key in reached if model.schemas[key[0]].tables[key[1]].is_asset()}
+
+        return RidSetComputation(
+            rid_sets,
+            rids_by_table,
+            asset_lengths_by_table,
+            fetched_rows,
+            sample_rows_by_table,
+            asset_tables,
+        )
 
     @property
     def _ml_schema(self) -> str:

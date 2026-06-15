@@ -29,3 +29,34 @@ def test_rid_sets_from_reachability_missing_table_is_empty_list():
     reached = {("S", "T"): [()]}
     result = _rid_sets_from_reachability(reached, {}, set())
     assert result == {("S", "T"): []}
+
+
+def test_compute_rid_sets_method_exists():
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    assert hasattr(DatasetBagBuilder, "_compute_rid_sets")
+
+
+def test_compute_rid_sets_carries_from_model_and_reachability():
+    """The shared helper owns the from_model fix and the reachability call."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
+    assert "from_model" in src
+    assert "compute_reachability" in src
+    assert "_rid_sets_from_reachability" in src
+
+
+def test_estimate_delegates_to_compute_rid_sets():
+    """estimate_bag_size delegates the reachability assembly (no longer inlines
+    its own from_model fetch closure)."""
+    import inspect
+
+    from deriva_ml.dataset.dataset import Dataset
+
+    src = inspect.getsource(Dataset.estimate_bag_size)
+    assert "_compute_rid_sets" in src
+    # The from_model closure now lives in the shared helper, not the estimate.
+    assert "datapath.from_model" not in src
