@@ -60,3 +60,25 @@ def test_estimate_delegates_to_compute_rid_sets():
     assert "_compute_rid_sets" in src
     # The from_model closure now lives in the shared helper, not the estimate.
     assert "datapath.from_model" not in src
+
+
+def test_catalog_bag_builder_accepts_rid_sets():
+    """_catalog_bag_builder forwards an opt-in rid_sets to CatalogBagBuilder."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    sig = inspect.signature(DatasetBagBuilder._catalog_bag_builder)
+    assert "rid_sets" in sig.parameters
+    assert sig.parameters["rid_sets"].default is None
+
+
+def test_build_bag_uses_rid_sets():
+    """build_bag computes rid_sets and passes them to the CatalogBagBuilder."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    src = inspect.getsource(DatasetBagBuilder.build_bag)
+    assert "_compute_rid_sets" in src
+    assert "rid_sets=" in src

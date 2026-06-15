@@ -365,6 +365,10 @@ class DatasetBagBuilder:
 
         anchors = self.anchors_for(dataset)
         policy = self.build_policy(dataset)
+        # Compute the per-table reachable RID sets so the upstream engine
+        # emits one rid-set csv processor per non-vocab reached table
+        # (Format-B) instead of one csv processor per FK path.
+        rid_sets = self._compute_rid_sets(dataset).rid_sets
 
         catalog = self._ml_instance.catalog
         prior_config = getattr(catalog, "_session_config", None)
@@ -383,6 +387,7 @@ class DatasetBagBuilder:
                 anchors=anchors,
                 output_dir=cb_output_dir,
                 policy=policy,
+                rid_sets=rid_sets,
             )
             unpacked_path = builder.build()
         finally:
@@ -516,13 +521,17 @@ class DatasetBagBuilder:
     # Internal driver — constructs a :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
-    def _catalog_bag_builder(self, dataset: DatasetLike | None) -> CatalogBagBuilder:
+    def _catalog_bag_builder(
+        self,
+        dataset: DatasetLike | None,
+        rid_sets: dict[tuple[str, str], list[str]] | None = None,
+    ) -> CatalogBagBuilder:
         """Construct a :class:`CatalogBagBuilder` for this dataset.
 
-        Three callers (:meth:`generate_dataset_download_spec`,
+        Four callers (:meth:`generate_dataset_download_spec`,
         :meth:`generate_dataset_download_annotations`,
-        :meth:`aggregate_queries`) share this construction so all
-        three drive off the same walker.
+        :meth:`aggregate_queries`, :meth:`_compute_rid_sets`) share
+        this construction so they all drive off the same walker.
 
         Args:
             dataset: Per-dataset scoping. When non-``None``, the
@@ -532,6 +541,13 @@ class DatasetBagBuilder:
                 ``deriva-ml:Dataset`` table — the catalog-wide
                 view used by annotation generation and by
                 :meth:`aggregate_queries` with no dataset filter.
+            rid_sets: Opt-in per-table reachable RID sets. When
+                supplied, the upstream engine emits one rid-set csv
+                processor per non-vocab reached table (Format-B) instead
+                of one csv processor per FK path. ``None`` (the default,
+                used by every share-the-walker caller above) keeps
+                per-path emission unchanged; only the download/build
+                path supplies it (via a separately-constructed builder).
         """
         if dataset is not None:
             anchors = self.anchors_for(dataset)
@@ -549,6 +565,7 @@ class DatasetBagBuilder:
             anchors=anchors,
             output_dir=output_dir,
             policy=policy,
+            rid_sets=rid_sets,
         )
         # Stash the tmp on the builder so it lives until the
         # builder is garbage-collected. The annotation/aggregate
