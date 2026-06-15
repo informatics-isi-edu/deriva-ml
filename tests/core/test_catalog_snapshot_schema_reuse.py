@@ -28,10 +28,18 @@ def test_live_instance_retains_schema_json(live_ml):
     assert "schemas" in live_ml._schema_json
 
 
-def test_init_online_skips_fetch_when_schema_supplied(live_ml, monkeypatch):
-    """When reuse_schema_json is supplied, _init_online does not call getCatalogSchema()."""
-    # Build a second instance against the same catalog, supplying the
-    # already-parsed schema; assert getCatalogSchema is never called.
+def test_init_online_validates_reused_schema_against_catalog(live_ml, monkeypatch):
+    """When reuse_schema_json is supplied, _init_online validates it against the
+    catalog's actual schema rather than trusting it blindly.
+
+    The reuse fast-path used to adopt reuse_schema_json unconditionally,
+    skipping getCatalogSchema() entirely. That is unsafe for a snapshot whose
+    schema differs from the live instance's (e.g. a snapshot taken before a
+    schema migration): the model would carry tables the snapshot catalog
+    doesn't have, and a pathBuilder query against the snapshot 409s. The fix
+    revalidates via getCatalogSchema (ETag-cheap) so the model matches the
+    catalog. So exactly one revalidation request is expected — not zero.
+    """
     from deriva.core.ermrest_catalog import ErmrestCatalog
 
     calls = {"n": 0}
@@ -51,16 +59,99 @@ def test_init_online_skips_fetch_when_schema_supplied(live_ml, monkeypatch):
         credential=live_ml.credential,
         reuse_schema_json=live_ml._schema_json,
     )
-    assert calls["n"] == 0, "getCatalogSchema must not be called when schema is reused"
+    # The model must come from the catalog's real schema (validated), not from
+    # blindly trusting the reused dict. One revalidation fetch is correct.
+    assert calls["n"] >= 1, (
+        "reused schema must be validated against the catalog (getCatalogSchema "
+        "called at least once), not adopted blindly"
+    )
+
+
+def test_init_online_model_matches_catalog_not_stale_reuse(live_ml, monkeypatch):
+    """REGRESSION: a reused schema that DIFFERS from the catalog must not win.
+
+    Reproduces the snapshot-predates-migration bug: the caller hands a reused
+    schema containing a table the connected catalog does NOT have. The built
+    model must reflect the CATALOG (table absent), not the stale reused dict
+    (table present) — otherwise a later pathBuilder query 409s on a table the
+    snapshot lacks.
+    """
+    import copy
+
+    from deriva.core.ermrest_catalog import ErmrestCatalog
+
+    real = ErmrestCatalog.getCatalogSchema
+    # The catalog's REAL schema (what the server returns).
+    catalog_schema = real(live_ml.catalog)
+    ml_schema_name = live_ml.ml_schema
+    assert "_PhantomTable_" not in catalog_schema["schemas"][ml_schema_name]["tables"]
+
+    # A STALE reused schema: same as live PLUS a phantom table the catalog
+    # does not have (simulating a table added after this snapshot's snaptime).
+    # Build a MINIMAL valid table definition (RID column only, no foreign
+    # keys) so it parses cleanly — copying an existing table would duplicate
+    # its FK constraint names and crash the parser before the assertion.
+    stale = copy.deepcopy(catalog_schema)
+    phantom = {
+        "schema_name": ml_schema_name,
+        "table_name": "_PhantomTable_",
+        "kind": "table",
+        "column_definitions": [
+            {"name": "RID", "type": {"typename": "ermrest_rid"}, "nullok": False},
+        ],
+        "keys": [{"unique_columns": ["RID"], "names": [[ml_schema_name, "_PhantomTable__RIDkey"]]}],
+        "foreign_keys": [],
+        "annotations": {},
+        "comment": None,
+    }
+    stale["schemas"][ml_schema_name]["tables"]["_PhantomTable_"] = phantom
+
+    monkeypatch.setattr(ErmrestCatalog, "getCatalogSchema", real)
+
+    instance = DerivaML(
+        live_ml.host_name,
+        live_ml.catalog_id,
+        working_dir=live_ml.working_dir,
+        ml_schema=live_ml.ml_schema,
+        credential=live_ml.credential,
+        reuse_schema_json=stale,
+    )
+    # The model must match the catalog (no phantom), proving the stale reuse
+    # was validated/discarded — not trusted.
+    model_tables = set(instance.model.model.schemas[ml_schema_name].tables)
+    assert "_PhantomTable_" not in model_tables, (
+        "stale reused schema's phantom table leaked into the model — reuse was "
+        "trusted blindly instead of validated against the catalog (the bug)"
+    )
 
 
 def _a_snapshot_id(live_ml):
-    """Resolve a real snapshot id from the live catalog's current snaptime."""
-    return live_ml.catalog.get("/").json()["snaptime"]
+    """Resolve a real snapshot id in the COMPOUND ``<catalog_id>@<snaptime>``
+    form that production (``_version_snapshot_catalog_id``) always uses.
+
+    A bare snaptime has no ``@``, so deriva-py would treat it as a *catalog
+    id* and connect to a non-existent catalog — which only appeared to work
+    before because the old code never queried ``/schema`` on that bogus
+    connection. The schema-validation fix does query it, so the id must be
+    the real compound form.
+    """
+    raw = live_ml.catalog.get("/").json()["snaptime"]
+    # catalog_id may already be compound (e.g. on a snapshot-derived
+    # instance); use only the bare catalog id portion to avoid a double "@".
+    bare_catalog_id = str(live_ml.catalog_id).split("@", 1)[0]
+    return f"{bare_catalog_id}@{raw}"
 
 
-def test_catalog_snapshot_does_no_schema_fetch(live_ml, monkeypatch):
-    """catalog_snapshot() builds the snapshot instance with zero getCatalogSchema calls."""
+def test_catalog_snapshot_validates_schema_against_snapshot(live_ml, monkeypatch):
+    """catalog_snapshot() validates the reused schema against the snapshot.
+
+    The reused schema is no longer trusted blindly — it is validated against
+    the snapshot catalog's own /schema (ETag-cheap: a 304 when the snapshot
+    schema equals live). So a single getCatalogSchema call is expected on the
+    snapshot, not zero. This is the correctness-over-zero-fetch tradeoff: a
+    snapshot predating a schema migration would otherwise get a model that
+    doesn't match its catalog.
+    """
     from deriva.core.ermrest_catalog import ErmrestCatalog
 
     calls = {"n": 0}
@@ -74,7 +165,7 @@ def test_catalog_snapshot_does_no_schema_fetch(live_ml, monkeypatch):
 
     snap = live_ml.catalog_snapshot(_a_snapshot_id(live_ml))
     assert snap is not None
-    assert calls["n"] == 0, "catalog_snapshot must not fetch /schema"
+    assert calls["n"] >= 1, "catalog_snapshot must validate the reused schema against the snapshot"
 
 
 def test_catalog_snapshot_memoized_per_id(live_ml):
@@ -110,11 +201,9 @@ def test_reused_schema_model_matches_fetched(live_ml):
     """The schema-reusing snapshot model is structurally identical to a fetched one."""
     from deriva.core.ermrest_catalog import ErmrestSnapshot
 
-    raw_snaptime = _a_snapshot_id(live_ml)
-    # catalog_snapshot expects the compound "<catalog_id>@<snaptime>" form
-    # (what _version_snapshot_catalog_id produces in production); a bare
-    # snaptime has no '@' and deriva-py would treat it as a catalog id.
-    compound_sid = f"{live_ml.catalog_id}@{raw_snaptime}"
+    # _a_snapshot_id already returns the compound "<catalog_id>@<snaptime>"
+    # form that catalog_snapshot / _version_snapshot_catalog_id expect.
+    compound_sid = _a_snapshot_id(live_ml)
 
     reused = live_ml.catalog_snapshot(compound_sid)
 
@@ -302,8 +391,8 @@ def test_model_built_wrapper_writes_reach_catalog(populated_catalog):
 
 def test_snapshot_pathbuilder_reads_are_snapshot_pinned(live_ml):
     """A snapshot instance's pathBuilder routes data reads to the @snaptime URI."""
-    raw = _a_snapshot_id(live_ml)
-    compound = f"{live_ml.catalog_id}@{raw}"
+    # _a_snapshot_id already returns the compound form.
+    compound = _a_snapshot_id(live_ml)
     snap = live_ml.catalog_snapshot(compound)
     pb = snap.pathBuilder()
     base = pb._wrapped_catalog._server_uri
