@@ -601,7 +601,7 @@ class DatasetBagBuilder:
         builder._datasetbag_output_tmp = tmp  # type: ignore[attr-defined]
         return builder
 
-    def _compute_rid_sets(self, dataset: DatasetLike) -> RidSetComputation:
+    def _compute_rid_sets(self, dataset: DatasetLike, reachability_concurrency: int = 1) -> RidSetComputation:
         """Compute per-table reachable RID sets for a dataset, client-side.
 
         Factored from estimate_bag_size's reachability assembly so the
@@ -612,6 +612,15 @@ class DatasetBagBuilder:
 
         Args:
             dataset: The dataset to analyze. Must expose ``dataset_rid``.
+            reachability_concurrency: Opt-in bounded parallelism for the
+                edge-table fetch phase (forwarded to
+                :func:`compute_reachability` as ``max_workers``). ``1``
+                (default) fetches sequentially -- exact, behavior-preserving.
+                ``> 1`` parallelizes the per-table fetches, speeding up the
+                estimate AND both bag-generation callers
+                (:meth:`generate_dataset_download_spec`, :meth:`build_bag`) on
+                large datasets. Distinct from the asset-file-download
+                ``fetch_concurrency`` on the download path.
 
         Returns:
             A :class:`RidSetComputation` bundling the per-table RID sets
@@ -653,7 +662,11 @@ class DatasetBagBuilder:
                 return list(tpb.entities().fetch())
 
         rids_by_table, asset_lengths_by_table, fetched_rows = compute_reachability(
-            reached=reached, anchor_rids=anchor_rids, model=model, fetch=_fetch
+            reached=reached,
+            anchor_rids=anchor_rids,
+            model=model,
+            fetch=_fetch,
+            max_workers=reachability_concurrency,
         )
         sample_rows_by_table = sample_rows_from_fetched(reached=reached, fetched_rows=fetched_rows)
 

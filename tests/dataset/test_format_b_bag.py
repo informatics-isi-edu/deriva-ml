@@ -269,3 +269,19 @@ def test_format_b_bag_fetch_txt_scoped_to_reachable_assets(catalog_with_datasets
         )
         asserted += 1
     assert asserted, "no asset table fetch-count was asserted"
+
+
+def test_compute_rid_sets_threads_reachability_concurrency():
+    """_compute_rid_sets accepts reachability_concurrency (default 1) and
+    forwards it to compute_reachability as max_workers, so the estimate and
+    both bag-gen paths can opt into parallel edge-table fetches."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    sig = inspect.signature(DatasetBagBuilder._compute_rid_sets)
+    assert "reachability_concurrency" in sig.parameters
+    assert sig.parameters["reachability_concurrency"].default == 1
+
+    src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
+    assert "max_workers=reachability_concurrency" in src
