@@ -299,3 +299,61 @@ def test_get_storage_summary_tallies_cache_and_executions(tmp_path):
     # working_dir and cache_dir are reported as strings.
     assert summary["working_dir"] == str(h.working_dir)
     assert summary["cache_dir"] == str(h.cache_dir)
+
+
+# ---------------------------------------------------------------------------
+# _dir_size resilience to PermissionError (regression: it caught only
+# FileNotFoundError, so a permission-denied subdir crashed list_cached_bags
+# instead of returning the readable bags).
+# ---------------------------------------------------------------------------
+
+
+def test_dir_size_skips_permission_denied_file(monkeypatch, tmp_path):
+    """A file whose size lookup raises PermissionError is skipped, not fatal."""
+    from deriva_ml.core import storage
+
+    (tmp_path / "ok.txt").write_text("hello")  # 5 bytes
+    (tmp_path / "locked.txt").write_text("secret")
+
+    real_stat = Path.stat
+
+    def fake_stat(self, *a, **k):
+        if self.name == "locked.txt":
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_stat(self, *a, **k)
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+    # Must not raise; counts only the readable file.
+    assert storage._dir_size(tmp_path) == 5
+
+
+def test_dir_size_survives_permission_denied_subdir(monkeypatch, tmp_path):
+    """os.walk hitting a PermissionError traversing a subdir (perm-denied dir on
+    a non-owner process / stricter platform) is skipped, not fatal — and the
+    walk continues across readable siblings via os.walk's onerror callback."""
+    from deriva_ml.core import storage
+
+    # Two readable files plus a (would-be) denied subtree. os.walk's onerror
+    # makes a denied dir non-fatal; assert the readable bytes are still counted.
+    (tmp_path / "a.txt").write_text("hi")  # 2 bytes
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "b.txt").write_text("yo")  # 2 bytes
+
+    real_walk = os.walk
+
+    def walk_with_denied_dir(top, **kw):
+        # Drive the real walk but inject an onerror trigger: simulate the
+        # scandir on `sub` raising PermissionError by skipping it and invoking
+        # the caller's onerror, exactly as os.walk does on a real denial.
+        onerror = kw.get("onerror")
+        for dirpath, dirnames, filenames in real_walk(top):
+            if Path(dirpath) == sub:
+                if onerror:
+                    onerror(PermissionError(13, "Permission denied", str(sub)))
+                continue  # denied dir contributes nothing, walk continues
+            yield dirpath, dirnames, filenames
+
+    monkeypatch.setattr(os, "walk", walk_with_denied_dir)
+    # Must not raise; counts the readable top-level file, skips the denied subdir.
+    assert storage._dir_size(tmp_path) == 2

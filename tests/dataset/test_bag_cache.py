@@ -1,7 +1,7 @@
 """Tests for BagCache — cache status detection for downloaded dataset bags."""
 
-import pytest
 from pathlib import Path
+
 from deriva_ml.dataset.bag_cache import (
     BagCache,
     CacheStatus,
@@ -86,9 +86,7 @@ class TestCacheStatus:
         data_dir = bag_dir / "data"
         data_dir.mkdir(exist_ok=True)
         (bag_dir / "manifest-sha256.txt").write_text("")
-        (bag_dir / "fetch.txt").write_text(
-            "https://example.com/missing.dat\t100\tdata/missing.dat\n"
-        )
+        (bag_dir / "fetch.txt").write_text("https://example.com/missing.dat\t100\tdata/missing.dat\n")
 
         cache = BagCache(tmp_path)
         result = cache.cache_status("XXXX")
@@ -190,5 +188,41 @@ class TestBagCacheIndexIntegration:
             )
             assert info["cache_path"] is not None
             assert checksum in info["versions_cached"]
+        finally:
+            cache.dispose()
+
+
+class TestListBagsResilience:
+    """list_bags must survive an unreadable bag dir rather than crashing the
+    whole listing (regression: _dir_size caught only FileNotFoundError, so a
+    permission-denied subdir inside a cached bag raised straight through)."""
+
+    def test_list_bags_survives_permission_denied_bag(self, tmp_path, monkeypatch):
+        # Two recorded bags with no size_bytes in the index, so list_bags falls
+        # back to _dir_size(bag_dir) for each. Give each a real data file.
+        bag_a = _record_bag(tmp_path, dataset_rid="AAAA", checksum="aaa111")
+        bag_b = _record_bag(tmp_path, dataset_rid="BBBB", checksum="bbb222")
+        (bag_a / "data.txt").write_text("ok")
+        (bag_b / "data.txt").write_text("secret")
+
+        # Make the size lookup for the SECOND bag's data file raise
+        # PermissionError (a real unreadable file inside a cached bag). Pre-fix
+        # this propagated straight through list_bags and crashed the listing.
+        real_stat = Path.stat
+
+        def fake_stat(self, *a, **k):
+            if str(bag_b) in str(self) and self.name == "data.txt":
+                raise PermissionError(13, "Permission denied", str(self))
+            return real_stat(self, *a, **k)
+
+        monkeypatch.setattr(Path, "stat", fake_stat)
+
+        cache = BagCache(tmp_path)
+        try:
+            # Must NOT raise — returns both bags (the unreadable one included).
+            bags = cache.list_bags()
+            rids = {b.dataset_rid for b in bags}
+            assert "AAAA" in rids
+            assert "BBBB" in rids  # the unreadable bag is still listed
         finally:
             cache.dispose()
