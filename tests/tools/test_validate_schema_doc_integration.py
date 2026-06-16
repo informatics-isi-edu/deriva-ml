@@ -28,9 +28,8 @@ def test_validator_runs_clean_on_current_repo():
     actual = _load_from_code(code_path)
     mismatches = _diff_schemas(expected=expected, actual=actual)
 
-    assert mismatches == [], (
-        "schema.md and create_schema.py disagree:\n"
-        + "\n".join(f"  - {m.kind.value}: {m.detail}" for m in mismatches)
+    assert mismatches == [], "schema.md and create_schema.py disagree:\n" + "\n".join(
+        f"  - {m.kind.value}: {m.detail}" for m in mismatches
     )
 
 
@@ -43,7 +42,5 @@ def test_cli_exits_zero_on_current_repo():
         text=True,
         timeout=30,
     )
-    assert result.returncode == 0, (
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
     assert "agree" in result.stdout

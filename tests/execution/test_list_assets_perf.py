@@ -37,9 +37,7 @@ from deriva_ml.model.catalog import DerivaModel
 class TestFindAssetExecutionTablesCaching:
     """``DerivaModel.find_asset_execution_tables`` discovers + caches."""
 
-    def _build_fake_model(
-        self, *, domain_schemas: list[str], ml_schema: str, tables_by_schema: dict
-    ):
+    def _build_fake_model(self, *, domain_schemas: list[str], ml_schema: str, tables_by_schema: dict):
         """Build a MagicMock that quacks like ``DerivaModel`` for cache tests.
 
         ``tables_by_schema`` is a ``{schema_name: [table_name, ...]}``
@@ -217,14 +215,10 @@ class TestListAssetsErrorSurfacing:
     def test_outer_query_failure_propagates(self):
         """Live behavioural pin: a catalog fetch failure raises, not returns []."""
         ml = MagicMock()
-        ml.model.find_asset_execution_tables.return_value = [
-            ("my_domain", "Image_Execution")
-        ]
+        ml.model.find_asset_execution_tables.return_value = [("my_domain", "Image_Execution")]
         # Make ``query.entities().fetch()`` raise.
         table_path = self._table_path_mock(ml)
-        table_path.filter.return_value.entities.return_value.fetch.side_effect = (
-            ConnectionError("catalog down")
-        )
+        table_path.filter.return_value.entities.return_value.fetch.side_effect = ConnectionError("catalog down")
 
         with pytest.raises(ConnectionError, match="catalog down"):
             _helpers.list_assets(ml_instance=ml, execution_rid="exec-1")
@@ -232,9 +226,7 @@ class TestListAssetsErrorSurfacing:
     def test_per_row_lookup_failure_is_swallowed(self):
         """Per-row swallow still applies: one bad row doesn't kill the listing."""
         ml = MagicMock()
-        ml.model.find_asset_execution_tables.return_value = [
-            ("my_domain", "Image_Execution")
-        ]
+        ml.model.find_asset_execution_tables.return_value = [("my_domain", "Image_Execution")]
         # Outer query succeeds, returns two rows.
         records = [
             {"Image": "asset-good"},

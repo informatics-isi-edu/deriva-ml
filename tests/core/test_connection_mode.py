@@ -34,6 +34,7 @@ def test_str_representation_is_value():
 def test_derivaml_default_mode_is_online(test_ml):
     """Default mode is online."""
     from deriva_ml import ConnectionMode
+
     assert test_ml.mode is ConnectionMode.online
 
 
@@ -47,6 +48,7 @@ def test_derivaml_accepts_mode_enum(catalog_manager, tmp_path):
     online-populate-then-offline-load contract.
     """
     from deriva_ml import ConnectionMode, DerivaML
+
     catalog_manager.reset()
     # Step 1: online run populates the schema cache in tmp_path.
     DerivaML(
@@ -72,6 +74,7 @@ def test_derivaml_accepts_mode_string(catalog_manager, tmp_path):
     populates the cache, then offline run loads it.
     """
     from deriva_ml import ConnectionMode, DerivaML
+
     catalog_manager.reset()
     DerivaML(
         hostname=catalog_manager.hostname,
@@ -93,6 +96,7 @@ def test_derivaml_rejects_invalid_mode(catalog_manager, tmp_path):
     from pydantic import ValidationError
 
     from deriva_ml import DerivaML
+
     catalog_manager.reset()
     with pytest.raises((ValidationError, ValueError)):
         DerivaML(

@@ -534,9 +534,7 @@ class TestAssetRecord:
 
         from deriva_ml.asset.asset_record import asset_record_class
 
-        def _fake_column(
-            name: str, typename: str, nullok: bool = False
-        ) -> MagicMock:
+        def _fake_column(name: str, typename: str, nullok: bool = False) -> MagicMock:
             col = MagicMock()
             col.name = name
             col.type.typename = typename
@@ -551,14 +549,22 @@ class TestAssetRecord:
         skip_columns = [
             _fake_column(n, "text")
             for n in (
-                "RID", "RCT", "RMT", "RCB", "RMB",
-                "URL", "Filename", "Length", "MD5", "Description",
+                "RID",
+                "RCT",
+                "RMT",
+                "RCB",
+                "RMB",
+                "URL",
+                "Filename",
+                "Length",
+                "MD5",
+                "Description",
             )
         ]
         # Metadata columns the factory should pick up.
         metadata_columns = [
-            _fake_column("Subject", "text"),                # required str
-            _fake_column("Acquisition_Year", "int4"),       # required int
+            _fake_column("Subject", "text"),  # required str
+            _fake_column("Acquisition_Year", "int4"),  # required int
             _fake_column("Confidence", "float8", nullok=True),  # optional float
         ]
         metadata_names = {c.name for c in metadata_columns}
@@ -589,9 +595,7 @@ class TestAssetRecord:
         assert rec.Confidence is None
 
         # Optional field can be set.
-        rec_with = ImageAssetRecord(
-            Subject="2-DEF", Acquisition_Year=2026, Confidence=0.97
-        )
+        rec_with = ImageAssetRecord(Subject="2-DEF", Acquisition_Year=2026, Confidence=0.97)
         assert rec_with.Confidence == 0.97
 
         # Unknown fields rejected (extra="forbid" inherited from AssetRecord).
@@ -599,12 +603,12 @@ class TestAssetRecord:
         # ``Filename`` must NOT appear as fields on the generated
         # class — the metadata filter must have dropped them.
         with pytest.raises(Exception):  # Pydantic ValidationError
-            ImageAssetRecord(
-                Subject="2-DEF", Acquisition_Year=2026, Bogus="x"
-            )
+            ImageAssetRecord(Subject="2-DEF", Acquisition_Year=2026, Bogus="x")
         with pytest.raises(Exception):  # standard-asset column must be filtered out
             ImageAssetRecord(
-                Subject="2-DEF", Acquisition_Year=2026, URL="/hatrac/...",
+                Subject="2-DEF",
+                Acquisition_Year=2026,
+                URL="/hatrac/...",
             )
 
 

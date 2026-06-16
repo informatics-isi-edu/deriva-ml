@@ -8,6 +8,7 @@ def test_schema_model_fields():
         SchemaModel,
         TableModel,
     )
+
     m = SchemaModel(tables=[])
     assert m.tables == []
 
@@ -26,6 +27,7 @@ def test_schema_model_fields():
 
 def test_column_model_fields():
     from deriva_ml.tools.validate_schema_doc import ColumnModel
+
     c = ColumnModel(name="Status", type="text")
     assert c.name == "Status"
     assert c.type == "text"
@@ -33,6 +35,7 @@ def test_column_model_fields():
 
 def test_fk_model_fields():
     from deriva_ml.tools.validate_schema_doc import ForeignKeyModel
+
     fk = ForeignKeyModel(
         columns=["Workflow"],
         referenced_schema="deriva-ml",
@@ -45,6 +48,7 @@ def test_fk_model_fields():
 
 def test_vocabulary_term_model():
     from deriva_ml.tools.validate_schema_doc import VocabularyTermModel
+
     term = VocabularyTermModel(name="Running")
     assert term.name == "Running"
 
@@ -52,6 +56,7 @@ def test_vocabulary_term_model():
 def test_mismatch_kinds_defined():
     """Enum of mismatch kinds is present."""
     from deriva_ml.tools.validate_schema_doc import MismatchKind
+
     assert MismatchKind.MISSING_TABLE.value == "missing_table"
     assert MismatchKind.COLUMN_MISMATCH.value == "column_mismatch"
     assert MismatchKind.FK_MISMATCH.value == "fk_mismatch"
@@ -96,16 +101,7 @@ def test_extract_yaml_blocks_ignores_non_yaml_fences(tmp_path):
     from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
 
     doc = tmp_path / "schema.md"
-    doc.write_text(
-        "```python\n"
-        "x = 1\n"
-        "```\n"
-        "\n"
-        "```yaml\n"
-        "table: Dataset\n"
-        "kind: table\n"
-        "```\n"
-    )
+    doc.write_text("```python\nx = 1\n```\n\n```yaml\ntable: Dataset\nkind: table\n```\n")
 
     blocks = _extract_yaml_blocks(doc)
     assert len(blocks) == 1
@@ -146,13 +142,7 @@ def test__load_from_doc_vocabulary(tmp_path):
 
     doc = tmp_path / "schema.md"
     doc.write_text(
-        "```yaml\n"
-        "table: Asset_Type\n"
-        "kind: vocabulary\n"
-        "terms:\n"
-        "  - name: Execution_Config\n"
-        "  - name: Runtime_Env\n"
-        "```\n"
+        "```yaml\ntable: Asset_Type\nkind: vocabulary\nterms:\n  - name: Execution_Config\n  - name: Runtime_Env\n```\n"
     )
     model = _load_from_doc(doc)
     t = model.tables[0]
@@ -214,12 +204,7 @@ def test__load_from_doc_invalid_kind_raises(tmp_path):
     from deriva_ml.tools.validate_schema_doc import SchemaDocError, _load_from_doc
 
     doc = tmp_path / "schema.md"
-    doc.write_text(
-        "```yaml\n"
-        "table: Bogus\n"
-        "kind: not-a-real-kind\n"
-        "```\n"
-    )
+    doc.write_text("```yaml\ntable: Bogus\nkind: not-a-real-kind\n```\n")
     with pytest.raises(SchemaDocError, match="unknown kind"):
         _load_from_doc(doc)
 
@@ -231,11 +216,7 @@ def test__load_from_doc_missing_required_key_raises(tmp_path):
     from deriva_ml.tools.validate_schema_doc import SchemaDocError, _load_from_doc
 
     doc = tmp_path / "schema.md"
-    doc.write_text(
-        "```yaml\n"
-        "table: Bogus\n"
-        "```\n"
-    )
+    doc.write_text("```yaml\ntable: Bogus\n```\n")
     with pytest.raises(SchemaDocError, match="missing required key"):
         _load_from_doc(doc)
 
@@ -304,26 +285,26 @@ def test__load_from_code_simple_tabledef(tmp_path):
 
     fixture = tmp_path / "fixture_schema.py"
     fixture.write_text(
-        'from deriva.core.typed import TableDef, ColumnDef, ForeignKeyDef, BuiltinType\n'
-        'from deriva_ml.core.definitions import MLTable\n'
-        '\n'
-        'def create_execution_table(schema):\n'
-        '    schema.create_table(TableDef(\n'
-        '        name=MLTable.execution,\n'
-        '        columns=[\n'
+        "from deriva.core.typed import TableDef, ColumnDef, ForeignKeyDef, BuiltinType\n"
+        "from deriva_ml.core.definitions import MLTable\n"
+        "\n"
+        "def create_execution_table(schema):\n"
+        "    schema.create_table(TableDef(\n"
+        "        name=MLTable.execution,\n"
+        "        columns=[\n"
         '            ColumnDef("Workflow", BuiltinType.text),\n'
         '            ColumnDef("Description", BuiltinType.markdown),\n'
         '            ColumnDef("Status", BuiltinType.text),\n'
-        '        ],\n'
-        '        foreign_keys=[\n'
-        '            ForeignKeyDef(\n'
+        "        ],\n"
+        "        foreign_keys=[\n"
+        "            ForeignKeyDef(\n"
         '                columns=["Workflow"],\n'
         '                referenced_schema="deriva-ml",\n'
         '                referenced_table="Workflow",\n'
         '                referenced_columns=["RID"],\n'
-        '            )\n'
-        '        ],\n'
-        '    ))\n'
+        "            )\n"
+        "        ],\n"
+        "    ))\n"
     )
     model = _load_from_code(fixture)
     assert len(model.tables) == 1
@@ -343,19 +324,19 @@ def test__load_from_code_vocabulary_with_terms(tmp_path):
 
     fixture = tmp_path / "fixture_vocab.py"
     fixture.write_text(
-        'from deriva.core.typed import VocabularyTableDef\n'
-        'from deriva_ml.core.definitions import MLVocab\n'
-        '\n'
-        'def create():\n'
-        '    schema.create_table(\n'
+        "from deriva.core.typed import VocabularyTableDef\n"
+        "from deriva_ml.core.definitions import MLVocab\n"
+        "\n"
+        "def create():\n"
+        "    schema.create_table(\n"
         '        VocabularyTableDef(name=MLVocab.workflow_type, curie_template="x:{RID}")\n'
-        '    )\n'
-        '\n'
-        'def seed():\n'
-        '    _ensure_terms(MLVocab.workflow_type, [\n'
+        "    )\n"
+        "\n"
+        "def seed():\n"
+        "    _ensure_terms(MLVocab.workflow_type, [\n"
         '        {"Name": "Training", "Description": "Train a model"},\n'
         '        {"Name": "Testing", "Description": "Evaluate a model"},\n'
-        '    ])\n'
+        "    ])\n"
     )
     model = _load_from_code(fixture)
     assert len(model.tables) == 1
@@ -371,21 +352,21 @@ def test__load_from_code_association_table(tmp_path):
 
     fixture = tmp_path / "fixture_assoc.py"
     fixture.write_text(
-        'from deriva.core.ermrest_model import Table\n'
-        'from deriva.core.typed import ColumnDef, BuiltinType\n'
-        '\n'
-        'def create():\n'
-        '    schema.create_table(\n'
-        '        Table.define_association(\n'
-        '            associates=[\n'
+        "from deriva.core.ermrest_model import Table\n"
+        "from deriva.core.typed import ColumnDef, BuiltinType\n"
+        "\n"
+        "def create():\n"
+        "    schema.create_table(\n"
+        "        Table.define_association(\n"
+        "            associates=[\n"
         '                ("Execution", execution_table),\n'
         '                ("Nested_Execution", execution_table),\n'
-        '            ],\n'
-        '            metadata=[\n'
+        "            ],\n"
+        "            metadata=[\n"
         '                ColumnDef(name="Sequence", type="int4", nullok=True),\n'
-        '            ],\n'
-        '        )\n'
-        '    )\n'
+        "            ],\n"
+        "        )\n"
+        "    )\n"
     )
     model = _load_from_code(fixture)
     assert len(model.tables) == 1
@@ -400,6 +381,7 @@ def test__load_from_code_association_table(tmp_path):
 
 def test_mismatch_dataclass_fields():
     from deriva_ml.tools.validate_schema_doc import Mismatch, MismatchKind
+
     m = Mismatch(
         kind=MismatchKind.MISSING_TABLE,
         table="Execution_Status",
@@ -416,20 +398,25 @@ def test_diff_identical_schemas_empty():
         TableModel,
         _diff_schemas,
     )
-    s1 = SchemaModel(tables=[
-        TableModel(
-            name="Dataset",
-            kind="table",
-            columns=[ColumnModel(name="Name", type="text")],
-        ),
-    ])
-    s2 = SchemaModel(tables=[
-        TableModel(
-            name="Dataset",
-            kind="table",
-            columns=[ColumnModel(name="Name", type="text")],
-        ),
-    ])
+
+    s1 = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="text")],
+            ),
+        ]
+    )
+    s2 = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="text")],
+            ),
+        ]
+    )
     assert _diff_schemas(expected=s1, actual=s2) == []
 
 
@@ -441,14 +428,25 @@ def test_diff_column_missing_in_actual():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Dataset", kind="table",
-        columns=[ColumnModel(name="Name", type="text"), ColumnModel(name="Extra", type="text")],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Dataset", kind="table",
-        columns=[ColumnModel(name="Name", type="text")],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="text"), ColumnModel(name="Extra", type="text")],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="text")],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert len(mismatches) == 1
     assert mismatches[0].kind == MismatchKind.COLUMN_MISMATCH
@@ -463,19 +461,28 @@ def test_diff_column_type_mismatch():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Dataset", kind="table",
-        columns=[ColumnModel(name="Name", type="text")],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Dataset", kind="table",
-        columns=[ColumnModel(name="Name", type="markdown")],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="text")],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="markdown")],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(
-        m.kind == MismatchKind.COLUMN_MISMATCH
-        and "text" in m.detail and "markdown" in m.detail
-        for m in mismatches
+        m.kind == MismatchKind.COLUMN_MISMATCH and "text" in m.detail and "markdown" in m.detail for m in mismatches
     )
 
 
@@ -488,26 +495,41 @@ def test_diff_fk_target_mismatch():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Execution", kind="table",
-        columns=[ColumnModel(name="Workflow", type="text")],
-        foreign_keys=[ForeignKeyModel(
-            columns=["Workflow"],
-            referenced_schema="deriva-ml",
-            referenced_table="Workflow",
-            referenced_columns=["RID"],
-        )],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Execution", kind="table",
-        columns=[ColumnModel(name="Workflow", type="text")],
-        foreign_keys=[ForeignKeyModel(
-            columns=["Workflow"],
-            referenced_schema="deriva-ml",
-            referenced_table="SomeOtherTable",
-            referenced_columns=["RID"],
-        )],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Execution",
+                kind="table",
+                columns=[ColumnModel(name="Workflow", type="text")],
+                foreign_keys=[
+                    ForeignKeyModel(
+                        columns=["Workflow"],
+                        referenced_schema="deriva-ml",
+                        referenced_table="Workflow",
+                        referenced_columns=["RID"],
+                    )
+                ],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Execution",
+                kind="table",
+                columns=[ColumnModel(name="Workflow", type="text")],
+                foreign_keys=[
+                    ForeignKeyModel(
+                        columns=["Workflow"],
+                        referenced_schema="deriva-ml",
+                        referenced_table="SomeOtherTable",
+                        referenced_columns=["RID"],
+                    )
+                ],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
 
@@ -520,22 +542,31 @@ def test_diff_vocab_terms_differ():
         VocabularyTermModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Asset_Type",
-        kind="vocabulary",
-        terms=[
-            VocabularyTermModel(name="Execution_Config"),
-            VocabularyTermModel(name="Extra_DocOnly_Term"),
-        ],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Asset_Type",
-        kind="vocabulary",
-        terms=[
-            VocabularyTermModel(name="Execution_Config"),
-            VocabularyTermModel(name="Extra_CodeOnly_Term"),
-        ],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Asset_Type",
+                kind="vocabulary",
+                terms=[
+                    VocabularyTermModel(name="Execution_Config"),
+                    VocabularyTermModel(name="Extra_DocOnly_Term"),
+                ],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Asset_Type",
+                kind="vocabulary",
+                terms=[
+                    VocabularyTermModel(name="Execution_Config"),
+                    VocabularyTermModel(name="Extra_CodeOnly_Term"),
+                ],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(
         m.kind == MismatchKind.VOCAB_TERMS_MISMATCH
@@ -553,22 +584,31 @@ def test_diff_association_endpoints_differ():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Dataset_Execution",
-        kind="association",
-        associates=[
-            AssociationEndpointModel(table="Dataset"),
-            AssociationEndpointModel(table="Execution"),
-        ],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Dataset_Execution",
-        kind="association",
-        associates=[
-            AssociationEndpointModel(table="Dataset"),
-            AssociationEndpointModel(table="Workflow"),  # differs
-        ],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset_Execution",
+                kind="association",
+                associates=[
+                    AssociationEndpointModel(table="Dataset"),
+                    AssociationEndpointModel(table="Execution"),
+                ],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset_Execution",
+                kind="association",
+                associates=[
+                    AssociationEndpointModel(table="Dataset"),
+                    AssociationEndpointModel(table="Workflow"),  # differs
+                ],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.ASSOCIATION_MISMATCH for m in mismatches)
 
@@ -578,18 +618,10 @@ def test_cli_match_returns_0(tmp_path, capsys):
     from deriva_ml.tools.validate_schema_doc import main
 
     doc = tmp_path / "schema.md"
-    doc.write_text(
-        "```yaml\n"
-        "table: X\n"
-        "kind: table\n"
-        "columns: []\n"
-        "foreign_keys: []\n"
-        "```\n"
-    )
+    doc.write_text("```yaml\ntable: X\nkind: table\ncolumns: []\nforeign_keys: []\n```\n")
     code = tmp_path / "code.py"
     code.write_text(
-        'from deriva.core.typed import TableDef\n'
-        'schema.create_table(TableDef(name="X", columns=[], foreign_keys=[]))\n'
+        'from deriva.core.typed import TableDef\nschema.create_table(TableDef(name="X", columns=[], foreign_keys=[]))\n'
     )
 
     exit_code = main(["--doc", str(doc), "--code", str(code)])
@@ -603,24 +635,15 @@ def test_cli_mismatch_returns_1(tmp_path, capsys):
     from deriva_ml.tools.validate_schema_doc import main
 
     doc = tmp_path / "schema.md"
-    doc.write_text(
-        "```yaml\n"
-        "table: X\n"
-        "kind: table\n"
-        "columns:\n"
-        "  - name: A\n"
-        "    type: text\n"
-        "foreign_keys: []\n"
-        "```\n"
-    )
+    doc.write_text("```yaml\ntable: X\nkind: table\ncolumns:\n  - name: A\n    type: text\nforeign_keys: []\n```\n")
     code = tmp_path / "code.py"
     code.write_text(
-        'from deriva.core.typed import TableDef, ColumnDef, BuiltinType\n'
-        'schema.create_table(TableDef(\n'
+        "from deriva.core.typed import TableDef, ColumnDef, BuiltinType\n"
+        "schema.create_table(TableDef(\n"
         '    name="X",\n'
         '    columns=[ColumnDef("B", BuiltinType.text)],\n'
-        '    foreign_keys=[],\n'
-        '))\n'
+        "    foreign_keys=[],\n"
+        "))\n"
     )
 
     exit_code = main(["--doc", str(doc), "--code", str(code)])
@@ -634,12 +657,7 @@ def test_cli_parse_error_returns_2(tmp_path, capsys):
     from deriva_ml.tools.validate_schema_doc import main
 
     doc = tmp_path / "schema.md"
-    doc.write_text(
-        "```yaml\n"
-        "table: X\n"
-        "kind: invalid-kind\n"
-        "```\n"
-    )
+    doc.write_text("```yaml\ntable: X\nkind: invalid-kind\n```\n")
     code = tmp_path / "code.py"
     code.write_text("")
 
@@ -658,27 +676,30 @@ def test_to_doc_markdown_roundtrip(tmp_path):
         _load_from_doc,
         to_doc_markdown,
     )
-    original = SchemaModel(tables=[
-        TableModel(
-            name="Dataset",
-            kind="table",
-            columns=[ColumnModel(name="Name", type="text")],
-            foreign_keys=[],
-        ),
-        TableModel(
-            name="Workflow_Type",
-            kind="vocabulary",
-            terms=[VocabularyTermModel(name="Training")],
-        ),
-        TableModel(
-            name="Dataset_Dataset_Type",
-            kind="association",
-            associates=[
-                AssociationEndpointModel(table="Dataset"),
-                AssociationEndpointModel(table="Dataset_Type"),
-            ],
-        ),
-    ])
+
+    original = SchemaModel(
+        tables=[
+            TableModel(
+                name="Dataset",
+                kind="table",
+                columns=[ColumnModel(name="Name", type="text")],
+                foreign_keys=[],
+            ),
+            TableModel(
+                name="Workflow_Type",
+                kind="vocabulary",
+                terms=[VocabularyTermModel(name="Training")],
+            ),
+            TableModel(
+                name="Dataset_Dataset_Type",
+                kind="association",
+                associates=[
+                    AssociationEndpointModel(table="Dataset"),
+                    AssociationEndpointModel(table="Dataset_Type"),
+                ],
+            ),
+        ]
+    )
     md = to_doc_markdown(original)
     doc = tmp_path / "schema.md"
     doc.write_text(md)
@@ -686,7 +707,9 @@ def test_to_doc_markdown_roundtrip(tmp_path):
 
     assert len(roundtripped.tables) == 3
     assert [t.name for t in roundtripped.tables] == [
-        "Dataset", "Workflow_Type", "Dataset_Dataset_Type",
+        "Dataset",
+        "Workflow_Type",
+        "Dataset_Dataset_Type",
     ]
     assert roundtripped.tables[0].columns[0].name == "Name"
     assert roundtripped.tables[1].terms[0].name == "Training"
@@ -708,28 +731,41 @@ def test_dynamic_value_fk_schema_matches_any():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Execution",
-        kind="table",
-        columns=[ColumnModel(name="Workflow", type="text")],
-        foreign_keys=[ForeignKeyModel(
-            columns=["Workflow"],
-            referenced_schema="deriva-ml",  # doc-side literal
-            referenced_table="Workflow",
-            referenced_columns=["RID"],
-        )],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Execution",
-        kind="table",
-        columns=[ColumnModel(name="Workflow", type="text")],
-        foreign_keys=[ForeignKeyModel(
-            columns=["Workflow"],
-            referenced_schema=DYNAMIC_VALUE,  # code-side unresolvable
-            referenced_table="Workflow",
-            referenced_columns=["RID"],
-        )],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Execution",
+                kind="table",
+                columns=[ColumnModel(name="Workflow", type="text")],
+                foreign_keys=[
+                    ForeignKeyModel(
+                        columns=["Workflow"],
+                        referenced_schema="deriva-ml",  # doc-side literal
+                        referenced_table="Workflow",
+                        referenced_columns=["RID"],
+                    )
+                ],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Execution",
+                kind="table",
+                columns=[ColumnModel(name="Workflow", type="text")],
+                foreign_keys=[
+                    ForeignKeyModel(
+                        columns=["Workflow"],
+                        referenced_schema=DYNAMIC_VALUE,  # code-side unresolvable
+                        referenced_table="Workflow",
+                        referenced_columns=["RID"],
+                    )
+                ],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert mismatches == [], f"Expected no mismatches; got {mismatches}"
 
@@ -745,28 +781,41 @@ def test_dynamic_value_does_not_mask_other_fk_differences():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="Execution",
-        kind="table",
-        columns=[ColumnModel(name="Workflow", type="text")],
-        foreign_keys=[ForeignKeyModel(
-            columns=["Workflow"],
-            referenced_schema="deriva-ml",
-            referenced_table="Workflow",
-            referenced_columns=["RID"],
-        )],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="Execution",
-        kind="table",
-        columns=[ColumnModel(name="Workflow", type="text")],
-        foreign_keys=[ForeignKeyModel(
-            columns=["Workflow"],
-            referenced_schema=DYNAMIC_VALUE,
-            referenced_table="DifferentTable",  # differs
-            referenced_columns=["RID"],
-        )],
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="Execution",
+                kind="table",
+                columns=[ColumnModel(name="Workflow", type="text")],
+                foreign_keys=[
+                    ForeignKeyModel(
+                        columns=["Workflow"],
+                        referenced_schema="deriva-ml",
+                        referenced_table="Workflow",
+                        referenced_columns=["RID"],
+                    )
+                ],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="Execution",
+                kind="table",
+                columns=[ColumnModel(name="Workflow", type="text")],
+                foreign_keys=[
+                    ForeignKeyModel(
+                        columns=["Workflow"],
+                        referenced_schema=DYNAMIC_VALUE,
+                        referenced_table="DifferentTable",  # differs
+                        referenced_columns=["RID"],
+                    )
+                ],
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
     assert any(m.kind == MismatchKind.FK_MISMATCH for m in mismatches)
 
@@ -781,27 +830,34 @@ def test_compare_associates_detects_metadata_mismatch():
         TableModel,
         _diff_schemas,
     )
-    expected = SchemaModel(tables=[TableModel(
-        name="X_Y",
-        kind="association",
-        associates=[
-            AssociationEndpointModel(table="X"),
-            AssociationEndpointModel(table="Y"),
-        ],
-        metadata=[ColumnModel(name="Sequence", type="int4")],
-    )])
-    actual = SchemaModel(tables=[TableModel(
-        name="X_Y",
-        kind="association",
-        associates=[
-            AssociationEndpointModel(table="X"),
-            AssociationEndpointModel(table="Y"),
-        ],
-        metadata=[],  # code is missing the metadata column
-    )])
+
+    expected = SchemaModel(
+        tables=[
+            TableModel(
+                name="X_Y",
+                kind="association",
+                associates=[
+                    AssociationEndpointModel(table="X"),
+                    AssociationEndpointModel(table="Y"),
+                ],
+                metadata=[ColumnModel(name="Sequence", type="int4")],
+            )
+        ]
+    )
+    actual = SchemaModel(
+        tables=[
+            TableModel(
+                name="X_Y",
+                kind="association",
+                associates=[
+                    AssociationEndpointModel(table="X"),
+                    AssociationEndpointModel(table="Y"),
+                ],
+                metadata=[],  # code is missing the metadata column
+            )
+        ]
+    )
     mismatches = _diff_schemas(expected=expected, actual=actual)
-    assert any(
-        m.kind == MismatchKind.ASSOCIATION_MISMATCH
-        and "metadata" in m.detail
-        for m in mismatches
-    ), f"Expected metadata mismatch; got {mismatches}"
+    assert any(m.kind == MismatchKind.ASSOCIATION_MISMATCH and "metadata" in m.detail for m in mismatches), (
+        f"Expected metadata mismatch; got {mismatches}"
+    )

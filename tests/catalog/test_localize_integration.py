@@ -135,9 +135,7 @@ def test_localize_assets_same_host_skips_all_as_already_local(
         output_dir=tmp_path / "bag",
         policy=FKTraversalPolicy(asset_mode=AssetMode.ROWS_ONLY),
     )
-    assert clone_result.load_report.total_rows_inserted > 0, (
-        "Clone produced no rows — test premise broken."
-    )
+    assert clone_result.load_report.total_rows_inserted > 0, "Clone produced no rows — test premise broken."
 
     schema = source_ml.default_schema
     dest_image_rows = _list_image_rows(dest_catalog_for_localize, schema)
@@ -154,9 +152,7 @@ def test_localize_assets_same_host_skips_all_as_already_local(
     )
 
     # Result shape + same-host short-circuit behaviour.
-    assert isinstance(result, LocalizeResult), (
-        f"localize_assets must return a LocalizeResult; got {type(result)!r}"
-    )
+    assert isinstance(result, LocalizeResult), f"localize_assets must return a LocalizeResult; got {type(result)!r}"
     assert result.assets_processed == 0, (
         f"Expected zero processed when source == dest host; got "
         f"{result.assets_processed}. The function must short-circuit "
@@ -168,8 +164,7 @@ def test_localize_assets_same_host_skips_all_as_already_local(
         f"misidentifying the host or the same-host comparison broke."
     )
     assert result.assets_failed == 0, (
-        f"Same-host short-circuit must not fail any assets; got "
-        f"failed={result.assets_failed}, errors={result.errors!r}"
+        f"Same-host short-circuit must not fail any assets; got failed={result.assets_failed}, errors={result.errors!r}"
     )
 
     # Catalog rows untouched on the same-host path.
@@ -268,10 +263,6 @@ def test_localize_assets_unknown_rid_marks_skipped(
     assert isinstance(result, LocalizeResult)
     assert result.assets_processed == 0
     assert result.assets_skipped == 1, (
-        f"Unknown RID should bump assets_skipped; got skipped="
-        f"{result.assets_skipped}, failed={result.assets_failed}"
+        f"Unknown RID should bump assets_skipped; got skipped={result.assets_skipped}, failed={result.assets_failed}"
     )
-    assert result.assets_failed == 0, (
-        f"Unknown RID is a skip, not a failure; got failed="
-        f"{result.assets_failed}"
-    )
+    assert result.assets_failed == 0, f"Unknown RID is a skip, not a failure; got failed={result.assets_failed}"

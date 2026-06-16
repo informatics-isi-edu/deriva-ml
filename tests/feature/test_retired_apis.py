@@ -4,6 +4,7 @@ These tests enforce the S2 migration contract: every retired method must raise
 with a message that tells the user exactly where to go for the replacement.
 Silent fallthrough or generic errors are not acceptable.
 """
+
 from __future__ import annotations
 
 import pytest

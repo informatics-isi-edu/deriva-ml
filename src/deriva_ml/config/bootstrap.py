@@ -182,7 +182,4 @@ def _format_workflow_spec(rid: str) -> str:
 
 def _format_deriva_ml_spec(hostname: str, catalog_id: str) -> str:
     """Format the ``deriva_store(DerivaMLConfig, ...)`` call body."""
-    return (
-        f'deriva_store(DerivaMLConfig, name="default_deriva", '
-        f'hostname="{hostname}", catalog_id="{catalog_id}")'
-    )
+    return f'deriva_store(DerivaMLConfig, name="default_deriva", hostname="{hostname}", catalog_id="{catalog_id}")'

@@ -44,15 +44,26 @@ def test_execution_snapshot_is_frozen():
 
     now = datetime.now(timezone.utc)
     rec = ExecutionSnapshot(
-        rid="X", workflow_rid=None, description=None,
-        status=ExecutionStatus.Created, mode=ConnectionMode.online,
+        rid="X",
+        workflow_rid=None,
+        description=None,
+        status=ExecutionStatus.Created,
+        mode=ConnectionMode.online,
         working_dir_rel="execution/X",
-        start_time=None, stop_time=None, last_activity=now,
-        error=None, sync_pending=False, created_at=now,
-        pending_rows=0, failed_rows=0, pending_files=0, failed_files=0,
+        start_time=None,
+        stop_time=None,
+        last_activity=now,
+        error=None,
+        sync_pending=False,
+        created_at=now,
+        pending_rows=0,
+        failed_rows=0,
+        pending_files=0,
+        failed_files=0,
     )
     # Pydantic v2 frozen models raise ValidationError on mutation
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         rec.rid = "Y"
 
@@ -80,8 +91,10 @@ def test_execution_snapshot_from_row_constructs_from_sqlite_dict():
     }
     rec = ExecutionSnapshot.from_row(
         row,
-        pending_rows=3, failed_rows=0,
-        pending_files=1, failed_files=0,
+        pending_rows=3,
+        failed_rows=0,
+        pending_files=1,
+        failed_files=0,
     )
     assert rec.rid == "EXE-A"
     assert rec.status is ExecutionStatus.Stopped
@@ -98,12 +111,22 @@ def test_execution_snapshot_model_dump():
 
     now = datetime.now(timezone.utc)
     snap = ExecutionSnapshot(
-        rid="X", workflow_rid=None, description=None,
-        status=ExecutionStatus.Created, mode=ConnectionMode.online,
+        rid="X",
+        workflow_rid=None,
+        description=None,
+        status=ExecutionStatus.Created,
+        mode=ConnectionMode.online,
         working_dir_rel="execution/X",
-        start_time=None, stop_time=None, last_activity=now,
-        error=None, sync_pending=False, created_at=now,
-        pending_rows=0, failed_rows=0, pending_files=0, failed_files=0,
+        start_time=None,
+        stop_time=None,
+        last_activity=now,
+        error=None,
+        sync_pending=False,
+        created_at=now,
+        pending_rows=0,
+        failed_rows=0,
+        pending_files=0,
+        failed_files=0,
     )
     d = snap.model_dump()
     assert d["rid"] == "X"

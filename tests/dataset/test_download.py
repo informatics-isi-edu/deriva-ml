@@ -56,7 +56,8 @@ class TestDatasetDownload:
             # vs what the bag has", so each ds is queried at its own
             # latest version.
             catalog_elements = snapshot_ds.list_dataset_members(
-                version=snapshot_ds.current_version, recurse=recurse,
+                version=snapshot_ds.current_version,
+                recurse=recurse,
             )
             del catalog_elements["File"]  # Files is not in the bag.
             bag_elements = dataset_bag.list_dataset_members(recurse=recurse)

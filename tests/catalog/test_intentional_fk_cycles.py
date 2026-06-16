@@ -48,9 +48,7 @@ def test_intentional_fk_cycles_includes_dataset_dataset_version() -> None:
     """
     expected = frozenset({"deriva-ml.Dataset", "deriva-ml.Dataset_Version"})
     cycle_sets = {frozenset(c) for c in INTENTIONAL_FK_CYCLES}
-    assert expected in cycle_sets, (
-        f"Expected {expected} in INTENTIONAL_FK_CYCLES; got {cycle_sets}"
-    )
+    assert expected in cycle_sets, f"Expected {expected} in INTENTIONAL_FK_CYCLES; got {cycle_sets}"
 
 
 def test_intentional_fk_cycles_shape() -> None:
@@ -66,8 +64,7 @@ def test_intentional_fk_cycles_shape() -> None:
         for table in cycle:
             assert isinstance(table, str)
             assert "." in table, (
-                f"INTENTIONAL_FK_CYCLES entries must be "
-                f"fully-qualified ({{schema}}.{{table}}); got {table!r}"
+                f"INTENTIONAL_FK_CYCLES entries must be fully-qualified ({{schema}}.{{table}}); got {table!r}"
             )
 
 
@@ -108,6 +105,7 @@ def test_bag_builder_policy_includes_intentional_cycles(monkeypatch) -> None:
     # bag_builder.py construct stops passing intentional_cycles.
     # We use a regex grep over the source as a backstop too.
     import inspect
+
     src = inspect.getsource(DatasetBagBuilder)
     assert "intentional_cycles" in src, (
         "DatasetBagBuilder should pass `intentional_cycles=` to "

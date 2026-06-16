@@ -3,7 +3,6 @@
 Unit tests using a stub container (no live catalog required).
 """
 
-
 import pytest
 
 from deriva_ml.core.exceptions import DerivaMLException

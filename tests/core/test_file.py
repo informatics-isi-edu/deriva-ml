@@ -238,9 +238,7 @@ class TestCreateFilespecsLength:
             (tmp_path / name).write_bytes(b"x" * n)
 
         specs = {Path(s.url).name: s for s in FileSpec.create_filespecs(tmp_path, "walk")}
-        assert set(specs) == set(sizes), (
-            f"Expected one spec per file; got {set(specs)} vs {set(sizes)}"
-        )
+        assert set(specs) == set(sizes), f"Expected one spec per file; got {set(specs)} vs {set(sizes)}"
         for name, expected in sizes.items():
             assert specs[name].length == expected, (
                 f"FileSpec for {name!r} reported length {specs[name].length}, "

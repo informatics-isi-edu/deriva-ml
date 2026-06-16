@@ -56,12 +56,8 @@ def test_clone_via_bag_root_rid_maps_to_rid_anchor(tmp_path: Path) -> None:
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         # Configure builder to return a known bag path.
         builder_instance = MockBuilder.return_value
@@ -115,12 +111,8 @@ def test_clone_via_bag_passes_through_explicit_anchors(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -154,12 +146,8 @@ def test_clone_via_bag_default_output_dir(tmp_path: Path) -> None:
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
         patch(
             "deriva_ml.catalog.clone_via_bag.Path.cwd",
             return_value=tmp_path,
@@ -216,12 +204,8 @@ def test_clone_via_bag_passes_policy_through(tmp_path: Path) -> None:
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -271,12 +255,8 @@ def test_clone_via_bag_merges_defaults_into_partial_policy(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -308,10 +288,7 @@ def test_clone_via_bag_merges_defaults_into_partial_policy(
         # messages for the deriva-ml core schema's intentional
         # cycle. See core/constants.py:INTENTIONAL_FK_CYCLES.
         cycle_table_sets = {frozenset(c) for c in merged.intentional_cycles}
-        assert (
-            frozenset({"deriva-ml.Dataset", "deriva-ml.Dataset_Version"})
-            in cycle_table_sets
-        )
+        assert frozenset({"deriva-ml.Dataset", "deriva-ml.Dataset_Version"}) in cycle_table_sets
 
 
 def test_clone_via_bag_preserves_explicit_empty_cycles(tmp_path: Path) -> None:
@@ -336,12 +313,8 @@ def test_clone_via_bag_preserves_explicit_empty_cycles(tmp_path: Path) -> None:
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -394,12 +367,8 @@ def test_clone_via_bag_preserves_explicit_fail_strategy(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -447,12 +416,8 @@ def test_clone_via_bag_preserves_explicit_referenced_only_vocab(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -485,15 +450,9 @@ def test_clone_via_bag_uses_get_credential_when_creds_absent(
 
     with (
         patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.get_credential"
-        ) as mock_creds,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.get_credential") as mock_creds,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         mock_creds.return_value = {"fake": "creds"}
         MockBuilder.return_value.build.return_value = fake_bag_path
@@ -523,15 +482,9 @@ def test_clone_via_bag_uses_explicit_credentials(tmp_path: Path) -> None:
 
     with (
         patch("deriva_ml.catalog.clone_via_bag.DerivaServer"),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.get_credential"
-        ) as mock_creds,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.get_credential") as mock_creds,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -658,9 +611,7 @@ def test_expand_nested_dataset_anchors_no_children() -> None:
         _expand_nested_dataset_anchors,
     )
 
-    catalog = _make_mock_catalog_with_dataset_dataset_rows(
-        {("L",): []}
-    )
+    catalog = _make_mock_catalog_with_dataset_dataset_rows({("L",): []})
     anchors = [RIDAnchor(table="Dataset", rids=["L"])]
     expanded = _expand_nested_dataset_anchors(anchors, catalog)
     assert set(expanded[0].rids) == {"L"}
@@ -723,9 +674,7 @@ def test_clone_via_bag_delete_strategy_surfaces_orphan_count_on_provenance(
     fake_bag_path = tmp_path / "fake-bag"
     fake_bag_path.mkdir()
 
-    fake_report = _make_load_report_with_orphans(
-        total_rows=100, rows_skipped_orphan=7
-    )
+    fake_report = _make_load_report_with_orphans(total_rows=100, rows_skipped_orphan=7)
 
     user_policy = FKTraversalPolicy(
         dangling_fk_strategy=DanglingFKStrategy.DELETE,
@@ -737,15 +686,9 @@ def test_clone_via_bag_delete_strategy_surfaces_orphan_count_on_provenance(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
-        ) as MockSetProv,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.set_catalog_provenance") as MockSetProv,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()
@@ -777,9 +720,7 @@ def test_clone_via_bag_nullify_strategy_surfaces_orphan_count_on_provenance(
     fake_bag_path = tmp_path / "fake-bag"
     fake_bag_path.mkdir()
 
-    fake_report = _make_load_report_with_orphans(
-        total_rows=50, rows_nullified_orphan=4
-    )
+    fake_report = _make_load_report_with_orphans(total_rows=50, rows_nullified_orphan=4)
 
     user_policy = FKTraversalPolicy(
         dangling_fk_strategy=DanglingFKStrategy.NULLIFY,
@@ -791,15 +732,9 @@ def test_clone_via_bag_nullify_strategy_surfaces_orphan_count_on_provenance(
             "deriva_ml.catalog.clone_via_bag.get_credential",
             return_value={},
         ),
-        patch(
-            "deriva_ml.catalog.clone_via_bag.CatalogBagBuilder"
-        ) as MockBuilder,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.BagCatalogLoader"
-        ) as MockLoader,
-        patch(
-            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
-        ) as MockSetProv,
+        patch("deriva_ml.catalog.clone_via_bag.CatalogBagBuilder") as MockBuilder,
+        patch("deriva_ml.catalog.clone_via_bag.BagCatalogLoader") as MockLoader,
+        patch("deriva_ml.catalog.clone_via_bag.set_catalog_provenance") as MockSetProv,
     ):
         MockBuilder.return_value.build.return_value = fake_bag_path
         loader = MagicMock()

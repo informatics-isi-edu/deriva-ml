@@ -841,21 +841,13 @@ class TestCatalogDenormalize:
         #    fixture has rows with NULL Image.RID (orphans), drop them
         #    on both sides before keyed comparison — they're legitimately
         #    present in both sources and don't have a useful join key.
-        assert "Image.RID" in catalog_cols, (
-            "Test assumes Image.RID is in the result; demo fixture changed?"
-        )
+        assert "Image.RID" in catalog_cols, "Test assumes Image.RID is in the result; demo fixture changed?"
 
         sorted_cols = sorted(catalog_cols)
         cat_keyed = (
-            catalog_df.dropna(subset=["Image.RID"])
-            .sort_values(by="Image.RID")
-            .reset_index(drop=True)[sorted_cols]
+            catalog_df.dropna(subset=["Image.RID"]).sort_values(by="Image.RID").reset_index(drop=True)[sorted_cols]
         )
-        bag_keyed = (
-            bag_df.dropna(subset=["Image.RID"])
-            .sort_values(by="Image.RID")
-            .reset_index(drop=True)[sorted_cols]
-        )
+        bag_keyed = bag_df.dropna(subset=["Image.RID"]).sort_values(by="Image.RID").reset_index(drop=True)[sorted_cols]
 
         # Use Image.RID set equality as the strong row-identity check;
         # full row-by-row equality is too brittle to typing differences
@@ -1695,9 +1687,7 @@ class TestNewFKPatterns:
         )
 
         # The resolver should substitute the feature name silently.
-        include_resolved, _via_resolved, _row_per = d._resolve_table_names(
-            ["Image", "Quality"]
-        )
+        include_resolved, _via_resolved, _row_per = d._resolve_table_names(["Image", "Quality"])
         # Image passes through; Quality resolves to the feature-table.
         assert include_resolved[0] == "Image"
         assert include_resolved[1] == "Execution_Image_Quality", (

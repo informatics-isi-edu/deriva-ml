@@ -269,11 +269,7 @@ def test_output_rows_deleted_input_rows_survive(seeded_ml):
     # Output provenance is preserved in Dataset_Version.Execution.
     pb = catalog.getPathBuilder()
     dv = pb.schemas[ML_SCHEMA].Dataset_Version
-    authored = {
-        (r["Dataset"], r["Execution"])
-        for r in dv.entities().fetch()
-        if r.get("Execution")
-    }
+    authored = {(r["Dataset"], r["Execution"]) for r in dv.entities().fetch() if r.get("Execution")}
     assert (out_ds, out_exec) in authored
 
 
@@ -402,8 +398,7 @@ def test_backfill_only_runs_backfill_past_short_circuit(seeded_ml, tmp_path):
     de = pb.schemas[ML_SCHEMA].Dataset_Execution
     in_row = next(r for r in de.entities().fetch() if r["Execution"] == in_exec and r["Dataset"] == out_ds)
     de.update([{"RID": in_row["RID"], "Dataset_Version": None}], [de.RID])
-    assert next(r for r in _dataset_execution_rows(catalog)
-                if r["RID"] == in_row["RID"])["Dataset_Version"] is None
+    assert next(r for r in _dataset_execution_rows(catalog) if r["RID"] == in_row["RID"])["Dataset_Version"] is None
 
     # 2. A NORMAL migrate() would short-circuit (column present, no output rows) and
     #    leave the NULL row untouched.

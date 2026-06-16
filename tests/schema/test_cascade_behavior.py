@@ -60,7 +60,8 @@ def test_create_ml_schema_drops_existing_with_cascade() -> None:
     sentinel_name = "CASCADE_SENTINEL_001"
 
     catalog = create_ml_catalog(
-        hostname="localhost", project_name="s1b_cascade_test",
+        hostname="localhost",
+        project_name="s1b_cascade_test",
     )
     try:
         # create_ml_catalog runs create_ml_schema + initialize_ml_schema,
@@ -69,8 +70,7 @@ def test_create_ml_schema_drops_existing_with_cascade() -> None:
         dataset_type = pb.schemas["deriva-ml"].tables["Dataset_Type"]
         seeded_rows = list(dataset_type.entities().fetch())
         assert seeded_rows, (
-            "create_ml_catalog should have seeded Dataset_Type — "
-            "if this fails the test premise is broken, not CASCADE."
+            "create_ml_catalog should have seeded Dataset_Type — if this fails the test premise is broken, not CASCADE."
         )
 
         # Plant a sentinel that is NOT in the canonical re-seed list.
@@ -82,9 +82,7 @@ def test_create_ml_schema_drops_existing_with_cascade() -> None:
         )
         pre_rows = list(dataset_type.entities().fetch())
         names_pre = {r["Name"] for r in pre_rows}
-        assert sentinel_name in names_pre, (
-            "Sentinel insert failed; test premise broken."
-        )
+        assert sentinel_name in names_pre, "Sentinel insert failed; test premise broken."
 
         # Action: re-run create_ml_schema. The destructive branch
         # in create_schema.py:335-337 should DROP the existing
@@ -95,8 +93,7 @@ def test_create_ml_schema_drops_existing_with_cascade() -> None:
         # The schema exists again, fresh.
         recreated_model = catalog.getCatalogModel()
         assert "deriva-ml" in recreated_model.schemas, (
-            "create_ml_schema must leave the schema present after a "
-            "drop+recreate cycle."
+            "create_ml_schema must leave the schema present after a drop+recreate cycle."
         )
         assert "Dataset_Type" in recreated_model.schemas["deriva-ml"].tables, (
             "Dataset_Type table must be re-created after CASCADE drop."
@@ -104,9 +101,7 @@ def test_create_ml_schema_drops_existing_with_cascade() -> None:
 
         # The canonical terms are re-seeded; the sentinel is gone.
         pb = catalog.getPathBuilder()
-        post_rows = list(
-            pb.schemas["deriva-ml"].tables["Dataset_Type"].entities().fetch()
-        )
+        post_rows = list(pb.schemas["deriva-ml"].tables["Dataset_Type"].entities().fetch())
         names_post = {r["Name"] for r in post_rows}
         assert sentinel_name not in names_post, (
             f"CASCADE failed to drop sentinel term {sentinel_name!r}: "

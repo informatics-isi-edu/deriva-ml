@@ -157,8 +157,7 @@ def test_clone_via_bag_end_to_end_default_policy(
         f"and ≤{src_subject} (source total), got {dst_subject}"
     )
     assert expected_image_count <= dst_image <= src_image, (
-        f"Image: expected ≥{expected_image_count} (dataset members) "
-        f"and ≤{src_image} (source total), got {dst_image}"
+        f"Image: expected ≥{expected_image_count} (dataset members) and ≤{src_image} (source total), got {dst_image}"
     )
 
 
@@ -216,8 +215,7 @@ def test_clone_via_bag_rows_only_skips_asset_uploads(
     src_images = _row_count(source_ml.catalog, source_ml.default_schema, "Image")
     dst_images = _row_count(dest_catalog, source_ml.default_schema, "Image")
     assert expected_image_count <= dst_images <= src_images, (
-        f"Image: expected ≥{expected_image_count} (dataset members) "
-        f"and ≤{src_images} (source total), got {dst_images}"
+        f"Image: expected ≥{expected_image_count} (dataset members) and ≤{src_images} (source total), got {dst_images}"
     )
 
 

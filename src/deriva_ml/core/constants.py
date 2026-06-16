@@ -72,9 +72,11 @@ SYSTEM_SCHEMAS: frozenset[str] = frozenset({"public", "www", "WWW"})
 # Cycles **not** in this set should still surface as WARNING in
 # the bag-loader output — those warnings exist to flag accidental
 # schema bugs. Adding to this set is a deliberate opt-in.
-INTENTIONAL_FK_CYCLES: frozenset[frozenset[str]] = frozenset({
-    frozenset({f"{ML_SCHEMA}.Dataset", f"{ML_SCHEMA}.Dataset_Version"}),
-})
+INTENTIONAL_FK_CYCLES: frozenset[frozenset[str]] = frozenset(
+    {
+        frozenset({f"{ML_SCHEMA}.Dataset", f"{ML_SCHEMA}.Dataset_Version"}),
+    }
+)
 
 # Provenance tables the dataset-bag walk ENTERS but does not traverse
 # outward. ``Execution`` and ``Workflow`` describe *how* rows came to

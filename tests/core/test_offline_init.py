@@ -4,6 +4,7 @@
 a live catalog (e.g., missing-cache error, host/catalog mismatch)
 always run.
 """
+
 from __future__ import annotations
 
 import os
@@ -80,10 +81,9 @@ def test_online_first_populates_cache(test_ml):
     DERIVA_HOST; its working_dir should contain the cache file.
     """
     cache_file = Path(test_ml.working_dir) / "schema-cache.json"
-    assert cache_file.is_file(), (
-        f"schema-cache.json not found in {test_ml.working_dir}"
-    )
+    assert cache_file.is_file(), f"schema-cache.json not found in {test_ml.working_dir}"
     import json as _json
+
     data = _json.loads(cache_file.read_text())
     assert "snapshot_id" in data
     assert data["hostname"] == test_ml.host_name

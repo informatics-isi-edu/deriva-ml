@@ -8,6 +8,7 @@ conftest chain; importing the fixture function from the
 neighbouring conftest module + binding it locally makes it
 available to all tests in this directory.
 """
+
 from __future__ import annotations
 
 # Re-export the fixture verbatim. ``pytest`` collects fixtures

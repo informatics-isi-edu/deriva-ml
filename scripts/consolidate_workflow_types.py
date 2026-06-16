@@ -230,9 +230,7 @@ def step2_reassign_types(
     deleted = 0
     for wf_rid, old_type in rows_to_delete:
         try:
-            assoc_path.filter(
-                (assoc_path.Workflow == wf_rid) & (assoc_path.Workflow_Type == old_type)
-            ).delete()
+            assoc_path.filter((assoc_path.Workflow == wf_rid) & (assoc_path.Workflow_Type == old_type)).delete()
             deleted += 1
         except Exception as e:
             print(f"  [WARN] Failed to delete ({wf_rid}, {old_type}): {e}")
@@ -255,10 +253,7 @@ def step2_reassign_types(
         for row in assoc_path.entities().fetch():
             current_assocs.add((row["Workflow"], row["Workflow_Type"]))
 
-        to_insert = [
-            row for row in unique_rows
-            if (row["Workflow"], row["Workflow_Type"]) not in current_assocs
-        ]
+        to_insert = [row for row in unique_rows if (row["Workflow"], row["Workflow_Type"]) not in current_assocs]
 
         if to_insert:
             assoc_path.insert(to_insert)
@@ -282,8 +277,15 @@ def step3_verify_assignments(
 
     # Standard types = NEW_VOCAB_TERMS keys + existing standard types
     standard_types = set(NEW_VOCAB_TERMS.keys()) | {
-        "Training", "Testing", "Prediction", "Feature_Creation", "Embedding",
-        "Visualization", "Analysis", "Ingest", "Data_Cleaning",
+        "Training",
+        "Testing",
+        "Prediction",
+        "Feature_Creation",
+        "Embedding",
+        "Visualization",
+        "Analysis",
+        "Ingest",
+        "Data_Cleaning",
     }
 
     associations = get_all_associations(catalog, ml_schema)
@@ -382,7 +384,7 @@ def step5_show_summary(catalog: ErmrestCatalog, ml_schema: str, dry_run: bool) -
 
     print(f"\n  Final Workflow_Type terms ({len(existing_types)}):")
     print(f"  {'Type Name':<25} {'Workflows':>10}")
-    print(f"  {'-'*25} {'-'*10}")
+    print(f"  {'-' * 25} {'-' * 10}")
     for name in sorted(existing_types.keys()):
         count = type_counts.get(name, 0)
         print(f"  {name:<25} {count:>10}")
@@ -392,9 +394,7 @@ def step5_show_summary(catalog: ErmrestCatalog, ml_schema: str, dry_run: bool) -
     print(f"  Total association rows: {len(associations)}")
 
 
-def consolidate(
-    hostname: str, catalog_id: str, ml_schema: str = "deriva-ml", dry_run: bool = False
-) -> bool:
+def consolidate(hostname: str, catalog_id: str, ml_schema: str = "deriva-ml", dry_run: bool = False) -> bool:
     """Run the full consolidation.
 
     Returns:
@@ -441,14 +441,10 @@ def consolidate(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Consolidate workflow types into clean categorical types"
-    )
+    parser = argparse.ArgumentParser(description="Consolidate workflow types into clean categorical types")
     parser.add_argument("hostname", help="Catalog hostname (e.g., www.eye-ai.org)")
     parser.add_argument("catalog_id", help="Catalog ID or alias (e.g., eye-ai)")
-    parser.add_argument(
-        "--schema", default="deriva-ml", help="ML schema name (default: deriva-ml)"
-    )
+    parser.add_argument("--schema", default="deriva-ml", help="ML schema name (default: deriva-ml)")
     parser.add_argument(
         "--dry-run",
         action="store_true",

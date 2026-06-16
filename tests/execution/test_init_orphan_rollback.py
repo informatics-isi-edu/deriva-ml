@@ -144,9 +144,7 @@ class TestOrphanRollbackBehaviour:
             raise original_error
         except Exception:
             try:
-                schema_path.Execution.filter(
-                    schema_path.Execution.RID == execution_rid
-                ).delete()
+                schema_path.Execution.filter(schema_path.Execution.RID == execution_rid).delete()
             except Exception:
                 # In the real code this is logged-only; here we just swallow.
                 pass
@@ -161,9 +159,7 @@ class TestOrphanRollbackBehaviour:
     def test_orphan_rollback_does_not_mask_original_exception(self):
         """The original failure propagates even when delete also fails."""
         schema_path = MagicMock()
-        schema_path.Execution.filter.return_value.delete.side_effect = (
-            RuntimeError("catalog also unreachable")
-        )
+        schema_path.Execution.filter.return_value.delete.side_effect = RuntimeError("catalog also unreachable")
 
         execution_rid = "EX-orphan-2"
         original_error = ValueError("original failure")
@@ -173,9 +169,7 @@ class TestOrphanRollbackBehaviour:
             original = e
             try:
                 try:
-                    schema_path.Execution.filter(
-                        schema_path.Execution.RID == execution_rid
-                    ).delete()
+                    schema_path.Execution.filter(schema_path.Execution.RID == execution_rid).delete()
                 except Exception:
                     # Cleanup failure must NOT mask the original.
                     pass
@@ -201,12 +195,9 @@ class TestOrphanRollbackBehaviour:
 
         from deriva_ml.execution.execution import DRY_RUN_RID
 
-        owned_by_us = (
-            not reload and not _dry_run and execution_rid != DRY_RUN_RID
-        )
+        owned_by_us = not reload and not _dry_run and execution_rid != DRY_RUN_RID
         assert owned_by_us is False, (
-            "Dry-run path must not flag the catalog row for rollback "
-            "(it was never inserted in the first place)."
+            "Dry-run path must not flag the catalog row for rollback (it was never inserted in the first place)."
         )
 
     def test_reload_path_skips_rollback(self):
@@ -217,9 +208,7 @@ class TestOrphanRollbackBehaviour:
         _dry_run = False
         execution_rid = reload
 
-        owned_by_us = (
-            not reload and not _dry_run and execution_rid != DRY_RUN_RID
-        )
+        owned_by_us = not reload and not _dry_run and execution_rid != DRY_RUN_RID
         assert owned_by_us is False
 
 

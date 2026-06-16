@@ -171,18 +171,14 @@ class DerivaMLConfig(BaseModel):
         if self.working_dir is not None:
             self.working_dir = Path(self.working_dir).absolute()
         else:
-            self.working_dir = DerivaMLConfig.compute_workdir(
-                None, self.catalog_id, self.hostname
-            )
+            self.working_dir = DerivaMLConfig.compute_workdir(None, self.catalog_id, self.hostname)
 
         # HydraConfig is only available inside a Hydra run. Outside
         # that context (e.g. constructing the config in a notebook),
         # leave ``hydra_runtime_output_dir`` unset rather than
         # crashing the whole constructor.
         try:
-            self.hydra_runtime_output_dir = Path(
-                HydraConfig.get().runtime.output_dir
-            )
+            self.hydra_runtime_output_dir = Path(HydraConfig.get().runtime.output_dir)
         except ValueError:
             self.hydra_runtime_output_dir = None
 

@@ -95,10 +95,7 @@ def test_navbar_menu_includes_required_sections() -> None:
         "Features",
         "Catalog Registry",
     ):
-        assert names.count(required) == 1, (
-            f"section '{required}' should appear exactly once; "
-            f"got names={names}"
-        )
+        assert names.count(required) == 1, f"section '{required}' should appear exactly once; got names={names}"
 
 
 # ---------------------------------------------------------------------------
@@ -133,9 +130,7 @@ def test_navbar_menu_uses_catalog_id_in_urls() -> None:
     assert catalog_urls, "menu should contain at least one catalog-scoped URL"
     for url in catalog_urls:
         if "/chaise/recordset/#" in url:
-            assert "#my-catalog/" in url, (
-                f"URL {url!r} should embed the catalog_id 'my-catalog'"
-            )
+            assert "#my-catalog/" in url, f"URL {url!r} should embed the catalog_id 'my-catalog'"
 
 
 # ---------------------------------------------------------------------------
@@ -147,11 +142,7 @@ def test_navbar_menu_routes_vocabularies_to_vocabulary_section() -> None:
     """Tables classified as vocabularies appear under the Vocabulary menu."""
     menu = build_navbar_menu(_make_model())
     vocab_section = next(c for c in menu["children"] if c.get("name") == "Vocabulary")
-    vocab_names = [
-        child.get("name")
-        for child in vocab_section["children"]
-        if not child.get("header")
-    ]
+    vocab_names = [child.get("name") for child in vocab_section["children"] if not child.get("header")]
 
     # Asset_Type and Workflow_Type are ML-schema vocabs; Subject_Type
     # is a domain vocab — all three should appear.

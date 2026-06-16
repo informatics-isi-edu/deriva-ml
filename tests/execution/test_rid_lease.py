@@ -10,6 +10,7 @@ import pytest
 class _MockLeaseCatalog:
     """Mock that records POSTs to ERMrest_RID_Lease and returns
     synthetic RIDs keyed by the lease tokens."""
+
     def __init__(self, *, prefix: str = "RID-", fail: bool = False):
         self.prefix = prefix
         self.fail = fail
@@ -21,15 +22,15 @@ class _MockLeaseCatalog:
         assert "ERMrest_RID_Lease" in path
         assert isinstance(json, list)
         self.post_calls.append(json)
+
         class _R:
             def __init__(self, bodies, prefix):
                 self._bodies = bodies
                 self._prefix = prefix
+
             def json(self):
-                return [
-                    {"RID": f"{self._prefix}{i}", "ID": b["ID"]}
-                    for i, b in enumerate(self._bodies)
-                ]
+                return [{"RID": f"{self._prefix}{i}", "ID": b["ID"]} for i, b in enumerate(self._bodies)]
+
         return _R(json, self.prefix)
 
 

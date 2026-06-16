@@ -214,9 +214,7 @@ def test_dataset_type_filter_custom() -> None:
             _StubDataset(dataset_rid="1-BB", dataset_types=["Validation"], current_version="0.1.0"),
         ],
     )
-    report = ml.bootstrap_config(
-        kinds=["datasets"], dataset_type_filter=["Validation"]
-    )
+    report = ml.bootstrap_config(kinds=["datasets"], dataset_type_filter=["Validation"])
     rids = [s.rid for s in report.suggestions]
     assert rids == ["1-BB"]
 

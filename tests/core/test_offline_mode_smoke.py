@@ -8,6 +8,7 @@ properly refuses network access.
 
 Gated on ``DERIVA_HOST`` — skips if unset.
 """
+
 from __future__ import annotations
 
 import os
@@ -53,9 +54,7 @@ def test_offline_mode_end_to_end_usage(catalog_manager, tmp_path):
     )
 
     # --- Contract 1: catalog is a CatalogStub, not a real ErmrestCatalog.
-    assert isinstance(ml_offline.catalog, CatalogStub), (
-        f"expected CatalogStub, got {type(ml_offline.catalog).__name__}"
-    )
+    assert isinstance(ml_offline.catalog, CatalogStub), f"expected CatalogStub, got {type(ml_offline.catalog).__name__}"
 
     # --- Contract 2: the model is usable for schema inspection.
     # ml_schema / default_schema / domain_schemas should survive the
@@ -70,8 +69,7 @@ def test_offline_mode_end_to_end_usage(catalog_manager, tmp_path):
     offline_asset_names = {t.name for t in ml_offline.model.find_assets()}
     online_asset_names = {t.name for t in ml_online.model.find_assets()}
     assert offline_asset_names == online_asset_names, (
-        f"asset discovery differs; online={online_asset_names} "
-        f"offline={offline_asset_names}"
+        f"asset discovery differs; online={online_asset_names} offline={offline_asset_names}"
     )
 
     # --- Contract 4: any reach-through to the catalog raises.

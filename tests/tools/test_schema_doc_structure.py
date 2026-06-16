@@ -28,6 +28,7 @@ def test_schema_doc_exists():
 def test_schema_doc_yaml_blocks_all_valid():
     """Every fenced YAML block parses as a dict."""
     from deriva_ml.tools.validate_schema_doc import _extract_yaml_blocks
+
     blocks = _extract_yaml_blocks(DOC_PATH)
     assert len(blocks) > 0
     for b in blocks:
@@ -62,6 +63,5 @@ def test_schema_doc_has_entry_per_mlvocab_member():
     vocab_names = {t.name for t in model.tables if t.kind == "vocabulary"}
     for member in MLVocab:
         assert member.value in vocab_names, (
-            f"MLVocab.{member.name} ({member.value!r}) is missing as a "
-            f"vocabulary table in {DOC_PATH.name}."
+            f"MLVocab.{member.name} ({member.value!r}) is missing as a vocabulary table in {DOC_PATH.name}."
         )

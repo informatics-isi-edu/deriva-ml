@@ -340,10 +340,7 @@ class TestFetchByRids:
         fetcher.fetch_by_rids("Image", rids, table, batch_size=50, max_url_bytes=1)
 
         assert _rows_count(engine, table) == 50
-        post_requests = [
-            r for r in client.requests
-            if r[0] == "fetch_rid_batch" and r[1]["method"] == "POST"
-        ]
+        post_requests = [r for r in client.requests if r[0] == "fetch_rid_batch" and r[1]["method"] == "POST"]
         assert len(post_requests) >= 1, "POST fallback should have fired"
 
     def test_empty_rid_set_returns_zero(self, engine):

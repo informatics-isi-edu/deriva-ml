@@ -1,9 +1,11 @@
 """Unit tests for NullSentinelProcessor."""
+
 from __future__ import annotations
 
 
 def test_single_sentinel_converted_to_none():
     from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+
     metadata = {"Acquisition_Time": "__NULL__", "Acquisition_Date": "2026-01-01"}
     proc = NullSentinelProcessor(metadata=metadata)
     proc.process()
@@ -13,6 +15,7 @@ def test_single_sentinel_converted_to_none():
 
 def test_multiple_sentinels_in_metadata_all_converted():
     from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+
     metadata = {"a": "__NULL__", "b": "__NULL__", "c": "real"}
     proc = NullSentinelProcessor(metadata=metadata)
     proc.process()
@@ -23,11 +26,12 @@ def test_multiple_sentinels_in_metadata_all_converted():
 
 def test_non_sentinel_values_unchanged():
     from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+
     metadata = {
         "x": "hello",
         "y": 42,
-        "z": None,         # already None — stays None
-        "q": "__NUL__",    # almost-sentinel — stays as-is
+        "z": None,  # already None — stays None
+        "q": "__NUL__",  # almost-sentinel — stays as-is
         "r": "__NULLISH__",
     }
     proc = NullSentinelProcessor(metadata=metadata)
@@ -41,6 +45,7 @@ def test_non_sentinel_values_unchanged():
 
 def test_empty_metadata_is_no_op():
     from deriva_ml.asset.null_sentinel_processor import NullSentinelProcessor
+
     metadata: dict = {}
     proc = NullSentinelProcessor(metadata=metadata)
     proc.process()
@@ -60,9 +65,9 @@ def test_asset_table_upload_spec_includes_null_sentinel_processor_when_metadata_
     spec = asset_table_upload_spec(test_ml.model, "NullSentinelMetaAsset")
     pre = spec.get("pre_processors", [])
     types = [p.get("processor_type") for p in pre]
-    assert any(
-        t and t.endswith("NullSentinelProcessor") for t in types
-    ), f"pre_processors must wire NullSentinelProcessor; got {pre}"
+    assert any(t and t.endswith("NullSentinelProcessor") for t in types), (
+        f"pre_processors must wire NullSentinelProcessor; got {pre}"
+    )
 
 
 def test_asset_table_upload_spec_omits_pre_processors_when_no_metadata(test_ml):

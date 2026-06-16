@@ -31,15 +31,14 @@ def test_all_vocab_fks_reference_name():
     from deriva_ml.schema.create_schema import create_ml_catalog
 
     catalog = create_ml_catalog(
-        hostname="localhost", project_name="s1b_audit_test",
+        hostname="localhost",
+        project_name="s1b_audit_test",
     )
     try:
         model = catalog.getCatalogModel()
         schema = model.schemas["deriva-ml"]
 
-        vocab_tables = {
-            t.name for t in schema.tables.values() if _is_vocabulary_table(t)
-        }
+        vocab_tables = {t.name for t in schema.tables.values() if _is_vocabulary_table(t)}
         assert vocab_tables, "No vocabulary tables found in deriva-ml schema"
 
         violations: list[str] = []
@@ -50,14 +49,9 @@ def test_all_vocab_fks_reference_name():
                 if tgt_table in vocab_tables and tgt_cols != ["Name"]:
                     src_cols = [c.name for c in fk.foreign_key_columns]
                     violations.append(
-                        f"{t.name}({','.join(src_cols)}) → "
-                        f"{tgt_table}({','.join(tgt_cols)}) "
-                        f"(expected target Name)"
+                        f"{t.name}({','.join(src_cols)}) → {tgt_table}({','.join(tgt_cols)}) (expected target Name)"
                     )
 
-        assert not violations, (
-            "Vocabulary-FK convention violated:\n"
-            + "\n".join(f"  - {v}" for v in violations)
-        )
+        assert not violations, "Vocabulary-FK convention violated:\n" + "\n".join(f"  - {v}" for v in violations)
     finally:
         catalog.delete_ermrest_catalog(really=True)

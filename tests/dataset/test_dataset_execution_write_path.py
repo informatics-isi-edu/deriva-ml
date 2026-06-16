@@ -72,10 +72,7 @@ def test_create_dataset_writes_no_dataset_execution_row(test_ml):
 
     # No Dataset_Execution row for the produced dataset.
     rows = _dataset_execution_rows(test_ml, ds.dataset_rid, exe.execution_rid)
-    assert rows == [], (
-        "create_dataset must NOT write a Dataset_Execution row for an output dataset; "
-        f"found {rows!r}"
-    )
+    assert rows == [], f"create_dataset must NOT write a Dataset_Execution row for an output dataset; found {rows!r}"
 
     # Producer is recorded via the Dataset_Version.Execution link.
     assert test_ml._producer_of_dataset(ds.dataset_rid) == exe.execution_rid
@@ -122,6 +119,4 @@ def test_add_input_dataset_without_version_leaves_dataset_version_null(test_ml):
 
     rows = _dataset_execution_rows(test_ml, ds.dataset_rid, consumer.execution_rid)
     assert len(rows) == 1, f"expected exactly one input edge, found {rows!r}"
-    assert rows[0].get("Dataset_Version") is None, (
-        "add_input_dataset() with no version must leave Dataset_Version NULL"
-    )
+    assert rows[0].get("Dataset_Version") is None, "add_input_dataset() with no version must leave Dataset_Version NULL"

@@ -306,9 +306,7 @@ def test_set_catalog_provenance_swallows_write_failures() -> None:
         (CatalogCreationMethod.UNKNOWN, "unknown"),
     ],
 )
-def test_catalog_creation_method_string_form(
-    method: CatalogCreationMethod, value: str
-) -> None:
+def test_catalog_creation_method_string_form(method: CatalogCreationMethod, value: str) -> None:
     """Each enum member's string form matches the documented wire value."""
     # str(Enum) compares against the value because we inherit from str
     assert method.value == value
