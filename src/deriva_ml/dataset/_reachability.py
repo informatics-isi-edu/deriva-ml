@@ -207,6 +207,7 @@ def compute_reachability(
     anchor_rids: list[str],
     model: Any,
     fetch: FetchFn,
+    max_workers: int = 1,
 ) -> tuple[dict[str, set[str]], dict[str, dict[str, int]], dict[tuple[str, str], list[dict]]]:
     """Compute exact per-table reachable RID sets + asset byte maps.
 
@@ -223,6 +224,14 @@ def compute_reachability(
         model: deriva-py Model (``cb._get_model()``).
         fetch: ``(schema, table, columns) -> rows`` -- injected so the engine
             is testable. Production binds it to the path builder.
+        max_workers: Opt-in bounded parallelism for the edge-table fetch phase.
+            ``1`` (default) fetches sequentially -- the exact historical
+            behavior, byte-identical output. ``> 1`` runs the fetches through a
+            ``ThreadPoolExecutor`` capped at ``min(max_workers, n_tables)``,
+            cutting wall-clock on large datasets (many edge tables) where the
+            sequential fetch dominates. Output is independent of this value
+            (the fetch phase only populates ``fetched_rows``; the union and
+            asset-byte phases are order-insensitive).
 
     Returns:
         ``(rids_by_table, asset_lengths_by_table, fetched_rows)``:
@@ -247,11 +256,27 @@ def compute_reachability(
         for fk_path in fk_paths:
             edge_tables.update(fk_path)
 
-    # 2. Fetch each edge table ONCE, projected.
+    # 2. Fetch each edge table ONCE, projected. The fetches are independent
+    # reads writing to distinct ``fetched_rows`` keys, so order does not matter
+    # and they parallelize cleanly. ``max_workers > 1`` runs them through a
+    # bounded ThreadPoolExecutor; the default (1) keeps the exact sequential
+    # behavior with no thread overhead. Parallelism is opt-in because the
+    # production fetch shares a single (not-thread-safe-by-contract)
+    # ``requests.Session`` -- a bounded pool of read-only GETs is the pragmatic
+    # safe point, and the caller chooses the bound.
     fetched_rows: dict[tuple[str, str], list[dict]] = {}
-    for seg in edge_tables:
-        s, t = seg
-        fetched_rows[seg] = fetch(s, t, _needed_columns(seg, model))
+    if max_workers > 1 and len(edge_tables) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        workers = min(max_workers, len(edge_tables))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(fetch, s, t, _needed_columns((s, t), model)): (s, t) for (s, t) in edge_tables}
+            for fut, seg in futures.items():
+                fetched_rows[seg] = fut.result()  # re-raises fetch errors
+    else:
+        for seg in edge_tables:
+            s, t = seg
+            fetched_rows[seg] = fetch(s, t, _needed_columns(seg, model))
 
     anchor_set = set(anchor_rids)
 

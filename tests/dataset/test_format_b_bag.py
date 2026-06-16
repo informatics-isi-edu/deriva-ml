@@ -269,3 +269,71 @@ def test_format_b_bag_fetch_txt_scoped_to_reachable_assets(catalog_with_datasets
         )
         asserted += 1
     assert asserted, "no asset table fetch-count was asserted"
+
+
+def test_compute_rid_sets_threads_reachability_concurrency():
+    """_compute_rid_sets accepts reachability_concurrency (default 8) and
+    forwards it to compute_reachability as max_workers, so the estimate and
+    both bag-gen paths can opt into parallel edge-table fetches."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    sig = inspect.signature(DatasetBagBuilder._compute_rid_sets)
+    assert "reachability_concurrency" in sig.parameters
+    assert sig.parameters["reachability_concurrency"].default == 8
+
+    src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
+    assert "max_workers=reachability_concurrency" in src
+
+
+def test_public_entry_points_expose_reachability_concurrency():
+    """estimate_bag_size / bag_info surface reachability_concurrency (default 8)
+    so callers can opt into parallel edge-table fetches."""
+    import inspect
+
+    from deriva_ml.dataset.dataset import Dataset
+
+    for name in ("estimate_bag_size", "bag_info"):
+        sig = inspect.signature(getattr(Dataset, name))
+        assert "reachability_concurrency" in sig.parameters, name
+        assert sig.parameters["reachability_concurrency"].default == 8, name
+
+
+def test_build_and_spec_expose_reachability_concurrency():
+    """build_bag and generate_dataset_download_spec accept and forward
+    reachability_concurrency to _compute_rid_sets."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    for name in ("build_bag", "generate_dataset_download_spec"):
+        sig = inspect.signature(getattr(DatasetBagBuilder, name))
+        assert "reachability_concurrency" in sig.parameters, name
+        assert sig.parameters["reachability_concurrency"].default == 8, name
+        src = inspect.getsource(getattr(DatasetBagBuilder, name))
+        assert "reachability_concurrency=reachability_concurrency" in src, name
+
+
+@pytest.mark.skipif(
+    os.environ.get("DERIVA_HOST") in (None, ""),
+    reason="needs a live catalog",
+)
+def test_estimate_parallel_matches_sequential_live(catalog_with_datasets):
+    """The estimate under parallel edge-table fetch (reachability_concurrency>1)
+    is identical to the sequential default -- exactness gate against real
+    concurrent fetches on a live catalog."""
+    ml, _ = catalog_with_datasets
+    datasets = list(ml.find_datasets())
+    nested = next((d for d in datasets if d.list_dataset_children()), None)
+    if nested is None:
+        pytest.skip("need a nested dataset")
+    v = nested.current_version
+
+    seq = nested.estimate_bag_size(v, reachability_concurrency=1)
+    par = nested.estimate_bag_size(v, reachability_concurrency=8)
+
+    # Order-insensitive fields must match exactly.
+    assert seq["tables"] == par["tables"]
+    assert seq["total_asset_bytes"] == par["total_asset_bytes"]
+    assert seq["total_rows"] == par["total_rows"]

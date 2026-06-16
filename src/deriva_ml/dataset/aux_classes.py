@@ -327,6 +327,12 @@ class DatasetSpec(BaseModel):
             Increase read_timeout for large datasets with deep FK joins.
         fetch_concurrency (int): Number of concurrent fetch threads for asset
             download during materialization. Defaults to 8.
+        reachability_concurrency (int): Bounded parallelism for the
+            client-side edge-table fetch that computes which rows the bag
+            contains (drives the estimate AND bag-spec/build). Defaults to 8
+            (measured ~1.4x faster than sequential on eye-ai 2-277G, exact);
+            pass 1 for the sequential path. Distinct from ``fetch_concurrency``,
+            which parallelizes asset *file* downloads.
     """
 
     rid: RID
@@ -336,6 +342,7 @@ class DatasetSpec(BaseModel):
     exclude_tables: set[str] | None = None
     timeout: tuple[int, int] | None = None
     fetch_concurrency: int = 8
+    reachability_concurrency: int = 8
 
     model_config = VALIDATION_CONFIG
 
@@ -426,6 +433,11 @@ class DatasetSpecConfig:
         timeout: Optional ``[connect_timeout, read_timeout]`` in seconds for
             network requests during bag download.
         fetch_concurrency: Number of concurrent fetch threads for asset download.
+        reachability_concurrency: Bounded parallelism for the client-side
+            edge-table fetch that computes bag contents (estimate + bag-spec/build).
+            Defaults to 8 (~1.4x faster than sequential on eye-ai 2-277G, exact);
+            pass 1 for sequential. Distinct from ``fetch_concurrency`` (asset file
+            downloads).
     """
 
     rid: str
@@ -435,6 +447,7 @@ class DatasetSpecConfig:
     exclude_tables: list[str] | None = None
     timeout: list[int] | None = None
     fetch_concurrency: int = 8
+    reachability_concurrency: int = 8
 
 
 class DatasetReference(BaseModel):
