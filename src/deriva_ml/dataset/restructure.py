@@ -50,8 +50,6 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
-from sqlalchemy.orm import Session
-
 from deriva_ml.core.definitions import RID
 from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.feature import FeatureRecord
@@ -213,24 +211,21 @@ def _get_reachable_assets(bag, asset_table: str) -> list[dict[str, Any]]:
     Subjects, and Subject -> Encounter -> Image, this method will find those
     Images even though they're not directly in the Dataset_Image association table.
 
+    Thin wrapper over :func:`~deriva_ml.dataset.target_resolution.resolve_reachable_rows`
+    so restructure and the tf/torch adapters share ONE reachability traversal
+    (the divergence this consolidation removes was the cause of the adapters
+    missing FK-reachable elements). restructure consumes full rows (Filename
+    etc.) and collapses by filename, so the un-deduped row list is fine here.
+
     Args:
         asset_table: Name of the asset table (e.g., "Image")
 
     Returns:
         List of asset records as dictionaries.
     """
-    # Use the _dataset_table_view query which traverses all FK paths
-    sql_query = bag._dataset_table_view(asset_table)
+    from deriva_ml.dataset.target_resolution import resolve_reachable_rows
 
-    with Session(bag.engine) as session:
-        # ``.mappings().all()`` returns row mappings as
-        # public-API ``RowMapping`` objects — same shape as
-        # ``dict(row._mapping)`` but without reaching into a
-        # SQLAlchemy private attribute. Audit Ds-restr P3.
-        result = session.execute(sql_query)
-        rows = [dict(m) for m in result.mappings().all()]
-
-    return rows
+    return resolve_reachable_rows(bag, asset_table)
 
 
 def _detect_asset_table(bag) -> str | None:
