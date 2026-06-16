@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
+from sqlalchemy.orm import Session
+
 from deriva_ml.core.exceptions import DerivaMLException
 
 if TYPE_CHECKING:
@@ -22,6 +24,92 @@ if TYPE_CHECKING:
     from deriva_ml.feature import FeatureRecord
 
     FeatureSelector = Callable[[list["FeatureRecord"]], "FeatureRecord | None"]
+
+
+def resolve_reachable_rows(bag: "DatasetBag", table: str) -> list[dict[str, Any]]:
+    """All rows of ``table`` reachable from this dataset via any FK path.
+
+    The single source of truth for dataset *element reachability*, shared by
+    :func:`~deriva_ml.dataset.restructure._get_reachable_assets` and the
+    tf/torch adapters (via :func:`resolve_element_rids`). Wraps
+    :meth:`DatasetBag._dataset_table_view` — a SQL UNION over every FK path
+    ``Dataset -> ... -> table``, scoped to this dataset RID plus its nested
+    datasets — so an element reachable only indirectly (e.g. ``Image`` via
+    ``Subject -> Observation -> Image``) is still found. ``list_dataset_members``
+    would miss it (it recurses nested datasets only, not the FK chain).
+
+    Returns full row dicts (so restructure can read ``Filename`` etc. and the
+    adapters can project ``RID``). Rows are **not** RID-deduped here: the UNION
+    can surface the same RID via two FK paths. restructure collapses by
+    filename; callers that iterate by RID must dedup (see
+    :func:`resolve_element_rids`).
+
+    Args:
+        bag: The downloaded :class:`DatasetBag`.
+        table: Element/asset table name (e.g. ``"Image"``).
+
+    Returns:
+        List of row dicts for every reachable ``table`` row.
+
+    Raises:
+        DerivaMLException: If ``table`` is not a table in the bag's model.
+
+    Example:
+        >>> # Needs a live bag — see tests/dataset/test_reachable_enumeration.py
+        >>> rows = resolve_reachable_rows(bag, "Image")  # doctest: +SKIP
+    """
+    try:
+        bag.model.name_to_table(table)
+    except Exception as exc:  # noqa: BLE001 — model surface raises KeyError/AttributeError
+        raise DerivaMLException(f"Element type {table!r} not found in bag (not a known table).") from exc
+
+    sql_query = bag._dataset_table_view(table)
+    with Session(bag.engine) as session:
+        return [dict(m) for m in session.execute(sql_query).mappings().all()]
+
+
+def resolve_element_rids(bag: "DatasetBag", element_type: str, *, reachable: bool = True) -> list[str]:
+    """RIDs of ``element_type`` rows belonging to this dataset.
+
+    Order-preserving and RID-deduped — a UNION over multiple FK paths can
+    surface the same RID twice, and the adapters iterate by RID, so a duplicate
+    would yield the same sample twice.
+
+    Args:
+        bag: The downloaded :class:`DatasetBag`.
+        element_type: Element table name.
+        reachable: ``True`` (default) — FK-reachable rows via
+            :func:`resolve_reachable_rows` (same semantics as
+            ``restructure_assets`` / ``bag_info``). ``False`` — direct members
+            only (``bag.list_dataset_members(recurse=True)``), the opt-out.
+
+    Returns:
+        Order-preserving, deduped list of element RIDs.
+
+    Raises:
+        DerivaMLException: If ``element_type`` is not resolvable in the bag.
+
+    Example:
+        >>> rids = resolve_element_rids(bag, "Image")  # doctest: +SKIP
+    """
+    if not reachable:
+        members = bag.list_dataset_members(recurse=True)
+        if element_type not in members:
+            raise DerivaMLException(
+                f"Element type {element_type!r} not found in bag; available types: {sorted(members.keys())}"
+            )
+        rows: list[dict[str, Any]] = members[element_type]
+    else:
+        rows = resolve_reachable_rows(bag, element_type)
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for r in rows:
+        rid = r["RID"]
+        if rid not in seen:
+            seen.add(rid)
+            out.append(rid)
+    return out
 
 
 # Maximum unlabeled-RID count to show in missing="error" message before
