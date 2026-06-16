@@ -634,7 +634,11 @@ class DatasetMixin:
 
         Args:
             dataset: Specification of the dataset, including version and
-                optional exclude_tables.
+                optional exclude_tables. Concurrency is taken from the spec:
+                ``DatasetSpec.fetch_concurrency`` (asset file downloads) and
+                ``DatasetSpec.reachability_concurrency`` (the edge-table
+                reachability fetch) — both default to 8. Set them on the spec
+                to tune, e.g. ``DatasetSpec(rid=..., fetch_concurrency=4)``.
             materialize: If True (default), download all asset files. If False,
                 download only table metadata.
 
@@ -650,6 +654,7 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
             timeout=dataset.timeout,
             fetch_concurrency=dataset.fetch_concurrency,
+            reachability_concurrency=dataset.reachability_concurrency,
         )
 
     # ------------------------------------------------------------------
