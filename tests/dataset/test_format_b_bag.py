@@ -366,6 +366,19 @@ def test_adapters_enumerate_via_resolve_element_rids():
         assert sig.parameters["reachable"].default is True, fn
 
 
+def test_public_adapter_methods_expose_reachable():
+    """DatasetBag.as_torch_dataset / as_tf_dataset expose `reachable=True`
+    so callers can opt out of FK-reachable enumeration."""
+    import inspect
+
+    from deriva_ml.dataset.dataset_bag import DatasetBag
+
+    for name in ("as_torch_dataset", "as_tf_dataset"):
+        sig = inspect.signature(getattr(DatasetBag, name))
+        assert "reachable" in sig.parameters, name
+        assert sig.parameters["reachable"].default is True, name
+
+
 @pytest.mark.skipif(
     os.environ.get("DERIVA_HOST") in (None, ""),
     reason="needs a live catalog",

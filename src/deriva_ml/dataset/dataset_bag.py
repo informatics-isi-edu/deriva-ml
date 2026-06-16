@@ -1205,6 +1205,7 @@ class DatasetBag:
         targets: list[str] | dict[str, Any] | None = None,
         target_transform: Callable[..., Any] | None = None,
         missing: Literal["error", "skip", "unknown"] = "error",
+        reachable: bool = True,
     ) -> "torch.utils.data.Dataset":
         """Build a ``torch.utils.data.Dataset`` from this bag.
 
@@ -1307,6 +1308,17 @@ class DatasetBag:
                   returning a sentinel class index or an ignore-mask value).
                   Useful for semi-supervised and self-training workflows.
 
+            reachable: When ``True`` (default), the dataset's elements are
+                every ``element_type`` row reachable from this dataset by any
+                FK path — the same traversal ``restructure_assets`` uses. This
+                matters for subject-partitioned datasets: if the members are
+                ``Subject`` rows and ``Image`` is reachable via
+                ``Subject -> Observation -> Image``, those Images are found
+                even though they are not direct dataset members. When
+                ``False``, only direct members (``list_dataset_members(
+                recurse=True)``) are used — the opt-out for callers who want
+                strictly the rows enumerated in the dataset's membership.
+
         Returns:
             A ``torch.utils.data.Dataset`` whose ``__getitem__`` returns:
 
@@ -1368,6 +1380,7 @@ class DatasetBag:
             targets=targets,
             target_transform=target_transform,
             missing=missing,
+            reachable=reachable,
         )
 
     def as_tf_dataset(
@@ -1380,6 +1393,7 @@ class DatasetBag:
         target_transform: Callable[..., Any] | None = None,
         missing: Literal["error", "skip", "unknown"] = "error",
         output_signature: "tf.TensorSpec | tuple[tf.TensorSpec, ...] | None" = None,
+        reachable: bool = True,
     ) -> "tf.data.Dataset":
         """Build a ``tf.data.Dataset`` from this bag.
 
@@ -1486,6 +1500,17 @@ class DatasetBag:
                 explicit signature avoids the eager-inference overhead and
                 is preferred for production use.
 
+            reachable: When ``True`` (default), the dataset's elements are
+                every ``element_type`` row reachable from this dataset by any
+                FK path — the same traversal ``restructure_assets`` uses. This
+                matters for subject-partitioned datasets: if the members are
+                ``Subject`` rows and ``Image`` is reachable via
+                ``Subject -> Observation -> Image``, those Images are found
+                even though they are not direct dataset members. When
+                ``False``, only direct members (``list_dataset_members(
+                recurse=True)``) are used — the opt-out for callers who want
+                strictly the rows enumerated in the dataset's membership.
+
         Returns:
             A ``tf.data.Dataset`` whose elements are:
 
@@ -1550,6 +1575,7 @@ class DatasetBag:
             target_transform=target_transform,
             missing=missing,
             output_signature=output_signature,
+            reachable=reachable,
         )
 
     def restructure_assets(
