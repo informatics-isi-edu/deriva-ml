@@ -21,6 +21,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import time
 from datetime import datetime, timezone
@@ -111,13 +112,25 @@ def _dir_size(path: Path) -> int:
     if not path.exists():
         return 0
     total = 0
-    for f in path.rglob("*"):
-        try:
-            if f.is_file():
-                total += f.stat().st_size
-        except FileNotFoundError:
-            # Entry vanished mid-walk (concurrent cleanup) — skip it.
-            continue
+    # Walk with ``os.walk`` (not ``Path.rglob``) so a single unreadable
+    # subdirectory is *skipped* and the walk *continues* across its siblings,
+    # rather than aborting. ``onerror`` swallows the per-directory
+    # PermissionError/OSError that traversal raises (e.g. a bag dir owned by
+    # another user, or a stricter filesystem); the per-file ``stat`` is also
+    # guarded for entries that vanish or are unreadable mid-walk. Without this,
+    # one denied bag crashes ``list_cached_bags`` instead of returning the
+    # readable ones.
+    for dirpath, _dirnames, filenames in os.walk(path, onerror=lambda _e: None):
+        base = Path(dirpath)
+        for name in filenames:
+            fp = base / name
+            try:
+                if fp.is_file():
+                    total += fp.stat().st_size
+            except (OSError, PermissionError):
+                # Entry vanished (FileNotFoundError) or is unreadable
+                # (PermissionError) — skip it, keep counting the rest.
+                continue
     return total
 
 
