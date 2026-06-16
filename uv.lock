@@ -853,7 +853,7 @@ wheels = [
 [[package]]
 name = "deriva"
 version = "2.0.0.dev0"
-source = { git = "https://github.com/informatics-isi-edu/deriva-py?rev=93add8069d03a8411c7239ca576145f1ac1d9507#93add8069d03a8411c7239ca576145f1ac1d9507" }
+source = { git = "https://github.com/informatics-isi-edu/deriva-py?rev=7ef28fcd12341d47836f721c0481528fcea22165#7ef28fcd12341d47836f721c0481528fcea22165" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },
@@ -928,7 +928,7 @@ requires-dist = [
     { name = "bdbag", git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev" },
     { name = "bump-my-version" },
     { name = "deepdiff" },
-    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?rev=93add8069d03a8411c7239ca576145f1ac1d9507" },
+    { name = "deriva", git = "https://github.com/informatics-isi-edu/deriva-py?rev=7ef28fcd12341d47836f721c0481528fcea22165" },
     { name = "hydra-zen" },
     { name = "nbconvert" },
     { name = "nbstripout" },
