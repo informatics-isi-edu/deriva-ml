@@ -73,26 +73,41 @@ advances in one cycle, so there is no window where deriva-ml runs the broken
 
 ### The fix (deriva-py, `deriva/bag/builder.py`)
 
-In `add_asset`, resolve the source before any link/copy so the hardlink always
-targets the real inode:
+In `add_asset`, resolve the source to its real target before any link/copy so the
+hardlink always targets the real inode — **but derive the bag-entry name from the
+UNRESOLVED path first**, so the asset keeps the caller's filename (a symlink
+`link.bin` → real `real.bin` keeps the bag entry named `link.bin`):
 
 ```python
-source_path = Path(source_path).resolve()
+source_path = Path(source_path)
+name = filename or source_path.name   # caller's name, from the UNRESOLVED path
+source_path = source_path.resolve()   # resolve the link TARGET for link/copy
 ```
 
-Placed right after the existing `source_path = Path(source_path)` (~L424),
-**before** the `.is_file()` check. Verified-safe against the rest of the method:
+> **Implementation note (found during TDD):** the naive single-liner
+> `source_path = Path(source_path).resolve()` placed before the existing
+> `name = filename or source_path.name` line is **wrong** — it would name the bag
+> entry after the resolved target (`real.bin`), changing the caller-facing asset
+> name. The correct fix reorders so `name` is taken from the unresolved path, then
+> resolves. (~10 lines: the resolve + comment + moving the `name =` line up and
+> deleting its old position.)
 
-- `.is_file()` (L425) already follows symlinks — unaffected; resolving first just
-  makes the not-found error report the real path.
-- `os.link(source_path, dest)` (L452) now links the real file on every platform —
-  the fix.
-- `shutil.copy2` copy + EXDEV-fallback paths (L465, L467) already follow symlinks
-  — unaffected; resolving makes it explicit.
-- Idempotency key `_embedded_assets[dest]["source_path"]` (L437, L471) records the
-  **resolved** path; both compare sides see the resolved form, so re-adding the
-  same logical source (symlink vs resolved) stays consistent rather than
-  spuriously raising the "different source" `ValueError`.
+Verified-safe against the rest of the method:
+
+- `.is_file()` already follows symlinks — unaffected; resolving first just makes
+  the not-found error report the real path.
+- `os.link(source_path, dest)` now links the real file on every platform — the fix.
+- `shutil.copy2` copy + EXDEV-fallback paths already follow symlinks — unaffected;
+  resolving makes it explicit.
+- Bag-entry naming (`name`, `rel`, the stored `filename`) uses the **unresolved**
+  name; the link/copy and the idempotency `source_path` use the **resolved** path —
+  the two concerns are cleanly separated.
+- Idempotency key `_embedded_assets[dest]["source_path"]` records the **resolved**
+  path; both compare sides see the resolved form, so re-adding the same logical
+  source (symlink vs resolved) stays consistent rather than spuriously raising the
+  "different source" `ValueError`.
+- The `add_asset` docstring gains a line noting symlink sources are resolved (bag
+  payload is always a regular file) while the entry keeps the symlink's name.
 
 `os` and `Path` are already imported in `builder.py`. One line.
 
