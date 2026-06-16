@@ -335,15 +335,18 @@ def test_build_and_spec_expose_reachability_concurrency():
 
 
 def test_download_mixin_forwards_datasetspec_reachability_concurrency():
-    """The DerivaML.download_dataset_bag mixin must forward
+    """The spec-driven DerivaML mixins must forward
     DatasetSpec.reachability_concurrency to the Dataset method — otherwise the
-    DatasetSpec field is silently ignored on the download path."""
+    DatasetSpec field is silently ignored on that path."""
     import inspect
 
     from deriva_ml.core.mixins.dataset import DatasetMixin
 
-    src = inspect.getsource(DatasetMixin.download_dataset_bag)
-    assert "reachability_concurrency=dataset.reachability_concurrency" in src
+    # Every mixin wrapper that takes a DatasetSpec and triggers a reachability
+    # fetch must forward the spec's reachability_concurrency.
+    for name in ("download_dataset_bag", "cache_dataset", "estimate_bag_size", "bag_info"):
+        src = inspect.getsource(getattr(DatasetMixin, name))
+        assert "reachability_concurrency=dataset.reachability_concurrency" in src, name
 
 
 @pytest.mark.skipif(
