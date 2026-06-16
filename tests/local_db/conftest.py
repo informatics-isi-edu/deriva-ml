@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -1517,3 +1518,79 @@ def _base_schema_doc() -> dict:
             },
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Demo-catalog planner fixture (for FK-reachable-route tests)
+# ---------------------------------------------------------------------------
+#
+# The demo catalog schema reaches ``Image`` two distinct ways:
+#   - Dataset -> Dataset_Image -> Image              (direct membership)
+#   - Dataset -> Dataset_Subject -> Subject -> Image (FK-reachable, since
+#     ``Image.Subject`` references ``Subject``)
+# Tests that exercise multi-route emission load the *real* demo schema rather
+# than a canned shape so both association tables are present.
+
+# Absolute path to the demo catalog schema shipped with the dataset tests.
+_DEMO_CATALOG_SCHEMA = Path(__file__).resolve().parents[1] / "dataset" / "demo-catalog-schema.json"
+
+
+class _DenormDatasetStub:
+    """Minimal DatasetLike stand-in for catalog-free planner tests.
+
+    ``_prepare_wide_table`` never dereferences the ``dataset`` argument in the
+    catalog-free path (it only uses the model and ``dataset_rid``), but later
+    consumers expect a ``DatasetLike`` exposing ``dataset_rid`` and a
+    children accessor. This stub provides just those two members so the same
+    fixture can be reused as the planner pipeline grows.
+
+    Attributes:
+        dataset_rid: The dataset RID this stub represents.
+
+    Example:
+        >>> stub = _DenormDatasetStub("1-FAKE")  # illustrative placeholder id
+        >>> stub.list_dataset_children(recurse=True)
+        []
+    """
+
+    def __init__(self, dataset_rid: str) -> None:
+        self.dataset_rid = dataset_rid
+
+    def list_dataset_children(self, recurse: bool = False) -> list:
+        """Return this dataset's child datasets (none, for planning tests)."""
+        return []
+
+
+@pytest.fixture
+def demo_catalog_planner() -> tuple[Any, _DenormDatasetStub, str]:
+    """Build a DenormalizePlanner over the real demo-catalog schema.
+
+    Mirrors the ``denorm_deriva_model`` construction pattern (load a schema
+    JSON into a deriva ``Model``, wrap it in :class:`DerivaModel`) but uses the
+    shipped demo schema so both the ``Dataset_Image`` membership association
+    and the ``Dataset_Subject`` FK-reachable route to ``Image`` are present.
+
+    Returns:
+        A ``(planner, dataset_stub, dataset_rid)`` tuple where *planner* is the
+        ``DerivaModel._planner``, *dataset_stub* is a catalog-free
+        :class:`_DenormDatasetStub`, and *dataset_rid* is a freshly minted
+        opaque RID-shaped string (never a hard-coded literal).
+
+    Example:
+        >>> planner, stub, rid = demo_catalog_planner  # doctest: +SKIP
+        >>> join_tables, _cols, _multi = planner._prepare_wide_table(  # doctest: +SKIP
+        ...     stub, rid, ["Image"], row_per="Image"
+        ... )
+    """
+    model = Model.fromfile("file-system", _DEMO_CATALOG_SCHEMA)
+    deriva_model = DerivaModel(
+        model=model,
+        ml_schema="deriva-ml",
+        domain_schemas={"test-schema"},
+    )
+    # RIDs are opaque: synthesize a unique placeholder rather than embedding a
+    # literal. The planner never treats this as a live catalog RID in the
+    # catalog-free path; it only flows through the join plan as an identifier.
+    dataset_rid = f"1-{uuid.uuid4().hex[:8].upper()}"
+    dataset_stub = _DenormDatasetStub(dataset_rid)
+    return deriva_model._planner, dataset_stub, dataset_rid
