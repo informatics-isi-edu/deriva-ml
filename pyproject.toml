@@ -10,7 +10,13 @@ requires-python = ">=3.12"
 dependencies = [
     "bump-my-version",
     "bdbag @ git+https://github.com/fair-research/bdbag@1.9.0-dev",
-    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@deriva-ml",
+    # Pinned to an immutable commit (NOT the `deriva-ml` branch) so the pin is
+    # transitive: a downstream project that bumps deriva-ml is forced by uv to
+    # advance deriva-py to this exact commit. A branch pin carries no
+    # "newer-than" signal, so consumers silently freeze on a stale deriva-py
+    # (see CLAUDE.md "Updating the deriva-py pin"). Advance this SHA whenever
+    # deriva-ml needs a newer deriva-py — and BEFORE every bump-version.
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@93add8069d03a8411c7239ca576145f1ac1d9507",
     "deepdiff",
     "nbconvert",
     "pandas",
@@ -53,7 +59,10 @@ build-backend = "setuptools.build_meta"
 python-preference = "only-managed"
 
 [tool.uv.sources]
-deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", branch = "deriva-ml" }
+# Keep this rev in lockstep with the SHA in project.dependencies above. uv
+# applies this source override locally; pinning the same immutable rev (not the
+# branch) keeps dev resolution identical to what consumers get transitively.
+deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", rev = "93add8069d03a8411c7239ca576145f1ac1d9507" }
 
 
 [tool.setuptools.package-data]

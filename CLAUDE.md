@@ -469,6 +469,53 @@ Don't use `bump-my-version` directly as it doesn't push changes.
 
 Run `bump-version` only on `main`, after the feature PR has merged.
 
+**ALWAYS verify the deriva-py pin is current BEFORE bumping** (see
+"Updating the deriva-py pin" below). A release that ships a stale pin
+silently freezes every downstream consumer on an old deriva-py — the
+2026-06-16 eye-ai bag over-fetch (a fixed deriva-py bug reappearing
+because the consumer's lock was behind the pin) is the failure mode
+this prevents.
+
+### Updating the deriva-py pin
+
+deriva-py is pinned to an **immutable commit SHA**, not the
+`deriva-ml` branch, in **two** places that must stay in lockstep:
+
+- `project.dependencies` in `pyproject.toml`:
+  `"deriva @ git+...deriva-py@<sha>"`
+- `[tool.uv.sources]` in `pyproject.toml`:
+  `deriva = { git = "...deriva-py", rev = "<sha>" }`
+
+**Why a SHA and not the branch.** A git-*branch* dependency carries no
+"newer-than" version semantics, and `[tool.uv.sources]` is **not
+transitive** (uv only reads it from the workspace-root project). So a
+downstream project (e.g. eye-ai-vgg19) that bumps `deriva-ml` will
+**not** advance deriva-py — its own lock stays frozen on whatever
+deriva-py commit it last resolved, even though deriva-ml moved. A
+**commit SHA in `project.dependencies` is transitive and immutable**:
+uv records it in deriva-ml's published metadata, so bumping deriva-ml
+*forces* every consumer's resolver to pull deriva-py at exactly that
+commit. This is the mechanism that keeps the two repos in sync
+automatically.
+
+**To advance the pin** (when deriva-ml needs a newer deriva-py — e.g.
+after merging a deriva-py PR on the `deriva-ml` branch):
+
+1. Get the target commit (usually `origin/deriva-ml` HEAD after the
+   deriva-py PR merged):
+   ```bash
+   git -C ../../deriva-py rev-parse origin/deriva-ml
+   ```
+2. Replace the SHA in **both** the `project.dependencies` URL and the
+   `[tool.uv.sources]` `rev` (they must match).
+3. `uv lock && uv sync` and run the suite to confirm the new deriva-py
+   works.
+4. Land via PR like any change, then `bump-version` on `main`.
+
+**The pin advance is part of the bump, not separate.** When a release
+depends on a deriva-py fix, advancing the SHA and bumping the version
+go together — never bump with a stale pin.
+
 ### Asset Upload
 
 Use `asset_file_path()` API to register files for upload:
