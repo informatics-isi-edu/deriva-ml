@@ -39,6 +39,7 @@ from .test_utils import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from deriva_ml.dataset.dataset import Dataset
     from deriva_ml.demo_catalog import DatasetDescription
 
 
@@ -157,6 +158,50 @@ def catalog_with_datasets(catalog_manager: CatalogManager, tmp_path: Path) -> tu
     ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path)
     yield ml, dataset_desc
     # Note: No after-test reset - next test's before-reset handles isolation
+
+
+@pytest.fixture(scope="function")
+def subject_partitioned_dataset(catalog_with_datasets, tmp_path: Path) -> tuple[DerivaML, "Dataset"]:
+    """A dataset whose members are Subjects ONLY — Image is FK-reachable via
+    Image.Subject, never a direct member. Exercises the FK-reachable feature-read
+    path the denormalize union fixes.
+
+    Mirrors ``create_demo_datasets`` (src/deriva_ml/demo_catalog.py) and
+    ``CatalogManager.ensure_datasets`` (tests/catalog_manager.py) for the
+    workflow / execution / create_dataset / add_dataset_members / commit calls.
+
+    Returns:
+        Tuple of (DerivaML instance, Dataset).
+    """
+    from deriva_ml import ExecutionConfiguration
+
+    ml, _desc = catalog_with_datasets
+
+    # Choose Subjects that actually HAVE Images, so the FK-reachable Image set is
+    # non-empty. Fetch Image rows, collect their Subject FK values, and pick a
+    # couple of Subjects that appear there. RIDs come from the live catalog
+    # — never literals.
+    image_rows = ml._domain_path().tables["Image"].entities().fetch()
+    subjects_with_images = {row["Subject"] for row in image_rows if row["Subject"] is not None}
+    assert len(subjects_with_images) >= 2, (
+        f"Demo catalog should have >=2 Subjects with Images, got {len(subjects_with_images)}"
+    )
+    subject_rids = list(subjects_with_images)[:2]
+
+    # Create the subject-partitioned dataset via an execution, exactly as
+    # ensure_datasets does, then add ONLY Subject members (no Image members —
+    # that is the whole point: Images become FK-reachable, not direct members).
+    workflow = ml.create_workflow(name="Subject Partitioned Dataset", workflow_type="Test Workflow")
+    execution = ml.create_execution(workflow=workflow, configuration=ExecutionConfiguration())
+    with execution.execute() as exe:
+        ds = exe.create_dataset(
+            dataset_types=[],
+            description="Subject-partitioned dataset (Subjects only; Image FK-reachable)",
+        )
+        ds.add_dataset_members({"Subject": subject_rids}, description="Subjects only")
+    execution.commit_output_assets()
+
+    return ml, ds
 
 
 @pytest.fixture(scope="function")
