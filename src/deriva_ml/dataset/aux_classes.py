@@ -327,6 +327,11 @@ class DatasetSpec(BaseModel):
             Increase read_timeout for large datasets with deep FK joins.
         fetch_concurrency (int): Number of concurrent fetch threads for asset
             download during materialization. Defaults to 8.
+        reachability_concurrency (int): Opt-in bounded parallelism for the
+            client-side edge-table fetch that computes which rows the bag
+            contains (drives the estimate AND bag-spec/build). 1 (default) is
+            sequential; >1 speeds up large datasets. Distinct from
+            ``fetch_concurrency``, which parallelizes asset *file* downloads.
     """
 
     rid: RID
@@ -336,6 +341,7 @@ class DatasetSpec(BaseModel):
     exclude_tables: set[str] | None = None
     timeout: tuple[int, int] | None = None
     fetch_concurrency: int = 8
+    reachability_concurrency: int = 1
 
     model_config = VALIDATION_CONFIG
 
@@ -426,6 +432,10 @@ class DatasetSpecConfig:
         timeout: Optional ``[connect_timeout, read_timeout]`` in seconds for
             network requests during bag download.
         fetch_concurrency: Number of concurrent fetch threads for asset download.
+        reachability_concurrency: Opt-in bounded parallelism for the client-side
+            edge-table fetch that computes bag contents (estimate + bag-spec/build).
+            1 (default) is sequential; >1 speeds up large datasets. Distinct from
+            ``fetch_concurrency`` (asset file downloads).
     """
 
     rid: str
@@ -435,6 +445,7 @@ class DatasetSpecConfig:
     exclude_tables: list[str] | None = None
     timeout: list[int] | None = None
     fetch_concurrency: int = 8
+    reachability_concurrency: int = 1
 
 
 class DatasetReference(BaseModel):

@@ -285,3 +285,31 @@ def test_compute_rid_sets_threads_reachability_concurrency():
 
     src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
     assert "max_workers=reachability_concurrency" in src
+
+
+def test_public_entry_points_expose_reachability_concurrency():
+    """estimate_bag_size / bag_info surface reachability_concurrency (default 1)
+    so callers can opt into parallel edge-table fetches."""
+    import inspect
+
+    from deriva_ml.dataset.dataset import Dataset
+
+    for name in ("estimate_bag_size", "bag_info"):
+        sig = inspect.signature(getattr(Dataset, name))
+        assert "reachability_concurrency" in sig.parameters, name
+        assert sig.parameters["reachability_concurrency"].default == 1, name
+
+
+def test_build_and_spec_expose_reachability_concurrency():
+    """build_bag and generate_dataset_download_spec accept and forward
+    reachability_concurrency to _compute_rid_sets."""
+    import inspect
+
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    for name in ("build_bag", "generate_dataset_download_spec"):
+        sig = inspect.signature(getattr(DatasetBagBuilder, name))
+        assert "reachability_concurrency" in sig.parameters, name
+        assert sig.parameters["reachability_concurrency"].default == 1, name
+        src = inspect.getsource(getattr(DatasetBagBuilder, name))
+        assert "reachability_concurrency=reachability_concurrency" in src, name

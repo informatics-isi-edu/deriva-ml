@@ -469,6 +469,7 @@ class DatasetMixin:
         return ds.estimate_bag_size(
             version=dataset.version,
             exclude_tables=dataset.exclude_tables,
+            reachability_concurrency=dataset.reachability_concurrency,
         )
 
     def bag_info(
@@ -498,6 +499,7 @@ class DatasetMixin:
         return ds.bag_info(
             version=dataset.version,
             exclude_tables=dataset.exclude_tables,
+            reachability_concurrency=dataset.reachability_concurrency,
         )
 
     def estimate_denormalized_size(

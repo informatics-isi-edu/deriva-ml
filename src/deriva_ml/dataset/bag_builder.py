@@ -237,7 +237,7 @@ class DatasetBagBuilder:
     # Public surface — drives :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
-    def generate_dataset_download_spec(self, dataset: DatasetLike) -> dict[str, Any]:
+    def generate_dataset_download_spec(self, dataset: DatasetLike, reachability_concurrency: int = 1) -> dict[str, Any]:
         """Return the runtime download spec for a specific dataset.
 
         Drives a :class:`CatalogBagBuilder` scoped to the dataset's
@@ -293,7 +293,7 @@ class DatasetBagBuilder:
         # table (Format B) — matching the direct-download arm
         # (:meth:`build_bag`) — instead of one csv processor per FK
         # path (Format A).
-        rid_sets = self._compute_rid_sets(dataset).rid_sets
+        rid_sets = self._compute_rid_sets(dataset, reachability_concurrency=reachability_concurrency).rid_sets
         builder = self._catalog_bag_builder(dataset=dataset, rid_sets=rid_sets)
         spec = builder.get_export_spec()
 
@@ -341,6 +341,7 @@ class DatasetBagBuilder:
         dataset: DatasetLike,
         output_dir: Path,
         timeout: tuple[int, int] | None = None,
+        reachability_concurrency: int = 1,
     ) -> Path:
         """Build a bag for ``dataset`` and return the on-disk zip archive path.
 
@@ -394,7 +395,7 @@ class DatasetBagBuilder:
         # Compute the per-table reachable RID sets so the upstream engine
         # emits one rid-set csv processor per non-vocab reached table
         # (Format-B) instead of one csv processor per FK path.
-        rid_sets = self._compute_rid_sets(dataset).rid_sets
+        rid_sets = self._compute_rid_sets(dataset, reachability_concurrency=reachability_concurrency).rid_sets
 
         catalog = self._ml_instance.catalog
         prior_config = getattr(catalog, "_session_config", None)

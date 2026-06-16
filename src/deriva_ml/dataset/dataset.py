@@ -2651,6 +2651,7 @@ class Dataset:
         self,
         version: DatasetVersion | str,
         exclude_tables: set[str] | None = None,
+        reachability_concurrency: int = 1,
     ) -> dict[str, Any]:
         """Estimate the size of a dataset bag before downloading.
 
@@ -2732,7 +2733,7 @@ class Dataset:
             ml_instance=version_snapshot_catalog,
             exclude_tables=exclude_tables,
         )
-        rid_data = builder._compute_rid_sets(self)
+        rid_data = builder._compute_rid_sets(self, reachability_concurrency=reachability_concurrency)
 
         return assemble_estimate(
             asset_tables=rid_data.asset_tables,
@@ -2748,6 +2749,7 @@ class Dataset:
         self,
         version: DatasetVersion | str,
         exclude_tables: set[str] | None = None,
+        reachability_concurrency: int = 1,
     ) -> dict[str, Any]:
         """Get comprehensive info about a dataset bag: size, contents, and cache status.
 
@@ -2771,7 +2773,11 @@ class Dataset:
                 - cache_path: local path to cached bag (if cached), else None
         """
         # Get size estimate
-        size_info = self.estimate_bag_size(version=version, exclude_tables=exclude_tables)
+        size_info = self.estimate_bag_size(
+            version=version,
+            exclude_tables=exclude_tables,
+            reachability_concurrency=reachability_concurrency,
+        )
 
         # Get cache status
         from deriva_ml.dataset.bag_cache import BagCache
