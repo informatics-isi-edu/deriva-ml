@@ -224,7 +224,7 @@ class DatasetBag:
         """
         return self.model.bag_path
 
-    def materialize(self, *, fetch_concurrency: int = 1) -> Self:
+    def materialize(self, *, fetch_concurrency: int = 8) -> Self:
         """Fetch any not-yet-downloaded files for this bag, in place.
 
         A :class:`DatasetBag` may be downloaded metadata-only (via
@@ -245,7 +245,8 @@ class DatasetBag:
 
         Args:
             fetch_concurrency: Maximum number of concurrent file
-                downloads.
+                downloads. Defaults to 8, matching ``download_dataset_bag`` /
+                ``cache``; pass 1 for sequential downloads.
 
         Returns:
             Self: this same bag (its assets are now present on disk),
