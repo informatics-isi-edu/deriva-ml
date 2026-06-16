@@ -1060,10 +1060,13 @@ def _populate_from_catalog(
             write target).
         table_to_schema: Maps table name -> ERMrest schema name (used to
             build ``"schema:table"`` qualified names).
-        join_tables: Output from ``_prepare_wide_table`` — dict keyed by leaf
-            table name, values are ``(path, join_conditions, join_types)``
-            where ``path`` is a list of table names in join order starting
-            with "Dataset".
+        join_tables: Output from ``_prepare_wide_table`` — dict keyed by
+            ``{element}#{route_index}`` (one entry per distinct
+            ``Dataset -> ... -> element`` route; the key is opaque and never
+            read semantically — the consumer UNIONs them, and SQL ``UNION``
+            dedups identical output rows). Values are
+            ``(path, join_conditions, join_types)`` where ``path`` is a list of
+            table names in join order starting with "Dataset".
         dataset_rid_list: RIDs to scope the denormalization to (the root
             dataset plus any children from recursive traversal).
 

@@ -191,7 +191,10 @@ class TestPrepareWideTableIntegration:
             include_tables=["Image", "Subject"],
             via=["Observation"],
         )
-        assert "Image" in element_tables
+        # The planner now emits one entry per distinct Dataset->element route,
+        # keyed ``{element}#{i}`` (the consumer UNIONs them). Assert an Image
+        # route exists rather than the legacy single ``"Image"`` key.
+        assert any(key.split("#", 1)[0] == "Image" for key in element_tables)
 
 
 class TestFeatureBridgeDiamond:
@@ -520,14 +523,19 @@ class TestTransparencyPredicates:
             include_tables=["Image", "Image_Classification"],
             row_per="Image",
         )
-        assert "Image" in element_tables, (
-            f"join plan should be keyed on the chosen row_per, got element_tables.keys()={list(element_tables.keys())}"
+        # The planner now emits one entry per distinct Dataset->element route,
+        # keyed ``{element}#{i}``. Resolve the Image route(s) by element prefix
+        # rather than the legacy single ``"Image"`` key.
+        image_keys = [key for key in element_tables if key.split("#", 1)[0] == "Image"]
+        assert image_keys, (
+            f"join plan should include the chosen row_per element, got keys={list(element_tables.keys())}"
         )
         # The plan tuple is (path_names, join_conditions, join_types);
         # path_names is the pre-order JOIN sequence. For the feature-
         # assoc bridge to be wired correctly, the bridge must appear
         # in the sequence between Image and Image_Classification.
-        path_names, _join_conditions, _join_types = element_tables["Image"]
+        # subtree is identical across routes, so any Image route carries the bridge
+        path_names, _join_conditions, _join_types = element_tables[image_keys[0]]
         assert "Execution_Image_Image_Classification" in path_names, (
             f"join sequence must route through the feature-assoc bridge, got path_names={path_names}"
         )

@@ -1681,9 +1681,15 @@ class DenormalizePlanner:
             ``(element_tables, denormalized_columns, multi_schema)`` where:
 
             - **element_tables** -- ``dict[str, (path, join_conditions, join_types)]``
-              keyed by element table name.
-              *path* is a list of table name strings in JOIN order (pre-order walk
-              of the JoinTree, starting with "Dataset").
+              keyed by ``{element}#{route_index}`` -- one entry per distinct
+              ``Dataset -> ... -> element`` route (membership AND FK-reachable),
+              so a subject-partitioned dataset (empty membership association)
+              still resolves rows via the FK route. The consumer UNIONs the
+              entries (deduped on the ``row_per`` leaf), so the key is never
+              read semantically; it only needs to be unique.
+              *path* is a list of table name strings in JOIN order (the
+              ``Dataset -> ... -> element`` prefix followed by a pre-order walk
+              of the shared downstream JoinTree).
               *join_conditions* maps ``table_name -> set[(fk_col, pk_col)]``.
               *join_types* maps ``table_name -> "inner" | "left"``.
             - **denormalized_columns** -- list of
@@ -1739,56 +1745,36 @@ class DenormalizePlanner:
             if path[-1].name in include_tables_set and include_tables_set.intersection({p.name for p in path})
         ]
 
-        # ── Phase 1b: deduplicate association table routes ───────────────────
-        # In some catalogs (e.g., eye-ai), both Image_Dataset and Dataset_Image
-        # exist.  Keep only one route per (element, endpoint) via different
-        # association tables (path[1]).
+        # ── Phase 1b: deduplicate ONLY truly identical paths ─────────────────
+        # Previously this collapsed to one route per (element, endpoint),
+        # preferring the Dataset_{Element} membership association and DISCARDING
+        # the FK-reachable chain (e.g. Dataset -> Subject_Dataset -> Subject ->
+        # Image). On subject-partitioned datasets the membership association is
+        # empty, so that discard produced a silently-empty result. Retain every
+        # distinct route; the consumer UNIONs them (SQL `UNION` dedups identical
+        # output rows). See docs/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design.md.
         deduplicated_paths: list[list[Table]] = []
-        seen_element_endpoint: dict[tuple[str, str], tuple[list[Table], Table]] = {}
-
-        def _is_standard_assoc(assoc_name: str, element_name: str) -> bool:
-            """Check if assoc table matches the Dataset_{Element} naming pattern."""
-            return assoc_name == f"Dataset_{element_name}"
-
+        seen_path_sigs: set[tuple[str, ...]] = set()
         for path in table_paths:
-            if len(path) < 3:
+            sig = tuple(t.name for t in path)
+            if sig not in seen_path_sigs:
+                seen_path_sigs.add(sig)
                 deduplicated_paths.append(path)
-                continue
-            assoc_table = path[1]
-            element = path[2]
-            endpoint = path[-1]
-            key = (element.name, endpoint.name)
-
-            if key not in seen_element_endpoint:
-                seen_element_endpoint[key] = (path, assoc_table)
-                deduplicated_paths.append(path)
-            else:
-                existing_path, existing_assoc = seen_element_endpoint[key]
-                if existing_assoc.name != assoc_table.name:
-                    # Duplicate route via different association table.
-                    # Prefer the standard Dataset_{Element} pattern over legacy.
-                    if _is_standard_assoc(assoc_table.name, element.name) and not _is_standard_assoc(
-                        existing_assoc.name, element.name
-                    ):
-                        # Replace existing with standard pattern
-                        deduplicated_paths = [
-                            p for p in deduplicated_paths if not (len(p) >= 3 and (p[2].name, p[-1].name) == key)
-                        ]
-                        seen_element_endpoint[key] = (path, assoc_table)
-                        deduplicated_paths.append(path)
-                    # else: keep existing (either it's standard or both are non-standard)
-                else:
-                    deduplicated_paths.append(path)
 
         table_paths = deduplicated_paths
 
-        # ── Phase 1c: group by element, filter to elements in include_tables ─
+        # ── Phase 1c: group routes by the include-table they SERVE (endpoint) ─
+        # The element a route serves is its ENDPOINT (p[-1]), not its third
+        # table (p[2]). Both the membership route Dataset -> Dataset_Image ->
+        # Image (p[2] == Image) and the FK-reachable route Dataset ->
+        # Dataset_Subject -> Subject -> Image (p[2] == Subject) serve element
+        # "Image" — they share the same endpoint. Keying by p[2] dropped the
+        # FK route because its third table (Subject) is not in include_tables.
+        # Key by the endpoint so every route to an include-table is retained.
         paths_by_element: dict[str, list[list[Table]]] = defaultdict(list)
         for p in table_paths:
-            if len(p) >= 3:
-                paths_by_element[p[2].name].append(p)
-
-        paths_by_element = {elem: paths for elem, paths in paths_by_element.items() if elem in include_tables_set}
+            if len(p) >= 3 and p[-1].name in include_tables_set:
+                paths_by_element[p[-1].name].append(p)
 
         # ── Phase 2: build JoinTree per element ──────────────────────────────
         # System columns are dropped from the wide table by default. Callers
@@ -1798,63 +1784,60 @@ class DenormalizePlanner:
         element_tables: dict[str, tuple[list[str], dict[str, set], dict[str, str]]] = {}
 
         for element_name, paths in paths_by_element.items():
+            # The downstream subtree (element -> other include_tables) is the
+            # SAME for every route that reaches this element — only the
+            # Dataset -> ... -> element PREFIX differs. Build it once.
             tree = self._build_join_tree(element_name, include_tables_set, table_paths, via=set(via_list))
-
-            # ── Phase 3: flatten JoinTree to consumer format ───────────────────
-            # Pre-order walk gives us the correct JOIN order.
-            # We prepend "Dataset" and the association table that connects
-            # Dataset to the element (taken from paths[0][0:3]).
-
-            # Find the Dataset -> assoc -> element prefix from the first path
-            if paths and len(paths[0]) >= 3:
-                dataset_name = paths[0][0].name  # "Dataset"
-                assoc_name = paths[0][1].name  # e.g. "Dataset_Image"
-            else:
-                dataset_name = "Dataset"
-                assoc_name = None
-
-            # Walk the tree to get the join order (element -> children)
             tree_nodes = tree.walk()
 
-            # Build the flat path: [Dataset, assoc, element, ...tree children...]
-            path_names: list[str] = [dataset_name]
-            if assoc_name:
-                path_names.append(assoc_name)
+            # ── Phase 3: emit one consumer entry per DISTINCT route ────────────
+            # Each route gets its own Dataset -> ... -> element prefix joined to
+            # the shared subtree. The consumer UNIONs all entries (deduped on
+            # the row_per leaf), so a subject-partitioned dataset — whose
+            # membership association is empty — still resolves rows through the
+            # FK-reachable route. The dict KEY (element#i) is never read
+            # semantically by the consumer; it only needs to be unique.
+            for route_index, route in enumerate(paths):
+                # Locate the element in this route; the prefix is everything up
+                # to and including the element (Dataset -> ... -> element).
+                # Phase 1c grouped routes by endpoint, so element_name is always
+                # in route (route[-1]); next() can't exhaust.
+                elem_pos = next(i for i, t in enumerate(route) if t.name == element_name)
+                prefix = route[: elem_pos + 1]
 
-            # Add tree nodes (element first, then its subtree in pre-order)
-            for node in tree_nodes:
-                if node.table_name not in path_names:
-                    path_names.append(node.table_name)
+                path_names: list[str] = [t.name for t in prefix]
+                join_conditions: dict[str, set[tuple]] = {}
+                join_types: dict[str, str] = {}
 
-            # Build join conditions and join types from the tree edges
-            join_conditions: dict[str, set[tuple]] = {}
-            join_types: dict[str, str] = {}
+                # Walk the prefix's consecutive (from, to) pairs. Each edge's
+                # FK orientation is resolved by _table_relationship and may flip
+                # along the chain (membership hop vs FK hop); we HONOR the
+                # returned (fk_col, pk_col) ordering exactly. Keep inner joins
+                # to match the prior 2-hop prefix behavior.
+                for j in range(elem_pos):
+                    from_table = route[j]
+                    to_table = route[j + 1]
+                    try:
+                        col_pairs = self._table_relationship(from_table, to_table)
+                        join_conditions[to_table.name] = set(col_pairs)
+                        join_types[to_table.name] = "inner"
+                    except DerivaMLException:
+                        pass
 
-            # First, add the Dataset -> assoc and assoc -> element conditions
-            if assoc_name:
-                dataset_table = self.model.name_to_table(dataset_name)
-                assoc_table_obj = self.model.name_to_table(assoc_name)
-                try:
-                    col_pairs = self._table_relationship(dataset_table, assoc_table_obj)
-                    join_conditions[assoc_name] = set(col_pairs)
-                    join_types[assoc_name] = "inner"
-                except DerivaMLException:
-                    pass
+                # Append the shared downstream subtree (element first, then its
+                # children in pre-order). Skip nodes already in the prefix.
+                for node in tree_nodes:
+                    if node.table_name not in path_names:
+                        path_names.append(node.table_name)
 
-                try:
-                    col_pairs = self._table_relationship(assoc_table_obj, tree.table)
-                    join_conditions[tree.table_name] = set(col_pairs)
-                    join_types[tree.table_name] = "inner"
-                except DerivaMLException:
-                    pass
+                # Add join conditions from the subtree edges (root has no parent
+                # edge; its condition comes from the prefix walk above).
+                for _parent_node, child_node in tree.walk_edges():
+                    if child_node.fk_columns:
+                        join_conditions[child_node.table_name] = set(child_node.fk_columns)
+                        join_types[child_node.table_name] = child_node.join_type
 
-            # Add conditions from the JoinTree edges
-            for parent_node, child_node in tree.walk_edges():
-                if child_node.fk_columns:
-                    join_conditions[child_node.table_name] = set(child_node.fk_columns)
-                    join_types[child_node.table_name] = child_node.join_type
-
-            element_tables[element_name] = (path_names, join_conditions, join_types)
+                element_tables[f"{element_name}#{route_index}"] = (path_names, join_conditions, join_types)
 
         # ── Phase 4: build denormalized column list ──────────────────────────
         denormalized_columns = []
