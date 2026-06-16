@@ -1,4 +1,5 @@
 """Unit tests for DerivaModel.asset_metadata_columns."""
+
 from __future__ import annotations
 
 import pytest
@@ -25,8 +26,7 @@ def test_asset_metadata_columns_excludes_standard_asset_columns(test_ml):
     """Must not include Filename, URL, Length, MD5, Description, or system columns."""
     cols = test_ml.model.asset_metadata_columns("Execution_Metadata")
     names = {c.name for c in cols}
-    for forbidden in ("Filename", "URL", "Length", "MD5", "Description",
-                      "RID", "RCT", "RMT", "RCB", "RMB"):
+    for forbidden in ("Filename", "URL", "Length", "MD5", "Description", "RID", "RCT", "RMT", "RCB", "RMB"):
         assert forbidden not in names
 
 
@@ -39,5 +39,6 @@ def test_asset_metadata_columns_matches_asset_metadata_set(test_ml):
 
 def test_asset_metadata_columns_raises_for_non_asset_table(test_ml):
     from deriva_ml.core.exceptions import DerivaMLTableTypeError
+
     with pytest.raises(DerivaMLTableTypeError):
-        test_ml.model.asset_metadata_columns("Workflow")   # not an asset
+        test_ml.model.asset_metadata_columns("Workflow")  # not an asset

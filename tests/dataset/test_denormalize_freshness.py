@@ -73,10 +73,7 @@ def test_denormalize_does_not_observe_server_side_delete(dataset_test, tmp_path)
     members_before = dataset.list_dataset_members(recurse=False)
     subject_members = members_before.get("Subject", [])
     if len(subject_members) < 2:
-        pytest.skip(
-            "Freshness test needs ≥2 Subject members in the dataset; "
-            "demo fixture changed?"
-        )
+        pytest.skip("Freshness test needs ≥2 Subject members in the dataset; demo fixture changed?")
 
     df_before = dataset.get_denormalized_as_dataframe(
         include_tables=["Subject"],
@@ -84,8 +81,7 @@ def test_denormalize_does_not_observe_server_side_delete(dataset_test, tmp_path)
     )
     subjects_before = set(df_before["Subject.RID"].dropna())
     assert len(subjects_before) >= 2, (
-        "Sanity check: first denormalize should return at least 2 "
-        f"Subjects; got {subjects_before}."
+        f"Sanity check: first denormalize should return at least 2 Subjects; got {subjects_before}."
     )
 
     # Pick one Subject to delete from the dataset (we delete the

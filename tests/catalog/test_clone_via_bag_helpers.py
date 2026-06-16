@@ -146,9 +146,7 @@ class TestMaterializeBagAssets:
         bag = tmp_path / "my-bag"
         bag.mkdir()
         # Non-empty fetch.txt — one line is enough.
-        (bag / "fetch.txt").write_text(
-            "https://example.org/hatrac/x\t1024\tdata/asset/x.bin\n"
-        )
+        (bag / "fetch.txt").write_text("https://example.org/hatrac/x\t1024\tdata/asset/x.bin\n")
         with patch("bdbag.bdbag_api.materialize") as mock_materialize:
             _materialize_bag_assets(bag)
         mock_materialize.assert_called_once_with(str(bag))
@@ -213,9 +211,7 @@ class TestRecordCloneProvenance:
         )
         dest_catalog = MagicMock()
 
-        with patch(
-            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
-        ) as mock_set:
+        with patch("deriva_ml.catalog.clone_via_bag.set_catalog_provenance") as mock_set:
             _record_clone_provenance(
                 dest_catalog=dest_catalog,
                 source_hostname="src.example.org",
@@ -247,9 +243,7 @@ class TestRecordCloneProvenance:
         )
         dest_catalog = MagicMock()
 
-        with patch(
-            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
-        ) as mock_set:
+        with patch("deriva_ml.catalog.clone_via_bag.set_catalog_provenance") as mock_set:
             _record_clone_provenance(
                 dest_catalog=dest_catalog,
                 source_hostname="src.example.org",
@@ -281,9 +275,7 @@ class TestRecordCloneProvenance:
         dest_catalog = MagicMock()
 
         # The function should not raise — it logs and continues.
-        with patch(
-            "deriva_ml.catalog.clone_via_bag.set_catalog_provenance"
-        ) as mock_set:
+        with patch("deriva_ml.catalog.clone_via_bag.set_catalog_provenance") as mock_set:
             _record_clone_provenance(
                 dest_catalog=dest_catalog,
                 source_hostname="src.example.org",

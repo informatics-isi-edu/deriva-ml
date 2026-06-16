@@ -116,7 +116,6 @@ def _default_dir_name_from_target(
     return "Unknown"
 
 
-
 def _build_dataset_type_path_map(
     bag: "DatasetBag",
     type_selector: Callable[[list[str]], str] | None = None,
@@ -136,6 +135,7 @@ def _build_dataset_type_path_map(
         e.g., {"4-ABC": ["complete", "training"], "4-DEF": ["complete", "testing"]}
     """
     if type_selector is None:
+
         def type_selector(types: list[str]) -> str:
             return types[0] if types else "Testing"
 
@@ -940,8 +940,6 @@ def restructure_assets(
         manifest[source_path] = actual_path
 
     return manifest
-
-
 
 
 __all__ = ["restructure_assets"]

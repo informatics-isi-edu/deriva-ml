@@ -48,15 +48,15 @@ def test_no_legacy_status_references_in_src():
             str(REPO_ROOT / "src" / "deriva_ml"),
         ]
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False,
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         # grep returns 0 on hit, 1 on no-hit, 2 on error.
         if result.returncode == 0 and result.stdout.strip():
             hits.append(f"pattern={pattern!r}\n{result.stdout}")
-    assert not hits, (
-        "Legacy Status references found in src/deriva_ml/:\n\n"
-        + "\n".join(hits)
-    )
+    assert not hits, "Legacy Status references found in src/deriva_ml/:\n\n" + "\n".join(hits)
 
 
 def test_executionstatus_values_are_title_case_canonical():

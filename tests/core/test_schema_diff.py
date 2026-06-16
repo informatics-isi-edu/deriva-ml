@@ -1,4 +1,5 @@
 """Unit tests for _compute_diff + SchemaDiff rendering."""
+
 from __future__ import annotations
 
 
@@ -29,19 +30,16 @@ def _col(name, typename="text"):
 
 def _fkey(columns, ref_schema, ref_table, ref_columns):
     return {
-        "foreign_key_columns": [
-            {"schema_name": "deriva-ml", "table_name": "X", "column_name": c}
-            for c in columns
-        ],
+        "foreign_key_columns": [{"schema_name": "deriva-ml", "table_name": "X", "column_name": c} for c in columns],
         "referenced_columns": [
-            {"schema_name": ref_schema, "table_name": ref_table, "column_name": c}
-            for c in ref_columns
+            {"schema_name": ref_schema, "table_name": ref_table, "column_name": c} for c in ref_columns
         ],
     }
 
 
 def test_empty_diff_when_schemas_identical():
     from deriva_ml.core.schema_diff import _compute_diff
+
     s = _schema({"T": _table(columns=[_col("a")])})
     diff = _compute_diff(s, s)
     assert diff.is_empty()
@@ -51,11 +49,12 @@ def test_empty_diff_when_schemas_identical():
 
 def test_added_schema():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema()
     live = {
         "schemas": {
             "deriva-ml": {"schema_name": "deriva-ml", "tables": {}},
-            "newsch":    {"schema_name": "newsch",    "tables": {}},
+            "newsch": {"schema_name": "newsch", "tables": {}},
         }
     }
     diff = _compute_diff(cached, live)
@@ -66,10 +65,11 @@ def test_added_schema():
 
 def test_removed_schema():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = {
         "schemas": {
             "deriva-ml": {"schema_name": "deriva-ml", "tables": {}},
-            "gone":      {"schema_name": "gone",      "tables": {}},
+            "gone": {"schema_name": "gone", "tables": {}},
         }
     }
     live = _schema()
@@ -79,11 +79,14 @@ def test_removed_schema():
 
 def test_added_table():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T1": _table(name="T1")})
-    live = _schema({
-        "T1": _table(name="T1"),
-        "T2": _table(name="T2"),
-    })
+    live = _schema(
+        {
+            "T1": _table(name="T1"),
+            "T2": _table(name="T2"),
+        }
+    )
     diff = _compute_diff(cached, live)
     assert [t.table for t in diff.added_tables] == ["T2"]
     assert all(t.schema_name == "deriva-ml" for t in diff.added_tables)
@@ -91,10 +94,13 @@ def test_added_table():
 
 def test_removed_table():
     from deriva_ml.core.schema_diff import _compute_diff
-    cached = _schema({
-        "T1": _table(name="T1"),
-        "T2": _table(name="T2"),
-    })
+
+    cached = _schema(
+        {
+            "T1": _table(name="T1"),
+            "T2": _table(name="T2"),
+        }
+    )
     live = _schema({"T1": _table(name="T1")})
     diff = _compute_diff(cached, live)
     assert [t.table for t in diff.removed_tables] == ["T2"]
@@ -102,6 +108,7 @@ def test_removed_table():
 
 def test_added_column():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T": _table(columns=[_col("a")])})
     live = _schema({"T": _table(columns=[_col("a"), _col("b", "int4")])})
     diff = _compute_diff(cached, live)
@@ -115,6 +122,7 @@ def test_added_column():
 
 def test_removed_column():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T": _table(columns=[_col("a"), _col("b")])})
     live = _schema({"T": _table(columns=[_col("a")])})
     diff = _compute_diff(cached, live)
@@ -123,6 +131,7 @@ def test_removed_column():
 
 def test_column_type_change():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T": _table(columns=[_col("a", "text")])})
     live = _schema({"T": _table(columns=[_col("a", "int4")])})
     diff = _compute_diff(cached, live)
@@ -135,13 +144,16 @@ def test_column_type_change():
 
 def test_added_fkey():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T": _table(columns=[_col("x")])})
-    live = _schema({
-        "T": _table(
-            columns=[_col("x")],
-            fkeys=[_fkey(["x"], "deriva-ml", "Other", ["y"])],
-        ),
-    })
+    live = _schema(
+        {
+            "T": _table(
+                columns=[_col("x")],
+                fkeys=[_fkey(["x"], "deriva-ml", "Other", ["y"])],
+            ),
+        }
+    )
     diff = _compute_diff(cached, live)
     assert len(diff.added_fkeys) == 1
     fk = diff.added_fkeys[0]
@@ -152,12 +164,15 @@ def test_added_fkey():
 
 def test_removed_fkey():
     from deriva_ml.core.schema_diff import _compute_diff
-    cached = _schema({
-        "T": _table(
-            columns=[_col("x")],
-            fkeys=[_fkey(["x"], "deriva-ml", "Other", ["y"])],
-        ),
-    })
+
+    cached = _schema(
+        {
+            "T": _table(
+                columns=[_col("x")],
+                fkeys=[_fkey(["x"], "deriva-ml", "Other", ["y"])],
+            ),
+        }
+    )
     live = _schema({"T": _table(columns=[_col("x")])})
     diff = _compute_diff(cached, live)
     assert len(diff.removed_fkeys) == 1
@@ -165,6 +180,7 @@ def test_removed_fkey():
 
 def test_diff_render_produces_human_readable():
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T": _table(columns=[_col("a")])})
     live = _schema({"T": _table(columns=[_col("a"), _col("b", "int4")])})
     diff = _compute_diff(cached, live)
@@ -180,10 +196,13 @@ def test_diff_render_produces_human_readable():
 def test_diff_determinism():
     """Two runs over the same inputs produce identical diffs (sorted)."""
     from deriva_ml.core.schema_diff import _compute_diff
+
     cached = _schema({"T": _table(columns=[_col("a")])})
-    live = _schema({
-        "T": _table(columns=[_col("a"), _col("z"), _col("m"), _col("b")]),
-    })
+    live = _schema(
+        {
+            "T": _table(columns=[_col("a"), _col("z"), _col("m"), _col("b")]),
+        }
+    )
     d1 = _compute_diff(cached, live)
     d2 = _compute_diff(cached, live)
     assert d1 == d2

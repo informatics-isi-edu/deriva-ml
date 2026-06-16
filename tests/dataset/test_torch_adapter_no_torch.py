@@ -4,6 +4,7 @@ If torch is truly installed in the test venv, we stub it out of
 sys.modules temporarily. The goal is to prove that importing DatasetBag
 does NOT import torch eagerly.
 """
+
 from __future__ import annotations
 
 import sys
@@ -33,11 +34,13 @@ def test_as_torch_dataset_raises_importerror_without_torch(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", None)
 
     from unittest.mock import MagicMock
+
     bag = MagicMock()
 
     if "deriva_ml.dataset.torch_adapter" in sys.modules:
         monkeypatch.delitem(sys.modules, "deriva_ml.dataset.torch_adapter", raising=False)
 
     from deriva_ml.dataset.torch_adapter import build_torch_dataset
+
     with pytest.raises(ImportError, match=r"torch"):
         build_torch_dataset(bag, "Image")

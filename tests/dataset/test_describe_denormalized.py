@@ -282,14 +282,9 @@ class TestEstimatedRowCount:
             info = dataset.describe_denormalized(["Image"])
             if info["anchors"]["by_type"].get("Image", 0) > 0:
                 return dataset
-        raise AssertionError(
-            "No dataset in catalog_with_datasets has Image anchors; "
-            "demo fixture changed?"
-        )
+        raise AssertionError("No dataset in catalog_with_datasets has Image anchors; demo fixture changed?")
 
-    def test_estimate_exact_when_anchor_is_row_per(
-        self, catalog_with_datasets: "tuple[DerivaML, object]"
-    ):
+    def test_estimate_exact_when_anchor_is_row_per(self, catalog_with_datasets: "tuple[DerivaML, object]"):
         """Anchors at the row_per table give an exact estimate.
 
         Demo fixture has Image anchors; with row_per='Image', the
@@ -332,9 +327,7 @@ class TestEstimatedRowCount:
             )
             assert estimated["total"] == image_anchors
 
-    def test_estimate_unknown_when_row_per_downstream_of_anchor(
-        self, catalog_with_datasets: "tuple[DerivaML, object]"
-    ):
+    def test_estimate_unknown_when_row_per_downstream_of_anchor(self, catalog_with_datasets: "tuple[DerivaML, object]"):
         """Regression for 2026-05-21 finding A02.
 
         When ``row_per`` is downstream of the anchor table (via FK
@@ -376,10 +369,8 @@ class TestEstimatedRowCount:
         assert estimated["total"] is None
         # Reason field tells the caller WHY the estimate is unknown.
         assert "reason" in estimated, (
-            "estimated_row_count should include a 'reason' field when "
-            "the count cannot be computed honestly."
+            "estimated_row_count should include a 'reason' field when the count cannot be computed honestly."
         )
         assert "downstream" in estimated["reason"].lower(), (
-            f"reason should mention the downstream relationship: got "
-            f"{estimated['reason']!r}"
+            f"reason should mention the downstream relationship: got {estimated['reason']!r}"
         )

@@ -212,9 +212,7 @@ class TestDirtyDetectionStatusCodes:
         # passes in).
         (repo / "extra.py").write_text("# to be deleted\n")
         subprocess.run(["git", "add", "extra.py"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Add extra.py"], cwd=repo, capture_output=True, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "Add extra.py"], cwd=repo, capture_output=True, check=True)
         (repo / "extra.py").unlink()
         _, dirty_paths = Workflow._github_url(test_file)
         assert dirty_paths
@@ -225,12 +223,8 @@ class TestDirtyDetectionStatusCodes:
         # Commit a second file we can rename without affecting test_file.
         (repo / "extra.py").write_text("# to be renamed\n")
         subprocess.run(["git", "add", "extra.py"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Add extra.py"], cwd=repo, capture_output=True, check=True
-        )
-        subprocess.run(
-            ["git", "mv", "extra.py", "renamed.py"], cwd=repo, capture_output=True, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "Add extra.py"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(["git", "mv", "extra.py", "renamed.py"], cwd=repo, capture_output=True, check=True)
         _, dirty_paths = Workflow._github_url(test_file)
         assert dirty_paths
 
@@ -248,9 +242,7 @@ class TestDirtyDetectionStatusCodes:
         # file in the repo is modified.
         (repo / "other.py").write_text("# tracked file added\n")
         subprocess.run(["git", "add", "other.py"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Add other.py"], cwd=repo, capture_output=True, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "Add other.py"], cwd=repo, capture_output=True, check=True)
         (repo / "other.py").write_text("# modified after commit\n")
         _, dirty_paths = Workflow._github_url(test_file)
         assert dirty_paths
@@ -307,10 +299,7 @@ class TestFilterDirtyPaths:
         from deriva_ml.execution.workflow import Workflow
 
         porcelain = (
-            " M src/models/train.py\n"
-            "?? findings/run_output.txt\n"
-            "?? outputs/results.csv\n"
-            " M notebooks/explore.ipynb\n"
+            " M src/models/train.py\n?? findings/run_output.txt\n?? outputs/results.csv\n M notebooks/explore.ipynb\n"
         )
         result = Workflow._filter_dirty_paths(porcelain)
         assert result == [" M src/models/train.py", " M notebooks/explore.ipynb"]

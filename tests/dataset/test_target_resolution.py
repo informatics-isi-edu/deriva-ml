@@ -5,6 +5,7 @@ from torch, tensorflow, and the restructure_assets call-site. If these
 tests fail, the adapter and restructure alignment both break in the
 same way, which is a feature — one helper, one set of semantics.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -18,6 +19,7 @@ from deriva_ml.feature import FeatureRecord
 
 class _FakeRecord(FeatureRecord):
     """Minimal FeatureRecord stand-in for target-resolution tests."""
+
     Image: str  # target column: asset RID this record describes
     Grade: str  # scalar label
     Feature_Name: str = "Grade"  # default so tests don't repeat it
@@ -46,8 +48,9 @@ def _make_bag(feature_returns: dict[str, dict[str, list[_FakeRecord]]]):
 
     bag.feature_values = fake_feature_values
     bag.list_dataset_members = MagicMock(
-        return_value={"Image": [{"RID": rid} for rid in feature_returns.get(
-            next(iter(feature_returns), "Grade"), {}).keys()]}
+        return_value={
+            "Image": [{"RID": rid} for rid in feature_returns.get(next(iter(feature_returns), "Grade"), {}).keys()]
+        }
     )
     return bag
 
@@ -99,13 +102,13 @@ def test_resolve_targets_multi_target_returns_dict_keyed_by_feature():
     """Multi-target yields dict[feature_name, FeatureRecord] per RID."""
     grade_recs = [_FakeRecord(Image="1-IMG1", Grade="Mild")]
     severity_recs = [_FakeRecord(Image="1-IMG1", Grade="Low")]
-    bag = _make_bag({
-        "Grade": {"1-IMG1": grade_recs},
-        "Severity": {"1-IMG1": severity_recs},
-    })
-    result = _resolve_targets(
-        bag, "Image", targets=["Grade", "Severity"], missing="error"
+    bag = _make_bag(
+        {
+            "Grade": {"1-IMG1": grade_recs},
+            "Severity": {"1-IMG1": severity_recs},
+        }
     )
+    result = _resolve_targets(bag, "Image", targets=["Grade", "Severity"], missing="error")
     assert set(result["1-IMG1"].keys()) == {"Grade", "Severity"}
     assert result["1-IMG1"]["Grade"].Grade == "Mild"
 
@@ -116,9 +119,7 @@ def test_resolve_targets_selector_dict_applies_per_feature():
     r1 = _FakeRecord(Image="1-IMG1", Grade="Mild")
     r2 = _FakeRecord(Image="1-IMG1", Grade="Severe")
     bag = _make_bag({"Grade": {"1-IMG1": [r1, r2]}})
-    result = _resolve_targets(
-        bag, "Image", targets={"Grade": selector}, missing="error"
-    )
+    result = _resolve_targets(bag, "Image", targets={"Grade": selector}, missing="error")
     # The selector picks one; exact choice depends on select_newest's
     # impl, but the result should be one of the two records.
     assert result["1-IMG1"].Grade in ("Mild", "Severe")

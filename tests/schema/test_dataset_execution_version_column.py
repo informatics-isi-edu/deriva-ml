@@ -34,6 +34,4 @@ def test_dataset_execution_has_dataset_version_fk(demo_model, ml_schema):
         for fk in de.foreign_keys
         if any(c.name == "Dataset_Version" for c in fk.foreign_key_columns)
     }
-    assert "Dataset_Version" in fk_targets, (
-        "Dataset_Execution.Dataset_Version must FK to the Dataset_Version table"
-    )
+    assert "Dataset_Version" in fk_targets, "Dataset_Execution.Dataset_Version must FK to the Dataset_Version table"

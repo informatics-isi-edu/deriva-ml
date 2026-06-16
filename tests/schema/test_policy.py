@@ -42,9 +42,7 @@ def test_policy_has_required_top_level_keys(policy: dict) -> None:
 def test_policy_groups_resolve_to_lists(policy: dict) -> None:
     """Every entry in ``groups`` maps to a list (possibly of group names)."""
     for name, members in policy["groups"].items():
-        assert isinstance(members, list), (
-            f"group '{name}' must map to a list, got {type(members).__name__}"
-        )
+        assert isinstance(members, list), f"group '{name}' must map to a list, got {type(members).__name__}"
 
 
 def test_policy_row_owner_guard_binding_present(policy: dict) -> None:
@@ -57,8 +55,7 @@ def test_policy_row_owner_guard_binding_present(policy: dict) -> None:
     """
     bindings = policy["acl_bindings"]
     assert "row_owner_guard" in bindings, (
-        "row_owner_guard binding missing — non-public tables would have "
-        "no per-row update/delete protection."
+        "row_owner_guard binding missing — non-public tables would have no per-row update/delete protection."
     )
     guard = bindings["row_owner_guard"]
     assert guard["types"] == ["update", "delete"]
@@ -78,11 +75,7 @@ def test_policy_table_acls_apply_row_owner_guard_to_non_public(policy: dict) -> 
     assert isinstance(table_acls, list) and table_acls, "table_acls must be non-empty list"
 
     # Find the catch-all entry binding row_owner_guard.
-    matching = [
-        entry
-        for entry in table_acls
-        if "row_owner_guard" in entry.get("acl_bindings", [])
-    ]
+    matching = [entry for entry in table_acls if "row_owner_guard" in entry.get("acl_bindings", [])]
     assert matching, "row_owner_guard not wired through any table_acls entry"
 
     # The catch-all entry must exclude 'public' (non-public tables
@@ -90,13 +83,9 @@ def test_policy_table_acls_apply_row_owner_guard_to_non_public(policy: dict) -> 
     # schema_acls).
     entry = matching[0]
     assert "public" in entry["schema_pattern"], (
-        "row_owner_guard's schema_pattern must explicitly handle the "
-        "public schema (typically via negative lookahead)."
+        "row_owner_guard's schema_pattern must explicitly handle the public schema (typically via negative lookahead)."
     )
-    assert entry["table_pattern"] == ".*", (
-        "row_owner_guard should bind every table in matching schemas, "
-        "not a subset."
-    )
+    assert entry["table_pattern"] == ".*", "row_owner_guard should bind every table in matching schemas, not a subset."
 
 
 def test_policy_public_schema_is_read_only(policy: dict) -> None:
@@ -111,9 +100,7 @@ def test_policy_public_schema_is_read_only(policy: dict) -> None:
     assert public_entries, "policy.json must declare a schema_acls entry for 'public'"
 
     entry = public_entries[0]
-    assert entry["acl"] == "read_only", (
-        f"public schema must be read_only, got '{entry['acl']}'"
-    )
+    assert entry["acl"] == "read_only", f"public schema must be read_only, got '{entry['acl']}'"
 
 
 def test_policy_acl_definitions_have_required_modes(policy: dict) -> None:
@@ -127,6 +114,4 @@ def test_policy_acl_definitions_have_required_modes(policy: dict) -> None:
     required_modes = {"select", "enumerate", "insert", "update", "delete"}
     for name, definition in policy["acl_definitions"].items():
         missing = required_modes - set(definition)
-        assert not missing, (
-            f"acl_definition '{name}' missing CRUD modes: {missing}"
-        )
+        assert not missing, f"acl_definition '{name}' missing CRUD modes: {missing}"

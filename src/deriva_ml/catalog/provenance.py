@@ -175,10 +175,7 @@ class CatalogProvenance(BaseModel):
         """``True`` when the catalog was cloned from another."""
         # use_enum_values=True stores the value, not the enum member,
         # so compare against the string form.
-        return (
-            self.creation_method == CatalogCreationMethod.CLONE.value
-            and self.clone_details is not None
-        )
+        return self.creation_method == CatalogCreationMethod.CLONE.value and self.clone_details is not None
 
 
 def set_catalog_provenance(

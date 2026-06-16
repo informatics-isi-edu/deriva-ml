@@ -182,9 +182,7 @@ class TestResolveSourcePath:
     def test_returns_filename_when_it_exists(self, tmp_path):
         f = tmp_path / "real.jpg"
         f.write_bytes(b"img")
-        result = _resolve_source_path(
-            {"Filename": str(f), "RID": "ASSET-1"}, "Image", MagicMock()
-        )
+        result = _resolve_source_path({"Filename": str(f), "RID": "ASSET-1"}, "Image", MagicMock())
         assert result == f
 
     def test_falls_back_to_bag_path_layout(self, tmp_path):
@@ -198,9 +196,7 @@ class TestResolveSourcePath:
         bag = MagicMock()
         bag.path = bag_root  # public property
         # ``Filename`` is a bare name (no path) that doesn't exist as-is.
-        result = _resolve_source_path(
-            {"Filename": "img.jpg", "RID": "ASSET-1"}, "Image", bag
-        )
+        result = _resolve_source_path({"Filename": "img.jpg", "RID": "ASSET-1"}, "Image", bag)
         assert result == canonical_file
 
     def test_no_filename_returns_none(self):
@@ -209,9 +205,7 @@ class TestResolveSourcePath:
     def test_neither_location_exists_returns_none(self, tmp_path):
         bag = MagicMock()
         bag.path = tmp_path / "no-such-bag"
-        result = _resolve_source_path(
-            {"Filename": "nope.jpg", "RID": "ASSET-1"}, "Image", bag
-        )
+        result = _resolve_source_path({"Filename": "nope.jpg", "RID": "ASSET-1"}, "Image", bag)
         assert result is None
 
     def test_attribute_error_on_path_is_handled(self, tmp_path):
@@ -226,9 +220,7 @@ class TestResolveSourcePath:
         del bag.path  # simulate missing attribute
         type(bag).path = property(lambda self: (_ for _ in ()).throw(AttributeError()))
 
-        result = _resolve_source_path(
-            {"Filename": "img.jpg", "RID": "ASSET-1"}, "Image", bag
-        )
+        result = _resolve_source_path({"Filename": "img.jpg", "RID": "ASSET-1"}, "Image", bag)
         assert result is None
 
 
@@ -409,9 +401,7 @@ class TestPlaceAsset:
             actual.write_bytes(b"converted")
             return actual
 
-        result = _place_asset(
-            src, dst, file_transformer=my_transformer, use_symlinks=True
-        )
+        result = _place_asset(src, dst, file_transformer=my_transformer, use_symlinks=True)
         assert result == actual
         assert actual.read_bytes() == b"converted"
         # The suggested destination wasn't touched.

@@ -1,4 +1,5 @@
 """Unit tests for CatalogStub — the offline-mode ErmrestCatalog stand-in."""
+
 from __future__ import annotations
 
 import pytest

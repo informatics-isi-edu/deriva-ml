@@ -1,4 +1,5 @@
 """Unit tests for _validate_pending_asset_leases."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -69,6 +70,7 @@ def _fake_catalog(found_rids: set[str]):
 
 def test_empty_entries_returns_none():
     from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+
     catalog = MagicMock()
     assert _validate_pending_asset_leases(catalog, []) is None
     # Empty entries should short-circuit before touching the datapath API.
@@ -77,6 +79,7 @@ def test_empty_entries_returns_none():
 
 def test_all_leases_valid_passes():
     from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
+
     catalog = _fake_catalog({"1-ABC", "1-DEF"})
     entries = [("Image/a.png", "1-ABC"), ("Image/b.png", "1-DEF")]
     assert _validate_pending_asset_leases(catalog, entries) is None
@@ -85,6 +88,7 @@ def test_all_leases_valid_passes():
 def test_single_missing_lease_raises():
     from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
     from deriva_ml.core.exceptions import DerivaMLValidationError
+
     catalog = _fake_catalog({"1-ABC"})  # 1-DEF NOT there
     entries = [("Image/a.png", "1-ABC"), ("Image/b.png", "1-DEF")]
     with pytest.raises(DerivaMLValidationError) as ei:
@@ -98,6 +102,7 @@ def test_single_missing_lease_raises():
 def test_multiple_missing_leases_aggregated():
     from deriva_ml.execution.rid_lease import _validate_pending_asset_leases
     from deriva_ml.core.exceptions import DerivaMLValidationError
+
     catalog = _fake_catalog(set())  # nothing found
     entries = [
         ("Image/z.png", "1-ZZZ"),

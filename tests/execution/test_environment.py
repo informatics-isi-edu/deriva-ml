@@ -107,8 +107,7 @@ class TestGetExecutionEnvironment:
         assert isinstance(env, dict)
         for key in ("imports", "os", "sys", "sys_path", "site", "platform"):
             assert key in env, (
-                f"get_execution_environment missing aggregate key {key!r}: "
-                f"keys present = {sorted(env.keys())}"
+                f"get_execution_environment missing aggregate key {key!r}: keys present = {sorted(env.keys())}"
             )
 
     def test_is_json_serializable(self):

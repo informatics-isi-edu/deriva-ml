@@ -602,6 +602,7 @@ class TestRestructureHelperMethods:
         for img in images:
             assert img["RID"] in asset_map
 
+
 class TestRestructureWithFeatures:
     """Tests for restructure_assets with feature-based grouping."""
 

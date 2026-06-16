@@ -54,12 +54,12 @@ def test_create_ml_catalog_applies_row_owner_guard() -> None:
     policy_file = files("deriva_ml.schema").joinpath("policy.json")
     policy = json.loads(policy_file.read_text())
     assert "row_owner_guard" in policy["acl_bindings"], (
-        "policy.json does not declare row_owner_guard — test premise "
-        "is broken. Investigate the policy file separately."
+        "policy.json does not declare row_owner_guard — test premise is broken. Investigate the policy file separately."
     )
 
     catalog = create_ml_catalog(
-        hostname="localhost", project_name="s1b_acl_test",
+        hostname="localhost",
+        project_name="s1b_acl_test",
     )
     try:
         model = catalog.getCatalogModel()
@@ -74,9 +74,7 @@ def test_create_ml_catalog_applies_row_owner_guard() -> None:
         # create_ml_schema) or a policy regression.
         deriva_ml = model.schemas["deriva-ml"]
         missing = [
-            tname
-            for tname, table in deriva_ml.tables.items()
-            if "row_owner_guard" not in (table.acl_bindings or {})
+            tname for tname, table in deriva_ml.tables.items() if "row_owner_guard" not in (table.acl_bindings or {})
         ]
         assert not missing, (
             f"row_owner_guard binding missing on deriva-ml tables: "

@@ -190,10 +190,7 @@ def _model_fingerprint(model) -> dict:
     """A structural fingerprint: {schema: {table: sorted(column names)}}."""
     fp: dict[str, dict[str, list[str]]] = {}
     for sname, schema in model.model.schemas.items():
-        fp[sname] = {
-            tname: sorted(c.name for c in table.columns)
-            for tname, table in schema.tables.items()
-        }
+        fp[sname] = {tname: sorted(c.name for c in table.columns) for tname, table in schema.tables.items()}
     return fp
 
 
@@ -348,8 +345,7 @@ def test_live_pathbuilder_no_schema_fetch(live_ml, monkeypatch):
     live_ml.pathBuilder()
     live_ml.pathBuilder()
     assert counter["schema"] == 0, (
-        f"pathBuilder() issued {counter['schema']} /schema GETs; expected 0 "
-        "(wrapper is built from the in-memory model)"
+        f"pathBuilder() issued {counter['schema']} /schema GETs; expected 0 (wrapper is built from the in-memory model)"
     )
 
 

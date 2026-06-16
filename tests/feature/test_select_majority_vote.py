@@ -13,9 +13,7 @@ from deriva_ml.core.exceptions import DerivaMLException
 from deriva_ml.feature import FeatureRecord
 
 
-def _make_record(
-    execution: str, rct: str, label: str, feature_name: str = "Diagnosis"
-) -> FeatureRecord:
+def _make_record(execution: str, rct: str, label: str, feature_name: str = "Diagnosis") -> FeatureRecord:
     """Create a minimal FeatureRecord with a `Diagnosis` term-style column.
 
     We attach the label as a dynamic attribute since the base
@@ -133,9 +131,7 @@ class _FakeFeature:
 
     def __init__(self, term_column_names: list[str]) -> None:
         # Matches Feature.__init__: a set, not a list.
-        self.term_columns: set[_FakeColumn] = {
-            _FakeColumn(n) for n in term_column_names
-        }
+        self.term_columns: set[_FakeColumn] = {_FakeColumn(n) for n in term_column_names}
 
 
 def test_select_majority_vote_auto_detect_single_term_column() -> None:
@@ -163,9 +159,7 @@ def test_select_majority_vote_auto_detect_single_term_column() -> None:
     SingleTermRecord.feature = _FakeFeature(term_column_names=["Diagnosis"])
 
     def _make(execution: str, rct: str, label: str) -> "SingleTermRecord":
-        rec = SingleTermRecord(
-            Execution=execution, Feature_Name="Diagnosis", RCT=rct
-        )
+        rec = SingleTermRecord(Execution=execution, Feature_Name="Diagnosis", RCT=rct)
         object.__setattr__(rec, "Diagnosis", label)
         return rec
 
@@ -190,13 +184,9 @@ def test_select_majority_vote_auto_detect_rejects_multi_term_feature() -> None:
     class MultiTermRecord(FeatureRecord):
         pass
 
-    MultiTermRecord.feature = _FakeFeature(
-        term_column_names=["Diagnosis", "Severity"]
-    )
+    MultiTermRecord.feature = _FakeFeature(term_column_names=["Diagnosis", "Severity"])
 
-    rec = MultiTermRecord(
-        Execution="e1", Feature_Name="Diagnosis", RCT="2024-01-01T00:00:00"
-    )
+    rec = MultiTermRecord(Execution="e1", Feature_Name="Diagnosis", RCT="2024-01-01T00:00:00")
     object.__setattr__(rec, "Diagnosis", "benign")
 
     selector = FeatureRecord.select_majority_vote()  # column=None
@@ -204,9 +194,7 @@ def test_select_majority_vote_auto_detect_rejects_multi_term_feature() -> None:
         selector([rec])
     # Deterministic available-list in the message (sorted).
     msg = str(exc_info.value)
-    assert "['Diagnosis', 'Severity']" in msg, (
-        f"Expected sorted column list in error; got: {msg}"
-    )
+    assert "['Diagnosis', 'Severity']" in msg, f"Expected sorted column list in error; got: {msg}"
 
 
 def test_select_majority_vote_returns_none_on_empty_records() -> None:

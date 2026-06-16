@@ -65,9 +65,7 @@ def check_preconditions(catalog: ErmrestCatalog, ml_schema: str) -> dict:
     workflows_with_type = []
     if has_column:
         workflows_with_type = [
-            {"RID": w["RID"], "Workflow_Type": w["Workflow_Type"]}
-            for w in workflows
-            if w.get("Workflow_Type")
+            {"RID": w["RID"], "Workflow_Type": w["Workflow_Type"]} for w in workflows if w.get("Workflow_Type")
         ]
 
     return {
@@ -146,10 +144,12 @@ def step2_copy_types_to_association(
     for w in workflows_with_type:
         key = (w["RID"], w["Workflow_Type"])
         if key not in existing_assocs:
-            rows_to_insert.append({
-                "Workflow": w["RID"],
-                "Workflow_Type": w["Workflow_Type"],
-            })
+            rows_to_insert.append(
+                {
+                    "Workflow": w["RID"],
+                    "Workflow_Type": w["Workflow_Type"],
+                }
+            )
 
     if not rows_to_insert:
         print(f"  [SKIP] All {len(workflows_with_type)} associations already exist")
@@ -160,9 +160,7 @@ def step2_copy_types_to_association(
     return len(rows_to_insert)
 
 
-def step3_verify_migration(
-    catalog: ErmrestCatalog, ml_schema: str, workflows_with_type: list, dry_run: bool
-) -> bool:
+def step3_verify_migration(catalog: ErmrestCatalog, ml_schema: str, workflows_with_type: list, dry_run: bool) -> bool:
     """Verify that all workflow types were migrated to the association table.
 
     Returns:
@@ -295,14 +293,10 @@ def migrate(hostname: str, catalog_id: str, ml_schema: str = "deriva-ml", dry_ru
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate Workflow_Type from direct FK column to association table"
-    )
+    parser = argparse.ArgumentParser(description="Migrate Workflow_Type from direct FK column to association table")
     parser.add_argument("hostname", help="Catalog hostname (e.g., dev.eye-ai.org)")
     parser.add_argument("catalog_id", help="Catalog ID")
-    parser.add_argument(
-        "--schema", default="deriva-ml", help="ML schema name (default: deriva-ml)"
-    )
+    parser.add_argument("--schema", default="deriva-ml", help="ML schema name (default: deriva-ml)")
     parser.add_argument(
         "--dry-run",
         action="store_true",

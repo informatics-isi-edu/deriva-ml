@@ -4,6 +4,7 @@ See Bug E.2 — the helpers manage the annotation
 ``tag:isrd.isi.edu,2026:strict-preallocated-rid`` on asset tables,
 which opts the table into strict-mode RID checks during upload.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -43,6 +44,7 @@ class TestStrictPreallocatedRid:
     def test_set_strict_raises_for_non_asset_table(self, test_ml):
         """Non-asset tables (e.g., Workflow) cannot have strict annotation."""
         from deriva_ml.core.exceptions import DerivaMLTableTypeError
+
         with pytest.raises(DerivaMLTableTypeError):
             test_ml.set_strict_preallocated_rid("Workflow", strict=True)
 

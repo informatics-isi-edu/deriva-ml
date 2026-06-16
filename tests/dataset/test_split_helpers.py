@@ -38,9 +38,7 @@ class TestValidateSplitInputs:
     """``_validate_split_inputs`` enforces three mutual-exclusion / requires rules."""
 
     def test_no_extras_is_ok(self):
-        _validate_split_inputs(
-            stratify_by_column=None, selection_fn=None, include_tables=None
-        )
+        _validate_split_inputs(stratify_by_column=None, selection_fn=None, include_tables=None)
 
     def test_stratify_and_selection_are_mutually_exclusive(self):
         with pytest.raises(ValueError, match="mutually exclusive"):
@@ -52,9 +50,7 @@ class TestValidateSplitInputs:
 
     def test_stratify_requires_include_tables(self):
         with pytest.raises(ValueError, match="include_tables is required"):
-            _validate_split_inputs(
-                stratify_by_column="x", selection_fn=None, include_tables=None
-            )
+            _validate_split_inputs(stratify_by_column="x", selection_fn=None, include_tables=None)
 
     def test_stratify_with_empty_include_tables_raises(self):
         """Empty list is falsy — must trigger the requires check.
@@ -64,9 +60,7 @@ class TestValidateSplitInputs:
         less-helpful error.
         """
         with pytest.raises(ValueError, match="include_tables is required"):
-            _validate_split_inputs(
-                stratify_by_column="x", selection_fn=None, include_tables=[]
-            )
+            _validate_split_inputs(stratify_by_column="x", selection_fn=None, include_tables=[])
 
     def test_selection_fn_requires_include_tables(self):
         with pytest.raises(ValueError, match="include_tables is required"):
@@ -77,9 +71,7 @@ class TestValidateSplitInputs:
             )
 
     def test_stratify_alone_with_include_tables_is_ok(self):
-        _validate_split_inputs(
-            stratify_by_column="x", selection_fn=None, include_tables=["T"]
-        )
+        _validate_split_inputs(stratify_by_column="x", selection_fn=None, include_tables=["T"])
 
     def test_selection_fn_alone_with_include_tables_is_ok(self):
         _validate_split_inputs(

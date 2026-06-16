@@ -68,9 +68,7 @@ class TestIsDatasetRid:
         # Pull an Image RID from the catalog (any non-Dataset RID
         # would do; Image is reliably present per the demo fixture).
         pb = ml.pathBuilder()
-        image_rows = list(
-            pb.schemas[ml.default_schema].tables["Image"].entities().fetch()
-        )
+        image_rows = list(pb.schemas[ml.default_schema].tables["Image"].entities().fetch())
         assert image_rows, "Demo fixture must seed Image rows."
         non_dataset_rid = image_rows[0]["RID"]
 
@@ -106,9 +104,7 @@ class TestFindFeaturesDedupSmoke:
     the critical-correctness branch at ``catalog.py:603-645``.
     """
 
-    def test_no_arg_find_features_returns_each_feature_once(
-        self, dataset_test, tmp_path
-    ):
+    def test_no_arg_find_features_returns_each_feature_once(self, dataset_test, tmp_path):
         """``model.find_features()`` (no-arg) dedups by feature_table."""
         from deriva_ml import DerivaML
 
@@ -122,10 +118,7 @@ class TestFindFeaturesDedupSmoke:
         features = list(ml.model.find_features())
         # Dedup invariant: every feature_table qualified name
         # appears at most once.
-        qnames = [
-            f"{f.feature_table.schema.name}.{f.feature_table.name}"
-            for f in features
-        ]
+        qnames = [f"{f.feature_table.schema.name}.{f.feature_table.name}" for f in features]
         assert len(qnames) == len(set(qnames)), (
             f"find_features() returned duplicates by feature_table qname: "
             f"{qnames}. The dedup at catalog.py:603-645 has regressed."
@@ -191,10 +184,7 @@ class TestDerivaMLBagViewResolveRid:
         bag = materialized_bag_with_feature.bag
         result = bag._catalog.resolve_rid(bag.dataset_rid)
         assert result["RID"] == bag.dataset_rid
-        assert "version" in result, (
-            f"resolve_rid contract: must return {{'RID': ..., 'version': ...}}; "
-            f"got {result!r}"
-        )
+        assert "version" in result, f"resolve_rid contract: must return {{'RID': ..., 'version': ...}}; got {result!r}"
 
     def test_raises_for_rid_not_in_bag(self, materialized_bag_with_feature):
         """An RID absent from the bag raises ``DerivaMLDatasetNotFound``.

@@ -93,9 +93,7 @@ class TestDataset:
             use_minid=False,
         )
         ml_instance.add_term(MLVocab.dataset_type, "Testing", description="A test dataset", exists_ok=True)
-        ml_instance.add_term(
-            MLVocab.workflow_type, "Manual Workflow", description="A manual workflow", exists_ok=True
-        )
+        ml_instance.add_term(MLVocab.workflow_type, "Manual Workflow", description="A manual workflow", exists_ok=True)
         workflow = ml_instance.create_workflow(
             name="Description Setter Test Workflow",
             workflow_type="Manual Workflow",
@@ -296,6 +294,7 @@ class TestDataset:
         # observe dev2 (1 from add, 1 from delete) — see ADR-0003 on
         # per-call dev increments.
         from deriva_ml.dataset.aux_classes import VersionPart
+
         dataset.release(bump=VersionPart.minor, description="Released after seed")
 
         # Get initial version (now a released label).
@@ -498,15 +497,11 @@ class TestDataset:
         # Direct children (not useful — they're already members,
         # so the existing-member guard would fire before the
         # cycle guard).
-        direct_children_rids = {
-            child.dataset_rid for child in parent.list_dataset_children()
-        }
+        direct_children_rids = {child.dataset_rid for child in parent.list_dataset_children()}
         # All descendants (recursive).
         all_descendants = parent.list_dataset_children(recurse=True)
         # Grandchildren = descendants minus direct children.
-        grandchildren = [
-            d for d in all_descendants if d.dataset_rid not in direct_children_rids
-        ]
+        grandchildren = [d for d in all_descendants if d.dataset_rid not in direct_children_rids]
         if not grandchildren:
             pytest.skip("Fixture has no grandchild datasets to exercise the cycle path.")
 

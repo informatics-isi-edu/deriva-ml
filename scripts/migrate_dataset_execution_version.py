@@ -75,9 +75,7 @@ def check_preconditions(catalog: ErmrestCatalog, ml_schema: str) -> dict:
     col_names = {c.name for c in de.columns}
     has_column = _DV_COLUMN in col_names
 
-    has_fk = has_column and any(
-        any(c.name == _DV_COLUMN for c in fk.foreign_key_columns) for fk in de.foreign_keys
-    )
+    has_fk = has_column and any(any(c.name == _DV_COLUMN for c in fk.foreign_key_columns) for fk in de.foreign_keys)
 
     pb = catalog.getPathBuilder()
     de_path = pb.schemas[ml_schema].Dataset_Execution
@@ -266,9 +264,7 @@ def _read_consumed_versions(hostname: str, url: str) -> dict[str, str]:
     return consumed
 
 
-def step3_backfill_input_versions(
-    catalog: ErmrestCatalog, hostname: str, ml_schema: str, dry_run: bool
-) -> dict:
+def step3_backfill_input_versions(catalog: ErmrestCatalog, hostname: str, ml_schema: str, dry_run: bool) -> dict:
     """Best-effort backfill of ``Dataset_Version`` on surviving input rows.
 
     For each remaining ``Dataset_Execution`` row that has no ``Dataset_Version``
@@ -291,11 +287,7 @@ def step3_backfill_input_versions(
     de_path = pb.schemas[ml_schema].Dataset_Execution
 
     # Only consider rows that still need a value.
-    rows = [
-        r
-        for r in de_path.entities().fetch()
-        if r.get("Dataset") and not r.get(_DV_COLUMN)
-    ]
+    rows = [r for r in de_path.entities().fetch() if r.get("Dataset") and not r.get(_DV_COLUMN)]
 
     counts = {"filled": 0, "null_config": 0, "null_no_record": 0, "errors": 0}
     if not rows:
@@ -346,9 +338,7 @@ def step3_backfill_input_versions(
             counts["errors"] += 1
 
     detail = (
-        f"null_config={counts['null_config']}, "
-        f"null_no_record={counts['null_no_record']}, "
-        f"errors={counts['errors']}"
+        f"null_config={counts['null_config']}, null_no_record={counts['null_no_record']}, errors={counts['errors']}"
     )
     if dry_run:
         print(f"  [DRY-RUN] Would backfill {counts['filled']} input row(s) ({detail})")
@@ -478,8 +468,7 @@ def migrate(
         # short-circuit and the structural steps. The column must already exist.
         if not info["has_column"]:
             print(
-                "\n[ERROR] --backfill-only requires the Dataset_Version column to "
-                "exist; run the full migration first."
+                "\n[ERROR] --backfill-only requires the Dataset_Version column to exist; run the full migration first."
             )
             return False
         print("\nStep 3 (only): Backfill consumed version on input rows (best-effort)")
@@ -518,9 +507,7 @@ def migrate(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Migrate Dataset_Execution to the input-only provenance shape"
-    )
+    parser = argparse.ArgumentParser(description="Migrate Dataset_Execution to the input-only provenance shape")
     parser.add_argument("hostname", help="Catalog hostname (e.g., dev.eye-ai.org)")
     parser.add_argument("catalog_id", help="Catalog ID")
     parser.add_argument("--schema", default="deriva-ml", help="ML schema name (default: deriva-ml)")

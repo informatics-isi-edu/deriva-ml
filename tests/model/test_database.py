@@ -113,17 +113,13 @@ class TestDataBaseModel:
         schemas = ml_instance.model.schemas
         ml_schema = ml_instance.ml_schema
         default_schema = ml_instance.default_schema
-        catalog_tables = {
-            f"{default_schema}.{name}" for name in schemas[default_schema].tables
-        } | {
+        catalog_tables = {f"{default_schema}.{name}" for name in schemas[default_schema].tables} | {
             f"{ml_schema}.{name}" for name in schemas[ml_schema].tables
         }
         # Bag tables are a subset of the catalog's (empty associations
         # are pruned by the bag builder's exclude-empty-associations
         # pass — see DatasetBagBuilder._exclude_empty_associations).
-        assert tables.issubset(catalog_tables), (
-            f"Bag table not in catalog: {tables - catalog_tables}"
-        )
+        assert tables.issubset(catalog_tables), f"Bag table not in catalog: {tables - catalog_tables}"
         # Spot-check the core ML tables that every dataset bag should
         # carry, regardless of which element types are populated.
         for core in (

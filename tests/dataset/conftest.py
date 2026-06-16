@@ -3,6 +3,7 @@
 Provides fixtures that download materialized bags for offline testing,
 including bags that contain feature data.
 """
+
 from __future__ import annotations
 
 import dataclasses

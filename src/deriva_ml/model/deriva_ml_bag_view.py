@@ -171,9 +171,7 @@ class DerivaMLBagView:
         atable = f"Dataset_{MLVocab.dataset_type.value}"
         types_by_rid: dict[str, list[str]] = {}
         for row in self._database_model.get_table_contents(atable):
-            types_by_rid.setdefault(row["Dataset"], []).append(
-                row[MLVocab.dataset_type.value]
-            )
+            types_by_rid.setdefault(row["Dataset"], []).append(row[MLVocab.dataset_type.value])
 
         datasets = []
         for dataset in self._database_model.get_table_contents("Dataset"):

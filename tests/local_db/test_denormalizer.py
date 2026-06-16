@@ -50,9 +50,7 @@ class TestAsDataframe:
         d = Denormalizer(ds)
         df = d.as_dataframe(["Image", "Subject"])
         for sys_col in ("RCT", "RMT", "RCB", "RMB"):
-            assert not any(c.endswith(f".{sys_col}") for c in df.columns), (
-                f"{sys_col} should be excluded by default"
-            )
+            assert not any(c.endswith(f".{sys_col}") for c in df.columns), f"{sys_col} should be excluded by default"
 
     def test_system_columns_opt_in_retains_rcb(self, populated_denorm) -> None:
         """system_columns=['RCB'] retains the creating-user column per table."""
@@ -64,9 +62,7 @@ class TestAsDataframe:
         assert "Subject.RCB" in df.columns
         # The other system columns remain excluded (opt-in is per-column).
         for sys_col in ("RCT", "RMT", "RMB"):
-            assert not any(c.endswith(f".{sys_col}") for c in df.columns), (
-                f"{sys_col} should still be excluded"
-            )
+            assert not any(c.endswith(f".{sys_col}") for c in df.columns), f"{sys_col} should still be excluded"
 
     def test_empty_dataset(self, populated_denorm) -> None:
         """Nonexistent dataset RID returns empty DataFrame with correct columns."""
@@ -840,8 +836,7 @@ class TestDescribeKeyParity:
         d = Denormalizer(ds)
         plan = d.describe(self.INCLUDE)
         assert plan["row_per"] in plan["row_per_candidates"], (
-            f"resolved row_per={plan['row_per']!r} should be among "
-            f"row_per_candidates={plan['row_per_candidates']!r}"
+            f"resolved row_per={plan['row_per']!r} should be among row_per_candidates={plan['row_per_candidates']!r}"
         )
 
     def test_columns_set_equals_dataframe_columns(self, populated_denorm) -> None:
@@ -883,9 +878,7 @@ class TestDescribeKeyParity:
                 f"through transparently — exempted by name.)"
             )
 
-    def test_transparent_intermediates_disjoint_from_include(
-        self, populated_denorm
-    ) -> None:
+    def test_transparent_intermediates_disjoint_from_include(self, populated_denorm) -> None:
         """``transparent_intermediates`` ⊂ ``join_path`` and disjoint
         from ``include_tables``.
 
@@ -900,12 +893,10 @@ class TestDescribeKeyParity:
         join_path = set(plan["join_path"])
         include = set(plan["include_tables"])
         assert transparent.issubset(join_path), (
-            f"transparent_intermediates={transparent} must be ⊂ "
-            f"join_path={join_path}"
+            f"transparent_intermediates={transparent} must be ⊂ join_path={join_path}"
         )
         assert transparent.isdisjoint(include), (
-            f"transparent_intermediates={transparent} must be disjoint "
-            f"from include_tables={include}"
+            f"transparent_intermediates={transparent} must be disjoint from include_tables={include}"
         )
 
     def test_anchors_by_type_subset_of_member_types(self, populated_denorm) -> None:
@@ -923,8 +914,7 @@ class TestDescribeKeyParity:
         member_types = set(info["member_types"])
         anchor_types = set(plan["anchors"]["by_type"])
         assert anchor_types.issubset(member_types), (
-            f"anchors.by_type keys={anchor_types} must be ⊆ "
-            f"member_types={member_types}"
+            f"anchors.by_type keys={anchor_types} must be ⊆ member_types={member_types}"
         )
 
     def test_estimated_row_count_shape(self, populated_denorm) -> None:
@@ -973,10 +963,7 @@ class TestDescribeKeyParity:
         ds = _FakeDataset(populated_denorm)
         d = Denormalizer(ds)
         plan = d.describe(self.INCLUDE)
-        assert plan["warnings"] == [], (
-            f"clean describe call should produce no warnings; got "
-            f"{plan['warnings']}"
-        )
+        assert plan["warnings"] == [], f"clean describe call should produce no warnings; got {plan['warnings']}"
 
 
 class TestListPaths:
@@ -1538,7 +1525,6 @@ class _FakeDataset:
         return []
 
 
-
 class TestDescribeWarningsFieldExists:
     """``describe()`` always returns a ``warnings: list[str]`` key.
 
@@ -1554,12 +1540,8 @@ class TestDescribeWarningsFieldExists:
         d = Denormalizer(ds)
         plan = d.describe(["Image", "Subject"])
         assert "warnings" in plan, f"plan missing 'warnings' key: {list(plan.keys())}"
-        assert isinstance(plan["warnings"], list), (
-            f"plan['warnings'] is {type(plan['warnings'])}, expected list"
-        )
-        assert plan["warnings"] == [], (
-            f"clean describe should produce no warnings, got {plan['warnings']}"
-        )
+        assert isinstance(plan["warnings"], list), f"plan['warnings'] is {type(plan['warnings'])}, expected list"
+        assert plan["warnings"] == [], f"clean describe should produce no warnings, got {plan['warnings']}"
 
     def test_warnings_key_present_on_bad_row_per(self, populated_denorm) -> None:
         """Even when describe's planner-rule paths fail, warnings is a list[str]."""
@@ -1614,9 +1596,7 @@ class TestDescribeWarningsPopulated:
         )
         model.find_features = lambda table=None: [feat_a, feat_b]
 
-    def test_warning_emitted_when_resolve_table_names_raises(
-        self, populated_denorm
-    ) -> None:
+    def test_warning_emitted_when_resolve_table_names_raises(self, populated_denorm) -> None:
         """Ambiguous feature name → ``_resolve_table_names`` raises →
         warning appears in plan["warnings"] naming the failing call."""
         ds = _FakeDataset(populated_denorm)
@@ -1624,19 +1604,13 @@ class TestDescribeWarningsPopulated:
         self._stub_ambiguous_feature(populated_denorm["model"])
 
         plan = d.describe(["Image", "AmbigName"])
-        assert len(plan["warnings"]) >= 1, (
-            f"expected at least one warning, got {plan['warnings']}"
-        )
+        assert len(plan["warnings"]) >= 1, f"expected at least one warning, got {plan['warnings']}"
         # The first warning must name the call that failed so a caller can
         # tell which envelope position is unreliable.
         joined = " | ".join(plan["warnings"])
-        assert "_resolve_table_names" in joined, (
-            f"warnings should name _resolve_table_names, got {plan['warnings']}"
-        )
+        assert "_resolve_table_names" in joined, f"warnings should name _resolve_table_names, got {plan['warnings']}"
 
-    def test_warning_format_includes_exception_type_and_default(
-        self, populated_denorm
-    ) -> None:
+    def test_warning_format_includes_exception_type_and_default(self, populated_denorm) -> None:
         """Each warning string carries the exception class name and a
         short ``what defaulted`` clause so the user can diagnose without
         consulting source."""
@@ -1649,12 +1623,8 @@ class TestDescribeWarningsPopulated:
         assert resolve_warnings, plan["warnings"]
         w = resolve_warnings[0]
         # Format: "<call>: <ExcType> (<msg>); <default-explanation>"
-        assert "DerivaMLDenormalizeError" in w, (
-            f"warning should name the exception type: {w!r}"
-        )
-        assert "reverted to original" in w, (
-            f"warning should describe what defaulted: {w!r}"
-        )
+        assert "DerivaMLDenormalizeError" in w, f"warning should name the exception type: {w!r}"
+        assert "reverted to original" in w, f"warning should describe what defaulted: {w!r}"
 
 
 class TestDescribeStillNeverRaises:
@@ -1689,9 +1659,7 @@ class TestDescribeStillNeverRaises:
         )
         model.find_features = lambda table=None: [feat_a, feat_b]
 
-    def test_describe_does_not_raise_when_resolver_fails(
-        self, populated_denorm
-    ) -> None:
+    def test_describe_does_not_raise_when_resolver_fails(self, populated_denorm) -> None:
         """Ambiguous feature name in include_tables: ``describe`` swallows,
         the warning is appended, and the caller still gets a well-formed
         dict instead of an exception."""

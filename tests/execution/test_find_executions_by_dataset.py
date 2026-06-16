@@ -47,15 +47,11 @@ def producer_and_consumer(test_ml):
     ml = test_ml
     workflow = _setup_workflow(ml)
 
-    producer = ml.create_execution(
-        ExecutionConfiguration(description="Producer", workflow=workflow)
-    )
+    producer = ml.create_execution(ExecutionConfiguration(description="Producer", workflow=workflow))
     dataset = producer.create_dataset(dataset_types=["TestSet"], description="Produced dataset")
     version = dataset.current_version
 
-    consumer = ml.create_execution(
-        ExecutionConfiguration(description="Consumer", workflow=workflow)
-    )
+    consumer = ml.create_execution(ExecutionConfiguration(description="Consumer", workflow=workflow))
     consumer.add_input_dataset(dataset.dataset_rid, version=version)
 
     return ml, producer.execution_rid, consumer.execution_rid, dataset.dataset_rid, version
@@ -118,9 +114,7 @@ def test_find_executions_bogus_version_pin_excludes_null_version_input(producer_
 
     # A consumer that records an input edge WITHOUT a version -> Dataset_Version is NULL.
     workflow = _setup_workflow(ml)
-    null_consumer = ml.create_execution(
-        ExecutionConfiguration(description="NULL-version consumer", workflow=workflow)
-    )
+    null_consumer = ml.create_execution(ExecutionConfiguration(description="NULL-version consumer", workflow=workflow))
     null_consumer.add_input_dataset(dataset_rid)  # no version -> Dataset_Version NULL
 
     # Sanity: with no version pin the NULL-version consumer IS returned.

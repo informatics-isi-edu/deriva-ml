@@ -594,7 +594,8 @@ class TestExternalConsumerContract:
 
         sig = inspect.signature(DerivaML.apply_annotations)
         positional_required = [
-            p for p in sig.parameters.values()
+            p
+            for p in sig.parameters.values()
             if p.name != "self"
             and p.default is inspect.Parameter.empty
             and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)

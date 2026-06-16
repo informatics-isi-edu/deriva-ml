@@ -77,9 +77,7 @@ class _StubMixin(DatasetMixin):
             if canned is None:
                 # Default: spec is valid (we don't know the rid yet, so
                 # assume well-formed).
-                results.append(
-                    DatasetSpecResult(spec=s, valid=True, resolved_version=str(s.version))
-                )
+                results.append(DatasetSpecResult(spec=s, valid=True, resolved_version=str(s.version)))
             else:
                 # Echo the spec back with the canned outcome's reasons.
                 results.append(
@@ -367,7 +365,7 @@ def test_directory_walk_skips_pycache(tmp_path: Path) -> None:
     cache = tmp_path / "__pycache__"
     cache.mkdir()
     (cache / "bogus.py").write_text(
-        'this is not python (((\n'  # Would be a parse error if visited.
+        "this is not python (((\n"  # Would be a parse error if visited.
     )
     (tmp_path / "datasets.py").write_text(
         'datasets_store(name="x", spec=DatasetSpecConfig(rid="1-AAAA", version="0.1.0"))\n'

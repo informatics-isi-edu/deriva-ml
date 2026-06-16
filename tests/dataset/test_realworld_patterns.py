@@ -110,7 +110,9 @@ class TestDeepFKChains:
         dataset = _create_dataset_with_members(test_ml, "ChainA", [r["RID"] for r in data["a"]], "Deep chain test")
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
-        df = bag.get_denormalized_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
+        df = bag.get_denormalized_as_dataframe(
+            include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"]
+        )
         assert len(df) == 1
         assert df["ChainA.A_Name"].iloc[0] == "Level1"
         assert df["ChainF.F_Name"].iloc[0] == "Root"
@@ -159,7 +161,9 @@ class TestDeepFKChains:
         bag = dataset.download_dataset_bag(dataset.current_version, materialize=False)
 
         # Include only endpoints: ChainA and ChainF, with intermediates auto-joined
-        df = bag.get_denormalized_as_dataframe(include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"])
+        df = bag.get_denormalized_as_dataframe(
+            include_tables=["ChainA", "ChainB", "ChainC", "ChainD", "ChainE", "ChainF"]
+        )
         assert len(df) == 1
         assert df["ChainF.F_Name"].iloc[0] == "Root"
 

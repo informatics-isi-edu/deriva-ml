@@ -4,6 +4,7 @@ If tensorflow is truly installed in the test venv, we stub it out of
 sys.modules temporarily. The goal is to prove that importing DatasetBag
 does NOT import tensorflow eagerly.
 """
+
 from __future__ import annotations
 
 import sys
@@ -33,11 +34,13 @@ def test_as_tf_dataset_raises_importerror_without_tf(monkeypatch):
     monkeypatch.setitem(sys.modules, "tensorflow", None)
 
     from unittest.mock import MagicMock
+
     bag = MagicMock()
 
     if "deriva_ml.dataset.tf_adapter" in sys.modules:
         monkeypatch.delitem(sys.modules, "deriva_ml.dataset.tf_adapter", raising=False)
 
     from deriva_ml.dataset.tf_adapter import build_tf_dataset
+
     with pytest.raises(ImportError, match=r"tensorflow"):
         build_tf_dataset(bag, "Image")

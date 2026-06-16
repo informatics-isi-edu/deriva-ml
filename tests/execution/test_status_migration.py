@@ -7,6 +7,7 @@ import pytest
 
 def test_execution_status_values_are_title_case():
     from deriva_ml.execution.state_store import ExecutionStatus
+
     assert ExecutionStatus.Created.value == "Created"
     assert ExecutionStatus.Running.value == "Running"
     assert ExecutionStatus.Stopped.value == "Stopped"
@@ -19,12 +20,14 @@ def test_execution_status_values_are_title_case():
 def test_execution_status_parses_title_case_from_catalog():
     """A catalog row with {'Status': 'Running'} parses directly."""
     from deriva_ml.execution.state_store import ExecutionStatus
+
     assert ExecutionStatus("Running") is ExecutionStatus.Running
     assert ExecutionStatus("Pending_Upload") is ExecutionStatus.Pending_Upload
 
 
 def test_execution_status_rejects_lowercase():
     from deriva_ml.execution.state_store import ExecutionStatus
+
     with pytest.raises(ValueError):
         ExecutionStatus("running")
     with pytest.raises(ValueError):
@@ -34,6 +37,7 @@ def test_execution_status_rejects_lowercase():
 def test_execution_status_member_count():
     """Canonical set is exactly 7."""
     from deriva_ml.execution.state_store import ExecutionStatus
+
     assert len(list(ExecutionStatus)) == 7
 
 
@@ -50,10 +54,15 @@ def test_sqlite_stores_title_case_status(tmp_path):
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-T1", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Running,
-        mode=ConnectionMode.online, working_dir_rel="execution/EXE-T1",
-        created_at=now, last_activity=now,
+        rid="EXE-T1",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Running,
+        mode=ConnectionMode.online,
+        working_dir_rel="execution/EXE-T1",
+        created_at=now,
+        last_activity=now,
     )
     row = store.get_execution("EXE-T1")
     assert row is not None

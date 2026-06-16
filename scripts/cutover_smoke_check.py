@@ -39,9 +39,7 @@ def _bind_rid_template(spec: dict, rid: str) -> dict:
     return json.loads(text)
 
 
-def _download_via_spec(
-    ml: Any, spec: dict, rid: str, out_dir: Path
-) -> Path:
+def _download_via_spec(ml: Any, spec: dict, rid: str, out_dir: Path) -> Path:
     from deriva.transfer.download.deriva_download import GenericDownloader
 
     spec = _bind_rid_template(spec, rid)
@@ -109,9 +107,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", required=True, help="Catalog hostname.")
     parser.add_argument("--catalog-id", required=True, help="Catalog ID.")
-    parser.add_argument(
-        "--dataset-rid", required=True, help="Dataset RID to download."
-    )
+    parser.add_argument("--dataset-rid", required=True, help="Dataset RID to download.")
     parser.add_argument(
         "--out",
         required=True,
@@ -133,18 +129,12 @@ def main() -> int:
     new_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"== Building bag via CatalogGraph (legacy) in {legacy_dir} ...")
-    legacy_spec = CatalogGraph(ml_instance=ml).generate_dataset_download_spec(
-        dataset
-    )
-    legacy_bag = _download_via_spec(
-        ml, legacy_spec, args.dataset_rid, legacy_dir
-    )
+    legacy_spec = CatalogGraph(ml_instance=ml).generate_dataset_download_spec(dataset)
+    legacy_bag = _download_via_spec(ml, legacy_spec, args.dataset_rid, legacy_dir)
     print(f"   bag: {legacy_bag}")
 
     print(f"== Building bag via DatasetBagBuilder (new) in {new_dir} ...")
-    new_spec = DatasetBagBuilder(
-        ml_instance=ml
-    ).generate_dataset_download_spec(dataset)
+    new_spec = DatasetBagBuilder(ml_instance=ml).generate_dataset_download_spec(dataset)
     new_bag = _download_via_spec(ml, new_spec, args.dataset_rid, new_dir)
     print(f"   bag: {new_bag}")
 
@@ -184,19 +174,14 @@ def main() -> int:
     print("== Asset (RID, MD5) comparison")
     legacy_assets = _bag_asset_md5_sets(legacy_bag)
     new_assets = _bag_asset_md5_sets(new_bag)
-    for table in sorted(
-        set(legacy_assets.keys()) | set(new_assets.keys())
-    ):
+    for table in sorted(set(legacy_assets.keys()) | set(new_assets.keys())):
         legacy = legacy_assets.get(table, set())
         new = new_assets.get(table, set())
         if legacy == new:
             print(f"  ok {table}: {len(legacy)} assets")
         else:
             diff = legacy ^ new
-            print(
-                f"  ! {table}: legacy={len(legacy)} new={len(new)} "
-                f"diff={len(diff)}; first 5: {sorted(diff)[:5]}"
-            )
+            print(f"  ! {table}: legacy={len(legacy)} new={len(new)} diff={len(diff)}; first 5: {sorted(diff)[:5]}")
             mismatches += 1
 
     print()

@@ -181,9 +181,7 @@ class TestConfigureLogging:
         """Every documented Hydra logger follows ``level``."""
         configure_logging(level=logging.ERROR)
         for name in HYDRA_LOGGERS:
-            assert logging.getLogger(name).level == logging.ERROR, (
-                f"Hydra logger {name!r} did not follow level=ERROR"
-            )
+            assert logging.getLogger(name).level == logging.ERROR, f"Hydra logger {name!r} did not follow level=ERROR"
 
     def test_sets_deriva_level_on_deriva_py_loggers(self, clean_deriva_ml_logger):
         """The deriva-py / bdbag / bagit loggers follow ``deriva_level``."""
@@ -199,9 +197,7 @@ class TestConfigureLogging:
         for name in DERIVA_LOGGERS:
             assert logging.getLogger(name).level == logging.INFO
 
-    def test_adds_stream_handler_when_none_present_outside_hydra(
-        self, clean_deriva_ml_logger
-    ):
+    def test_adds_stream_handler_when_none_present_outside_hydra(self, clean_deriva_ml_logger):
         """Outside Hydra, the deriva_ml logger gets a StreamHandler.
 
         Pre-test fixture strips all handlers, so this exercises the
@@ -213,17 +209,12 @@ class TestConfigureLogging:
             pytest.skip("Test runs under Hydra; non-Hydra path unreachable.")
 
         configure_logging(level=logging.WARNING)
-        assert any(
-            isinstance(h, logging.StreamHandler)
-            for h in clean_deriva_ml_logger.handlers
-        ), (
+        assert any(isinstance(h, logging.StreamHandler) for h in clean_deriva_ml_logger.handlers), (
             "Expected configure_logging to add a StreamHandler when the "
             "logger had no handlers and is_hydra_initialized() is False."
         )
 
-    def test_does_not_duplicate_handler_when_one_already_exists(
-        self, clean_deriva_ml_logger
-    ):
+    def test_does_not_duplicate_handler_when_one_already_exists(self, clean_deriva_ml_logger):
         """A pre-existing handler is preserved; no second one is added."""
         sentinel = logging.NullHandler()
         clean_deriva_ml_logger.addHandler(sentinel)
@@ -232,12 +223,8 @@ class TestConfigureLogging:
 
         # Sentinel still present, no StreamHandler appended.
         assert sentinel in clean_deriva_ml_logger.handlers
-        assert not any(
-            isinstance(h, logging.StreamHandler)
-            for h in clean_deriva_ml_logger.handlers
-        ), (
-            "configure_logging must not add a StreamHandler when the "
-            "deriva_ml logger already has handlers."
+        assert not any(isinstance(h, logging.StreamHandler) for h in clean_deriva_ml_logger.handlers), (
+            "configure_logging must not add a StreamHandler when the deriva_ml logger already has handlers."
         )
 
     def test_does_not_call_basicConfig(self, clean_deriva_ml_logger, monkeypatch):
@@ -255,8 +242,7 @@ class TestConfigureLogging:
         monkeypatch.setattr(logging, "basicConfig", fake_basicConfig)
         configure_logging(level=logging.INFO)
         assert calls == [], (
-            f"configure_logging called logging.basicConfig with {calls}; "
-            f"it must never touch the root logger."
+            f"configure_logging called logging.basicConfig with {calls}; it must never touch the root logger."
         )
 
     def test_returns_the_deriva_ml_logger(self, clean_deriva_ml_logger):

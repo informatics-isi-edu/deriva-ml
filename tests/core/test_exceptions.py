@@ -102,11 +102,7 @@ def test_definitions_reexports_every_exception_from_exceptions():
     from deriva_ml.core import definitions, exceptions
 
     exception_names = set(exceptions.__all__)
-    definitions_exception_names = {
-        name
-        for name in definitions.__all__
-        if name in exception_names
-    }
+    definitions_exception_names = {name for name in definitions.__all__ if name in exception_names}
     missing = exception_names - definitions_exception_names
     assert not missing, (
         f"deriva_ml.core.definitions does not re-export these "

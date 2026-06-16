@@ -37,9 +37,7 @@ def stub_restructure_helpers(monkeypatch: pytest.MonkeyPatch):
     helpers don't try to talk to a real bag.
     """
     monkeypatch.setattr(restructure_mod, "_detect_asset_table", lambda bag: "Image")
-    monkeypatch.setattr(
-        restructure_mod, "_build_dataset_type_path_map", lambda bag, sel=None: {DATASET_RID: ["train"]}
-    )
+    monkeypatch.setattr(restructure_mod, "_build_dataset_type_path_map", lambda bag, sel=None: {DATASET_RID: ["train"]})
     monkeypatch.setattr(restructure_mod, "_get_asset_dataset_mapping", lambda bag, asset_table: {})
     monkeypatch.setattr(restructure_mod, "_get_reachable_assets", lambda bag, asset_table: [])
     yield

@@ -72,8 +72,7 @@ def test_execution_update_status_error_kwarg_on_nonterminal_warns(test_ml, caplo
     with caplog.at_level(logging.WARNING):
         exe.update_status(ExecutionStatus.Running, error="this should warn")
     assert any(
-        "error= ignored on non-terminal" in rec.message
-        or "non-terminal transition" in rec.message
+        "error= ignored on non-terminal" in rec.message or "non-terminal transition" in rec.message
         for rec in caplog.records
     )
     store = test_ml.workspace.execution_state_store()
@@ -117,10 +116,15 @@ def test_update_status_offline_writes_sqlite_sets_sync_pending(tmp_path, monkeyp
     store.ensure_schema()
     now = datetime.now(timezone.utc)
     store.insert_execution(
-        rid="EXE-OFF", workflow_rid=None, description=None,
-        config_json="{}", status=ExecutionStatus.Running,
-        mode=ConnectionMode.offline, working_dir_rel="execution/EXE-OFF",
-        created_at=now, last_activity=now,
+        rid="EXE-OFF",
+        workflow_rid=None,
+        description=None,
+        config_json="{}",
+        status=ExecutionStatus.Running,
+        mode=ConnectionMode.offline,
+        working_dir_rel="execution/EXE-OFF",
+        created_at=now,
+        last_activity=now,
     )
 
     # Run transition directly (we're testing state_machine behavior under offline mode).

@@ -1,4 +1,5 @@
 """Unit tests for lease_manifest_pending_assets."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -15,8 +16,7 @@ def _fake_catalog(token_to_rid_map: dict[str, str]):
         assert path == "/entity/public:ERMrest_RID_Lease"
         response = MagicMock()
         response.json.return_value = [
-            {"ID": tok_entry["ID"], "RID": token_to_rid_map[tok_entry["ID"]]}
-            for tok_entry in json
+            {"ID": tok_entry["ID"], "RID": token_to_rid_map[tok_entry["ID"]]} for tok_entry in json
         ]
         return response
 
@@ -51,11 +51,13 @@ def _fake_manifest(entries: dict):
 
 def _entry(asset_table: str, rid=None):
     from deriva_ml.asset.manifest import AssetEntry
+
     return AssetEntry(asset_table=asset_table, schema="test-schema", rid=rid)
 
 
 def test_empty_manifest_is_noop():
     from deriva_ml.execution.manifest_lease import lease_manifest_pending_assets
+
     catalog = MagicMock()
     manifest = _fake_manifest({})
     lease_manifest_pending_assets(catalog, manifest)
@@ -64,11 +66,14 @@ def test_empty_manifest_is_noop():
 
 def test_all_entries_already_have_rid_is_noop():
     from deriva_ml.execution.manifest_lease import lease_manifest_pending_assets
+
     catalog = MagicMock()
-    manifest = _fake_manifest({
-        "Image/a.png": _entry("Image", rid="1-ABC"),
-        "Image/b.png": _entry("Image", rid="1-DEF"),
-    })
+    manifest = _fake_manifest(
+        {
+            "Image/a.png": _entry("Image", rid="1-ABC"),
+            "Image/b.png": _entry("Image", rid="1-DEF"),
+        }
+    )
     lease_manifest_pending_assets(catalog, manifest)
     catalog.post.assert_not_called()
 
@@ -80,7 +85,8 @@ def test_rids_assigned_to_entries_missing_rid(monkeypatch):
     # Deterministic tokens — patch generate_lease_token to return fixed tokens.
     tokens_generated = ["tok-a", "tok-b"]
     monkeypatch.setattr(
-        manifest_lease, "generate_lease_token",
+        manifest_lease,
+        "generate_lease_token",
         lambda: tokens_generated.pop(0),
     )
 
@@ -100,9 +106,7 @@ def test_rids_assigned_to_entries_missing_rid(monkeypatch):
     # SQLite transaction.
     assert manifest.set_asset_rids_batch.call_count == 1
     items = manifest.set_asset_rids_batch.call_args.args[0]
-    assert sorted(items) == sorted(
-        [("Image/a.png", "1-NEW-A"), ("Image/b.png", "1-NEW-B")]
-    )
+    assert sorted(items) == sorted([("Image/a.png", "1-NEW-A"), ("Image/b.png", "1-NEW-B")])
 
 
 def test_mixed_entries_only_missing_rids_leased(monkeypatch):
@@ -110,7 +114,8 @@ def test_mixed_entries_only_missing_rids_leased(monkeypatch):
     from deriva_ml.execution.manifest_lease import lease_manifest_pending_assets
 
     monkeypatch.setattr(
-        manifest_lease, "generate_lease_token",
+        manifest_lease,
+        "generate_lease_token",
         lambda: "tok-fresh",
     )
     catalog = _fake_catalog({"tok-fresh": "1-LEASED"})

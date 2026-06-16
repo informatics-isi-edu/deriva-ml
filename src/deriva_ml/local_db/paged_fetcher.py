@@ -363,11 +363,7 @@ class PagedFetcher:
             if estimated <= max_url_bytes:
                 # URL should fit — try GET on the entire remaining set.
                 try:
-                    out.extend(
-                        self._client.fetch_rid_batch(
-                            table=table, column=column, rids=remaining, method="GET"
-                        )
-                    )
+                    out.extend(self._client.fetch_rid_batch(table=table, column=column, rids=remaining, method="GET"))
                     return out
                 except RuntimeError as exc:
                     if "too long" not in str(exc).lower():
@@ -387,16 +383,10 @@ class PagedFetcher:
                     column,
                     len(rids),
                 )
-                return self._client.fetch_rid_batch(
-                    table=table, column=column, rids=rids, method="POST"
-                )
+                return self._client.fetch_rid_batch(table=table, column=column, rids=rids, method="POST")
             chunk = remaining[:fits]
             try:
-                out.extend(
-                    self._client.fetch_rid_batch(
-                        table=table, column=column, rids=chunk, method="GET"
-                    )
-                )
+                out.extend(self._client.fetch_rid_batch(table=table, column=column, rids=chunk, method="GET"))
             except RuntimeError as exc:
                 if "too long" not in str(exc).lower():
                     raise
@@ -406,11 +396,7 @@ class PagedFetcher:
                 half = max(1, len(chunk) // 2)
                 chunk = chunk[:half]
                 try:
-                    out.extend(
-                        self._client.fetch_rid_batch(
-                            table=table, column=column, rids=chunk, method="GET"
-                        )
-                    )
+                    out.extend(self._client.fetch_rid_batch(table=table, column=column, rids=chunk, method="GET"))
                 except RuntimeError as exc2:
                     if "too long" not in str(exc2).lower():
                         raise
@@ -420,9 +406,7 @@ class PagedFetcher:
                         column,
                         len(rids),
                     )
-                    return self._client.fetch_rid_batch(
-                        table=table, column=column, rids=rids, method="POST"
-                    )
+                    return self._client.fetch_rid_batch(table=table, column=column, rids=rids, method="POST")
             remaining = remaining[len(chunk) :]
         return out
 

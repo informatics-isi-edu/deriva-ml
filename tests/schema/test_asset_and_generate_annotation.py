@@ -68,8 +68,16 @@ def _make_asset_table(
     # default subscript-as-call doesn't match what the function
     # expects, so we use a real dict + an iterable-of-values trick.
     standard = (
-        "RID", "RCT", "RMT", "RCB", "RMB",
-        "URL", "Filename", "Length", "MD5", "Description",
+        "RID",
+        "RCT",
+        "RMT",
+        "RCB",
+        "RMB",
+        "URL",
+        "Filename",
+        "Length",
+        "MD5",
+        "Description",
     )
     all_col_names = list(standard) + list(metadata_columns)
     col_objs = {}
@@ -151,10 +159,7 @@ class TestAssetAnnotationShape:
                     continue
                 inbound = src[0].get("inbound", []) if isinstance(src[0], dict) else []
                 outbound = src[1].get("outbound", []) if isinstance(src[1], dict) else []
-                if (
-                    expected_inbound_fkey in inbound
-                    and expected_outbound_fkey in outbound
-                ):
+                if expected_inbound_fkey in inbound and expected_outbound_fkey in outbound:
                     return True
             return False
 
@@ -199,9 +204,7 @@ class TestAssetAnnotationDeterministicOrdering:
         """The metadata-column tail of ``visible_columns["*"]`` is sorted by name."""
         # Pass metadata columns in deliberately-unsorted order; the
         # function should output them sorted.
-        table = _make_asset_table(
-            metadata_columns=("Zebra", "Alpha", "Mango", "Bravo")
-        )
+        table = _make_asset_table(metadata_columns=("Zebra", "Alpha", "Mango", "Bravo"))
         asset_annotation(table)
         vc = table.annotations[deriva_tags.visible_columns]
 
@@ -210,15 +213,12 @@ class TestAssetAnnotationDeterministicOrdering:
         star = vc["*"]
         trailing_strings = [e for e in star if isinstance(e, str) and e in {"Zebra", "Alpha", "Mango", "Bravo"}]
         assert trailing_strings == ["Alpha", "Bravo", "Mango", "Zebra"], (
-            f"Expected metadata tail sorted alphabetically; got "
-            f"{trailing_strings}. F-08 regression."
+            f"Expected metadata tail sorted alphabetically; got {trailing_strings}. F-08 regression."
         )
 
     def test_visible_columns_detailed_metadata_tail_is_alphabetically_sorted(self):
         """The metadata-column tail of ``visible_columns["detailed"]`` is sorted."""
-        table = _make_asset_table(
-            metadata_columns=("Zebra", "Alpha", "Mango", "Bravo")
-        )
+        table = _make_asset_table(metadata_columns=("Zebra", "Alpha", "Mango", "Bravo"))
         asset_annotation(table)
         vc = table.annotations[deriva_tags.visible_columns]
         detailed = vc["detailed"]
@@ -313,10 +313,5 @@ class TestGenerateAnnotationSchemaParameterIsThreaded:
             "execution_annotation",
             "dataset_version_annotation",
         ):
-            leaked = [
-                s for s in self._flatten_to_strings(result[key]) if s == "deriva-ml"
-            ]
-            assert not leaked, (
-                f"{key} leaked the literal 'deriva-ml' under "
-                f"schema='my_custom'."
-            )
+            leaked = [s for s in self._flatten_to_strings(result[key]) if s == "deriva-ml"]
+            assert not leaked, f"{key} leaked the literal 'deriva-ml' under schema='my_custom'."

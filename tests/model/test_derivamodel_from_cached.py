@@ -1,4 +1,5 @@
 """Unit test for DerivaModel.from_cached — offline model construction."""
+
 from __future__ import annotations
 
 

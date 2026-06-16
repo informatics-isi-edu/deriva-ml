@@ -82,19 +82,14 @@ def check_writable_catalog(
     ErmrestSnapshot = _deriva_core.ErmrestSnapshot
 
     if rid is None:
-        raise DerivaMLException(
-            f"Cannot {operation}: {entity_label} is not registered in the catalog (no RID)"
-        )
+        raise DerivaMLException(f"Cannot {operation}: {entity_label} is not registered in the catalog (no RID)")
 
     if ml_instance is None:
-        raise DerivaMLException(
-            f"Cannot {operation}: {entity_label} is not bound to a catalog"
-        )
+        raise DerivaMLException(f"Cannot {operation}: {entity_label} is not bound to a catalog")
 
     if isinstance(ml_instance.catalog, ErmrestSnapshot):
         raise DerivaMLException(
-            f"Cannot {operation} on a read-only catalog snapshot. "
-            f"Use a writable catalog connection instead."
+            f"Cannot {operation} on a read-only catalog snapshot. Use a writable catalog connection instead."
         )
 
 
@@ -190,9 +185,7 @@ def fetch_nested_execution_rows(
     else:  # parents
         # Walking parents: filter on the child's Nested_Execution
         # column, link out via the parent Execution column.
-        path = exec_exec_path.filter(
-            exec_exec_path.Nested_Execution == execution_rid
-        ).link(
+        path = exec_exec_path.filter(exec_exec_path.Nested_Execution == execution_rid).link(
             execution_path,
             on=(exec_exec_path.Execution == execution_path.RID),
         )

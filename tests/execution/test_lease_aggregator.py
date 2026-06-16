@@ -64,9 +64,7 @@ class TestFlush:
             calls.append(list(tokens))
             return {t: f"LEASED-{i}" for i, t in enumerate(tokens)}
 
-        monkeypatch.setattr(
-            "deriva_ml.execution.rid_lease.post_lease_batch", _fake_post
-        )
+        monkeypatch.setattr("deriva_ml.execution.rid_lease.post_lease_batch", _fake_post)
 
         agg = LeaseAggregator()
         agg.reserve(2)

@@ -244,8 +244,7 @@ def localize_assets(
                 )
             else:
                 logger.info(
-                    "Asset %s has relative URL, already local "
-                    "(specify source_hostname to localize)",
+                    "Asset %s has relative URL, already local (specify source_hostname to localize)",
                     rid,
                 )
                 result.assets_skipped += 1
@@ -328,9 +327,7 @@ def localize_assets(
                 # Get or create remote hatrac connection
                 if asset_src_host not in remote_hatrac_cache:
                     source_cred = get_credential(asset_src_host)
-                    remote_hatrac_cache[asset_src_host] = HatracStore(
-                        "https", asset_src_host, credentials=source_cred
-                    )
+                    remote_hatrac_cache[asset_src_host] = HatracStore("https", asset_src_host, credentials=source_cred)
                 source_hatrac = remote_hatrac_cache[asset_src_host]
 
                 # Download from source
@@ -350,12 +347,8 @@ def localize_assets(
                 # to be ignored.
                 file_size = local_file.stat().st_size
                 default_chunk_size = 50 * 1024 * 1024  # 50MB chunks
-                use_chunked = (
-                    chunk_size is not None and chunk_size > 0
-                ) or file_size > 100 * 1024 * 1024
-                actual_chunk_size = (
-                    chunk_size if (chunk_size is not None and chunk_size > 0) else default_chunk_size
-                )
+                use_chunked = (chunk_size is not None and chunk_size > 0) or file_size > 100 * 1024 * 1024
+                actual_chunk_size = chunk_size if (chunk_size is not None and chunk_size > 0) else default_chunk_size
 
                 new_url = local_hatrac.put_loc(
                     dest_path,

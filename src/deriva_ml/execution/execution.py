@@ -2032,9 +2032,7 @@ class Execution:
         if dataset_rid in already_linked:
             return
         version_rid = self._ml_object._version_rid(dataset_rid, version) if version is not None else None
-        dataset_exec.insert(
-            [{"Dataset": dataset_rid, "Execution": self.execution_rid, "Dataset_Version": version_rid}]
-        )
+        dataset_exec.insert([{"Dataset": dataset_rid, "Execution": self.execution_rid, "Dataset_Version": version_rid}])
 
     @validate_call(config=VALIDATION_CONFIG)
     def add_files(

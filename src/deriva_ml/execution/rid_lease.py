@@ -184,10 +184,7 @@ class LeaseAggregator:
                 single-shot.
         """
         if self._lease_map is not None:
-            raise RuntimeError(
-                "LeaseAggregator.flush() called twice; this aggregator "
-                "is single-shot."
-            )
+            raise RuntimeError("LeaseAggregator.flush() called twice; this aggregator is single-shot.")
         self._lease_map = post_lease_batch(catalog=catalog, tokens=self._tokens)
         return self._lease_map
 
@@ -207,8 +204,7 @@ class LeaseAggregator:
         """
         if self._lease_map is None:
             raise RuntimeError(
-                "LeaseAggregator.resolve() called before flush(); "
-                "no RID has been assigned to any token yet."
+                "LeaseAggregator.resolve() called before flush(); no RID has been assigned to any token yet."
             )
         return self._lease_map[token]
 

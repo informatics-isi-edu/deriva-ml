@@ -4,6 +4,7 @@ Tests that don't need a live catalog (offline pin/unpin, missing
 cache, diff_schema offline) always run. Tests that need a live
 catalog are gated on ``DERIVA_HOST``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,6 +19,7 @@ requires_catalog = pytest.mark.skipif(
 
 
 # ------------------------- offline-capable tests --------------------------
+
 
 def test_pin_schema_offline_returns_none(tmp_path):
     """Offline mode: pin_schema persists a pin and returns None."""
@@ -44,8 +46,10 @@ def test_pin_schema_offline_returns_none(tmp_path):
         },
     )
     ml = DerivaML(
-        hostname="h", catalog_id="1",
-        mode=ConnectionMode.offline, working_dir=tmp_path,
+        hostname="h",
+        catalog_id="1",
+        mode=ConnectionMode.offline,
+        working_dir=tmp_path,
     )
     result = ml.pin_schema(reason="offline test")
     assert result is None
@@ -56,13 +60,15 @@ def test_pin_schema_offline_returns_none(tmp_path):
 def test_unpin_schema_works_offline(tmp_path):
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.core.schema_cache import SchemaCache
+
     SchemaCache(tmp_path).write(
-        snapshot_id="s0", hostname="h", catalog_id="1",
+        snapshot_id="s0",
+        hostname="h",
+        catalog_id="1",
         ml_schema="deriva-ml",
         schema={"schemas": {"deriva-ml": {"schema_name": "deriva-ml", "tables": {}}}},
     )
-    ml = DerivaML(hostname="h", catalog_id="1",
-                  mode=ConnectionMode.offline, working_dir=tmp_path)
+    ml = DerivaML(hostname="h", catalog_id="1", mode=ConnectionMode.offline, working_dir=tmp_path)
     ml.pin_schema(reason="x")
     assert ml.pin_status().pinned is True
     ml.unpin_schema()
@@ -72,13 +78,15 @@ def test_unpin_schema_works_offline(tmp_path):
 def test_pin_status_reflects_cache_state(tmp_path):
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.core.schema_cache import SchemaCache
+
     SchemaCache(tmp_path).write(
-        snapshot_id="s-current", hostname="h", catalog_id="1",
+        snapshot_id="s-current",
+        hostname="h",
+        catalog_id="1",
         ml_schema="deriva-ml",
         schema={"schemas": {"deriva-ml": {"schema_name": "deriva-ml", "tables": {}}}},
     )
-    ml = DerivaML(hostname="h", catalog_id="1",
-                  mode=ConnectionMode.offline, working_dir=tmp_path)
+    ml = DerivaML(hostname="h", catalog_id="1", mode=ConnectionMode.offline, working_dir=tmp_path)
     status = ml.pin_status()
     assert status.pinned is False
     assert status.pinned_snapshot_id == "s-current"
@@ -88,18 +96,21 @@ def test_diff_schema_offline_raises(tmp_path):
     from deriva_ml import ConnectionMode, DerivaML
     from deriva_ml.core.exceptions import DerivaMLOfflineError
     from deriva_ml.core.schema_cache import SchemaCache
+
     SchemaCache(tmp_path).write(
-        snapshot_id="s0", hostname="h", catalog_id="1",
+        snapshot_id="s0",
+        hostname="h",
+        catalog_id="1",
         ml_schema="deriva-ml",
         schema={"schemas": {"deriva-ml": {"schema_name": "deriva-ml", "tables": {}}}},
     )
-    ml = DerivaML(hostname="h", catalog_id="1",
-                  mode=ConnectionMode.offline, working_dir=tmp_path)
+    ml = DerivaML(hostname="h", catalog_id="1", mode=ConnectionMode.offline, working_dir=tmp_path)
     with pytest.raises(DerivaMLOfflineError):
         ml.diff_schema()
 
 
 # --------------------------- live-catalog tests ---------------------------
+
 
 @requires_catalog
 def test_pin_schema_online_no_drift_returns_none(test_ml):
@@ -114,7 +125,8 @@ def test_pin_schema_online_no_drift_returns_none(test_ml):
 
 @requires_catalog
 def test_pin_schema_online_with_drift_returns_diff_and_logs_warning(
-    test_ml, caplog,
+    test_ml,
+    caplog,
 ):
     """Forge a drift scenario: rewrite the cache with a bogus snapshot
     + schema that differs from live; pin; expect SchemaDiff + warning."""
@@ -128,7 +140,7 @@ def test_pin_schema_online_with_drift_returns_diff_and_logs_warning(
         "schemas": {
             current["ml_schema"]: {
                 "schema_name": current["ml_schema"],
-                "tables": {},   # live will have many tables → all added
+                "tables": {},  # live will have many tables → all added
             }
         }
     }
@@ -146,10 +158,7 @@ def test_pin_schema_online_with_drift_returns_diff_and_logs_warning(
         assert diff is not None
         assert not diff.is_empty()
         assert len(diff.added_tables) > 0  # live has tables our forge didn't
-        assert any(
-            "drift" in r.getMessage().lower() or "pin_schema" in r.getMessage().lower()
-            for r in caplog.records
-        )
+        assert any("drift" in r.getMessage().lower() or "pin_schema" in r.getMessage().lower() for r in caplog.records)
     finally:
         test_ml.unpin_schema()
 
@@ -157,6 +166,7 @@ def test_pin_schema_online_with_drift_returns_diff_and_logs_warning(
 @requires_catalog
 def test_refresh_schema_refuses_when_pinned(test_ml):
     from deriva_ml.core.exceptions import DerivaMLSchemaPinned
+
     test_ml.pin_schema(reason="refuse test")
     try:
         with pytest.raises(DerivaMLSchemaPinned) as ei:
@@ -169,6 +179,7 @@ def test_refresh_schema_refuses_when_pinned(test_ml):
 @requires_catalog
 def test_refresh_schema_refuses_when_pinned_even_with_force(test_ml):
     from deriva_ml.core.exceptions import DerivaMLSchemaPinned
+
     test_ml.pin_schema(reason="force doesn't bypass pin")
     try:
         with pytest.raises(DerivaMLSchemaPinned):
@@ -189,6 +200,7 @@ def test_unpin_then_refresh_succeeds(test_ml):
 def test_diff_schema_online_returns_diff(test_ml):
     """diff_schema returns a SchemaDiff (possibly empty) online."""
     from deriva_ml.core.schema_diff import SchemaDiff
+
     diff = test_ml.diff_schema()
     assert isinstance(diff, SchemaDiff)
     # Fresh test_ml: cache IS live, so diff should be empty.
