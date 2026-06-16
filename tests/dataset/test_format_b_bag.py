@@ -272,7 +272,7 @@ def test_format_b_bag_fetch_txt_scoped_to_reachable_assets(catalog_with_datasets
 
 
 def test_compute_rid_sets_threads_reachability_concurrency():
-    """_compute_rid_sets accepts reachability_concurrency (default 1) and
+    """_compute_rid_sets accepts reachability_concurrency (default 8) and
     forwards it to compute_reachability as max_workers, so the estimate and
     both bag-gen paths can opt into parallel edge-table fetches."""
     import inspect
@@ -281,14 +281,14 @@ def test_compute_rid_sets_threads_reachability_concurrency():
 
     sig = inspect.signature(DatasetBagBuilder._compute_rid_sets)
     assert "reachability_concurrency" in sig.parameters
-    assert sig.parameters["reachability_concurrency"].default == 1
+    assert sig.parameters["reachability_concurrency"].default == 8
 
     src = inspect.getsource(DatasetBagBuilder._compute_rid_sets)
     assert "max_workers=reachability_concurrency" in src
 
 
 def test_public_entry_points_expose_reachability_concurrency():
-    """estimate_bag_size / bag_info surface reachability_concurrency (default 1)
+    """estimate_bag_size / bag_info surface reachability_concurrency (default 8)
     so callers can opt into parallel edge-table fetches."""
     import inspect
 
@@ -297,7 +297,7 @@ def test_public_entry_points_expose_reachability_concurrency():
     for name in ("estimate_bag_size", "bag_info"):
         sig = inspect.signature(getattr(Dataset, name))
         assert "reachability_concurrency" in sig.parameters, name
-        assert sig.parameters["reachability_concurrency"].default == 1, name
+        assert sig.parameters["reachability_concurrency"].default == 8, name
 
 
 def test_build_and_spec_expose_reachability_concurrency():
@@ -310,7 +310,7 @@ def test_build_and_spec_expose_reachability_concurrency():
     for name in ("build_bag", "generate_dataset_download_spec"):
         sig = inspect.signature(getattr(DatasetBagBuilder, name))
         assert "reachability_concurrency" in sig.parameters, name
-        assert sig.parameters["reachability_concurrency"].default == 1, name
+        assert sig.parameters["reachability_concurrency"].default == 8, name
         src = inspect.getsource(getattr(DatasetBagBuilder, name))
         assert "reachability_concurrency=reachability_concurrency" in src, name
 

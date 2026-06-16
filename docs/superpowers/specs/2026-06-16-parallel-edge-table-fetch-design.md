@@ -44,24 +44,42 @@ too" below).
 - **Parallelize edge-table fetches** — legitimate, and already flagged as the
   known sequential bottleneck in our own measurements.
 
-## Constraint: shared-session thread-safety
+## Shared-session thread-safety — analyzed, not assumed
 
-The production `fetch` closure issues `tpb.attributes(...).fetch()` through
-deriva-py's `ErmrestCatalog`, which holds **one** `requests.Session`
-(`self._session`, created once per binding). `requests.Session` is **not
-documented thread-safe** for concurrent use across threads. So we cannot
-blindly fan out unbounded GETs on the shared session.
+The production `fetch` closure issues `tpb.attributes(...).fetch()` →
+`catalog.get(path, headers=headers)` through deriva-py's `ErmrestCatalog`,
+which holds **one** `requests.Session` (`self._session`). The generic
+"`requests.Session` is not thread-safe" caveat is about *mutating session
+attributes mid-request*; the actual risk for a given access pattern is bounded
+by what that pattern shares. Reading the deriva-py binding
+(`deriva/core/deriva_binding.py`) against our pattern (one GET per reached
+table, distinct URLs, read-only):
 
-In practice, a *bounded* number of concurrent GETs on one session works (the
-risk is connection-pool / cookie-jar races, low for read-only GETs), but it
-is technically unsupported. The design must therefore:
+1. **Per-call headers** (`self._session.get(url, headers=headers)`): the
+   headers are request-local, not a mutation of `session.headers`. Thread-safe.
+2. **Shared GET cache** (`self._cache`, on by default): `_pre_get` reads
+   `self._cache.get(url)` and `get()` writes `self._cache[url] = r`. Concurrent,
+   unsynchronized — BUT each reachability fetch uses a **distinct URL** (one per
+   table), so no two threads touch the same key. CPython dict insertion of
+   distinct keys is GIL-atomic: no corruption, no lost writes. The ETag/304
+   `prev_response` path is per-URL and a first-fetch miss anyway. The cache is a
+   race **only** for concurrent same-URL GETs, which this pattern never issues.
+3. **Connection pool** (`urllib3` `PoolManager`/`HTTPConnectionPool` under
+   `requests.Session`): designed for concurrent use; thread-safe.
 
-1. Keep the `fetch` callable's contract unchanged (injected, single-table).
-2. Make concurrency **opt-in and bounded**, defaulting to the current
-   sequential behavior so nothing regresses by default.
-3. Preserve **exact** output — parallelism must not change `fetched_rows`,
-   `rids_by_table`, or `asset_lengths_by_table` (the live differential
-   exactness test is the gate).
+So for THIS access pattern — distinct URLs, per-call headers, read-only GETs —
+concurrent fetches on the shared session are safe. This is verified by the live
+exactness gate (parallel output byte-identical to sequential) **and** by a live
+2-277G measurement (see "Default" below).
+
+The design still:
+
+1. Keeps the `fetch` callable's contract unchanged (injected, single-table).
+2. Bounds concurrency (a `ThreadPoolExecutor` capped at `min(workers,
+   n_tables)`) — we don't fan out unboundedly.
+3. Preserves **exact** output — parallelism must not change `fetched_rows`,
+   `rids_by_table`, or `asset_lengths_by_table` (the live exactness test +
+   the unit equivalence test are the gates).
 
 ## Design
 
@@ -136,10 +154,31 @@ edge-table fetch parallelism:
   reachability fetch that builds the spec, the other parallelizes the asset
   download that materializes the bag).
 
-**Default stays sequential (`1`).** Deliberate: the parallel path is opt-in
-because (a) shared-session concurrency is technically unsupported, and (b) the
-win only materializes at scale (80+ tables); the demo catalog (32 tables, 280
-rows, 0.34s) sees no benefit. Production callers on large catalogs opt in.
+**Default: `reachability_concurrency = 8` at the public surface.** The
+user-facing methods (`estimate_bag_size`, `bag_info`, `build_bag`,
+`generate_dataset_download_spec`, `_compute_rid_sets`, `DatasetSpec`) default
+to parallel so the people hurt by slow bag generation get the speedup without
+having to know the knob exists. The engine primitive
+`compute_reachability(max_workers=1)` keeps a sequential default — a library
+function shouldn't silently spawn threads; the deriva-ml layer is where the
+product decision (parallel-by-default) lives. Pass `reachability_concurrency=1`
+anywhere to force sequential.
+
+This flip is **evidence-gated, not assumed**:
+
+- **Safe + exact on the real catalog.** Live eye-ai 2-277G measurement (80
+  tables, 360,756 rows, 19.35 GB): sequential 79.0s vs parallel(8) 55.5s,
+  **byte-identical** output (same tables, rows, asset_bytes). The shared-session
+  analysis above (distinct-URL GETs, per-call headers, GIL-atomic distinct-key
+  cache writes) is borne out in practice.
+- **Speedup is real but modest: ~1.42x** (not the "5–10x" originally
+  speculated). The edge-table fetch is *not* the dominant cost — the in-memory
+  BFS and per-fetch latency floor eat most of the wall-clock. 1.42x on a 79s
+  estimate (~24s saved) is still worth defaulting on, especially on the slow
+  path that motivated the work.
+- Small catalogs see no harm: the demo catalog (32 tables, 280 rows, 0.34s)
+  has `len(edge_tables) <= 1` short-circuits or trivial fan-out; parallel ==
+  sequential output, negligible thread overhead.
 
 To keep the surface from sprawling, the public wiring can be staged: land the
 engine + `_compute_rid_sets` knob first (internal, fully tested), then thread

@@ -2651,7 +2651,7 @@ class Dataset:
         self,
         version: DatasetVersion | str,
         exclude_tables: set[str] | None = None,
-        reachability_concurrency: int = 1,
+        reachability_concurrency: int = 8,
     ) -> dict[str, Any]:
         """Estimate the size of a dataset bag before downloading.
 
@@ -2749,7 +2749,7 @@ class Dataset:
         self,
         version: DatasetVersion | str,
         exclude_tables: set[str] | None = None,
-        reachability_concurrency: int = 1,
+        reachability_concurrency: int = 8,
     ) -> dict[str, Any]:
         """Get comprehensive info about a dataset bag: size, contents, and cache status.
 

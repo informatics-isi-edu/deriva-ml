@@ -237,7 +237,7 @@ class DatasetBagBuilder:
     # Public surface — drives :class:`CatalogBagBuilder`
     # ------------------------------------------------------------------
 
-    def generate_dataset_download_spec(self, dataset: DatasetLike, reachability_concurrency: int = 1) -> dict[str, Any]:
+    def generate_dataset_download_spec(self, dataset: DatasetLike, reachability_concurrency: int = 8) -> dict[str, Any]:
         """Return the runtime download spec for a specific dataset.
 
         Drives a :class:`CatalogBagBuilder` scoped to the dataset's
@@ -341,7 +341,7 @@ class DatasetBagBuilder:
         dataset: DatasetLike,
         output_dir: Path,
         timeout: tuple[int, int] | None = None,
-        reachability_concurrency: int = 1,
+        reachability_concurrency: int = 8,
     ) -> Path:
         """Build a bag for ``dataset`` and return the on-disk zip archive path.
 
@@ -602,7 +602,7 @@ class DatasetBagBuilder:
         builder._datasetbag_output_tmp = tmp  # type: ignore[attr-defined]
         return builder
 
-    def _compute_rid_sets(self, dataset: DatasetLike, reachability_concurrency: int = 1) -> RidSetComputation:
+    def _compute_rid_sets(self, dataset: DatasetLike, reachability_concurrency: int = 8) -> RidSetComputation:
         """Compute per-table reachable RID sets for a dataset, client-side.
 
         Factored from estimate_bag_size's reachability assembly so the
@@ -613,14 +613,15 @@ class DatasetBagBuilder:
 
         Args:
             dataset: The dataset to analyze. Must expose ``dataset_rid``.
-            reachability_concurrency: Opt-in bounded parallelism for the
-                edge-table fetch phase (forwarded to
-                :func:`compute_reachability` as ``max_workers``). ``1``
-                (default) fetches sequentially -- exact, behavior-preserving.
-                ``> 1`` parallelizes the per-table fetches, speeding up the
-                estimate AND both bag-generation callers
-                (:meth:`generate_dataset_download_spec`, :meth:`build_bag`) on
-                large datasets. Distinct from the asset-file-download
+            reachability_concurrency: Bounded parallelism for the edge-table
+                fetch phase (forwarded to :func:`compute_reachability` as
+                ``max_workers``). Defaults to ``8`` -- the per-table fetches
+                are parallelized, speeding up the estimate AND both
+                bag-generation callers
+                (:meth:`generate_dataset_download_spec`, :meth:`build_bag`).
+                Measured ~1.4x faster than sequential on eye-ai 2-277G (80
+                tables, 360k rows), with byte-identical output. Pass ``1`` for
+                the sequential path. Distinct from the asset-file-download
                 ``fetch_concurrency`` on the download path.
 
         Returns:
