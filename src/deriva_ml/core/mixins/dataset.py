@@ -440,6 +440,7 @@ class DatasetMixin:
             exclude_tables=dataset.exclude_tables,
             timeout=dataset.timeout,
             fetch_concurrency=dataset.fetch_concurrency,
+            reachability_concurrency=dataset.reachability_concurrency,
         )
 
     def estimate_bag_size(

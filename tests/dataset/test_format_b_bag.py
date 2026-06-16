@@ -288,16 +288,35 @@ def test_compute_rid_sets_threads_reachability_concurrency():
 
 
 def test_public_entry_points_expose_reachability_concurrency():
-    """estimate_bag_size / bag_info surface reachability_concurrency (default 8)
-    so callers can opt into parallel edge-table fetches."""
+    """The dataset-bag entry points surface reachability_concurrency (default 8)
+    so callers can tune the parallel edge-table fetch. download_dataset_bag /
+    cache run the same reachability work (via the download spec) as the
+    estimate, so they must expose the knob too."""
     import inspect
 
     from deriva_ml.dataset.dataset import Dataset
 
-    for name in ("estimate_bag_size", "bag_info"):
+    for name in ("estimate_bag_size", "bag_info", "download_dataset_bag", "cache"):
         sig = inspect.signature(getattr(Dataset, name))
         assert "reachability_concurrency" in sig.parameters, name
         assert sig.parameters["reachability_concurrency"].default == 8, name
+
+
+def test_get_and_create_minid_thread_reachability_concurrency():
+    """get_dataset_minid / create_dataset_minid accept reachability_concurrency
+    and forward it to generate_dataset_download_spec, so the download path runs
+    the reachability fetch at the caller's chosen concurrency."""
+    import inspect
+
+    from deriva_ml.dataset import bag_download
+
+    for fn_name in ("get_dataset_minid", "create_dataset_minid"):
+        fn = getattr(bag_download, fn_name)
+        sig = inspect.signature(fn)
+        assert "reachability_concurrency" in sig.parameters, fn_name
+        assert sig.parameters["reachability_concurrency"].default == 8, fn_name
+        src = inspect.getsource(fn)
+        assert "reachability_concurrency=reachability_concurrency" in src, fn_name
 
 
 def test_build_and_spec_expose_reachability_concurrency():
@@ -313,6 +332,18 @@ def test_build_and_spec_expose_reachability_concurrency():
         assert sig.parameters["reachability_concurrency"].default == 8, name
         src = inspect.getsource(getattr(DatasetBagBuilder, name))
         assert "reachability_concurrency=reachability_concurrency" in src, name
+
+
+def test_download_mixin_forwards_datasetspec_reachability_concurrency():
+    """The DerivaML.download_dataset_bag mixin must forward
+    DatasetSpec.reachability_concurrency to the Dataset method — otherwise the
+    DatasetSpec field is silently ignored on the download path."""
+    import inspect
+
+    from deriva_ml.core.mixins.dataset import DatasetMixin
+
+    src = inspect.getsource(DatasetMixin.download_dataset_bag)
+    assert "reachability_concurrency=dataset.reachability_concurrency" in src
 
 
 @pytest.mark.skipif(
