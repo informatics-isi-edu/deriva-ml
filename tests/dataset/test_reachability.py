@@ -278,6 +278,104 @@ def test_sample_rows_from_fetched_empty_table_absent():
     assert "T" not in samples
 
 
+def _make_multi_table_model(table_names):
+    """Model with N independent non-asset tables, each anchor-reachable via a
+    length-1 path. No FKs needed -- the concurrency tests only exercise the
+    fetch phase, not the join."""
+    tables = {}
+    for name in table_names:
+        tables[name] = SimpleNamespace(
+            foreign_keys=[],
+            referenced_by=[],
+            column_definitions=SimpleNamespace(elements={}),
+            is_asset=lambda: False,
+        )
+    return SimpleNamespace(schemas={"S": SimpleNamespace(tables=tables)})
+
+
+def _multi_reached(table_names):
+    """One length-1 path per table (the table reachable as its own anchor)."""
+    return {("S", t): [(("S", t),)] for t in table_names}
+
+
+def test_parallel_fetch_matches_sequential_exactly():
+    """compute_reachability with max_workers>1 produces byte-identical output
+    to the sequential default -- the fetch phase is order-insensitive."""
+    names = [f"T{i}" for i in range(6)]
+    model = _make_multi_table_model(names)
+    reached = _multi_reached(names)
+    # Anchor RIDs = the first row RID of every table, so each contributes.
+    anchors = [f"{t}-0" for t in names]
+
+    def fetch(schema, table, columns):
+        return [{"RID": f"{table}-{i}"} for i in range(3)]
+
+    seq = compute_reachability(reached=reached, anchor_rids=anchors, model=model, fetch=fetch, max_workers=1)
+    par = compute_reachability(reached=reached, anchor_rids=anchors, model=model, fetch=fetch, max_workers=8)
+    assert seq[0] == par[0]  # rids_by_table
+    assert seq[1] == par[1]  # asset_lengths_by_table
+    assert seq[2] == par[2]  # fetched_rows
+
+
+def test_parallel_fetch_uses_multiple_threads():
+    """max_workers>1 actually fans the fetches across threads; max_workers=1
+    stays on the calling thread."""
+    import threading
+
+    names = [f"T{i}" for i in range(6)]
+    model = _make_multi_table_model(names)
+
+    def make_fetch(seen):
+        def fetch(schema, table, columns):
+            seen.add(threading.get_ident())
+            return [{"RID": f"{table}-0"}]
+
+        return fetch
+
+    seen_par: set[int] = set()
+    compute_reachability(
+        reached=_multi_reached(names),
+        anchor_rids=[],
+        model=model,
+        fetch=make_fetch(seen_par),
+        max_workers=4,
+    )
+    assert len(seen_par) > 1, "parallel path did not use multiple threads"
+
+    seen_seq: set[int] = set()
+    compute_reachability(
+        reached=_multi_reached(names),
+        anchor_rids=[],
+        model=model,
+        fetch=make_fetch(seen_seq),
+        max_workers=1,
+    )
+    assert len(seen_seq) == 1, "sequential path used more than one thread"
+
+
+def test_parallel_fetch_propagates_error():
+    """A fetch failure under parallelism aborts the whole call (no silent
+    partial results) -- same semantics as the sequential path."""
+    import pytest
+
+    names = [f"T{i}" for i in range(6)]
+    model = _make_multi_table_model(names)
+
+    def boom(schema, table, columns):
+        if table == "T3":
+            raise RuntimeError("fetch failed")
+        return [{"RID": f"{table}-0"}]
+
+    with pytest.raises(RuntimeError, match="fetch failed"):
+        compute_reachability(
+            reached=_multi_reached(names),
+            anchor_rids=[],
+            model=model,
+            fetch=boom,
+            max_workers=8,
+        )
+
+
 def test_estimate_no_longer_imports_deep_join_helpers():
     """The deep-join path is deleted; estimate must not import it."""
     import inspect
