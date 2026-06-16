@@ -349,6 +349,23 @@ def test_download_mixin_forwards_datasetspec_reachability_concurrency():
         assert "reachability_concurrency=dataset.reachability_concurrency" in src, name
 
 
+def test_adapters_enumerate_via_resolve_element_rids():
+    """Both builders enumerate elements via the shared resolve_element_rids
+    (FK-reachable), not list_dataset_members directly, and expose `reachable`."""
+    import inspect
+
+    from deriva_ml.dataset import tf_adapter, torch_adapter
+
+    for mod, fn in ((tf_adapter, "build_tf_dataset"), (torch_adapter, "build_torch_dataset")):
+        src = inspect.getsource(getattr(mod, fn))
+        assert "resolve_element_rids" in src, fn
+        # The old direct-members enumeration is gone.
+        assert "members_by_type[element_type]" not in src, fn
+        sig = inspect.signature(getattr(mod, fn))
+        assert "reachable" in sig.parameters, fn
+        assert sig.parameters["reachable"].default is True, fn
+
+
 @pytest.mark.skipif(
     os.environ.get("DERIVA_HOST") in (None, ""),
     reason="needs a live catalog",

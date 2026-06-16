@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from deriva_ml.core.exceptions import DerivaMLException
-from deriva_ml.dataset.target_resolution import _resolve_targets
+from deriva_ml.dataset.target_resolution import _resolve_targets, resolve_element_rids
 
 if TYPE_CHECKING:
     import torch.utils.data
@@ -41,6 +41,7 @@ def build_torch_dataset(
     targets: "list[str] | dict[str, FeatureSelector] | None" = None,
     target_transform: "Callable[..., Any] | None" = None,
     missing: Literal["error", "skip", "unknown"] = "error",
+    reachable: bool = True,
 ) -> "torch.utils.data.Dataset":
     """Build a torch.utils.data.Dataset from a DatasetBag.
 
@@ -62,6 +63,11 @@ def build_torch_dataset(
         missing: Policy for elements with no feature value. ``"error"``
             raises at construction; ``"skip"`` drops unlabeled elements;
             ``"unknown"`` keeps them with target=None.
+        reachable: ``True`` (default) enumerates every ``element_type`` row
+            FK-reachable from this dataset — matching ``restructure_assets``,
+            so an ``Image`` reachable only via ``Subject -> Observation ->
+            Image`` is still included. ``False`` restricts to direct dataset
+            members (``list_dataset_members(recurse=True)``), the opt-out.
 
     Returns:
         A ``torch.utils.data.Dataset`` whose ``__getitem__`` returns:
@@ -87,12 +93,11 @@ def build_torch_dataset(
     except ImportError as e:
         raise ImportError(_TORCH_INSTALL_HINT) from e
 
-    # Validate element_type exists in the bag.
-    members_by_type = bag.list_dataset_members(recurse=True)
-    if element_type not in members_by_type:
-        raise DerivaMLException(
-            f"Element type {element_type!r} not found in bag; available types: {sorted(members_by_type.keys())}"
-        )
+    # Enumerate the element RIDs belonging to this dataset. reachable=True
+    # (default) finds FK-reachable elements (e.g. Image via Subject -> ... ->
+    # Image), matching restructure_assets / bag_info; reachable=False is the
+    # direct-members-only opt-out. Raises if element_type is unresolvable.
+    all_rids = resolve_element_rids(bag, element_type, reachable=reachable)
 
     # Validate sample_loader is provided for asset-table element types.
     is_asset = _bag_element_is_asset(bag, element_type)
@@ -110,9 +115,8 @@ def build_torch_dataset(
     # Resolve targets once at construction time.
     target_map = _resolve_targets(bag, element_type, targets=targets, missing=missing)
 
-    # Build the RID list — all elements if targets=None, only labeled
-    # elements if targets is set.
-    all_rids = [m["RID"] for m in members_by_type[element_type]]
+    # Filter the RID list — all reachable elements if targets=None, only
+    # labeled elements if targets is set.
     if targets is None:
         rids = all_rids
     elif missing == "skip":
