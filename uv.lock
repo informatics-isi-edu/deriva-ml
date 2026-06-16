@@ -853,7 +853,7 @@ wheels = [
 [[package]]
 name = "deriva"
 version = "2.0.0.dev0"
-source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=deriva-ml#f3f988920cf127ae87e824316947c942b2030557" }
+source = { git = "https://github.com/informatics-isi-edu/deriva-py?branch=deriva-ml#93add8069d03a8411c7239ca576145f1ac1d9507" }
 dependencies = [
     { name = "bdbag" },
     { name = "fair-identifiers-client" },

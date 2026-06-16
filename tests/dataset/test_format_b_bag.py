@@ -178,3 +178,94 @@ def test_format_b_bag_one_csv_per_table_matches_estimate(catalog_with_datasets, 
         asserted += 1
 
     assert asserted, "no non-vocab table count was asserted -- the count gate did nothing"
+
+
+@pytest.mark.skipif(
+    os.environ.get("DERIVA_HOST") in (None, ""),
+    reason="needs a live catalog",
+)
+def test_format_b_bag_fetch_txt_scoped_to_reachable_assets(catalog_with_datasets, tmp_path):
+    """The bag's fetch.txt (asset byte manifest) is scoped to the dataset's
+    reachable assets -- one entry per reachable asset RID, not the whole asset
+    table.
+
+    Consumer-side coverage for the asset-fetch over-fetch bug (deriva-py
+    PR #275). Previously the csv processor was rid_set-scoped but the *fetch*
+    processor queried the whole asset table, so fetch.txt -- and therefore the
+    actual byte download -- pulled every asset in the table regardless of
+    dataset membership (a ~6x over-download on eye-ai 2-277G). The estimate
+    correctly counts only reachable assets; this asserts the bag's fetch
+    manifest agrees with it.
+
+    Validated as a true regression guard: against pre-#275 deriva-py this
+    fails on the demo catalog (BoundingBox: fetch.txt 10 vs reachable 4); with
+    the fix the fetch manifest is scoped to the 4 reachable rows.
+
+    The existing one-CSV-per-table test only inspects ``data/**/*.csv`` -- the
+    correctly-scoped half. This test inspects ``fetch.txt``, the half that was
+    broken.
+    """
+    from deriva_ml.dataset.bag_builder import DatasetBagBuilder
+
+    ml, _desc = catalog_with_datasets
+
+    datasets = list(ml.find_datasets())
+    nested = next((d for d in datasets if d.list_dataset_children()), None)
+    if nested is None:
+        pytest.skip("fixture has no nested dataset")
+    version = nested.current_version
+
+    # Estimate is the oracle: per-asset-table reachable row counts.
+    est = nested.estimate_bag_size(version)
+    asset_est = {t: d["row_count"] for t, d in est["tables"].items() if d.get("is_asset") and d["row_count"] > 0}
+    if not asset_est:
+        pytest.skip("fixture's reachable slice has no asset rows to scope")
+
+    snap = nested._version_snapshot_catalog(version)
+    builder = DatasetBagBuilder(ml_instance=snap)
+    zip_path = builder.build_bag(nested, output_dir=tmp_path)
+
+    extract = tmp_path / "extracted"
+    with zipfile.ZipFile(zip_path) as zf:
+        zf.extractall(extract)
+
+    fetch_files = list(extract.rglob("fetch.txt"))
+    assert fetch_files, "bag has no fetch.txt"
+
+    # Bucket fetch entries by asset table. Entry filenames are templated
+    # ``data/asset/{asset_rid}/{table_name}/...`` (the fetch processor's
+    # output_path), so the path segment after ``asset/<rid>/`` is the table.
+    per_table_fetched: dict[str, set[str]] = {}
+    for fetch_txt in fetch_files:
+        for line in fetch_txt.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # fetch.txt is TSV: <url>\t<length>\t<filename>
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            filename = parts[2]
+            segs = filename.split("/")
+            if "asset" not in segs:
+                continue
+            i = segs.index("asset")
+            # segs[i+1] = asset_rid, segs[i+2] = table_name
+            if i + 2 >= len(segs):
+                continue
+            asset_rid, table_name = segs[i + 1], segs[i + 2]
+            per_table_fetched.setdefault(table_name, set()).add(asset_rid)
+
+    # For every asset table the estimate reached, the bag's fetch.txt must
+    # contain exactly the reachable asset count -- not the full-table count.
+    # (Pre-#275 the fetch manifest held every row in the table, so this count
+    # would exceed the estimate.)
+    asserted = 0
+    for table, reachable in asset_est.items():
+        fetched = len(per_table_fetched.get(table, set()))
+        assert fetched == reachable, (
+            f"{table}: fetch.txt has {fetched} asset entries but the dataset "
+            f"reaches {reachable} -- fetch processor not scoped to the rid set"
+        )
+        asserted += 1
+    assert asserted, "no asset table fetch-count was asserted"
