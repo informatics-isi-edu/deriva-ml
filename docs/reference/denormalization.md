@@ -40,6 +40,7 @@ against the bag's local SQLite database.
 | My anchors have no FK path — error or skip? | [D5](#d5) (`ignore_unrelated_anchors`) |
 | How do I keep `RCB`/`RCT` provenance columns? | [D5](#d5) (`system_columns`, **dataframe only**) |
 | Does `_as_dict` return a list I can index? | No — [D6](#d6) (it's a **generator**) |
+| My dataset's members are `Subject`s but I read `Image` features — why does it work? | [D7](#d7) (the planner unions FK-reachable routes, not just direct membership) |
 | What does denormalization have to do with FK-traversal policy? | Nothing — see [Mental model](#mental-model) |
 
 ## Mental model
@@ -80,11 +81,18 @@ Two things this is **not**:
   membership is simply a **filter** on what's in scope. Don't conflate
   the two: one *produces* the bag, the other *reshapes* it.
 
+  (Within that bag-local scope, the planner reaches an `include_tables`
+  element through **every** `Dataset → element` route — direct membership
+  *and* FK-reachable chains — unioned RID-distinct; see [D7](#d7).)
+
 The denormalizer is governed by **nine semantic rules** (the canonical
 contract list is `Denormalizer`'s class docstring and the
 [tutorial](../user-guide/denormalization.md)'s "Rules" section). The
 formal rules below — **D1–D6** — group those nine by the knob a caller
-actually turns; each cites the underlying rule numbers.
+actually turns; each cites the underlying rule numbers. **D7** is not a
+caller knob — it documents how the planner reaches an element from the
+dataset (union of all FK-reachable routes), the behavior that makes
+denormalization work on subject-partitioned datasets.
 
 ## Formal rules
 
@@ -218,6 +226,36 @@ distinct types — pick by what you need:
 / `::get_denormalized_as_dict` / `::list_denormalized_columns` /
 `::describe_denormalized`; the 13-key shape is spelled out in
 `Denormalizer.describe`'s docstring.
+
+<a id="d7"></a>
+**D7 — The planner unions ALL reachable `Dataset → element` routes,
+RID-distinct.** To reach an `include_tables` element from the dataset,
+the planner does **not** pick a single "best" route. It **unions every**
+`Dataset → … → element` path it can find — both the **direct-membership
+association** route (`Dataset_{Element}`, e.g. `Dataset_Image`) **and**
+**FK-reachable chains** (e.g.
+`Dataset → Dataset_Subject → Subject → … → Image`). The unioned result
+is **RID-distinct**: SQL `UNION` (not `UNION ALL`) dedups identical
+output rows, so when the same element is reachable via several routes it
+contributes a single row — for a feature read, exactly one row per
+feature-association row. On a **directly-populated** dataset the
+membership route is non-empty and the FK routes add no new leaf RIDs (or
+duplicate existing ones), so the union yields exactly the same row set as
+a membership-only join — directly-populated reads are unchanged. On a
+**subject-partitioned** dataset (members are an upstream element like
+`Subject`; the target table is reachable **only** via the FK chain, with
+an **empty** direct-membership association) this union is the **only**
+way the target's rows appear at all — a membership-only join would return
+**0**. This is what makes `feature_values` / `get_denormalized_*` work on
+subject-partitioned datasets. (Multiple *distinct* FK paths between
+`row_per` and a requested table still raise per [D3](#d3) — D7 is about
+unioning the membership and FK-reachable routes to the *same* element,
+not about silently guessing among ambiguous join paths.) Spec:
+`docs/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design.md`.
+`[deriva-ml]`
+`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner`
+(route discovery + UNION-distinct emission in `_prepare_wide_table`);
+shared by `feature_values`, `get_denormalized_*`, and `describe`.
 
 ## Worked examples
 
