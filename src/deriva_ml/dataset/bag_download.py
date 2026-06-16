@@ -58,10 +58,10 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-import deriva.core.utils.hash_utils as hash_utils
 import requests
 from bdbag import bdbag_api as bdb
 from bdbag.fetch.fetcher import fetch_single_file
+from deriva.bag.cache_index import BagCacheIndex
 from deriva.core.utils.core_utils import format_exception
 from deriva.transfer.download import (
     DerivaDownloadAuthenticationError,
@@ -123,109 +123,64 @@ def fetch_minid_metadata(dataset: "Dataset", version: DatasetVersion, url: str) 
     return DatasetMinid(dataset_version=version, **r.json())
 
 
-def download_dataset_minid(dataset: "Dataset", minid: DatasetMinid, use_minid: bool) -> Path:
-    """Download and extract a dataset bag archive into the local cache.
+def _extract_archive_to_cache(
+    index: "BagCacheIndex",
+    archive_path: str,
+    checksum: str,
+    dataset_rid: str,
+    dataset_version: str,
+) -> Path:
+    """Extract a bag archive into the checksum-keyed cache, atomically.
 
-    Handles three source types based on how the bag was obtained:
+    Extracts ``archive_path`` into a staging directory, validates the BDBag
+    structure, atomically renames the staging dir to its final cache location
+    (``{cache_root}/bags/{checksum}/Dataset_{rid}``), and records the bag in
+    ``index`` so the next Tier-1 lookup finds it. The atomic rename prevents
+    partial/corrupt cache entries if the process crashes mid-extract.
 
-    1. **Local cache hit** (``minid.checksum`` set by Tier 1 in
-       :func:`get_dataset_minid`):
-       The index already records this checksum and the bag directory
-       exists at ``{cache_root}/bags/{checksum}/Dataset_{rid}`` → return
-       immediately.
-
-    2. **S3 download** (``use_minid=True``):
-       Download the bag archive from S3 via ``minid.bag_url``.
-
-    3. **Client-side bag** (``use_minid=False``):
-       The bag was already generated locally by
-       :func:`create_dataset_minid` driving
-       :meth:`DatasetBagBuilder.build_bag` and is referenced via a
-       ``file://`` URI.
-
-    After obtaining the archive, this function:
-
-    - Extracts it under a staging directory (atomic — prevents corrupt caches).
-    - Validates the BDBag structure.
-    - Moves the staging directory to its final cache location under
-      ``{cache_root}/bags/{checksum}/Dataset_{rid}/``.
-    - Records the bag in :class:`~deriva.bag.cache_index.BagCacheIndex`
-      so Tier-1 lookups can find it on the next call.
-    - Cleans up temporary files (including any ``client_export``
-      intermediate produced by the non-MINID path).
-
-    Cache layout (post-Phase-2 cutover):
-        ``{cache_root}/bags/{checksum}/Dataset_{rid}/``
-
-        ``checksum`` is the deterministic ``{spec_hash[:16]}_{snapshot}``
-        string for non-MINID downloads (set by Tier 1/3) or the SHA-256
-        of the S3 archive (set by Tier 2).
+    The caller owns ``index``'s lifecycle (this function does not dispose it).
+    Shared by the S3 arm of :func:`download_dataset_minid` and the client arm
+    of :func:`create_dataset_minid`.
 
     Args:
-        dataset: The dataset being downloaded (for catalog access and
-            logging).
-        minid: DatasetMinid with bag URL and cache key (in checksum field).
-        use_minid: If True, source is S3. If False, source is local file://.
+        index: Open :class:`~deriva.bag.cache_index.BagCacheIndex` rooted at
+            the cache dir.
+        archive_path: Path to the bag zip archive to extract.
+        checksum: Deterministic cache key (``{spec_hash[:16]}_{snapshot}``)
+            or SHA-256 of the archive — used as the cache-dir name.
+        dataset_rid: Dataset RID, for the cache dir name and index anchor.
+        dataset_version: Dataset version string, for the index anchor summary.
 
     Returns:
-        Path to the extracted bag directory:
-        ``{cache_root}/bags/{checksum}/Dataset_{rid}``.
+        Path to the extracted bag directory inside the cache
+        (``{cache_root}/bags/{checksum}/Dataset_{rid}``).
+
+    Raises:
+        Exception: Propagates any error from ``bdb.extract_bag`` /
+            ``bdb.validate_bag_structure`` after cleaning up the staging dir
+            (so no partial cache entry is left behind).
+
+    Example:
+        >>> # Illustrative — requires a live index + archive.
+        >>> path = _extract_archive_to_cache(idx, "/tmp/b.zip", "ab_S", "2-X", "1.0.0")  # doctest: +SKIP
     """
-    from deriva.bag.cache_index import BagCacheIndex
+    bag_root = index.bag_dir_for(checksum)
+    bag_dir = bag_root / f"Dataset_{dataset_rid}"
 
-    index = BagCacheIndex(dataset._ml_instance.cache_dir)
-
-    # Tier-1 hit: the index lookup in get_dataset_minid set minid.checksum;
-    # the bag may already exist on disk from a prior download.
-    bag_root = index.bag_dir_for(minid.checksum)
-    bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
-    if bag_dir.exists():
-        dataset._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
-        return bag_dir
-
-    # ----- Download the archive -------------------------------------------
-    with TemporaryDirectory() as tmp_dir:
-        if use_minid:
-            # Tier 2: Download bag archive from S3
-            bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
-            archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
-        elif minid.bag_url.startswith("file://"):
-            # Tier 3: Client-side bag — already on local filesystem
-            archive_path = urlparse(minid.bag_url).path
-        else:
-            # Legacy: Download from catalog export endpoint
-            exporter = DerivaExport(host=dataset._ml_instance.catalog.deriva_server.server, output_dir=tmp_dir)
-            archive_path = exporter.retrieve_file(minid.bag_url)
-
-        # For non-MINID downloads without a pre-computed cache key (legacy
-        # code path), fall back to SHA-256 of the archive as cache key.
-        if not use_minid and not minid.checksum:
-            hashes = hash_utils.compute_file_hashes(archive_path, hashes=["md5", "sha256"])
-            checksum = hashes["sha256"][0]
-            bag_root = index.bag_dir_for(checksum)
-            bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
-            if bag_dir.exists():
-                dataset._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
-                return bag_dir
-            # Rebind minid.checksum so the index record at the end of this
-            # function uses the SHA-256 cache key. ``DatasetMinid`` is
-            # immutable; rebuild it with the derived checksum.
-            minid = minid.model_copy(update={"checksums": [{"function": "sha256", "value": checksum}]})
-
-        # ----- Extract to staging directory (atomic cache population) ------
-        # Write to a temporary staging directory first. Only rename to the
-        # final cache location after successful extraction and validation.
-        # This prevents partial/corrupt cache entries if the process crashes.
-        staging_dir = bag_root.parent / f"{bag_root.name}_staging"
-        if staging_dir.exists():
-            shutil.rmtree(staging_dir)
-        staging_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            extracted_bag_path = bdb.extract_bag(archive_path, staging_dir.as_posix())
-            bdb.validate_bag_structure(extracted_bag_path)
-        except Exception:
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            raise
+    # ----- Extract to staging directory (atomic cache population) ------
+    # Write to a temporary staging directory first. Only rename to the
+    # final cache location after successful extraction and validation.
+    # This prevents partial/corrupt cache entries if the process crashes.
+    staging_dir = bag_root.parent / f"{bag_root.name}_staging"
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        extracted_bag_path = bdb.extract_bag(archive_path, staging_dir.as_posix())
+        bdb.validate_bag_structure(extracted_bag_path)
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
 
     # Atomic move: staging → final cache location. The bag directory's
     # parent (``cache_root/bags/{checksum}``) is created by the rename.
@@ -233,21 +188,79 @@ def download_dataset_minid(dataset: "Dataset", minid: DatasetMinid, use_minid: b
     staging_dir.rename(bag_root)
 
     # Record the bag in the index so the next Tier-1 lookup finds it.
+    index.record(
+        checksum=checksum,
+        anchors=[("Dataset", dataset_rid)],
+        anchor_summary={"version": str(dataset_version)},
+    )
+    return bag_dir
+
+
+def download_dataset_minid(dataset: "Dataset", minid: DatasetMinid, use_minid: bool) -> Path:
+    """Resolve a dataset bag into the local cache, returning its directory.
+
+    Two source types:
+
+    1. **Local cache hit** (the common case):
+       The index already records ``minid.checksum`` and the bag directory
+       exists at ``{cache_root}/bags/{checksum}/Dataset_{rid}`` → return
+       immediately. This also covers the client arm (Tier 3 of
+       :func:`get_dataset_minid`), which extracts into the cache itself and
+       hands back an already-extracted dir.
+
+    2. **S3 download** (``use_minid=True``, MINID arm):
+       Download the bag archive from S3 via ``minid.bag_url``, then extract +
+       validate + atomic-move into the cache and record in the index (via
+       :func:`_extract_archive_to_cache`).
+
+    Cache layout:
+        ``{cache_root}/bags/{checksum}/Dataset_{rid}/``
+
+        ``checksum`` is the deterministic ``{spec_hash[:16]}_{snapshot}``
+        string (set by Tier 1/3) for non-MINID bags, or the value recorded on
+        the MINID for the S3 arm.
+
+    Args:
+        dataset: The dataset being downloaded (for catalog access and
+            logging).
+        minid: DatasetMinid with bag URL and cache key (in checksum field).
+        use_minid: If True, the bag is downloaded from S3. If False, the bag
+            was already extracted into the cache by the client arm and this is
+            a cache-hit no-op.
+
+    Returns:
+        Path to the extracted bag directory:
+        ``{cache_root}/bags/{checksum}/Dataset_{rid}``.
+    """
+    index = BagCacheIndex(dataset._ml_instance.cache_dir)
     try:
-        index.record(
-            checksum=minid.checksum,
-            anchors=[("Dataset", minid.dataset_rid)],
-            anchor_summary={"version": str(minid.dataset_version)},
-        )
+        # Tier-1 hit: the index lookup in get_dataset_minid set minid.checksum;
+        # the bag may already exist on disk from a prior download.
+        bag_root = index.bag_dir_for(minid.checksum)
+        bag_dir = bag_root / f"Dataset_{minid.dataset_rid}"
+        if bag_dir.exists():
+            dataset._logger.info(f"Using cached bag for {minid.dataset_rid} Version:{minid.dataset_version}")
+            return bag_dir
+
+        # ----- Tier 2: download the bag archive from S3 -------------------
+        # The client arm (use_minid=False, Tier 3) extracts into the cache
+        # itself and returns an already-extracted dir, which the Tier-1 guard
+        # above catches — so the only archive that reaches here is the S3 one.
+        with TemporaryDirectory() as tmp_dir:
+            bag_path = Path(tmp_dir) / Path(urlparse(minid.bag_url).path).name
+            archive_path = fetch_single_file(minid.bag_url, output_path=bag_path)
+
+            # Extract + validate + atomic-move into the cache, then record in
+            # the index. Shared with the client arm of create_dataset_minid.
+            bag_dir = _extract_archive_to_cache(
+                index=index,
+                archive_path=archive_path,
+                checksum=minid.checksum,
+                dataset_rid=minid.dataset_rid,
+                dataset_version=str(minid.dataset_version),
+            )
     finally:
         index.dispose()
-
-    # Clean up the client_export temp directory for local file:// bags.
-    # After extraction to cache, the original archive is no longer needed.
-    if not use_minid and minid.bag_url.startswith("file://"):
-        export_dir = Path(archive_path).parent
-        if "client_export" in export_dir.parts:
-            shutil.rmtree(export_dir, ignore_errors=True)
 
     return bag_dir
 
@@ -259,8 +272,9 @@ def create_dataset_minid(
     exclude_tables: set[str] | None = None,
     spec: dict | None = None,
     spec_hash: str | None = None,
+    cache_suffix: str | None = None,
     timeout: tuple[int, int] | None = None,
-) -> str:
+) -> str | Path:
     """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
     This function generates a BDBag export of the dataset and optionally
@@ -277,12 +291,19 @@ def create_dataset_minid(
             generated from the snapshot catalog.
         spec_hash: Optional pre-computed SHA-256 hash of the spec. If None and
             spec is provided, it is computed from the spec.
+        cache_suffix: Deterministic cache key (``{spec_hash[:16]}_{snapshot}``)
+            for the client arm (``use_minid=False``). When provided, the
+            client-side bag is extracted into the cache under this key — kept
+            identical to the key Tier 1 looks up so existing cached bags hit.
+            If None on the client arm, it is derived from ``spec_hash`` + the
+            version's snapshot. Ignored on the MINID arm.
         timeout: Optional (connect_timeout, read_timeout) in seconds for network
             requests. Defaults to (10, 610).
 
     Returns:
-        URL to the MINID landing page (if ``use_minid=True``) or
-        the direct bag download URL (``file://`` URI).
+        On the MINID arm (``use_minid=True``): the MINID landing-page URL
+        (``str``). On the client arm (``use_minid=False``): the :class:`Path`
+        to the extracted bag directory in the local cache.
     """
     with TemporaryDirectory() as tmp_dir:
         # Generate spec if not supplied (allows callers to reuse a spec they already computed).
@@ -349,13 +370,19 @@ def create_dataset_minid(
             # anchors/policy); we keep the parameter on the function
             # signature because the MINID arm above still consumes it.
             #
-            # The bag is built into a working subdirectory under
-            # ``working_dir/client_export/`` (NOT ``tmp_dir``) so the zip
-            # survives the ``TemporaryDirectory`` cleanup at the end of
-            # this function — the caller (:func:`download_dataset_minid`)
-            # consumes the file:// URI returned here. The cleanup path in
-            # :func:`download_dataset_minid` recognizes ``client_export`` in
-            # the archive's parent and removes it after extraction.
+            # The bag is built into a ``TemporaryDirectory`` rooted at
+            # ``cache_dir`` and extracted straight into the cache. The staging
+            # zip never touches ``working_dir`` and is removed on every exit
+            # path (success or exception) by the context manager — no
+            # cross-function ``file://`` hand-off, no manual cleanup. Staging
+            # on the cache filesystem also makes the staging→cache move a cheap
+            # same-device rename.
+            if cache_suffix is None:
+                # Defensive: derive the cache key the way Tier 1 does, so the
+                # extracted bag is found on the next lookup.
+                snapshot = _resolve_version_record(dataset, version).snapshot
+                cache_suffix = f"{spec_hash[:16]}_{snapshot}"
+
             version_snapshot_catalog = dataset._version_snapshot_catalog(version)
             builder = DatasetBagBuilder(
                 ml_instance=version_snapshot_catalog,
@@ -363,31 +390,42 @@ def create_dataset_minid(
                 use_minid=False,
                 exclude_tables=exclude_tables,
             )
-            client_export_dir = Path(dataset._ml_instance.working_dir) / "client_export" / spec_hash[:8]
-            client_export_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                zip_path = builder.build_bag(dataset, output_dir=client_export_dir, timeout=timeout)
-            except (
-                DerivaDownloadError,
-                DerivaDownloadConfigurationError,
-                DerivaDownloadAuthenticationError,
-                DerivaDownloadAuthorizationError,
-                DerivaDownloadTimeoutError,
-            ) as e:
-                # Preserve the actionable-message contract callers relied on
-                # from the legacy _create_dataset_bag_client. The original
-                # advice (add direct dataset members for tables whose deep
-                # FK joins timed out) still applies — surface it alongside
-                # the deriva-py error so users have a fix to try.
-                raise DerivaMLException(
-                    f"Dataset bag export failed: {format_exception(e)}. "
-                    "This typically happens when deep multi-table joins "
-                    "exceed server query time limits. To fix this, add the "
-                    "desired records as direct dataset members using "
-                    "add_dataset_members() with the relevant table's RIDs."
-                )
+            cache_dir = Path(dataset._ml_instance.cache_dir)
+            with TemporaryDirectory(dir=cache_dir) as staging:
+                try:
+                    zip_path = builder.build_bag(dataset, output_dir=Path(staging), timeout=timeout)
+                except (
+                    DerivaDownloadError,
+                    DerivaDownloadConfigurationError,
+                    DerivaDownloadAuthenticationError,
+                    DerivaDownloadAuthorizationError,
+                    DerivaDownloadTimeoutError,
+                ) as e:
+                    # Preserve the actionable-message contract callers relied
+                    # on from the legacy _create_dataset_bag_client. The
+                    # original advice (add direct dataset members for tables
+                    # whose deep FK joins timed out) still applies — surface it
+                    # alongside the deriva-py error so users have a fix to try.
+                    raise DerivaMLException(
+                        f"Dataset bag export failed: {format_exception(e)}. "
+                        "This typically happens when deep multi-table joins "
+                        "exceed server query time limits. To fix this, add the "
+                        "desired records as direct dataset members using "
+                        "add_dataset_members() with the relevant table's RIDs."
+                    )
 
-            return zip_path.as_uri()
+                index = BagCacheIndex(cache_dir)
+                try:
+                    bag_dir = _extract_archive_to_cache(
+                        index=index,
+                        archive_path=str(zip_path),
+                        checksum=cache_suffix,
+                        dataset_rid=dataset.dataset_rid,
+                        dataset_version=str(version),
+                    )
+                finally:
+                    index.dispose()
+            return bag_dir
 
 
 def _resolve_version_record(dataset: "Dataset", version: DatasetVersion) -> Any:
@@ -467,8 +505,6 @@ def _tier1_local_cache_lookup(
         :class:`DatasetMinid` pointing at the cached bag, or
         ``None`` when no matching bag is on disk.
     """
-    from deriva.bag.cache_index import BagCacheIndex
-
     index = BagCacheIndex(dataset._ml_instance.cache_dir)
     try:
         cached_checksums = index.find_bags_for_rid(table="Dataset", rid=dataset.dataset_rid)
@@ -607,19 +643,25 @@ def _tier3_client_path(
         dataset.dataset_rid,
         version,
     )
-    bag_url = create_dataset_minid(
+    # The client arm extracts the bag into the cache itself and returns the
+    # final cache PATH. Wrap its PARENT (the checksum cache root) as the
+    # location — same shape Tier 1 produces — so the downstream
+    # download_dataset_minid call hits its bag_dir.exists() guard and returns
+    # immediately (no re-extraction).
+    bag_dir = create_dataset_minid(
         dataset,
         version,
         use_minid=False,
         exclude_tables=exclude_tables,
         spec=spec,
         spec_hash=spec_hash,
+        cache_suffix=cache_suffix,
         timeout=timeout,
     )
     return DatasetMinid(
         dataset_version=version,
         RID=_build_version_rid(dataset.dataset_rid, snapshot),
-        location=bag_url,
+        location=bag_dir.parent.as_uri(),
         checksums=[{"function": "sha256", "value": cache_suffix}],
     )
 

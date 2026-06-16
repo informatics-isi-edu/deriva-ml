@@ -272,8 +272,7 @@ def discover_entries() -> list[DirectoryEntry]:
 
             # Check if this looks like a catalog working dir
             is_workdir = any(
-                (catalog_dir / sub).exists()
-                for sub in ["cache", "databases", "deriva-ml", "hydra", "hydra-sweep", "client_export"]
+                (catalog_dir / sub).exists() for sub in ["cache", "databases", "deriva-ml", "hydra", "hydra-sweep"]
             )
 
             if is_workdir:
@@ -284,8 +283,7 @@ def discover_entries() -> list[DirectoryEntry]:
         # Also check if host_dir itself is a working dir (e.g., ~/.deriva-ml/eye-ai/)
         if not has_catalog_subdirs:
             is_workdir = any(
-                (host_dir / sub).exists()
-                for sub in ["cache", "databases", "deriva-ml", "hydra", "hydra-sweep", "client_export"]
+                (host_dir / sub).exists() for sub in ["cache", "databases", "deriva-ml", "hydra", "hydra-sweep"]
             ) or any(
                 "_" in child.name and child.is_dir() and len(child.name) > 40
                 for child in host_dir.iterdir()

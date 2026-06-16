@@ -24,6 +24,7 @@ Pure-Python tests; no live catalog required.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -103,9 +104,7 @@ class TestTier2MinidPath:
         """When the stored ``spec_hash`` matches, the MINID is fetched."""
         dataset = MagicMock()
         version_record = MagicMock(spec_hash="abc123")
-        with patch(
-            "deriva_ml.dataset.bag_download.fetch_minid_metadata"
-        ) as fetch:
+        with patch("deriva_ml.dataset.bag_download.fetch_minid_metadata") as fetch:
             fetch.return_value = "FETCHED"
             result = _tier2_minid_path(
                 dataset,
@@ -142,9 +141,10 @@ class TestTier2MinidPath:
         """Stored spec_hash mismatch → regenerate; ``create=False`` would raise."""
         dataset = MagicMock()
         version_record = MagicMock(spec_hash="OLD")
-        with patch("deriva_ml.dataset.bag_download.fetch_minid_metadata") as fetch, patch(
-            "deriva_ml.dataset.bag_download.create_dataset_minid"
-        ) as create_fn:
+        with (
+            patch("deriva_ml.dataset.bag_download.fetch_minid_metadata") as fetch,
+            patch("deriva_ml.dataset.bag_download.create_dataset_minid") as create_fn,
+        ):
             fetch.return_value = "REFRESHED"
             create_fn.return_value = "ark://new"
             result = _tier2_minid_path(
@@ -161,9 +161,7 @@ class TestTier2MinidPath:
         assert result == "REFRESHED"
         create_fn.assert_called_once()
         # The regenerated URL flows into the metadata fetch.
-        fetch.assert_called_once_with(
-            dataset, DatasetVersion.parse("1.0.0"), "ark://new"
-        )
+        fetch.assert_called_once_with(dataset, DatasetVersion.parse("1.0.0"), "ark://new")
 
     def test_spec_drift_create_false_raises(self):
         dataset = MagicMock()
@@ -191,15 +189,19 @@ class TestTier2MinidPath:
 class TestTier3ClientPath:
     """``_tier3_client_path`` generates bags locally under the cache suffix."""
 
-    def test_generates_bag_and_returns_dataset_minid(self):
+    def test_generates_bag_and_returns_dataset_minid(self, tmp_path):
         dataset = MagicMock()
         dataset.dataset_rid = "3WX"
+        # The client arm now extracts into the cache itself and returns the
+        # final cache PATH; Tier 3 wraps its PARENT (the checksum cache root)
+        # as the DatasetMinid location, matching the Tier-1 shape so the
+        # downstream download_dataset_minid call is a no-op cache hit.
+        cache_bag = tmp_path / "cache" / "bags" / "abcdef1234567890_2-7XYZ" / "Dataset_3WX"
+        cache_bag.mkdir(parents=True)
         # Snapshot must be RID-shaped to satisfy the
         # ``DatasetMinid.RID`` pattern.
-        with patch(
-            "deriva_ml.dataset.bag_download.create_dataset_minid"
-        ) as create_fn:
-            create_fn.return_value = "file:///tmp/bag.zip"
+        with patch("deriva_ml.dataset.bag_download.create_dataset_minid") as create_fn:
+            create_fn.return_value = cache_bag
             result = _tier3_client_path(
                 dataset,
                 version=DatasetVersion.parse("1.0.0"),
@@ -212,10 +214,12 @@ class TestTier3ClientPath:
                 exclude_tables=None,
                 timeout=None,
             )
-        # ``DatasetMinid`` aliases ``location`` → ``bag_url`` and
-        # collapses the ``checksums`` list into the SHA256 value
-        # via a validator.
-        assert result.bag_url == "file:///tmp/bag.zip"
+        # cache_suffix is forwarded to the client arm so its write key matches
+        # what Tier 1 reads.
+        assert create_fn.call_args.kwargs["cache_suffix"] == "abcdef1234567890_2-7XYZ"
+        # ``DatasetMinid`` aliases ``location`` → ``bag_url``. The location is
+        # the file:// URI of the cache root (parent of the extracted bag dir).
+        assert result.bag_url == cache_bag.parent.as_uri()
         assert result.version_rid == "3WX@2-7XYZ"
         assert result.checksum == "abcdef1234567890_2-7XYZ"
 
@@ -245,10 +249,8 @@ class TestTier3ClientPath:
         """
         dataset = MagicMock()
         dataset.dataset_rid = "3WX"
-        with patch(
-            "deriva_ml.dataset.bag_download.create_dataset_minid"
-        ) as create_fn:
-            create_fn.return_value = "file:///tmp/bag.zip"
+        with patch("deriva_ml.dataset.bag_download.create_dataset_minid") as create_fn:
+            create_fn.return_value = Path("/tmp/cache/bags/abc_None/Dataset_3WX")
             result = _tier3_client_path(
                 dataset,
                 version=DatasetVersion.parse("1.0.0"),
@@ -267,10 +269,8 @@ class TestTier3ClientPath:
     def test_passes_through_exclude_tables_and_timeout(self):
         dataset = MagicMock()
         dataset.dataset_rid = "3WX"
-        with patch(
-            "deriva_ml.dataset.bag_download.create_dataset_minid"
-        ) as create_fn:
-            create_fn.return_value = "file:///tmp/bag.zip"
+        with patch("deriva_ml.dataset.bag_download.create_dataset_minid") as create_fn:
+            create_fn.return_value = Path("/tmp/cache/bags/abc_None/Dataset_3WX")
             _tier3_client_path(
                 dataset,
                 version=DatasetVersion.parse("1.0.0"),
@@ -287,3 +287,5 @@ class TestTier3ClientPath:
         assert kwargs["exclude_tables"] == {"Skip"}
         assert kwargs["timeout"] == (7, 42)
         assert kwargs["use_minid"] is False
+        # cache_suffix is forwarded so the client arm's write key matches Tier 1.
+        assert kwargs["cache_suffix"] == "abc_None"
