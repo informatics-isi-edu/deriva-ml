@@ -274,6 +274,7 @@ def create_dataset_minid(
     spec_hash: str | None = None,
     cache_suffix: str | None = None,
     timeout: tuple[int, int] | None = None,
+    reachability_concurrency: int = 8,
 ) -> str | Path:
     """Create a new MINID (Minimal Viable Identifier) for the dataset.
 
@@ -315,7 +316,7 @@ def create_dataset_minid(
                 use_minid=use_minid,
                 exclude_tables=exclude_tables,
             )
-            spec = downloader.generate_dataset_download_spec(dataset)
+            spec = downloader.generate_dataset_download_spec(dataset, reachability_concurrency=reachability_concurrency)
 
         if spec_hash is None:
             spec_hash = _hash_spec(spec)
@@ -393,7 +394,12 @@ def create_dataset_minid(
             cache_dir = Path(dataset._ml_instance.cache_dir)
             with TemporaryDirectory(dir=cache_dir) as staging:
                 try:
-                    zip_path = builder.build_bag(dataset, output_dir=Path(staging), timeout=timeout)
+                    zip_path = builder.build_bag(
+                        dataset,
+                        output_dir=Path(staging),
+                        timeout=timeout,
+                        reachability_concurrency=reachability_concurrency,
+                    )
                 except (
                     DerivaDownloadError,
                     DerivaDownloadConfigurationError,
@@ -545,6 +551,7 @@ def _tier2_minid_path(
     create: bool,
     exclude_tables: set[str] | None,
     timeout: tuple[int, int] | None,
+    reachability_concurrency: int = 8,
 ) -> DatasetMinid:
     """Tier 2 — fetch existing MINID or regenerate when spec drifted.
 
@@ -594,6 +601,7 @@ def _tier2_minid_path(
         spec=spec,
         spec_hash=spec_hash,
         timeout=timeout,
+        reachability_concurrency=reachability_concurrency,
     )
     return fetch_minid_metadata(dataset, version, new_minid_url)
 
@@ -609,6 +617,7 @@ def _tier3_client_path(
     cache_suffix: str,
     exclude_tables: set[str] | None,
     timeout: tuple[int, int] | None,
+    reachability_concurrency: int = 8,
 ) -> DatasetMinid:
     """Tier 3 — generate the bag client-side under the deterministic cache key.
 
@@ -657,6 +666,7 @@ def _tier3_client_path(
         spec_hash=spec_hash,
         cache_suffix=cache_suffix,
         timeout=timeout,
+        reachability_concurrency=reachability_concurrency,
     )
     return DatasetMinid(
         dataset_version=version,
@@ -673,6 +683,7 @@ def get_dataset_minid(
     use_minid: bool,
     exclude_tables: set[str] | None = None,
     timeout: tuple[int, int] | None = None,
+    reachability_concurrency: int = 8,
 ) -> DatasetMinid | None:
     """Locate or create a dataset bag, using a three-tier caching strategy.
 
@@ -748,7 +759,7 @@ def get_dataset_minid(
         use_minid=use_minid,
         exclude_tables=exclude_tables,
     )
-    spec = downloader.generate_dataset_download_spec(dataset)
+    spec = downloader.generate_dataset_download_spec(dataset, reachability_concurrency=reachability_concurrency)
     spec_hash = _hash_spec(spec)
     cache_suffix = f"{spec_hash[:16]}_{snapshot}"
 
@@ -769,6 +780,7 @@ def get_dataset_minid(
             create,
             exclude_tables,
             timeout,
+            reachability_concurrency,
         )
     return _tier3_client_path(
         dataset,
@@ -781,6 +793,7 @@ def get_dataset_minid(
         cache_suffix,
         exclude_tables,
         timeout,
+        reachability_concurrency,
     )
 
 

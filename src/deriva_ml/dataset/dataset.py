@@ -2560,6 +2560,7 @@ class Dataset:
         exclude_tables: set[str] | None = None,
         timeout: tuple[int, int] | None = None,
         fetch_concurrency: int = 8,
+        reachability_concurrency: int = 8,
     ) -> DatasetBag:
         """Downloads a dataset to the local filesystem and optionally creates a MINID.
 
@@ -2586,6 +2587,10 @@ class Dataset:
                 with deep FK joins that need more time to complete.
             fetch_concurrency: Maximum number of concurrent file downloads during
                 materialization. Defaults to 8.
+            reachability_concurrency: Bounded parallelism for the client-side
+                edge-table reachability fetch that computes the bag's contents
+                (the download spec). Defaults to 8; pass 1 for sequential.
+                Distinct from ``fetch_concurrency`` (asset file downloads).
 
         Returns:
             DatasetBag: A ``DatasetBag`` instance wrapping the downloaded bag. Key attributes:
@@ -2633,7 +2638,13 @@ class Dataset:
         )
 
         minid = get_dataset_minid(
-            self, version, create=True, use_minid=use_minid, exclude_tables=exclude_tables, timeout=timeout
+            self,
+            version,
+            create=True,
+            use_minid=use_minid,
+            exclude_tables=exclude_tables,
+            timeout=timeout,
+            reachability_concurrency=reachability_concurrency,
         )
 
         bag_path = (
@@ -2794,6 +2805,7 @@ class Dataset:
         exclude_tables: set[str] | None = None,
         timeout: tuple[int, int] | None = None,
         fetch_concurrency: int = 8,
+        reachability_concurrency: int = 8,
     ) -> dict[str, Any]:
         """Download a dataset bag into the local cache without creating an execution.
 
@@ -2811,6 +2823,10 @@ class Dataset:
             timeout: Optional (connect_timeout, read_timeout) in seconds.
             fetch_concurrency: Maximum number of concurrent file downloads during
                 materialization. Defaults to 8.
+            reachability_concurrency: Bounded parallelism for the client-side
+                edge-table reachability fetch that computes the bag's contents
+                (the download spec). Defaults to 8; pass 1 for sequential.
+                Distinct from ``fetch_concurrency`` (asset file downloads).
 
         Returns:
             dict with bag_info results after caching (includes cache_status,
@@ -2823,8 +2839,13 @@ class Dataset:
             exclude_tables=exclude_tables,
             timeout=timeout,
             fetch_concurrency=fetch_concurrency,
+            reachability_concurrency=reachability_concurrency,
         )
-        return self.bag_info(version=version, exclude_tables=exclude_tables)
+        return self.bag_info(
+            version=version,
+            exclude_tables=exclude_tables,
+            reachability_concurrency=reachability_concurrency,
+        )
 
     @staticmethod
     def _estimate_csv_bytes(sample_rows: list[dict], total_row_count: int) -> int:
