@@ -103,3 +103,38 @@ def test_client_arm_cleans_staging_on_extract_failure(tmp_path):
         assert not staging.exists()
     # Nothing orphaned under working_dir.
     assert not (ds._ml_instance.working_dir / "client_export").exists()
+
+
+def test_live_client_download_lands_in_cache_not_working_dir(catalog_with_datasets):
+    """End-to-end: cache(use_minid=False) builds a loadable bag under cache_dir
+    and never creates a client_export dir under working_dir.
+
+    Exercises the full client arm through the public ``Dataset.cache`` entry
+    point: build into a TemporaryDirectory(dir=cache_dir), extract in place,
+    Tier-3 returns the cache path, downstream download is a no-op cache hit.
+    """
+    ml, _ = catalog_with_datasets
+    datasets = list(ml.find_datasets())
+    if not datasets:
+        pytest.skip("Need a dataset.")
+    ds = ml.lookup_dataset(datasets[0].dataset_rid)
+    versions = list(ds.dataset_history())
+    version = str(versions[-1].dataset_version)
+
+    info = ds.cache(version=version, materialize=False)
+
+    # ``cache()`` returns bag_info, which merges in BagCache.cache_status:
+    # the ``status`` key carries a CacheStatus value; metadata-only downloads
+    # land as cached_metadata_only / cached_holey.
+    assert info["status"] in (
+        "cached_metadata_only",
+        "cached_holey",
+        "cached_materialized",
+    )
+    assert info["cache_path"] is not None
+    cache_path = Path(info["cache_path"])
+    assert cache_path.exists()
+    # The cached bag lives under cache_dir, and working_dir gained no
+    # client_export staging dir.
+    assert Path(ml.cache_dir) in cache_path.parents
+    assert not (Path(ml.working_dir) / "client_export").exists()
