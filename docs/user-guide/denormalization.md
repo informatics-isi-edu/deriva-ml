@@ -78,8 +78,8 @@ members *plus* every Image belonging to one of the 8 member Subjects.
 On the demo catalog that's **8 rows, not 4**: the member Subjects pull
 their Images into scope through the FK. (This is the behavior that lets
 `feature_values` and `get_denormalized_*` work on datasets whose members
-are `Subject`s but whose features live on `Image` — see the
-[reference, D7](../reference/denormalization.md#d7).)
+are `Subject`s but whose features live on `Image` — see the reference's
+[FK-reachable scoping](../reference/denormalization.md#fk-reachable-scoping).)
 
 If a dataset's members already *are* the `row_per` table, the two
 notions coincide and you get one row per member. The general rule is the
@@ -141,8 +141,9 @@ ds.list_schema_paths()
 `describe_denormalized` is the **dry-run** entry point: it never
 raises, even if the request would fail at run time. Inspect the
 returned dict's `ambiguities` and `warnings` lists to find out
-what's wrong before committing to a real call. (See the contract
-section below for the full envelope and the dry-run invariant.)
+what's wrong before committing to a real call. (See the
+[implementation contract §8.3](../design/denormalization-contract.md)
+for the full envelope and the dry-run invariant.)
 
 ### Arbitrary RID anchors (no dataset required)
 

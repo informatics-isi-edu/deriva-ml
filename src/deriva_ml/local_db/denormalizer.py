@@ -4,13 +4,13 @@ Wraps the lower-level ``_denormalize_impl`` primitive in a class-based API
 with support for auto-inferred ``row_per``, explicit ``via`` path routing,
 orphan-row handling, and arbitrary RID anchor sets.
 
-Architecture, state model, fetcher/INSERT contract, fragility map,
-the six named semantic rules implemented here (Row grain, Column
+The six named semantic rules implemented here (Row grain, Column
 projection, Column hoisting, Downstream-leaf rejection, Path ambiguity,
-Anchor disposition), and the full test matrix all live in the single
-source of record:
-    ``docs/user-guide/denormalization.md``
-(see ``docs/reference/denormalization.md`` for the full rule definitions)
+Anchor disposition) are defined canonically in
+``docs/reference/denormalization.md``. The example-led introduction is
+``docs/user-guide/denormalization.md``; the architecture, state model,
+fetcher/INSERT contract, fragility map, and test matrix live in the
+maintainer-facing ``docs/design/denormalization-contract.md``.
 """
 
 from __future__ import annotations

@@ -311,11 +311,17 @@ The four entry points return distinct types — pick by what you need:
   `include_tables`, `via`, `join_path`, `transparent_intermediates`,
   `ambiguities`, `estimated_row_count`, `anchors`, `source`, `warnings`.
 
+Full method signatures (parameters, defaults, raised exceptions) are
+auto-generated from the docstrings in the
+[DatasetBag API reference](../api-reference/dataset_bag.md); the
+behavioral contracts for each method are in
+[the contract §8](../design/denormalization-contract.md), and the 13-key
+`describe()` shape in [§8.3.2](../design/denormalization-contract.md).
+
 `[deriva-ml]`
 `src/deriva_ml/dataset/dataset_bag.py::get_denormalized_as_dataframe`
 / `::get_denormalized_as_dict` / `::list_denormalized_columns` /
-`::describe_denormalized`; the 13-key shape is detailed in
-[the contract §8.3.2](../design/denormalization-contract.md).
+`::describe_denormalized`.
 `[deriva-ml]`
 `src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner`
 (route discovery + per-`row_per`-element UNION-distinct emission in
@@ -391,6 +397,87 @@ multi-annotator feature to one row, pass
 `selector=FeatureRecord.select_newest` with the single
 feature-association table in `include_tables`
 ([Column hoisting](#column-hoisting)).
+
+### Corner cases (each rule, by example)
+
+These illustrate the rules that fire only on specific shapes — what they
+look like when you hit them, and how to recover. All are described on the
+demo schema (`Subject ◄── Observation ◄── Image`, plus a direct
+`Image.Subject` FK that makes Image↔Subject ambiguous).
+
+**FK-reachable scoping — more rows than direct members.** A dataset with
+8 `Subject` members and 4 `Image` members:
+
+```python
+df = bag.get_denormalized_as_dataframe(["Image"])
+len(df)   # → 8, not 4
+```
+
+The 4 direct Image members plus the 4 Images reachable through the 8
+member Subjects (`Image.Subject`) are all in scope
+([FK-reachable scoping](#fk-reachable-scoping)). If you wanted only the
+direct members, scope the dataset differently — denormalize always
+follows FK-reachability.
+
+**Downstream-leaf rejection — explicit `row_per` upstream of a requested
+table.** `Subject` is upstream of `Image`:
+
+```python
+bag.get_denormalized_as_dataframe(["Subject", "Image"], row_per="Subject")
+# raises DerivaMLDenormalizeDownstreamLeaf:
+#   Table Image is downstream of row_per=Subject. One row per Subject
+#   would require aggregating multiple Image rows per Subject row —
+#   aggregation is not yet supported.
+#   Options:
+#     • Drop row_per to get one row per Image.
+#     • Remove Image from include_tables.
+```
+
+Drop `row_per` (auto-infers `Image`, one row per image with `Subject.*`
+hoisted) or drop `Image`.
+
+**Path ambiguity — two FK routes to the same table.** `Image` reaches
+`Subject` directly *and* via `Observation`:
+
+```python
+bag.get_denormalized_as_dataframe(["Image", "Subject"])
+# raises DerivaMLDenormalizeAmbiguousPath:
+#   Multiple FK paths between Image and Subject:
+#     Image → Subject
+#     Image → Observation → Subject
+#   Options:
+#     • Add an intermediate table to include_tables (its columns will be in output).
+#     • Add an intermediate table to via= (routing only, no columns).
+#     • Narrow the requested set to eliminate one path.
+#   Suggested intermediates: Observation
+```
+
+Resolve by routing explicitly — `via=["Observation"]` (no Observation
+columns) or `include_tables=["Image", "Observation", "Subject"]`
+(Observation columns included).
+
+**Anchor disposition case 3 — orphan rows.** A dataset whose members
+include a `Subject` with no in-scope `Image`. With `row_per=Image`, that
+Subject still appears, as a LEFT-JOIN-shaped orphan row:
+
+| Subject.RID | Subject.Name | Image.RID | Image.Filename |
+|---|---|---|---|
+| S1 | Alice | I1 | a.png |
+| S2 | Bob | `NaN` | `NaN` |
+
+S2 reaches no Image, so its `Image.*` columns are `NaN` but the row is
+not dropped ([Anchor disposition](#anchor-disposition) case 3).
+
+**Anchor disposition case 6 — unrelated anchor.** A dataset member whose
+table has no FK path to anything requested:
+
+```python
+# Dataset has File members; request is Image-only.
+bag.get_denormalized_as_dataframe(["Image"])
+# raises DerivaMLDenormalizeUnrelatedAnchor (File has no FK path to Image).
+bag.get_denormalized_as_dataframe(["Image"], ignore_unrelated_anchors=True)
+# OK — the File members are silently dropped.
+```
 
 ## See also
 
