@@ -99,7 +99,11 @@ denormalization work on subject-partitioned datasets.
 <a id="d1"></a>
 **D1 — `row_per` selects the row grain; the default is the
 furthest-downstream requested table.** The output has **one row per
-`row_per`-table instance in scope** (tutorial Rule 1). By default
+`row_per`-table instance in scope** (tutorial Rule 1). **"In scope" means
+FK-reachable from a dataset member — not member-*of*.** A dataset whose
+members are `Subject`s puts every `Image` reachable via `Image.Subject`
+in scope, so `["Image"]` returns those Images even though none is a
+direct `Image` member ([D7](#d7)). By default
 `row_per` is **auto-inferred** (tutorial Rule 2): among the
 `include_tables`, the one that no other requested table points to via FK
 — the "deepest" / furthest-downstream table — becomes the grain. If two
@@ -250,12 +254,28 @@ way the target's rows appear at all — a membership-only join would return
 subject-partitioned datasets. (Multiple *distinct* FK paths between
 `row_per` and a requested table still raise per [D3](#d3) — D7 is about
 unioning the membership and FK-reachable routes to the *same* element,
-not about silently guessing among ambiguous join paths.) Spec:
+not about silently guessing among ambiguous join paths.)
+
+**Only the `row_per` element's routes drive rows.** The route union is
+applied **per element**, but a wide table is `row_per`-grained
+([D1](#d1)): only routes that *end at the `row_per` table* produce output
+rows. Routes ending at a non-`row_per` include-table are **not** unioned
+into the row set — that table's columns are hoisted into the `row_per`
+routes' join ([D2](#d2)), not emitted as their own grain. (Emitting them
+was the #322 cartesian bug: every route is projected with the *full*
+column set, so a non-`row_per` route that never joins the `row_per`
+table cross-joins its columns — e.g. `[Image, Observation]` with
+`row_per=Image` produced 8 × 8 rows instead of 8. The planner now keeps
+only the `row_per` element's routes; see
+`tests/local_db/test_denormalize_fk_reachable_paths.py::test_only_row_per_element_drives_routes`
+and `tests/dataset/test_denormalize.py::TestDenormalize::test_denormalize_row_per_grain_no_cartesian`.)
+Spec:
 `docs/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design.md`.
 `[deriva-ml]`
 `src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner`
-(route discovery + UNION-distinct emission in `_prepare_wide_table`);
-shared by `feature_values`, `get_denormalized_*`, and `describe`.
+(route discovery + per-`row_per`-element UNION-distinct emission in
+`_prepare_wide_table`); shared by `feature_values`,
+`get_denormalized_*`, and `describe`.
 
 ## Worked examples
 

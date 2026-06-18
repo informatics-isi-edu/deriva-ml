@@ -1712,6 +1712,10 @@ class DenormalizePlanner:
         # ── Phase 0: planner guards (Rules 2, 5, 6) ──────────────────────────
         # Empty include_tables is a legal degenerate case (caller passes no
         # requested tables and expects an empty result). Skip guards then.
+        # `resolved_row_per` is also the row grain (Rule 1): only routes that
+        # END at this table may drive rows (Phase 1c). None when include_tables
+        # is empty (no routes emitted at all).
+        resolved_row_per: str | None = None
         if include_tables:
             resolved_row_per = self._determine_row_per(
                 include_tables=list(include_tables),
@@ -1771,9 +1775,22 @@ class DenormalizePlanner:
         # "Image" — they share the same endpoint. Keying by p[2] dropped the
         # FK route because its third table (Subject) is not in include_tables.
         # Key by the endpoint so every route to an include-table is retained.
+        #
+        # Only routes that END at the ``row_per`` table may DRIVE rows (Rule 1:
+        # one row per ``row_per`` instance). A route ending at a *non*-``row_per``
+        # include-table (e.g. Dataset -> ... -> Subject when row_per is Image)
+        # is the wrong grain — those upstream columns are HOISTED into the
+        # row_per routes' shared subtree (Phase 2 ``_build_join_tree``), not
+        # emitted as their own row source. Emitting them produced spurious rows:
+        # the consumer SELECTs the full column set for every route, so a
+        # Subject-ending route that never joins Image cross-joins Image's
+        # columns into a cartesian product (#322). Restrict to the row_per
+        # element. ``resolved_row_per`` is always set here because this code is
+        # only reached when ``include_tables`` is non-empty (empty returns the
+        # degenerate empty plan in Phase 4).
         paths_by_element: dict[str, list[list[Table]]] = defaultdict(list)
         for p in table_paths:
-            if len(p) >= 3 and p[-1].name in include_tables_set:
+            if len(p) >= 3 and p[-1].name == resolved_row_per:
                 paths_by_element[p[-1].name].append(p)
 
         # ── Phase 2: build JoinTree per element ──────────────────────────────

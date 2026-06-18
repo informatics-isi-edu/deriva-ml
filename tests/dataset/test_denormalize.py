@@ -83,6 +83,61 @@ class TestDenormalize:
         assert len(subject_columns) > 0, "Expected Subject columns in denormalized result"
         assert len(image_columns) > 0, "Expected Image columns in denormalized result"
 
+    def test_denormalize_row_per_grain_no_cartesian(self, dataset_test, tmp_path):
+        """A multi-element wide table is ``row_per``-grained — one row per
+        ``row_per`` instance, upstream columns hoisted, never a cartesian.
+
+        Regression for #322: #318 retained every ``Dataset -> ... -> endpoint``
+        route and keyed one ``join_tables`` entry per *endpoint*, including
+        non-``row_per`` include-tables. Because the consumer SELECTs the full
+        column set for every route, an ``Observation``-ending route that never
+        joins ``Image`` cross-joined ``Image``'s columns — turning the correct
+        8-row Image grain into a 64-row cartesian product with 56 wrong
+        ``Image.Observation`` ↔ ``Observation.RID`` pairings.
+
+        The oracle is derived from the bag itself (never hard-coded RIDs): for
+        ``[Image, Observation]`` the sink auto-infers to ``Image`` (downstream
+        via ``Image.Observation``), so the result is exactly the FK-reachable
+        Image set, each Image paired with ITS OWN Observation.
+        """
+        dataset_description = dataset_test.dataset_description
+        current_version = dataset_description.dataset.current_version
+        bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
+
+        # ── Oracle: the FK-reachable Image set, each with its own Observation ──
+        # resolve_reachable_rows is the #318 reachability core the wide table
+        # must agree with. Pull RIDs from the bag — never a literal.
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
+        reachable_images = {r["RID"] for r in resolve_reachable_rows(bag, "Image")}
+        assert reachable_images, "fixture must reach at least one Image"
+        # Each reachable Image's own Observation FK (the correct pairing).
+        image_rows = {r["RID"]: r for r in bag.get_table_as_dict("Image")}
+        expected_pairs = {
+            (rid, image_rows[rid].get("Observation")) for rid in reachable_images if rid in image_rows
+        }
+
+        df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation"])
+
+        # Locate the relevant columns regardless of the exact label scheme.
+        c_img_rid = next(c for c in df.columns if c.endswith("Image.RID"))
+        c_img_obs = next(c for c in df.columns if c.endswith("Image.Observation"))
+        c_obs_rid = next(c for c in df.columns if c.endswith("Observation.RID"))
+
+        # Row grain == one row per reachable Image (no cartesian fan-out).
+        assert len(df) == len(expected_pairs), (
+            f"expected {len(expected_pairs)} Image-grained rows, got {len(df)} "
+            "(a larger count means non-row_per routes cross-joined columns)"
+        )
+        assert df[c_img_rid].nunique() == len(reachable_images)
+        assert df[c_img_rid].notna().all(), "row_per (Image) column must never be NULL here"
+
+        # Every row pairs an Image with ITS OWN Observation — no mispairing.
+        got_pairs = {(row[c_img_rid], row[c_img_obs]) for _, row in df.iterrows()}
+        assert got_pairs == expected_pairs, "Image ↔ Observation pairing diverged from the FK oracle"
+        mispaired = df[(df[c_img_obs].notna()) & (df[c_obs_rid].notna()) & (df[c_img_obs] != df[c_obs_rid])]
+        assert len(mispaired) == 0, f"{len(mispaired)} rows pair an Image with a foreign Observation (cartesian)"
+
     def test_denormalize_as_dict(self, dataset_test, tmp_path):
         """Test denormalize_as_dict returns proper dictionary generator.
 
@@ -1148,16 +1203,30 @@ class TestMultiHopDenormalize:
                 )
 
     def test_row_count_matches_members(self, dataset_test, tmp_path):
-        """D2: Row count equals dataset member count, no duplication."""
+        """D2: Row count equals the FK-reachable Image count, no duplication.
+
+        Denormalization is scoped by FK-reachability from the dataset's
+        members, not by direct membership (D7 / the #318 FK-reachable-routes
+        change). The demo dataset has Subject members whose Images are
+        reachable via ``Image.Subject``, so the reachable Image set is a
+        superset of the directly-added Image members. With ``row_per=Image``,
+        the wide table has exactly one row per reachable Image — no cartesian
+        fan-out from the Observation element (#322). The expected count is
+        derived from the bag's own reachability core, never a literal.
+        """
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        members = bag.list_dataset_members(recurse=True)
-        image_count = len(members.get("Image", []))
+        reachable_images = {r["RID"] for r in resolve_reachable_rows(bag, "Image")}
 
         df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation"])
-        assert len(df) == image_count, f"Row count ({len(df)}) should match Image member count ({image_count})"
+        assert len(df) == len(reachable_images), (
+            f"Row count ({len(df)}) should match FK-reachable Image count "
+            f"({len(reachable_images)}) — one row per reachable Image, no cartesian."
+        )
 
     def test_null_fk_outer_join(self, dataset_test, tmp_path):
         """D3: Images with null Observation FK get null Observation columns."""
@@ -1255,20 +1324,29 @@ class TestMultiHopDenormalize:
             bag.get_denormalized_as_dataframe(include_tables=["Observation", "ClinicalRecord"])
 
     def test_denormalize_matches_members(self, dataset_test, tmp_path):
-        """C2: Denormalized RIDs match list_dataset_members for member tables."""
+        """C2: Denormalized RIDs match the FK-reachable Image set.
+
+        Denormalization returns every Image FK-reachable from the dataset's
+        members (D7), which is a superset of the directly-added Image members
+        — the demo dataset's Subject members contribute their own Images via
+        ``Image.Subject``. The denormalized RID set must equal the bag's
+        reachability core exactly (no missing reachable rows, no leaked
+        out-of-scope rows). Expected RIDs come from the bag, never a literal.
+        """
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        members = bag.list_dataset_members(recurse=True)
-        member_rids = {m["RID"] for m in members.get("Image", [])}
+        reachable_rids = {r["RID"] for r in resolve_reachable_rows(bag, "Image")}
 
         df = bag.get_denormalized_as_dataframe(include_tables=["Image"])
         denorm_rids = set(df["Image.RID"].dropna())
 
-        assert member_rids == denorm_rids, (
-            f"Denormalized RIDs should match list_dataset_members. "
-            f"Missing: {member_rids - denorm_rids}, Extra: {denorm_rids - member_rids}"
+        assert reachable_rids == denorm_rids, (
+            f"Denormalized RIDs should match the FK-reachable Image set. "
+            f"Missing: {reachable_rids - denorm_rids}, Extra: {denorm_rids - reachable_rids}"
         )
 
 
@@ -1546,31 +1624,36 @@ class TestNewFKPatterns:
     # -------------------------------------------------------------------------
 
     def test_nullable_fk_preserves_all_rows(self, dataset_test, tmp_path):
-        """Nullable FK: Image.Observation is nullable — all Image members must appear.
+        """Nullable FK: Image.Observation is nullable — all reachable Images appear.
 
         Image has a nullable FK to Observation.  When denormalizing
-        ["Image", "Observation"], the result should include ALL Image dataset
-        members, with null Observation columns for Images that have no
-        Observation FK set.
+        ["Image", "Observation"], the result should include EVERY FK-reachable
+        Image (D7 / #318 — reachability scopes the rows, not direct
+        membership), with null Observation columns for Images that have no
+        Observation FK set (LEFT JOIN semantics). row_per auto-infers to Image
+        (downstream of Observation via Image.Observation), so there is exactly
+        one row per reachable Image — no cartesian fan-out (#322).
 
-        NOTE: The current demo data sets Observation on all Images, so this
-        test currently passes trivially.  After Step 7 of the refactoring plan
-        (adding Images with null Observation FK to demo data), this test will
-        exercise the actual LEFT JOIN behavior.
+        NOTE: The current demo data sets Observation on all Images, so the
+        null-FK LEFT-JOIN branch isn't exercised here; the row count still
+        pins the reachable-Image scope. A dedicated null-Observation case
+        lives in TestMultiHopDenormalize.test_null_fk_outer_join.
         """
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        members = bag.list_dataset_members(recurse=True)
-        image_count = len(members.get("Image", []))
-        assert image_count > 0, "Expected Image members in dataset"
+        reachable_images = {r["RID"] for r in resolve_reachable_rows(bag, "Image")}
+        assert len(reachable_images) > 0, "Expected FK-reachable Images in dataset"
 
         df = bag.get_denormalized_as_dataframe(include_tables=["Image", "Observation"])
 
-        assert len(df) == image_count, (
-            f"Row count ({len(df)}) should match Image member count ({image_count}). "
-            "Images with null Observation FK should still appear (LEFT JOIN semantics)."
+        assert len(df) == len(reachable_images), (
+            f"Row count ({len(df)}) should match FK-reachable Image count "
+            f"({len(reachable_images)}). Every reachable Image appears once; "
+            "Images with null Observation FK still appear (LEFT JOIN)."
         )
 
     # -------------------------------------------------------------------------
@@ -1578,32 +1661,36 @@ class TestNewFKPatterns:
     # -------------------------------------------------------------------------
 
     def test_single_table_unaffected_by_fks(self, dataset_test, tmp_path):
-        """Single table: ["Image"] should return exactly Image members.
+        """Single table: ["Image"] returns every FK-reachable Image.
 
-        Denormalizing a single table should not be affected by Image's
-        FK relationships to Observation or Subject.  The row count should
-        exactly match the number of Image dataset members, and all Image
-        member RIDs should be present.
+        Denormalizing a single table is scoped by FK-reachability from the
+        dataset's members (D7 / #318), not by direct membership: the demo
+        dataset's Subject members pull their Images in via ``Image.Subject``,
+        so the reachable Image set is a superset of the directly-added Image
+        members. The denormalized RID set must equal the reachability core
+        exactly — the FK additions widen the scope, they don't cause
+        duplication or leakage.
         """
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        members = bag.list_dataset_members(recurse=True)
-        image_member_rids = {m["RID"] for m in members.get("Image", [])}
-        assert len(image_member_rids) > 0, "Expected Image members in dataset"
+        reachable_images = {r["RID"] for r in resolve_reachable_rows(bag, "Image")}
+        assert len(reachable_images) > 0, "Expected FK-reachable Images in dataset"
 
         df = bag.get_denormalized_as_dataframe(include_tables=["Image"])
 
-        assert len(df) == len(image_member_rids), (
-            f"Row count ({len(df)}) should match Image member count ({len(image_member_rids)}). "
-            "Single-table denormalization should not be affected by FK additions."
+        assert len(df) == len(reachable_images), (
+            f"Row count ({len(df)}) should match FK-reachable Image count ({len(reachable_images)}). "
+            "Single-table denormalization returns one row per reachable Image, no duplication."
         )
 
         denorm_rids = set(df["Image.RID"].dropna())
-        assert image_member_rids == denorm_rids, (
-            f"Denormalized RIDs should exactly match list_dataset_members. "
-            f"Missing: {image_member_rids - denorm_rids}, Extra: {denorm_rids - image_member_rids}"
+        assert reachable_images == denorm_rids, (
+            f"Denormalized RIDs should exactly match the FK-reachable Image set. "
+            f"Missing: {reachable_images - denorm_rids}, Extra: {denorm_rids - reachable_images}"
         )
 
     # -------------------------------------------------------------------------
@@ -1618,13 +1705,16 @@ class TestNewFKPatterns:
         ["Image", "Execution_Image_Quality"] should produce a wide table with
         both Image columns and feature columns (ImageQuality values).
 
-        The demo fixture creates exactly one Quality feature value per
-        Image (see ``demo_catalog.create_demo_features``), so the row
-        count equals the Image member count. The N-feature-per-anchor
-        case is covered by
-        :meth:`test_feature_table_multiple_rows_per_anchor` below
-        (the A01 regression test).
+        ``demo_catalog.create_demo_features`` annotates EVERY Image in the
+        domain with exactly one Quality value, so the row count equals the
+        number of FK-reachable Images (D7 / #318 — reachability scopes the
+        rows, not direct membership), one feature row each. The
+        N-feature-per-anchor case is covered by
+        :meth:`test_feature_table_multiple_rows_per_anchor` below (the A01
+        regression test).
         """
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
         dataset_description = dataset_test.dataset_description
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
@@ -1641,11 +1731,10 @@ class TestNewFKPatterns:
         feature_cols = [c for c in df.columns if c.startswith("Execution_Image_Quality.")]
         assert len(feature_cols) > 0, "Expected Execution_Image_Quality columns"
 
-        # Demo fixture: exactly one Quality feature value per Image.
-        members = bag.list_dataset_members(recurse=True)
-        image_count = len(members.get("Image", []))
-        assert len(df) == image_count, (
-            f"Row count ({len(df)}) should match Image member count ({image_count}) "
+        # One Quality feature value per FK-reachable Image.
+        reachable_images = {r["RID"] for r in resolve_reachable_rows(bag, "Image")}
+        assert len(df) == len(reachable_images), (
+            f"Row count ({len(df)}) should match FK-reachable Image count ({len(reachable_images)}) "
             "for the demo fixture's 1-feature-per-Image setup."
         )
 
@@ -1725,13 +1814,21 @@ class TestNewFKPatterns:
             use_minid=False,
         )
 
+        from deriva_ml.dataset.target_resolution import resolve_reachable_rows
+
         dataset_description = dataset_test.dataset_description
         bag_before = dataset_description.dataset.download_dataset_bag(
             dataset_description.dataset.current_version, use_minid=False
         )
-        members = bag_before.list_dataset_members(recurse=True)
-        image_member_rids = {m["RID"] for m in members.get("Image", [])}
-        assert len(image_member_rids) > 0, "Expected Image members in dataset"
+        # Denormalization is scoped by FK-reachability, not direct membership
+        # (D7 / #318): the demo dataset's Subject members pull in their Images
+        # via ``Image.Subject``, so the reachable Image set is a superset of the
+        # directly-added Image members. ``create_demo_features`` annotates
+        # EVERY Image in the domain with one Quality value, so each reachable
+        # Image has exactly one feature row at the start. Drive the regression
+        # over the full reachable set so the per-anchor math is uniform.
+        image_rids = {r["RID"] for r in resolve_reachable_rows(bag_before, "Image")}
+        assert len(image_rids) > 0, "Expected FK-reachable Images in dataset"
 
         # Warm up the local SQLite by running a live denormalize on the
         # original 1-per-Image data. This is the precondition that used
@@ -1742,8 +1839,8 @@ class TestNewFKPatterns:
             include_tables=["Image", "Execution_Image_Quality"],
             row_per="Execution_Image_Quality",
         )
-        assert len(df_warmup) == len(image_member_rids), (
-            f"Warm-up denormalize should return 1 row per Image ({len(image_member_rids)}); got {len(df_warmup)}."
+        assert len(df_warmup) == len(image_rids), (
+            f"Warm-up denormalize should return 1 row per reachable Image ({len(image_rids)}); got {len(df_warmup)}."
         )
 
         # Add EXTRA_ANNOTATORS more Quality features per Image, each
@@ -1775,7 +1872,7 @@ class TestNewFKPatterns:
             )
             label = "Good" if i % 2 == 0 else "Bad"
             with annot_n.execute() as exe:
-                exe.add_features([QualityFeature(Image=rid, ImageQuality=label) for rid in image_member_rids])
+                exe.add_features([QualityFeature(Image=rid, ImageQuality=label) for rid in image_rids])
             # Flush staged feature records to ermrest; add_features only
             # stages to a SQLite buffer; commit_output_assets writes.
             annot_n.commit_output_assets()
@@ -1792,16 +1889,16 @@ class TestNewFKPatterns:
             row_per="Execution_Image_Quality",
         )
 
-        expected = total_features_per_image * len(image_member_rids)
+        expected = total_features_per_image * len(image_rids)
         assert len(df) == expected, (
-            f"Expected {expected} rows ({len(image_member_rids)} Images × "
+            f"Expected {expected} rows ({len(image_rids)} reachable Images × "
             f"{total_features_per_image} Quality feature values each); got "
             f"{len(df)}. The denormalize surface is silently dropping "
             f"feature rows — finding A01."
         )
 
         per_image_counts = df["Image.RID"].value_counts()
-        for img_rid in image_member_rids:
+        for img_rid in image_rids:
             assert per_image_counts.get(img_rid, 0) == total_features_per_image, (
                 f"Image {img_rid} should appear in {total_features_per_image} "
                 f"rows (one per Quality feature record); got "
