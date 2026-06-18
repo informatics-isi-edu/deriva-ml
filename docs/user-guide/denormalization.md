@@ -62,14 +62,28 @@ One row per Image. Subject columns repeat across all images for a
 subject. Observation columns repeat across all images for an
 observation.
 
-### Dataset membership acts as a filter
+### Dataset membership scopes by FK-reachability, not by direct membership
 
-If you call `ds.get_denormalized_as_dataframe(...)` on a `Dataset`,
-the dataset's members scope which rows are in scope. Only rows
-reachable from a dataset member via FK appear in the output.
+When you denormalize a `Dataset`, its members define the **scope** —
+but "in scope" means **FK-reachable from a member**, not
+**a member of**. A row of the `row_per` table appears whenever it can
+be reached from *some* dataset member by following foreign keys, even
+if that row was never added to the dataset directly.
 
-If the dataset's members are Images (say 4 of them), you get 4
-rows — one per member Image, with Observations and Subjects hoisted.
+This matters most for **upstream-partitioned** datasets. Suppose a
+dataset has **8 `Subject` members and 4 `Image` members**, and `Image`
+has an FK to `Subject` (`Image.Subject`). Denormalizing `["Image"]`
+returns **every Image reachable from a member** — the 4 direct Image
+members *plus* every Image belonging to one of the 8 member Subjects.
+On the demo catalog that's **8 rows, not 4**: the member Subjects pull
+their Images into scope through the FK. (This is the behavior that lets
+`feature_values` and `get_denormalized_*` work on datasets whose members
+are `Subject`s but whose features live on `Image` — see the
+[reference, D7](../reference/denormalization.md#d7).)
+
+If a dataset's members already *are* the `row_per` table, the two
+notions coincide and you get one row per member. The general rule is the
+FK-reachable one; direct-membership is just its simplest case.
 
 Nested datasets (datasets whose members include other datasets) are
 followed transparently: members of nested datasets contribute their
@@ -332,8 +346,8 @@ ds.get_denormalized_as_dataframe(
 
 ds.get_denormalized_as_dataframe(["Subject", "Image"])
 # row_per = Image.
-# Output = |member Images| rows (Subjects hoisted)
-#       + |orphan Subjects| rows (Image columns NULL).
+# Output = |FK-reachable Images| rows (Subjects hoisted)
+#       + |orphan Subjects with no reachable Image| rows (Image columns NULL).
 ```
 
 ### Arbitrary anchors (no dataset)
