@@ -134,7 +134,7 @@ def denorm_schema_diamond(tmp_path: Path) -> Path:
     - ``Image → Subject``        (direct FK)
     - ``Image → Observation → Subject``  (indirect via Observation)
 
-    Used for testing Rule 6 (path ambiguity) in the denormalization
+    Used for testing Path ambiguity in the denormalization
     planner. Kept separate from :func:`denorm_schema` so that the
     non-diamond integration tests in ``test_denormalize.py`` continue
     to exercise the simple chain.
@@ -750,9 +750,9 @@ def denorm_schema_feature_diamond(denorm_schema_feature: Path, tmp_path: Path) -
     2. a direct ``Image.Image_Classification`` FK.
 
     Under the old (broken) predicate the feature bridge was opaque, so
-    Rule 6 saw only the direct path and planned silently. Under the
+    Path ambiguity saw only the direct path and planned silently. Under the
     Option E2 predicate the bridge is transparent and hops in
-    ``_is_downstream_chain``, so Rule 6 now sees two competing
+    ``_is_downstream_chain``, so Path ambiguity now sees two competing
     downstream chains from ``Image`` to ``Image_Classification`` and
     must raise ``DerivaMLDenormalizeAmbiguousPath``. This fixture pins
     that intentional new behavior.

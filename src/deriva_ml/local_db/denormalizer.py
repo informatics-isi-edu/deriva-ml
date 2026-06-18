@@ -4,12 +4,13 @@ Wraps the lower-level ``_denormalize_impl`` primitive in a class-based API
 with support for auto-inferred ``row_per``, explicit ``via`` path routing,
 orphan-row handling, and arbitrary RID anchor sets.
 
-Architecture, state model, fetcher/INSERT contract, fragility map,
-the nine semantic Rules implemented here (auto-inferred ``row_per``,
-downstream-leaf rejection, ambiguity detection, orphan emission,
-unrelated-anchor handling, etc.), and the full test matrix all live in
-the single source of record:
-    ``docs/user-guide/denormalization.md``
+The six named semantic rules implemented here (Row grain, Column
+projection, Column hoisting, Downstream-leaf rejection, Path ambiguity,
+Anchor disposition) are defined canonically in
+``docs/reference/denormalization.md``. The example-led introduction is
+``docs/user-guide/denormalization.md``; the architecture, state model,
+fetcher/INSERT contract, fragility map, and test matrix live in the
+maintainer-facing ``docs/design/denormalization-contract.md``.
 """
 
 from __future__ import annotations
@@ -32,20 +33,34 @@ class Denormalizer:
     """Produce wide-table denormalizations from Deriva datasets or anchor sets.
 
     The ``Denormalizer`` wraps the lower-level :func:`_denormalize_impl`
-    SQL executor in a class-based API that adds the new semantic rules
-    (Rules 1-8 from the design spec):
+    SQL executor in a class-based API that adds the six named semantic
+    rules (see ``docs/reference/denormalization.md`` for the full
+    definitions):
 
-    - Rule 2: auto-inferred ``row_per`` (sink-finding)
-    - Rule 5: explicit ``row_per`` with a downstream table in
-      ``include_tables`` raises :class:`DerivaMLDenormalizeDownstreamLeaf`
-    - Rule 6: multiple FK paths between requested tables raises
-      :class:`DerivaMLDenormalizeAmbiguousPath` unless disambiguated via
-      ``include_tables`` or ``via=``
-    - Rule 7: orphan anchors (upstream rows that don't reach ``row_per``)
-      emit LEFT-JOIN-style rows with the row_per-side columns NULL
-    - Rule 8: anchors with no FK path at all raise
-      :class:`DerivaMLDenormalizeUnrelatedAnchor` unless the
-      ``ignore_unrelated_anchors`` flag is set
+    - **Row grain**: the chosen ``row_per`` table fixes one output row
+      per row of that table; when ``row_per`` is omitted it is
+      auto-inferred from the unique sink in ``include_tables``. No
+      dedicated method — enforced by the planner's sink-finding and
+      row-grain join logic.
+    - **Column projection**: which requested tables contribute columns.
+      No dedicated method — enforced during column-spec assembly.
+    - **Column hoisting**: upstream columns are hoisted onto the
+      row-grain rows along the join path. No dedicated method —
+      enforced during join planning.
+    - **Downstream-leaf rejection**: an explicit ``row_per`` with a
+      downstream table in ``include_tables`` raises
+      :class:`DerivaMLDenormalizeDownstreamLeaf`. Enforced by the
+      planner's ``row_per`` validation.
+    - **Path ambiguity**: multiple FK paths between requested tables
+      raise :class:`DerivaMLDenormalizeAmbiguousPath` unless
+      disambiguated via ``include_tables`` or ``via=``. Enforced by the
+      planner's path-ambiguity check.
+    - **Anchor disposition**: orphan anchors (upstream rows that don't
+      reach ``row_per``) emit LEFT-JOIN-style rows with the
+      row_per-side columns NULL (case 3); anchors with no FK path at
+      all raise :class:`DerivaMLDenormalizeUnrelatedAnchor` unless the
+      ``ignore_unrelated_anchors`` flag is set (case 6). Enforced by
+      :meth:`_classify_anchors`.
 
     Construction:
 
@@ -438,8 +453,9 @@ class Denormalizer:
     ) -> pd.DataFrame:
         """Materialize the denormalized table as a :class:`pandas.DataFrame`.
 
-        Runs the full 4-phase pipeline: planner decisions (Rules 2/5/6) →
-        anchor classification (Rules 7/8) → main SQL join → orphan-row
+        Runs the full 4-phase pipeline: planner decisions (Row grain /
+        Downstream-leaf rejection / Path ambiguity) →
+        anchor classification (Anchor disposition) → main SQL join → orphan-row
         combine. When ``selector`` is provided, a final reduction pass
         groups rows by the feature-association table's target RID and
         applies the selector per group — same contract as
@@ -452,15 +468,15 @@ class Denormalizer:
                 labeled ``Table.column`` (or ``schema.Table.column`` when
                 multi-schema).
             row_per: Explicit leaf table. Must be in ``include_tables``.
-                If None, auto-inferred by Rule 2 (the unique sink in the
+                If None, auto-inferred by Row grain (the unique sink in the
                 FK subgraph over ``include_tables ∪ via``).
             via: Tables forced into the join chain without contributing
-                columns. Used to resolve Rule 6 path ambiguity without
+                columns. Used to resolve Path ambiguity without
                 cluttering the output.
             ignore_unrelated_anchors: If True, silently drop anchors whose
                 table has no FK path to any requested table. Default
                 False raises :class:`DerivaMLDenormalizeUnrelatedAnchor`
-                (Rule 8).
+                (Anchor disposition case 6).
             selector: Optional callable
                 ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
                 reduce multi-row feature groups. See ``FeatureRecord`` for
@@ -475,7 +491,7 @@ class Denormalizer:
         Returns:
             A :class:`pandas.DataFrame` with one row per ``row_per``
             instance in scope, plus any orphan rows from upstream anchors
-            that don't reach a ``row_per`` row (Rule 7 case 3). Upstream
+            that don't reach a ``row_per`` row (Anchor disposition case 3). Upstream
             table columns are hoisted onto each row; orphan rows have
             ``row_per``-side columns set to ``NaN``. When ``selector`` is
             provided, multi-row feature groups collapse to one row per
@@ -483,15 +499,16 @@ class Denormalizer:
 
         Raises:
             DerivaMLDenormalizeMultiLeaf: auto-inference finds multiple
-                candidate sinks (Rule 2).
-            DerivaMLDenormalizeNoSink: cycle in the FK subgraph (Rule 2).
+                candidate sinks (Row grain).
+            DerivaMLDenormalizeNoSink: cycle in the FK subgraph (Row grain).
             DerivaMLDenormalizeDownstreamLeaf: explicit ``row_per`` with a
-                downstream table in ``include_tables`` (Rule 5).
+                downstream table in ``include_tables`` (Downstream-leaf
+                rejection).
             DerivaMLDenormalizeAmbiguousPath: multiple FK paths between
-                ``row_per`` and another requested table (Rule 6).
+                ``row_per`` and another requested table (Path ambiguity).
             DerivaMLDenormalizeUnrelatedAnchor: anchor has no FK path to
-                any table in ``include_tables`` (Rule 8) — unless the
-                ``ignore_unrelated_anchors`` flag is set.
+                any table in ``include_tables`` (Anchor disposition case 6) —
+                unless the ``ignore_unrelated_anchors`` flag is set.
             ValueError: ``selector`` was provided but ``include_tables``
                 does not contain exactly one feature-association table.
 
@@ -567,10 +584,10 @@ class Denormalizer:
 
         Args:
             include_tables: Tables whose columns appear in the output.
-            row_per: Explicit leaf table (Rule 2 override).
-            via: Path-only intermediates (Rule 6 disambiguation).
+            row_per: Explicit leaf table (Row grain override).
+            via: Path-only intermediates (Path ambiguity disambiguation).
             ignore_unrelated_anchors: If True, silently drop unrelated
-                anchors (Rule 8).
+                anchors (Anchor disposition case 6).
             selector: Optional callable
                 ``(list[FeatureRecord]) -> FeatureRecord | None`` used to
                 reduce multi-row feature groups after materialization.
@@ -734,8 +751,9 @@ class Denormalizer:
         """Preview ``(column_name, type_name)`` pairs for the denormalized table.
 
         Model-only — no data fetch, no catalog query, no anchor classification.
-        Invokes the same planner as :meth:`as_dataframe` so Rules 2/5/6
-        errors surface here too; this makes ``columns`` useful as a cheap
+        Invokes the same planner as :meth:`as_dataframe` so the Row grain /
+        Downstream-leaf rejection / Path ambiguity errors surface here
+        too; this makes ``columns`` useful as a cheap
         validator of ``include_tables`` before committing to a full run.
 
         For a dry-run that reports ambiguities without raising, use
@@ -743,8 +761,8 @@ class Denormalizer:
 
         Args:
             include_tables: Tables whose columns appear in the output.
-            row_per: Explicit leaf table (Rule 2 override).
-            via: Path-only intermediates (Rule 6 disambiguation).
+            row_per: Explicit leaf table (Row grain override).
+            via: Path-only intermediates (Path ambiguity disambiguation).
 
         Returns:
             Sorted list of ``(column_name, column_type)`` tuples. Column
@@ -754,8 +772,9 @@ class Denormalizer:
 
         Raises:
             DerivaMLDenormalizeMultiLeaf / NoSink / DownstreamLeaf /
-            AmbiguousPath: same as :meth:`as_dataframe` (planner rules
-            2/5/6). Rule 7 and Rule 8 errors do NOT fire here — anchor
+            AmbiguousPath: same as :meth:`as_dataframe` (the Row grain,
+            Downstream-leaf rejection, and Path ambiguity guards).
+            Anchor disposition errors do NOT fire here — anchor
             classification happens only when rows are materialized.
 
         Example::
@@ -775,7 +794,8 @@ class Denormalizer:
             list(include_tables), via=via, row_per=row_per
         )
         # Invoke the planner on the model alone. _prepare_wide_table runs
-        # the Rule 2/5/6 guards and returns the column spec list. Walking
+        # the Row grain / Downstream-leaf rejection / Path ambiguity
+        # guards and returns the column spec list. Walking
         # that list with denormalize_column_name gives us the final
         # dot-prefixed output labels without touching any data.
         element_tables, column_specs, multi_schema = self._model._planner._prepare_wide_table(
@@ -824,7 +844,7 @@ class Denormalizer:
               ``row_per`` argument).
             - ``row_per_source``: ``"explicit"`` if the caller passed
               ``row_per``, else ``"auto-inferred"``.
-            - ``row_per_candidates``: list of sink tables from Rule 2
+            - ``row_per_candidates``: list of sink tables from Row grain
               sink-finding (the choices auto-inference considered).
             - ``columns``: list of ``(column_name, column_type)`` tuples
               that :meth:`as_dataframe` would produce.
@@ -836,7 +856,7 @@ class Denormalizer:
               the user did NOT name in ``include_tables`` — their
               columns are NOT in the output (joined through only).
             - ``ambiguities``: list of ``{type, from, to, paths,
-              suggestions}`` dicts, one per Rule 6 ambiguity. Empty
+              suggestions}`` dicts, one per Path ambiguity. Empty
               when the plan is unambiguous.
             - ``estimated_row_count``: ``{in_scope_row_per_rows,
               orphan_rows, total}``, optionally with a ``reason`` field.
@@ -1034,7 +1054,7 @@ class Denormalizer:
         #    estimator does not have without a catalog query. Honest answer:
         #    None (with a `reason` field so the caller knows why).
         # 3. Anchor table has no FK path to row_per → orphan (case 3 of
-        #    Rule 7; counted in orphan_rows).
+        #    Anchor disposition; counted in orphan_rows).
         #
         # The pre-A02 implementation only honored case 1 (filtered on
         # ``table == resolved_row_per``) and silently returned 0 for case
@@ -1412,13 +1432,14 @@ class Denormalizer:
 
         Pipeline:
 
-        1. **Planner decisions** (Rules 2/5/6): resolve ``row_per`` via
-           sink-finding or validate the explicit value, and check for
-           path ambiguities — raises at the first violation.
-        2. **Anchor classification** (Rules 7/8): partition anchors into
-           ``scoping`` (filter), ``orphans`` (Rule 7 case 3), and
-           ``ignored`` (Rule 7 case 5 silent drop / Rule 8 with flag).
-           Raises if Rule 8 fires and the flag is off.
+        1. **Planner decisions** (Row grain / Downstream-leaf rejection /
+           Path ambiguity): resolve ``row_per`` via sink-finding or
+           validate the explicit value, and check for path ambiguities —
+           raises at the first violation.
+        2. **Anchor classification** (Anchor disposition): partition
+           anchors into ``scoping`` (filter), ``orphans`` (case 3), and
+           ``ignored`` (case 5 silent drop / case 6 with flag). Raises if
+           the case-6 unrelated-anchor error fires and the flag is off.
         3. **Main SQL**: delegate to :func:`_denormalize_impl` with
            ``row_per`` / ``via`` / ``selector`` threaded through. For
            live Datasets ``source="catalog"`` and a :class:`PagedClient`
@@ -1463,7 +1484,7 @@ class Denormalizer:
             via=list(via or []),
             row_per=row_per,
         )
-        # Rule 6: check every (row_per, T) pair for multiple FK paths.
+        # Path ambiguity: check every (row_per, T) pair for multiple FK paths.
         # Unlike describe(), we raise on the first ambiguity detected so
         # callers get a clear error rather than a silently-wrong join.
         ambiguities = self._model._planner._find_path_ambiguities(
@@ -1482,7 +1503,7 @@ class Denormalizer:
                 suggested_intermediates=a["suggested_intermediates"],
             )
 
-        # Step 2: anchor classification (Rule 7, Rule 8)
+        # Step 2: anchor classification (Anchor disposition)
         anchors = self._anchors_as_dict()
         scoping, orphans, ignored = self._classify_anchors(
             anchors,
@@ -1600,7 +1621,7 @@ class Denormalizer:
         for t, rids in per_rid_orphans.items():
             combined_orphans.setdefault(t, []).extend(rids)
 
-        # Step 4b: orphan rows (Rule 7 case 3). Uses DenormalizeResult.extend
+        # Step 4b: orphan rows (Anchor disposition case 3). Uses DenormalizeResult.extend
         # to keep the combine a one-liner.
         if combined_orphans:
             orphan_rows = self._emit_orphan_rows(
@@ -1617,7 +1638,8 @@ class Denormalizer:
 
         Delegates to :meth:`~deriva_ml.dataset.Dataset.list_dataset_members`
         with ``recurse=True`` (so nested-dataset members are included
-        per Rule 9) and — if this Denormalizer was constructed with a
+        per the nested-dataset anchor enumeration) and — if this
+        Denormalizer was constructed with a
         ``version`` — passes that version through so member enumeration
         runs against the same snapshot the main SQL join will use.
 
@@ -1643,7 +1665,7 @@ class Denormalizer:
         row_per: str,
         ignore_unrelated_anchors: bool,
     ) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]:
-        """Classify anchors by their relationship to row_per (Rule 7 + Rule 8).
+        """Classify anchors by their relationship to row_per (Anchor disposition).
 
         Implements spec §3.7's six cases:
 
@@ -1664,7 +1686,7 @@ class Denormalizer:
         Args:
             anchors: table_name -> list of RIDs.
             include_tables, via, row_per: the planner inputs.
-            ignore_unrelated_anchors: if False, raise on Rule-8 (case 6) anchors.
+            ignore_unrelated_anchors: if False, raise on case-6 (unrelated) anchors.
 
         Returns:
             Tuple of (scoping_anchors, orphan_anchors, ignored_anchors). Each
@@ -1692,7 +1714,8 @@ class Denormalizer:
             # table on Dataset (e.g. Dataset_File) even when no members of
             # that type were added — the dict ends up with e.g.
             # ``{"File": []}``. Those zero-RID entries can't contribute
-            # anything to the output and should not trigger Rule 8, which
+            # anything to the output and should not trigger the
+            # Anchor disposition case-6 unrelated-anchor error, which
             # warns about anchors "that would contribute nothing." If the
             # RID list is empty, there's nothing TO contribute and nothing
             # to warn about.
@@ -1704,8 +1727,8 @@ class Denormalizer:
                 scoping[table] = list(rids)
                 continue
 
-            # Rule 7 reachability is direction-agnostic at the anchor-
-            # classification level: an anchor "filters" row_per if there
+            # Anchor disposition reachability is direction-agnostic at the
+            # anchor-classification level: an anchor "filters" row_per if there
             # is ANY FK chain connecting the two, in either direction.
             #
             # - Downstream reach (`_outbound_reachable`): anchor's rows
@@ -1786,7 +1809,7 @@ class Denormalizer:
         include_tables: list[str],
         row_per: str,
     ) -> list[dict[str, Any]]:
-        """Emit one output row per orphan anchor (Rule 7 case 3).
+        """Emit one output row per orphan anchor (Anchor disposition case 3).
 
         Each orphan row is an :class:`as_dataframe`-shaped dict with:
 
@@ -1794,7 +1817,7 @@ class Denormalizer:
         - All other columns (``row_per``-side and any other table in
           ``include_tables``) set to ``None``.
 
-        This is the LEFT-JOIN shape spec'd by Rule 7 case 3: upstream
+        This is the LEFT-JOIN shape spec'd by Anchor disposition case 3: upstream
         anchors that don't reach a ``row_per`` row still contribute an
         output row, preserving their identity for the caller.
 
