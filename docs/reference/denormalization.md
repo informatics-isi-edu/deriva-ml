@@ -33,14 +33,17 @@ against the bag's local SQLite database.
 
 | Question | Rule |
 |---|---|
-| How is the row grain (one-row-per-what) chosen? | [D1](#d1) (`row_per`, default = furthest-downstream table) |
-| Why do my `Subject` columns repeat across rows? | [D2](#d2) (upstream hoisting) |
-| Which tables contribute columns vs. just a join path? | [D3](#d3) (`include_tables` vs `via`) |
-| I have two annotators per image — how do I pick one? | [D4](#d4) (`selector`) |
-| My anchors have no FK path — error or skip? | [D5](#d5) (`ignore_unrelated_anchors`) |
-| How do I keep `RCB`/`RCT` provenance columns? | [D5](#d5) (`system_columns`, **dataframe only**) |
-| Does `_as_dict` return a list I can index? | No — [D6](#d6) (it's a **generator**) |
-| My dataset's members are `Subject`s but I read `Image` features — why does it work? | [D7](#d7) (the planner unions FK-reachable routes, not just direct membership) |
+| How is the row grain (one-row-per-what) chosen? | [Row grain](#row-grain) (`row_per`, default = furthest-downstream table) |
+| Why do my `Subject` columns repeat across rows? | [Column hoisting](#column-hoisting) |
+| Which tables contribute columns vs. just a join path? | [Column projection](#column-projection) (`include_tables` vs `via`) |
+| I have two annotators per image — how do I pick one? | [Column hoisting](#column-hoisting) (the `selector`) |
+| Why was my explicit `row_per` rejected? | [Downstream-leaf rejection](#downstream-leaf-rejection) |
+| Why did two FK paths raise instead of picking one? | [Path ambiguity](#path-ambiguity) |
+| My anchors have no FK path — error or skip? | [Anchor disposition](#anchor-disposition) (case 6, `ignore_unrelated_anchors`) |
+| Some members reach no `row_per` row — dropped or NULL? | [Anchor disposition](#anchor-disposition) (case 3, orphan rows) |
+| How do I keep `RCB`/`RCT` provenance columns? | [Return shapes](#return-shapes) (`system_columns`, **dataframe only**) |
+| Does `_as_dict` return a list I can index? | No — [Return shapes](#return-shapes) (it's a **generator**) |
+| My dataset's members are `Subject`s but I read `Image` features — why does it work? | [FK-reachable scoping](#fk-reachable-scoping) (the planner unions FK-reachable routes, not just direct membership) |
 | What does denormalization have to do with FK-traversal policy? | Nothing — see [Mental model](#mental-model) |
 
 ## Mental model
@@ -83,194 +86,236 @@ Two things this is **not**:
 
   (Within that bag-local scope, the planner reaches an `include_tables`
   element through **every** `Dataset → element` route — direct membership
-  *and* FK-reachable chains — unioned RID-distinct; see [D7](#d7).)
+  *and* FK-reachable chains — unioned RID-distinct; see
+  [FK-reachable scoping](#fk-reachable-scoping).)
 
-The denormalizer is governed by **nine semantic rules** (the canonical
-contract list is `Denormalizer`'s class docstring and the
-[tutorial](../user-guide/denormalization.md)'s "Rules" section). The
-formal rules below — **D1–D6** — group those nine by the knob a caller
-actually turns; each cites the underlying rule numbers. **D7** is not a
-caller knob — it documents how the planner reaches an element from the
-dataset (union of all FK-reachable routes), the behavior that makes
-denormalization work on subject-partitioned datasets.
+The denormalizer is governed by **six named semantic rules**. This page
+is their canonical definition; the
+[tutorial](../user-guide/denormalization.md) gives the example-led
+version and the
+[implementation contract](../design/denormalization-contract.md) §6.2
+gives the full planner-level language. The six rules answer, in order:
+
+| Rule | Answers |
+|---|---|
+| [Row grain](#row-grain) | *How many rows, keyed on what?* (`row_per`, default = furthest-downstream table) |
+| [Column projection](#column-projection) | *Which tables contribute columns vs. just a join path?* (`include_tables` vs `via`) |
+| [Column hoisting](#column-hoisting) | *Why do upstream columns repeat across rows?* |
+| [Downstream-leaf rejection](#downstream-leaf-rejection) | *Why was my explicit `row_per` rejected?* |
+| [Path ambiguity](#path-ambiguity) | *Why did two FK paths raise instead of picking one?* |
+| [Anchor disposition](#anchor-disposition) | *What happens to each dataset member — row, filter, orphan, or error?* |
+
+Two further behaviors are not caller-tunable "rules" but you need them to
+predict a result: [**FK-reachable scoping**](#fk-reachable-scoping) (how
+the dataset's members define which rows are in scope) and
+[**return shapes**](#return-shapes) (what each of the four methods hands
+back). Both follow the rules table.
 
 ## Formal rules
 
-<a id="d1"></a>
-**D1 — `row_per` selects the row grain; the default is the
-furthest-downstream requested table.** The output has **one row per
-`row_per`-table instance in scope** (tutorial Rule 1). **"In scope" means
-FK-reachable from a dataset member — not member-*of*.** A dataset whose
-members are `Subject`s puts every `Image` reachable via `Image.Subject`
-in scope, so `["Image"]` returns those Images even though none is a
-direct `Image` member ([D7](#d7)). By default
-`row_per` is **auto-inferred** (tutorial Rule 2): among the
-`include_tables`, the one that no other requested table points to via FK
-— the "deepest" / furthest-downstream table — becomes the grain. If two
-candidates tie (multi-leaf) or the FK subgraph has a cycle (no sink),
-auto-inference raises and you must pass `row_per=` explicitly. Setting
-`row_per` to a table that is *downstream* of another requested table is
-rejected (tutorial Rule 5: that would require aggregation).
+<a id="row-grain"></a>
+### Row grain
+
+**The output has one row per `row_per`-table instance in scope;
+`row_per` defaults to the furthest-downstream requested table.**
+
+"In scope" means **FK-reachable from a dataset member**, not *member-of*
+(see [FK-reachable scoping](#fk-reachable-scoping)). By default `row_per`
+is **auto-inferred**: among `include_tables`, the one that no other
+requested table points to via FK — the "deepest" / furthest-downstream
+table — becomes the grain. Auto-inference **raises** if two candidates
+tie (`DerivaMLDenormalizeMultiLeaf`) or the FK subgraph has a cycle with
+no sink (`DerivaMLDenormalizeNoSink`); pass `row_per=` explicitly to
+resolve. (Setting `row_per` to a table *downstream* of another requested
+table is rejected — see [Downstream-leaf rejection](#downstream-leaf-rejection).)
 `[deriva-ml]`
 `src/deriva_ml/local_db/denormalizer.py::Denormalizer.as_dataframe`
-(`row_per` argument; the sink-finding logic is
-`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner._find_sinks`,
-invoked through `Denormalizer`); surfaced through each `DatasetBag`
-method's `row_per` keyword.
+(`row_per` argument; sink-finding is
+`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner._find_sinks`);
+surfaced through each `DatasetBag` method's `row_per` keyword.
 
-<a id="d2"></a>
-**D2 — Upstream columns are hoisted and duplicated across rows that
-share an upstream row.** For each `row_per` row, columns from the tables
-it references (transitively, up the FK graph) are **repeated verbatim**
-across every output row that shares that upstream row (tutorial Rule 4 —
-star-schema hoisting). A table reached through an N-to-N link produces
-one output row per `(row_per, linked-row)` combination, so the
-`row_per` count can grow. Output columns use `Table.column` notation
-(e.g. `Subject.Name`).
-`[deriva-ml]` `src/deriva_ml/local_db/denormalize.py::_denormalize_impl`
-(the SQL join + projection the `Denormalizer` drives).
+<a id="column-projection"></a>
+### Column projection
 
-<a id="d3"></a>
-**D3 — `include_tables` names the column sources; `via` disambiguates
-the join path.** Columns come **only** from tables named in
-`include_tables` (tutorial Rule 3). Tables that appear only as
-transitive intermediates — association tables bridging two requested
-tables — are joined *through* but contribute **no columns**. When there
-are **multiple FK paths** between `row_per` and another requested table,
-the planner refuses to guess and raises (tutorial Rule 6); you resolve
-the ambiguity by either adding the disambiguating intermediate to
-`include_tables` (its columns appear) or to `via` (path-only, **no
-columns**). `via` is exactly the "route through this table but don't
-project it" knob.
-`[deriva-ml]` `src/deriva_ml/local_db/denormalizer.py` (the `via`
-argument; ambiguity detection raises
-`DerivaMLDenormalizeAmbiguousPath`).
+**`include_tables` names the column sources; `via` adds a join hop with
+no columns.** Columns come **only** from tables named in
+`include_tables`. Tables that appear only as transitive intermediates —
+association tables bridging two requested tables — are joined *through*
+but contribute **no columns** ("transparent intermediates"). `via` is
+the explicit "route through this table but don't project it" knob, used
+to resolve a [path ambiguity](#path-ambiguity) without cluttering the
+output. Feature names (e.g. `"Image_Classification"`) in `include_tables`
+are resolved to the underlying feature-association table before
+projection (see [the contract §8.4](../design/denormalization-contract.md)).
+`[deriva-ml]` `src/deriva_ml/local_db/denormalizer.py` (`include_tables`
+/ `via` arguments; transparent-intermediate detection in the planner).
 
-<a id="d4"></a>
-**D4 — Feature groups are reduced by a `selector`.** When
-`include_tables` contains **exactly one** feature-association table, the
-optional `selector` callable reduces each feature's multi-row group
-(e.g. several annotators' labels for one image) to a single chosen row.
-Its signature is
+<a id="column-hoisting"></a>
+### Column hoisting
+
+**Upstream columns are hoisted and duplicated across rows that share an
+upstream row.** For each `row_per` row, columns from the tables it
+references (transitively, up the FK graph) are **repeated verbatim**
+across every output row that shares that upstream row — the classic
+star-schema shape. A table reached through an N-to-N link produces one
+output row per `(row_per, linked-row)` combination, so the `row_per`
+count can grow. Output columns use `Table.column` notation (e.g.
+`Subject.Name`).
+
+This is also where a **feature `selector`** acts: when `include_tables`
+contains **exactly one** feature-association table, the optional
+`selector` callable reduces each feature's multi-row group (e.g. several
+annotators' labels for one image) to a single chosen row before
+hoisting. Its signature is
 `Callable[[list[FeatureRecord]], FeatureRecord | None]` — identical to
-`DerivaML.feature_values`'s `selector` argument. Built-ins on
-`FeatureRecord` include `select_newest`, `select_first`, and
-`select_by_workflow`; a custom callable may return `None` to drop the
-group. Passing `selector` while `include_tables` does **not** contain
-exactly one feature-association table raises `ValueError`. With no
-`selector`, every feature row is kept (the group is *not* collapsed),
-which multiplies the `row_per` count per [D2](#d2). `selector` is
-accepted by `get_denormalized_as_dataframe` and
-`get_denormalized_as_dict`; it is **not** a parameter of
-`list_denormalized_columns` or `describe_denormalized` (those are
-model-only / dry-run).
+`DerivaML.feature_values`'s `selector`; built-ins on `FeatureRecord`
+include `select_newest`, `select_first`, `select_by_workflow`, and a
+custom callable may return `None` to drop the group. With no `selector`,
+every feature row is kept, multiplying the `row_per` count. Passing
+`selector` without exactly one feature-association table raises
+`ValueError`. `selector` is accepted by `get_denormalized_as_dataframe`
+and `get_denormalized_as_dict` only.
+`[deriva-ml]` `src/deriva_ml/local_db/denormalize.py::_denormalize_impl`
+(the SQL join + projection); `src/deriva_ml/feature/__init__.py::FeatureRecord`
+for the built-in selectors.
+
+<a id="downstream-leaf-rejection"></a>
+### Downstream-leaf rejection
+
+**An explicit `row_per` with a downstream requested table is rejected.**
+If you pass `row_per=` and another table in `include_tables` is
+*downstream* of it (i.e. `row_per` has an outbound FK path to that
+table), the planner raises `DerivaMLDenormalizeDownstreamLeaf` rather
+than silently aggregating. One row per `row_per` would require
+collapsing many downstream rows per `row_per` row, and aggregation is
+not a denormalize concern. Resolve by dropping `row_per` (let
+auto-inference pick the downstream table as the grain) or removing the
+downstream table from `include_tables`.
 `[deriva-ml]`
-`src/deriva_ml/dataset/dataset_bag.py::get_denormalized_as_dataframe`
-(`selector` argument; delegated to `Denormalizer`). See
-`src/deriva_ml/feature/__init__.py::FeatureRecord` for the built-in
-selectors.
+`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner._determine_row_per`.
 
-<a id="d5"></a>
-**D5 — `ignore_unrelated_anchors` controls unrelated-anchor handling;
-`system_columns` (dataframe only) opts audit columns back in.** Two
-precise behaviors:
+<a id="path-ambiguity"></a>
+### Path ambiguity
 
-- **`ignore_unrelated_anchors`** (default `False`) — an anchor whose
-  table has **no FK path at all** to any table in
-  `include_tables ∪ via` raises `DerivaMLDenormalizeUnrelatedAnchor` by
-  default (tutorial Rule 8). Set `ignore_unrelated_anchors=True` to
-  **silently drop** such anchors instead of raising. (This is distinct
-  from an *orphan* anchor — one that *is* upstream of `row_per` but
-  reaches no `row_per` row — which always emits a LEFT-JOIN-style row
-  with the `row_per`-side columns `NULL`, per tutorial Rule 7;
-  `ignore_unrelated_anchors` does not affect orphan emission.) Accepted
-  by `get_denormalized_as_dataframe` and `get_denormalized_as_dict`.
-- **`system_columns`** (default `None`) — the per-table audit columns
-  `RCT` / `RMT` / `RCB` / `RMB` are **dropped by default**. Pass a list
-  of any of those four to **retain** them in the output, labeled
-  `Table.RCB` like any other column — e.g. `system_columns=["RCB"]`
-  keeps each row's creating-user id for a grader join. `system_columns`
-  is a parameter of **`get_denormalized_as_dataframe` only**; it is
-  **not** present on `get_denormalized_as_dict`,
-  `list_denormalized_columns`, or `describe_denormalized`.
-
+**Multiple distinct FK paths between `row_per` and a requested table
+raise rather than guess.** When two or more distinct FK paths connect
+`row_per` to another requested table, the planner raises
+`DerivaMLDenormalizeAmbiguousPath` listing the paths and suggesting
+intermediates — the result would differ between paths, and deriva-ml
+won't pick one silently. Resolve by adding the disambiguating
+intermediate to `include_tables` (its columns appear) or to `via`
+(path-only, no columns), or by narrowing the request so only one path is
+valid. (This is about *distinct* paths to the **same** table; it is
+**not** the same as the membership-vs-FK-reachable *route* union in
+[FK-reachable scoping](#fk-reachable-scoping), which unions routes to the
+same element and never raises.)
 `[deriva-ml]`
-`src/deriva_ml/dataset/dataset_bag.py` (both keywords on
-`get_denormalized_as_dataframe`; `ignore_unrelated_anchors` also on
-`get_denormalized_as_dict`).
+`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner._find_path_ambiguities`.
 
-<a id="d6"></a>
-**D6 — Return shapes differ by method.** The four entry points return
-distinct types — pick by what you need:
+<a id="anchor-disposition"></a>
+### Anchor disposition
+
+**Every dataset member (anchor) contributes in exactly one way,
+determined by its table and reachability.** The six cases:
+
+| Case | Anchor table | Reaches a `row_per` row? | Contribution |
+|---|---|---|---|
+| 1 | `== row_per` | — | one output row (itself, upstream hoisted) |
+| 2 | `∈ include_tables`, upstream of `row_per` | yes | filter-only (appears via the `row_per` row that hoists it) |
+| 3 | `∈ include_tables`, upstream of `row_per` | no | one **orphan** row — its columns populated, `row_per`-side columns `NULL` (LEFT-JOIN shape) |
+| 4 | `∉ include_tables`, upstream of `row_per` | yes | filter-only (no row of its own — its columns aren't projected) |
+| 5 | `∉ include_tables`, upstream of `row_per` | no | silently dropped (would not affect output) |
+| 6 | no FK path to any `include_tables ∪ via` table | — | raises `DerivaMLDenormalizeUnrelatedAnchor` unless `ignore_unrelated_anchors=True` (then silently dropped) |
+
+`ignore_unrelated_anchors` (default `False`) controls **only** case 6;
+it does **not** affect orphan (case 3) emission. Empty anchor sets are
+skipped and never trigger case 6. After the main join, a per-RID orphan
+scan catches case-3 anchors whose specific RIDs didn't appear in the
+result (e.g. a `Subject` with an empty `Image` set) and emits their
+orphan rows.
+`[deriva-ml]`
+`src/deriva_ml/local_db/denormalizer.py::Denormalizer._classify_anchors`
+(+ `_emit_orphan_rows`); `ignore_unrelated_anchors` accepted by
+`get_denormalized_as_dataframe` / `get_denormalized_as_dict`.
+
+## Behaviors (not caller knobs)
+
+<a id="fk-reachable-scoping"></a>
+### FK-reachable scoping
+
+**The dataset's members define scope by FK-reachability: every
+`Dataset → … → element` route is unioned, RID-distinct.** To reach an
+`include_tables` element from the dataset, the planner does **not** pick
+a single "best" route — it **unions every** route it can find: the
+**direct-membership association** (`Dataset_{Element}`, e.g.
+`Dataset_Image`) **and** **FK-reachable chains** (e.g.
+`Dataset → Dataset_Subject → Subject → … → Image`). The union is
+**RID-distinct** (SQL `UNION`, not `UNION ALL`), so an element reachable
+several ways contributes a single row.
+
+- On a **directly-populated** dataset the membership route is non-empty
+  and the FK routes add no new leaf RIDs, so the union equals a
+  membership-only join — directly-populated reads are unchanged.
+- On a **subject-partitioned** dataset (members are an upstream element
+  like `Subject`; the target is reachable **only** via the FK chain,
+  with an empty membership association) this union is the **only** way
+  the target's rows appear — a membership-only join returns **0**. This
+  is what makes `feature_values` / `get_denormalized_*` work on
+  subject-partitioned datasets.
+
+**Only the `row_per` element's routes drive rows.** The union is applied
+**per element**, but the table is [`row_per`-grained](#row-grain): only
+routes that *end at the `row_per` table* produce rows. Routes ending at a
+non-`row_per` include-table are **not** unioned into the row set — that
+table's columns are [hoisted](#column-hoisting) into the `row_per`
+routes' join, not emitted as their own grain. (Emitting them was the
+#322 cartesian: every route is projected with the *full* column set, so
+a non-`row_per` route that never joins the `row_per` table cross-joins
+its columns — `[Image, Observation]` with `row_per=Image` produced 8×8
+rows instead of 8. The planner now keeps only the `row_per` element's
+routes.)
+`[deriva-ml]`
+`src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner._prepare_wide_table`
+(per-`row_per`-element route discovery + UNION-distinct emission);
+shared by `feature_values`, `get_denormalized_*`, and `describe`.
+Pinned by
+`tests/local_db/test_denormalize_fk_reachable_paths.py::test_only_row_per_element_drives_routes`
+and
+`tests/dataset/test_denormalize.py::TestDenormalize::test_denormalize_row_per_grain_no_cartesian`.
+Spec:
+`docs/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design.md`.
+
+<a id="return-shapes"></a>
+### Return shapes
+
+The four entry points return distinct types — pick by what you need:
 
 - **`get_denormalized_as_dataframe(...)` → `pandas.DataFrame`.** One row
-  per `row_per` instance, `Table.column` headers. Materializes the
-  whole frame in memory.
-- **`get_denormalized_as_dict(...)` → `Generator[dict, None, None]`.**
-  A **generator**, *not* a list — you iterate it (`for row in ...`) and
-  cannot index it directly. Each yielded `dict` keys on `Table.column`
-  labels with raw Python values. (Note: per the method's own docstring
-  / audit finding SC-07, the full result is still materialized
-  internally before the first row is yielded, so this is a streaming
-  *interface*, not a lower-memory algorithm.)
+  per `row_per` instance, `Table.column` headers. Materializes the whole
+  frame in memory. Only this method takes `system_columns=` (a list of
+  `RCT`/`RMT`/`RCB`/`RMB` to **retain**; they are dropped by default).
+- **`get_denormalized_as_dict(...)` → `Generator[dict, None, None]`.** A
+  **generator**, *not* a list — iterate it (`for row in ...`), don't
+  index it. Each `dict` keys on `Table.column` labels. (The full result
+  is materialized internally before the first row is yielded — a
+  streaming *interface*, not a lower-memory algorithm; audit finding
+  SC-07.)
 - **`list_denormalized_columns(...)` → `list[tuple[str, str]]`.**
-  Model-only, no data fetch: `(column_name, column_type)` pairs the
-  frame *would* have. Runs the same Rule 2/5/6 validation as the real
-  call, so planner errors surface early.
+  Model-only, no data fetch: the `(column_name, column_type)` pairs the
+  frame *would* have. Runs the same Row-grain / Downstream-leaf /
+  Path-ambiguity validation as the real call, so planner errors surface
+  early.
 - **`describe_denormalized(...)` → `dict`.** A **dry-run** plan with
   **13 keys** that never raises (ambiguities are reported, not thrown):
   `row_per`, `row_per_source`, `row_per_candidates`, `columns`,
   `include_tables`, `via`, `join_path`, `transparent_intermediates`,
-  `ambiguities`, `estimated_row_count`, `anchors`, `source`,
-  `warnings`. Use it to inspect the resolved grain, join chain, and any
-  path ambiguity *before* committing to a real call.
+  `ambiguities`, `estimated_row_count`, `anchors`, `source`, `warnings`.
 
 `[deriva-ml]`
 `src/deriva_ml/dataset/dataset_bag.py::get_denormalized_as_dataframe`
 / `::get_denormalized_as_dict` / `::list_denormalized_columns` /
-`::describe_denormalized`; the 13-key shape is spelled out in
-`Denormalizer.describe`'s docstring.
-
-<a id="d7"></a>
-**D7 — The planner unions ALL reachable `Dataset → element` routes,
-RID-distinct.** To reach an `include_tables` element from the dataset,
-the planner does **not** pick a single "best" route. It **unions every**
-`Dataset → … → element` path it can find — both the **direct-membership
-association** route (`Dataset_{Element}`, e.g. `Dataset_Image`) **and**
-**FK-reachable chains** (e.g.
-`Dataset → Dataset_Subject → Subject → … → Image`). The unioned result
-is **RID-distinct**: SQL `UNION` (not `UNION ALL`) dedups identical
-output rows, so when the same element is reachable via several routes it
-contributes a single row — for a feature read, exactly one row per
-feature-association row. On a **directly-populated** dataset the
-membership route is non-empty and the FK routes add no new leaf RIDs (or
-duplicate existing ones), so the union yields exactly the same row set as
-a membership-only join — directly-populated reads are unchanged. On a
-**subject-partitioned** dataset (members are an upstream element like
-`Subject`; the target table is reachable **only** via the FK chain, with
-an **empty** direct-membership association) this union is the **only**
-way the target's rows appear at all — a membership-only join would return
-**0**. This is what makes `feature_values` / `get_denormalized_*` work on
-subject-partitioned datasets. (Multiple *distinct* FK paths between
-`row_per` and a requested table still raise per [D3](#d3) — D7 is about
-unioning the membership and FK-reachable routes to the *same* element,
-not about silently guessing among ambiguous join paths.)
-
-**Only the `row_per` element's routes drive rows.** The route union is
-applied **per element**, but a wide table is `row_per`-grained
-([D1](#d1)): only routes that *end at the `row_per` table* produce output
-rows. Routes ending at a non-`row_per` include-table are **not** unioned
-into the row set — that table's columns are hoisted into the `row_per`
-routes' join ([D2](#d2)), not emitted as their own grain. (Emitting them
-was the #322 cartesian bug: every route is projected with the *full*
-column set, so a non-`row_per` route that never joins the `row_per`
-table cross-joins its columns — e.g. `[Image, Observation]` with
-`row_per=Image` produced 8 × 8 rows instead of 8. The planner now keeps
-only the `row_per` element's routes; see
-`tests/local_db/test_denormalize_fk_reachable_paths.py::test_only_row_per_element_drives_routes`
-and `tests/dataset/test_denormalize.py::TestDenormalize::test_denormalize_row_per_grain_no_cartesian`.)
-Spec:
-`docs/superpowers/specs/2026-06-16-denormalize-fk-reachable-paths-design.md`.
+`::describe_denormalized`; the 13-key shape is detailed in
+[the contract §8.3.2](../design/denormalization-contract.md).
 `[deriva-ml]`
 `src/deriva_ml/model/denormalize_planner.py::DenormalizePlanner`
 (route discovery + per-`row_per`-element UNION-distinct emission in
@@ -305,9 +350,10 @@ list(df.columns)  # → ['Subject.RID', 'Subject.Name']
 | `4CG` | Thing2 |
 
 Two members in, two rows out, `row_per` auto-inferred as `Subject`
-(the only requested table, so trivially the sink — [D1](#d1)). The two
-columns are exactly `Subject`'s own columns ([D3](#d3)); there is no
-upstream table to hoist ([D2](#d2)).
+(the only requested table, so trivially the sink —
+[Row grain](#row-grain)). The two columns are exactly `Subject`'s own
+columns ([Column projection](#column-projection)); there is no upstream
+table to hoist ([Column hoisting](#column-hoisting)).
 
 > The `RID` values `4CE` / `4CG` above come straight from the
 > capture file — they are catalog-assigned and opaque. Never read
@@ -324,11 +370,12 @@ Observation references Subject):
 bag.get_denormalized_as_dataframe(["Subject", "Observation", "Image"])
 ```
 
-auto-infers `row_per=Image` ([D1](#d1) — Image is furthest downstream),
-emitting **one row per image**. Each row carries the image's own
-columns plus the `Observation` and `Subject` columns hoisted from its
-FK ancestors ([D2](#d2)), so a subject with three images appears three
-times with its `Subject.*` values repeated verbatim:
+auto-infers `row_per=Image` ([Row grain](#row-grain) — Image is furthest
+downstream), emitting **one row per image**. Each row carries the
+image's own columns plus the `Observation` and `Subject` columns hoisted
+from its FK ancestors ([Column hoisting](#column-hoisting)), so a subject
+with three images appears three times with its `Subject.*` values
+repeated verbatim:
 
 | Subject.RID | Subject.Name | Observation.RID | Image.RID | Image.Filename |
 |---|---|---|---|---|
@@ -338,16 +385,21 @@ times with its `Subject.*` values repeated verbatim:
 
 If two FK paths existed between `Image` and `Subject` (e.g. via
 `Observation` *and* directly), the planner would raise rather than guess
-([D3](#d3)); adding `via=["Observation"]` selects the route without
-adding columns. To reduce a per-image multi-annotator feature to one row,
-pass `selector=FeatureRecord.select_newest` with the single
-feature-association table in `include_tables` ([D4](#d4)).
+([Path ambiguity](#path-ambiguity)); adding `via=["Observation"]`
+selects the route without adding columns. To reduce a per-image
+multi-annotator feature to one row, pass
+`selector=FeatureRecord.select_newest` with the single
+feature-association table in `include_tables`
+([Column hoisting](#column-hoisting)).
 
 ## See also
 
 - [Denormalization tutorial](../user-guide/denormalization.md) — the
-  gentle, example-led introduction and the canonical nine-rule contract
-  (this reference is its formal counterpart).
+  gentle, example-led introduction to the six rules (this reference is
+  its formal counterpart).
+- [Denormalization implementation contract](../design/denormalization-contract.md)
+  — the maintainer-facing design contract (state model, fetcher/INSERT
+  contracts, fragility map, test matrix).
 - [Bag Export](bag-export.md) — **how the bag this page reshapes was
   produced** (anchors, traversal policy, the export spec). Denormalization
   runs *after* export, on the rows the bag already contains.

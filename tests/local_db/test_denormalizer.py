@@ -122,7 +122,7 @@ class TestColumns:
 
 
 class TestRowPerAutoInference:
-    """Verify Rule 2 auto-inference through the Denormalizer."""
+    """Verify Row grain auto-inference through the Denormalizer."""
 
     def test_image_is_sink(self, populated_denorm) -> None:
         """include_tables=[Subject, Image] → row_per auto = Image."""
@@ -134,7 +134,7 @@ class TestRowPerAutoInference:
 
 
 class TestExplicitRowPer:
-    """Verify explicit row_per honored; Rule 5 downstream rejection."""
+    """Verify explicit row_per honored; Downstream-leaf rejection."""
 
     def test_explicit_matching_auto(self, populated_denorm) -> None:
         """Explicit row_per=Image (same as auto) works."""
@@ -171,7 +171,7 @@ class TestViaParameter:
         Observation. Result: 2 rows (IMG-1, IMG-2).
 
         (This differs from the bare ``["Image", "Subject"]`` call where
-        Rule 6 now raises before a path is picked — see the raises
+        Path ambiguity now raises before a path is picked — see the raises
         assertion below.)
         """
         ds = _FakeDataset(populated_denorm_diamond)
@@ -193,7 +193,7 @@ class TestViaParameter:
 
 
 class TestUnrelatedAnchors:
-    """Rule 8: anchors with no FK path to include_tables → error by default."""
+    """Anchor disposition case 6: anchors with no FK path to include_tables → error by default."""
 
     def test_unrelated_anchor_rejected(self, populated_denorm) -> None:
         # A dataset whose members include an unrelated type.
@@ -229,7 +229,7 @@ class TestUnrelatedAnchors:
 
 
 class TestOrphanRows:
-    """Rule 7 case 3: upstream anchor with no row_per reachable → orphan row."""
+    """Anchor disposition case 3: upstream anchor with no row_per reachable → orphan row."""
 
     def test_orphan_subject_emits_row(self, populated_denorm) -> None:
         """Subject member with no Image in the dataset → one orphan row."""
@@ -262,7 +262,7 @@ class TestOrphanRows:
 
 
 class TestAnchorClassification:
-    """Rule 7 cases 1/2/4/5/6 exercised via Denormalizer._classify_anchors.
+    """Anchor disposition cases 1/2/4/5/6 exercised via Denormalizer._classify_anchors.
 
     Case 3 is covered by TestOrphanRows above (end-to-end orphan emission).
     Cases 1/2/4 are "scoping" (anchor contributes a filter). Case 5 is
@@ -309,7 +309,7 @@ class TestAnchorClassification:
         ``list_dataset_members`` may return ``{"File": []}`` when the
         ``Dataset_File`` association table exists but no members were
         actually added. A zero-RID anchor can't contribute anything to
-        the output — so it should NOT trigger Rule 8's UnrelatedAnchor
+        the output — so it should NOT trigger Anchor disposition case 6's UnrelatedAnchor
         diagnostic, which warns about anchors "that would contribute
         nothing." There's nothing to contribute and nothing to warn
         about.
@@ -345,7 +345,7 @@ class TestAnchorClassification:
         When row_per=Subject and an Image anchor is present, the Image
         table is DOWNSTREAM of Subject (Image.Subject is an FK to Subject).
         The anchor still provides a valid filter: "include only Subjects
-        that have one of these Images." Rule 7's reachability check must
+        that have one of these Images." Anchor disposition's reachability check must
         accept either-direction FK connectivity, not only downstream.
 
         This reproduces the nested-dataset scenario where a bag contains
@@ -480,7 +480,7 @@ class TestAnchorClassification:
 
 
 class TestNoSink:
-    """Rule 2 edge case: DerivaMLDenormalizeNoSink on cycle / empty."""
+    """Row grain edge case: DerivaMLDenormalizeNoSink on cycle / empty."""
 
     def test_empty_include_tables_via_determine_row_per(self, populated_denorm) -> None:
         """Empty include_tables → no sink → NoSink."""
@@ -576,7 +576,8 @@ class TestDescribe:
         ds = _FakeDataset(populated_denorm)
         d = Denormalizer(ds)
         # Subject points to nothing in-set; Image points to Subject.
-        # Explicit row_per=Subject with Image in include_tables is a Rule-5
+        # Explicit row_per=Subject with Image in include_tables is a
+        # Downstream-leaf rejection
         # violation that would raise from as_dataframe — but describe must
         # swallow it.
         plan = d.describe(["Image", "Subject"], row_per="Subject")
@@ -828,7 +829,7 @@ class TestDescribeKeyParity:
     def test_row_per_in_candidates(self, populated_denorm) -> None:
         """``plan["row_per_candidates"]`` is a superset of the resolved row_per.
 
-        Spec §5: row_per_candidates lists the sinks Rule 2 sink-finding
+        Spec §5: row_per_candidates lists the sinks Row grain sink-finding
         considered. The resolved row_per must be one of them (otherwise
         the resolver picked a value outside its own search space).
         """

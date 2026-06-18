@@ -34,7 +34,8 @@ tabular-read API, and deleted the legacy working-data cache.
   (caller has already populated rows; used by tests).
   **Public API**: callers should use the `Denormalizer` class in
   `denormalizer.py` (added in Task 4 of the denormalization-semantics
-  refactor), which wraps `_denormalize_impl` with Rule 2/5/6 planning
+  refactor), which wraps `_denormalize_impl` with Row grain /
+  Downstream-leaf rejection / Path ambiguity planning
   guards and orphan-row handling.
 
 ## Layout on disk
@@ -98,7 +99,7 @@ DatasetBag.get_denormalized_as_dataframe ─> Denormalizer(bag).as_dataframe(...
 
 - **Primary design reference:** `docs/user-guide/denormalization.md` —
   single-source-of-record user guide + architecture, state-ownership
-  model, fetcher / INSERT contracts, nine semantic Rules, fragility
+  model, fetcher / INSERT contracts, six named semantic rules, fragility
   map, and test matrix. Start here. The horizontal-rule divider
   separates the user-tier prose (above) from the `# Implementation
   contract` engineering reference (below).

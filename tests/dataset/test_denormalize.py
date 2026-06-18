@@ -924,7 +924,7 @@ class TestCatalogDenormalize:
         members from both the parent and all nested children.
 
         The dataset's members include File (WWW asset) anchors that have no
-        FK path to Subject — these are legitimately unrelated per Rule 8.
+        FK path to Subject — these are legitimately unrelated per Anchor disposition case 6.
         Pass ``ignore_unrelated_anchors=True`` to drop them silently so the
         query returns the Subject rows the user asked for.
         """
@@ -1004,12 +1004,12 @@ class TestCatalogDenormalize:
             assert non_null > 0, "Subject.RID should be populated via multi-hop"
 
     def test_catalog_direct_fk_preferred(self, catalog_with_datasets, tmp_path):
-        """Catalog: Image↔Subject diamond raises Rule 6 ambiguity.
+        """Catalog: Image↔Subject diamond raises Path ambiguity.
 
         Image has BOTH a direct FK to Subject AND an indirect all-
         downstream path via Observation (``Image → Observation →
         Subject``). Under the new denormalization semantics (spec §3.6
-        / Rule 6), silent path selection is rejected — the planner
+        / Path ambiguity), silent path selection is rejected — the planner
         must raise and require the caller to disambiguate via
         ``via=["Observation"]`` or by including Observation in
         ``include_tables``.
@@ -1024,7 +1024,7 @@ class TestCatalogDenormalize:
         ml_instance, dataset_description = catalog_with_datasets
         dataset = dataset_description.dataset
 
-        # Bare request → Rule 6 raises.
+        # Bare request → Path ambiguity raises.
         with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
             dataset.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
 
@@ -1124,7 +1124,7 @@ class TestMultiHopDenormalize:
     def test_association_table_join(self, dataset_test, tmp_path):
         """M3: Join through association table (M:N).
 
-        Under Rule 2 / Rule 6, ``["Image", "Observation", "ClinicalRecord"]``
+        Under Row grain / Path ambiguity, ``["Image", "Observation", "ClinicalRecord"]``
         has two sink candidates (Image and ClinicalRecord are both leaves
         in the FK graph), so auto-inference raises
         :class:`DerivaMLDenormalizeMultiLeaf`. Pin Image as the row anchor
@@ -1287,7 +1287,7 @@ class TestMultiHopDenormalize:
         """E3: Non-member subgraph that doesn't form a sink-connected chain raises.
 
         ``[Observation, ClinicalRecord]`` without an explicit route is a
-        genuine Rule-2 problem:
+        genuine Row grain problem:
 
         * Observation's only downstream path exits the set (to Subject).
         * ClinicalRecord has no outbound FKs in the subgraph.
@@ -1364,7 +1364,7 @@ class TestAmbiguousPaths:
     def test_direct_fk_raises_ambiguity(self, dataset_test, tmp_path):
         """A1: Two FK paths between Image and Subject now raise (was: silent pick).
 
-        Under the new denormalization semantics (spec §3.6 / Rule 6), any
+        Under the new denormalization semantics (spec §3.6 / Path ambiguity), any
         path ambiguity is surfaced as an error. Users must add an intermediate
         to include_tables or via= to disambiguate.
 
@@ -1381,7 +1381,7 @@ class TestAmbiguousPaths:
             bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
 
     def test_disambiguation_with_intermediate_changes_path(self, dataset_test, tmp_path):
-        """A1b: Under Rule 6, the bare ["Image", "Subject"] call raises; the
+        """A1b: Under Path ambiguity, the bare ["Image", "Subject"] call raises; the
         explicit chain call succeeds. Spec §3.6: silent path selection is
         rejected; disambiguation requires naming an intermediate.
 
@@ -1392,7 +1392,7 @@ class TestAmbiguousPaths:
         current_version = dataset_description.dataset.current_version
         bag = dataset_description.dataset.download_dataset_bag(current_version, use_minid=False)
 
-        # Without an intermediate → Rule 6 raises.
+        # Without an intermediate → Path ambiguity raises.
         with pytest.raises(DerivaMLDenormalizeAmbiguousPath):
             bag.get_denormalized_as_dataframe(include_tables=["Image", "Subject"])
 
@@ -1453,7 +1453,7 @@ class TestAmbiguousPaths:
         """A4: Association-table denormalization succeeds when ``row_per`` is explicit.
 
         Renamed from ``test_association_table_single_path``: under the
-        new Rule 2 (sink-finding), the bare
+        new Row grain (sink-finding), the bare
         ``["Image", "Observation", "ClinicalRecord"]`` request raises
         :class:`DerivaMLDenormalizeMultiLeaf` because Image and
         ClinicalRecord both qualify as sinks. The original "single
@@ -1498,7 +1498,7 @@ class TestNewFKPatterns:
     def test_diamond_ambiguity_detected(self, dataset_test, tmp_path):
         """Diamond: Image→Subject has two paths (direct FK and via Observation).
 
-        Under the new semantics (spec §3.6 / Rule 6), the bare
+        Under the new semantics (spec §3.6 / Path ambiguity), the bare
         ["Image", "Subject"] request now RAISES ``DerivaMLDenormalizeAmbiguousPath``
         instead of silently preferring the shortest path. Users must
         disambiguate by adding an intermediate to ``include_tables`` or
@@ -1569,12 +1569,12 @@ class TestNewFKPatterns:
         ``Image → Observation → ClinicalRecord_Observation → ClinicalRecord``
         which requires walking ``Observation ← ClinicalRecord_Observation``
         (upstream through the association's inbound FK from Observation).
-        That's not a monotonic-downstream chain, so Rule 2 auto-sink-
+        That's not a monotonic-downstream chain, so Row grain auto-sink-
         inference can't pick either Image or ClinicalRecord as a unique
         sink — they're on opposite sides of a shared-neighbor relationship
         rather than endpoints of a single-direction FK chain.
 
-        Under the new semantics (Rule 2 sink-finding + Rule 6 direct-path
+        Under the new semantics (Row grain sink-finding + Path ambiguity direct-path
         requirement), the caller must either:
 
         * Explicitly pick ``row_per=Image`` to force Image as the leaf, or
@@ -1948,8 +1948,9 @@ class TestNewFKPatterns:
 class TestVersionPinnedDenormalize:
     """Verify denormalize resolves ``version=`` to a catalog snapshot.
 
-    The contract (per Rule 10 refinement, originally deferred in the
-    spec and now implemented):
+    The contract (per the version-resolution refinement — not a
+    denormalize rule — originally deferred in the spec and now
+    implemented):
 
     * With no ``version=`` kwarg, denormalize runs against whatever
       catalog the ``DerivaML`` / ``Dataset`` instance is bound to —

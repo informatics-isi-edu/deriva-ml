@@ -5,7 +5,7 @@ feature-association table. When the dataset also contains *sibling*
 element types that have no FK path to that target — e.g. an AIREADI
 dataset whose members are ``CGM_Blood_Glucose`` + ``Subject`` +
 ``OCT_DICOM`` and the read targets a ``CGM_Blood_Glucose`` feature —
-those siblings are "unrelated anchors" (denormalizer Rule 8 / case-6).
+those siblings are "unrelated anchors" (denormalizer Anchor disposition case 6).
 
 PR #260 (Stage 3b) delegated **both** ``Dataset.feature_values`` and
 ``DatasetBag.feature_values`` to ``Denormalizer.feature_records``, which
@@ -276,7 +276,7 @@ def test_feature_records_hetero_equals_homo_with_selector(hetero_feature_db) -> 
 
 
 def test_unrelated_anchor_is_genuinely_case_6(hetero_feature_db) -> None:
-    """Guard: the dropped anchor really is a Rule-8 unrelated anchor.
+    """Guard: the dropped anchor really is an Anchor disposition case-6 unrelated anchor.
 
     If ``UnrelatedThing`` were secretly reachable from ``Image`` (a fixture
     drift), the ``feature_records`` non-raise above would be vacuous. This

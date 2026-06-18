@@ -45,7 +45,7 @@ In both cases, transparency means:
 - the planner walks **through** the table in both directions when
   determining reachability (:meth:`_outbound_reachable`);
 - the table does **not** count as an interior table for the
-  diamond-disambiguation rule (Rule 6 in :meth:`_find_path_ambiguities`);
+  diamond-disambiguation rule (Path ambiguity in :meth:`_find_path_ambiguities`);
 - the table's own columns are excluded from the output **unless** the
   caller explicitly names it in ``include_tables``, at which point
   its non-FK metadata columns (``Feature_Name`` / ``Confidence`` /
@@ -67,9 +67,9 @@ What is intentionally **not** transparent:
   off the requested star into the rest of the schema.
 
 **This module is internal.** The user-facing API for denormalization
-is :class:`local_db.denormalize.Denormalizer`. The semantic Rules
-this planner enforces (auto-inferred ``row_per``, downstream-leaf
-rejection, ambiguity detection, orphan emission, …), the full pipeline
+is :class:`local_db.denormalize.Denormalizer`. The named semantic rules
+this planner enforces (Row grain, Column projection, Column hoisting,
+Downstream-leaf rejection, Path ambiguity, Anchor disposition), the full pipeline
 (planner → row-population → SQL emission), the state-ownership model,
 and the fragility map for the denormalize subsystem all live in
 ``docs/user-guide/denormalization.md`` — start there when touching
@@ -85,20 +85,20 @@ Denormalization takes a star-shaped slice of the FK graph and turns
 it into a wide table where each row corresponds to one *leaf-table*
 row (``row_per``). The planner answers four interlocking questions:
 
-1. **Which table is the leaf?** (Rule 2 — spec §3.2)
+1. **Which table is the leaf?** (Row grain — spec §3.2)
    Find the unique sink in the directed FK subgraph on
    ``include_tables ∪ via``: the table with no outbound FK to any
    other table in the set. Zero sinks → cycle (rare; raise).
    Multiple sinks → ambiguous (raise with candidates listed).
    Caller can override via ``row_per=`` and bypass auto-inference.
 
-2. **Is the leaf legal?** (Rule 5 — spec §3.5)
+2. **Is the leaf legal?** (Downstream-leaf rejection — spec §3.5)
    When the caller passes an explicit ``row_per``, verify no table
    in ``include_tables`` is *downstream* of it. A downstream table
    would force an aggregation (one ``row_per`` row vs. many
    downstream rows), which this engine doesn't do.
 
-3. **Is the FK path unique?** (Rule 6 — spec §3.6)
+3. **Is the FK path unique?** (Path ambiguity — spec §3.6)
    For every (``row_per``, ``T``) pair with ``T ∈ include_tables ∪
    via``, enumerate all simple FK paths between them. If more than
    one path exists, the user must disambiguate (add an intermediate
@@ -106,7 +106,7 @@ row (``row_per``). The planner answers four interlocking questions:
    *transparent* — they bridge two tables without contributing
    columns, and they don't count toward path multiplicity.
 
-4. **How do we actually JOIN?** (Rule 4 — spec §3.4)
+4. **How do we actually JOIN?** (Column hoisting — spec §3.4)
    Build a :class:`JoinNode` tree rooted at the leaf table, with
    one edge per FK along the selected paths. Nullable FK columns
    produce ``LEFT JOIN``\\s so upstream rows aren't dropped.
@@ -139,11 +139,12 @@ The methods compose in three layers, lowest first:
 
 **Planner rules** — denormalization semantics layered on primitives:
 
-- :meth:`DenormalizePlanner._find_sinks` — Rule 2.
-- :meth:`DenormalizePlanner._determine_row_per` — Rules 2 + 5.
-- :meth:`DenormalizePlanner._enumerate_paths` — Rule 6 path discovery
+- :meth:`DenormalizePlanner._find_sinks` — Row grain.
+- :meth:`DenormalizePlanner._determine_row_per` — Row grain +
+  Downstream-leaf rejection.
+- :meth:`DenormalizePlanner._enumerate_paths` — Path ambiguity path discovery
   (with transparency filter).
-- :meth:`DenormalizePlanner._find_path_ambiguities` — Rule 6 detection.
+- :meth:`DenormalizePlanner._find_path_ambiguities` — Path ambiguity detection.
 
 **Top-level entries** — produce the consumer-facing plan:
 
@@ -335,8 +336,8 @@ class DenormalizePlanner:
         tables as transparent: they're joined through but their
         columns are excluded from the output unless the caller
         explicitly names them in ``include_tables``. Pure association
-        tables don't count toward path multiplicity in the Rule 6
-        ambiguity check either.
+        tables don't count toward path multiplicity in the Path ambiguity
+        check either.
 
         **Topology, not purity.** Association-ness is determined by FK
         arity alone, not by whether the table also carries metadata
@@ -431,7 +432,7 @@ class DenormalizePlanner:
 
         **Why we don't widen** :meth:`_is_topological_association` **instead**:
         the 2-FK predicate is intentionally strict because the diamond
-        rule (Rule 6) uses it. Conflating "transparent bridge" with
+        rule (Path ambiguity) uses it. Conflating "transparent bridge" with
         "feature" inside a single predicate makes the rule docs harder
         to read and risks accidentally treating other multi-FK shapes
         as transparent in the future. The two predicates compose at the
@@ -753,8 +754,8 @@ class DenormalizePlanner:
         bridge) does **not** treat B as downstream of A — neither
         side fans out into the other through the bridge.
 
-        Used by **Rule 5** (downstream-leaf rejection in
-        :meth:`_determine_row_per`) and **Rule 2** (sink-finding in
+        Used by **Downstream-leaf rejection** (in
+        :meth:`_determine_row_per`) and **Row grain** (sink-finding in
         :meth:`_find_sinks`).
 
         **Why a separate primitive.** :meth:`_outbound_reachable` is
@@ -763,7 +764,8 @@ class DenormalizePlanner:
         *any* FK chain?" — there, the bidirectional bridge hop is the
         right behavior (an Image-anchored set IS related to a
         Dataset-anchored set, even though the bridge sits in between
-        and points at both). For Rules 2 and 5 we need the strict
+        and points at both). For Row grain and Downstream-leaf rejection
+        we need the strict
         directional notion: "if I pick X as row_per, will the rows
         fan out into Y?" A bridge whose two endpoints are both
         upstream of it does not fan out — it produces at most a
@@ -967,7 +969,7 @@ class DenormalizePlanner:
         return relationships[0]
 
     # ------------------------------------------------------------------
-    # Planner rules (Rules 2, 5, 6)
+    # Planner rules (Row grain, Downstream-leaf rejection, Path ambiguity)
     #
     # These methods compose ``_fk_neighbors`` / ``_schema_to_paths`` /
     # ``is_topological_association`` — they do NOT introduce new FK traversal.
@@ -978,7 +980,7 @@ class DenormalizePlanner:
         include_tables: list[str],
         via: list[str] | None = None,
     ) -> list[str]:
-        """Find sinks in the FK subgraph on ``include_tables ∪ via`` (Rule 2).
+        """Find sinks in the FK subgraph on ``include_tables ∪ via`` (Row grain).
 
         A **sink** is a table in ``include_tables`` with no outbound FK
         (in the one-to-many / downstream sense) to any other table in
@@ -1032,16 +1034,17 @@ class DenormalizePlanner:
         via: list[str] | None,
         row_per: str | None,
     ) -> str:
-        """Resolve the ``row_per`` table, implementing Rules 2 and 5.
+        """Resolve the ``row_per`` table, implementing Row grain and
+        Downstream-leaf rejection.
 
         Two paths:
 
         - **Explicit** (``row_per`` not None): validate the caller's
           choice. ``row_per`` must be in ``include_tables``, and no
-          table in ``include_tables`` may be downstream of it (Rule 5 —
-          that would require aggregation, which the current engine
-          doesn't do).
-        - **Auto-infer** (``row_per is None``): apply Rule 2 via
+          table in ``include_tables`` may be downstream of it
+          (Downstream-leaf rejection — that would require aggregation,
+          which the current engine doesn't do).
+        - **Auto-infer** (``row_per is None``): apply Row grain via
           sink-finding. Expect exactly one sink.
 
         Args:
@@ -1056,11 +1059,12 @@ class DenormalizePlanner:
         Raises:
             ValueError: ``row_per`` is not in ``include_tables``.
             DerivaMLDenormalizeDownstreamLeaf: explicit ``row_per`` has
-                downstream table(s) in ``include_tables`` (Rule 5).
+                downstream table(s) in ``include_tables`` (Downstream-leaf
+                rejection).
             DerivaMLDenormalizeNoSink: no sink found (FK cycle in the
                 subgraph — pathological).
             DerivaMLDenormalizeMultiLeaf: auto-inference finds more
-                than one candidate sink (Rule 2).
+                than one candidate sink (Row grain).
 
         Example::
 
@@ -1069,7 +1073,7 @@ class DenormalizePlanner:
             )
             # "Image" (auto-inferred — Image is the sink)
 
-            # Rule 5: Subject with Image downstream is rejected.
+            # Downstream-leaf rejection: Subject with Image downstream is rejected.
             planner._determine_row_per(
                 include_tables=["Subject", "Image"], via=[], row_per="Subject"
             )
@@ -1087,8 +1091,9 @@ class DenormalizePlanner:
         if row_per is not None:
             if row_per not in include_tables:
                 raise ValueError(f"row_per={row_per!r} must be in include_tables={include_tables}")
-            # Rule 5 uses strict downstream (no bidirectional bridge
-            # hop) — picking either side of a transparent bridge as
+            # Downstream-leaf rejection uses strict downstream (no
+            # bidirectional bridge hop) — picking either side of a
+            # transparent bridge as
             # row_per is legitimate, since the bridge produces at
             # most a 1:1:1 join, not a fan-out.
             downstream = self._outbound_reachable_strict(row_per, all_tables)
@@ -1185,7 +1190,7 @@ class DenormalizePlanner:
         include_tables: list[str],
         via: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Enumerate path ambiguities between ``row_per`` and other requested tables (Rule 6).
+        """Enumerate path ambiguities between ``row_per`` and other requested tables (Path ambiguity).
 
         For each ``T`` in ``include_tables ∪ via`` (``T ≠ row_per``),
         enumerate all simple FK paths between ``row_per`` and ``T``
@@ -1652,8 +1657,9 @@ class DenormalizePlanner:
 
         Uses a **JoinTree** approach that preserves path-specific structure:
 
-        1. **Planner guards** -- validate ``row_per`` (Rule 2 / Rule 5) and
-           check for path ambiguity (Rule 6) before any join work.
+        1. **Planner guards** -- validate ``row_per`` (Row grain /
+           Downstream-leaf rejection) and check for path ambiguity
+           (Path ambiguity) before any join work.
         2. **Path discovery** -- ``_schema_to_paths()`` discovers all FK paths
            from Dataset through the schema.
         3. **Path filtering & deduplication** -- keep only paths relevant to
@@ -1709,10 +1715,10 @@ class DenormalizePlanner:
         for t in via_list:
             _ = self.model.name_to_table(t)  # validate existence
 
-        # ── Phase 0: planner guards (Rules 2, 5, 6) ──────────────────────────
+        # ── Phase 0: planner guards (Row grain, Downstream-leaf rejection, Path ambiguity) ──
         # Empty include_tables is a legal degenerate case (caller passes no
         # requested tables and expects an empty result). Skip guards then.
-        # `resolved_row_per` is also the row grain (Rule 1): only routes that
+        # `resolved_row_per` is also the row grain: only routes that
         # END at this table may drive rows (Phase 1c). None when include_tables
         # is empty (no routes emitted at all).
         resolved_row_per: str | None = None
@@ -1776,7 +1782,7 @@ class DenormalizePlanner:
         # FK route because its third table (Subject) is not in include_tables.
         # Key by the endpoint so every route to an include-table is retained.
         #
-        # Only routes that END at the ``row_per`` table may DRIVE rows (Rule 1:
+        # Only routes that END at the ``row_per`` table may DRIVE rows (Row grain:
         # one row per ``row_per`` instance). A route ending at a *non*-``row_per``
         # include-table (e.g. Dataset -> ... -> Subject when row_per is Image)
         # is the wrong grain — those upstream columns are HOISTED into the

@@ -302,9 +302,9 @@ backs `find_features` / `feature_values`. The full table name
 works too.
 
 **Setting `row_per=<target_table>` with a feature shorthand in
-`include_tables` is rejected (Rule 5).** The feature-association
-table is downstream of the target table, and the denormalizer does
-not aggregate. The two intents the caller might have in mind are
+`include_tables` is rejected ([Downstream-leaf rejection](../reference/denormalization.md#downstream-leaf-rejection)).**
+The feature-association table is downstream of the target table, and the
+denormalizer does not aggregate. The two intents the caller might have in mind are
 spelled differently:
 
 ```python
@@ -401,112 +401,86 @@ The workflow: `list_schema_paths` → `list_denormalized_columns` →
 
 ---
 
-## Rules (for when you need to reason about edge cases)
+## The six rules (for when you need to reason about edge cases)
 
-DerivaML's denormalizer is governed by **nine semantic Rules**.
-This section gives the user-facing summary. The full contract
-language (including the planner-level guarantees) is in §6.2 of the
-[implementation contract](../design/denormalization-contract.md).
+DerivaML's denormalizer is governed by **six named semantic rules**.
+The [reference](../reference/denormalization.md#formal-rules) gives the
+formal definitions and the
+[implementation contract](../design/denormalization-contract.md) §6.2
+the planner-level language; this is the user-facing summary, grouped by
+how often you'll meet each rule.
 
-### Rule 1 — Row cardinality
+### Basic behavior (every call)
 
-One output row per **`row_per`-table instance in scope**, plus
-one orphan row per unreached anchor (see Rule 7). "In scope"
-means reachable from some anchor via the FK graph.
+**Row grain.** One output row per **`row_per`-table instance in scope**.
+By default `row_per` is auto-inferred as the "deepest" requested table —
+the one no other requested table points to via FK. (Ties or FK cycles
+raise; pass `row_per=` to resolve.) "In scope" means **FK-reachable from
+a dataset member**, not member-of — see
+[Dataset membership scopes by FK-reachability](#dataset-membership-scopes-by-fk-reachability-not-by-direct-membership).
 
-### Rule 2 — Auto-inference of `row_per`
+**Column projection.** Columns come from `include_tables`. Tables in
+`via`, and association tables that only bridge two requested tables, are
+joined *through* but contribute no columns.
 
-Among the requested tables, the one that no other requested
-table points to via FK is `row_per`. Intuition: the "deepest"
-table in your request.
+**Column hoisting.** For each `row_per` row, upstream columns are hoisted
+from the FK graph and **repeated verbatim** across rows sharing the same
+upstream row (the classic star-schema shape). A table reached through an
+N-to-N link produces one row per `(row_per, linked-row)` combination, so
+the `row_per` count grows. (This is also where a feature `selector`
+reduces a multi-row feature group to one row — see
+[Feature values on images](#feature-values-on-images).)
 
-If two or more candidates tie (multi-leaf), you get an error
-asking you to specify `row_per` explicitly. If the FK subgraph
-has a cycle (no sink), you get an error too.
+### Constraints (cause an error you must resolve)
 
-### Rule 3 — Column projection
+**Downstream-leaf rejection.** If you set `row_per` explicitly and
+another requested table is *downstream* of it (i.e. `row_per` points to
+it via FK), you get `DerivaMLDenormalizeDownstreamLeaf` — one row per
+`row_per` would require aggregating the downstream rows, which
+denormalize doesn't do. Drop `row_per` (let auto-inference pick the
+downstream table) or remove that table from `include_tables`.
 
-Columns come from `include_tables`. Tables in `via` are path-only,
-no columns. Tables that only appear as transitive intermediates
-(e.g., association tables bridging two requested tables) are also
-path-only, no columns.
+**Path ambiguity.** If two or more distinct FK paths connect `row_per`
+to another requested table, you get `DerivaMLDenormalizeAmbiguousPath`
+listing the paths — the result would differ between them, so DerivaML
+won't guess. Add the disambiguating intermediate to `include_tables`
+(its columns appear) or to `via` (path-only), or narrow the request so
+only one path is valid.
 
-### Rule 4 — Column hoisting
+### Anchor disposition (what happens to each member)
 
-For each `row_per` row, upstream columns are hoisted from the FK
-graph and **repeated verbatim** across rows sharing the same
-upstream row. This is the classic star-schema denormalization
-shape.
+Every dataset member (anchor) contributes in exactly one way, by its
+table and reachability:
 
-Tables reached through an N-to-N link produce one output row per
-(row_per, linked-row) combination — the `row_per` count grows
-accordingly.
+- **Member's table is `row_per`** → it's one output row.
+- **Member is upstream of `row_per` and reaches a `row_per` row** →
+  filter-only: it appears via the `row_per` row that hoists it (no row
+  of its own).
+- **Member is upstream of `row_per` but reaches no `row_per` row** → an
+  **orphan row**: its columns populated, `row_per`-side columns NULL
+  (LEFT-JOIN shape). Example: a `Subject` with no Images in scope.
+- **Member's table has no FK path at all** to any `include_tables ∪ via`
+  table → raises `DerivaMLDenormalizeUnrelatedAnchor`. Pass
+  `ignore_unrelated_anchors=True` to silently drop these instead.
 
-### Rule 5 — Downstream-to-`row_per` is rejected
+(`ignore_unrelated_anchors` affects only the last case, never orphan
+emission. The reference's
+[Anchor disposition](../reference/denormalization.md#anchor-disposition)
+table spells out all six sub-cases.)
 
-If you set `row_per` explicitly and another requested table is
-downstream of it (i.e., `row_per` points to it via FK), you get
-an error. This would require aggregation (collapsing N downstream
-rows per `row_per` row), which is a future feature.
+### Anchor-set definition (not a rule)
 
-Workaround: drop `row_per` and let auto-inference pick the
-downstream table, or remove the downstream table from
-`include_tables`.
+The denormalizer's anchor set is the dataset's members **recursively** —
+members of nested datasets are followed transparently, and descendant
+dataset RIDs are threaded into the SQL scope so their members show up
+under the root. (`from_rids` takes anchors directly and does no
+recursion.) This is *how anchors enter the system*, not a denormalize
+behavior — so it's a definition, not one of the six rules.
 
-### Rule 6 — Path ambiguity requires resolution
-
-If there are multiple FK paths between `row_per` and another
-requested table, you get an error listing the paths. Resolve by:
-
-- Adding an intermediate to `include_tables` (its columns are
-  included), or
-- Adding an intermediate to `via` (path-only, no columns), or
-- Narrowing your request so only one path is valid.
-
-Silent path selection is rejected by design — the result would
-be different between the two paths, and DerivaML won't guess.
-
-### Rule 7 — Orphan anchors (LEFT-JOIN semantics)
-
-If an anchor's table is upstream of `row_per` but the anchor
-doesn't reach any `row_per` row (no rows of `row_per` type point
-back to it), the anchor produces an **orphan row** — its columns
-populated, `row_per`-side columns NULL. Upstream FK columns are
-still hoisted for the orphan row.
-
-This is the LEFT-OUTER-JOIN interpretation: every anchor
-contributes at least one row; unreachable ones contribute with
-NULL leaf-side data.
-
-Anchors of types not in `include_tables` are dropped silently
-when they have no path to `row_per` (no warning — they wouldn't
-contribute anyway). Anchors with no FK path **at all** are
-handled by Rule 8.
-
-### Rule 8 — Unrelated anchors
-
-An anchor whose table has no FK path to any table in
-`include_tables ∪ via` raises by default. Pass
-`ignore_unrelated_anchors=True` to silently drop them.
-
-### Rule 9 — Nested datasets
-
-When constructed from a `Dataset` (or `DatasetBag`), the anchor
-set is the dataset's members **recursively**, including all
-members of nested datasets. The `Denormalizer.__init__(dataset)`
-constructor handles the recursive walk; `from_rids` takes
-anchors directly and does no recursion.
-
-Descendant dataset RIDs are also threaded into the SQL filter
-(`Dataset.RID IN (root, ...children)`), so members of nested
-datasets show up correctly under the root.
-
-> **Note on `version`.** A `version` kwarg pins denormalization
-> to a catalog snapshot (see "Version-pinned denormalization"
-> above). This was deferred in earlier specs as "Rule 10"; the
-> kwarg is implemented for live `Dataset` inputs and ignored for
-> bags. There is no separate semantic Rule 10 in the current
-> design.
+> **On `version`.** A `version=` kwarg pins denormalization to a catalog
+> snapshot (see "Version-pinned denormalization" above): implemented for
+> live `Dataset` inputs, ignored for bags. It's a constructor concern,
+> not a semantic rule.
 
 ---
 

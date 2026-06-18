@@ -34,9 +34,9 @@ downloaded bag, or "local" for tests), runs the join in SQL
 against the local cache, and returns the rows. The user sees a
 pandas DataFrame or a row iterator.
 
-The nine semantic Rules summarised in the user-facing section
-are reproduced as Rules 1–9 in §6 below with their full contract
-language.
+The six named semantic rules summarised in the
+[reference](../reference/denormalization.md#formal-rules) are reproduced
+in §6.2 below with their full contract language.
 
 ---
 
@@ -329,7 +329,7 @@ via, ignore_unrelated_anchors)`:
   4. Emits SQL against the local SQLite, runs it, materialises
      rows.
   5. Returns a `DenormalizeResult` (rows + column metadata).
-- **Output row count.** Determined by the nine Rules
+- **Output row count.** Determined by the six rules
   (§6.2). The pipeline is *correct* iff that row count matches
   the server's reality, modulo the freshness caveat below.
 
@@ -377,14 +377,21 @@ whatever version it was built from.
   construction is explicit enough that a silent fallback would
   be worse than the failure.
 
-### 6.2 The nine semantic Rules
+### 6.2 The six semantic rules (full contract language)
 
-Each Rule below has a one-line summary; full contract language
-follows. Rule 1, 3, 4 are descriptive (shape rules); Rules 2,
-5, 6, 7, 8 are operational (the planner enforces them); Rule 9
-governs nested-dataset anchor enumeration.
+The six named rules are defined in the
+[reference](../reference/denormalization.md#formal-rules); this section
+restates them with the full planner-level contract language and error
+text. **Row grain** and **Anchor disposition** each merge two of the
+earlier numbered rules (cardinality + auto-inference; orphan + unrelated
+anchors); the case numbers under Anchor disposition are stable.
+**Column projection** and **Column hoisting** are descriptive (shape)
+rules; **Downstream-leaf rejection**, **Path ambiguity**, and the
+error-raising cases of **Anchor disposition** are operational (the
+planner enforces them). Nested-dataset enumeration is an anchor-set
+definition (§6.3), not a rule.
 
-#### Rule 1: Row cardinality = `|row_per rows in scope|` + `|orphan rows|`
+#### Row grain (cardinality + `row_per` auto-inference)
 
 Each output row corresponds to one of:
 
@@ -394,11 +401,10 @@ Each output row corresponds to one of:
   `include_tables` and upstream of `row_per`, when no `row_per`
   row is reachable from that anchor. Its columns are populated
   from the anchor and its own upstream FKs; `row_per` and
-  downstream columns are NULL.
+  downstream columns are NULL (see Anchor disposition case 3).
 
-#### Rule 2: Auto-inference of `row_per`
-
-Given `include_tables = {T₁, …, Tₙ}`, build the directed graph
+`row_per` is auto-inferred when not given:
+given `include_tables = {T₁, …, Tₙ}`, build the directed graph
 on `include_tables ∪ via` where an edge `A → B` means A has an
 outbound FK to B (directly or via non-member association-table
 intermediates). Find sinks — tables with no outbound edges in
@@ -409,7 +415,7 @@ this subgraph.
 - Multiple sinks → multi-leaf ambiguity; raise
   `DerivaMLDenormalizeMultiLeaf` with candidates listed.
 
-#### Rule 3: Column projection
+#### Column projection
 
 - Columns come **only** from tables in `include_tables`.
 - `via` tables contribute to the join path but not to columns.
@@ -419,7 +425,7 @@ this subgraph.
 - Non-requested tables that are neither `via` nor transparent
   intermediates are not joined at all.
 
-#### Rule 4: Upstream hoisting (star schema)
+#### Column hoisting (star schema)
 
 For each `row_per` row R:
 
@@ -432,7 +438,7 @@ For each `row_per` row R:
   — the output then has `|row_per × (average T-links per
   row_per)|` rows.
 
-#### Rule 5: Explicit `row_per` with downstream table → error
+#### Downstream-leaf rejection (explicit `row_per` with downstream table → error)
 
 If `row_per` is explicitly specified and any table in
 `include_tables` is **downstream** of `row_per` (i.e., `row_per`
@@ -449,7 +455,7 @@ Options:
   • Remove {T} from include_tables.
 ```
 
-#### Rule 6: Multiple FK paths → error
+#### Path ambiguity (multiple FK paths → error)
 
 If between `row_per` and another table T in `include_tables ∪
 via` there exist two or more distinct FK paths, raise
@@ -472,10 +478,11 @@ Suggested intermediates: {list of candidates}
 The "suggested intermediates" list is the set of tables that
 appear in at least one path but not in `include_tables`.
 
-#### Rule 7: Anchor contribution
+#### Anchor disposition (the six anchor cases)
 
 Every anchor must contribute to the output in exactly one way,
-determined by its table and reachability:
+determined by its table and reachability. Cases 3 and 6 are the
+operational ones (orphan emission, unrelated-anchor error):
 
 1. **Anchor table == `row_per`**: contributes one output row
    (the anchor row itself, upstream cols hoisted).
@@ -485,8 +492,8 @@ determined by its table and reachability:
    are in scope). Does not produce its own row — that row
    appears via the `row_per` row that hoists this anchor.
 3. **Anchor table ∈ `include_tables`, upstream of `row_per`,
-   reaches no `row_per` row**: produces one orphan row (Rule 1
-   §6.2 Rule 1).
+   reaches no `row_per` row**: produces one orphan row (see the
+   Row grain rule's orphan-row clause).
 4. **Anchor table ∉ `include_tables`, upstream of `row_per`,
    reaches at least one `row_per` row**: filter-only
    contribution. No orphan row because the anchor's columns
@@ -497,11 +504,12 @@ determined by its table and reachability:
 6. **Anchor table has no FK path to or from any table in
    `include_tables ∪ via`**: raise
    `DerivaMLDenormalizeUnrelatedAnchor` unless
-   `ignore_unrelated_anchors=True` (Rule 8).
+   `ignore_unrelated_anchors=True` (the unrelated-anchor case).
 
 Empty anchor sets (e.g. `{"File": []}` returned by
 `list_dataset_members` for an association table whose row
-count is zero) are skipped entirely and never trigger Rule 8.
+count is zero) are skipped entirely and never trigger the
+unrelated-anchor error.
 
 After the main SQL join runs, `_run` performs a **per-RID
 orphan scan** (Step 4a) to catch upstream scoping anchors whose
@@ -511,9 +519,9 @@ the orphan set and emitted via `_emit_orphan_rows`, producing
 LEFT-JOIN-shaped output rows with the row_per-side columns set
 to `None`.
 
-#### Rule 8: Unrelated anchors
+#### Anchor disposition — the unrelated-anchor error (case 6, detail)
 
-If any anchor falls under Rule 7 case 6 and
+If any anchor falls under Anchor disposition case 6 and
 `ignore_unrelated_anchors=False` (the default), raise
 `DerivaMLDenormalizeUnrelatedAnchor`:
 
@@ -530,11 +538,11 @@ Options:
 When `ignore_unrelated_anchors=True`, unrelated anchors are
 silently ignored (they contribute no row and no filter).
 
-Anchors of Rule 7 case 5 (table ∉ include_tables, unreachable)
-are silently dropped regardless of the flag — they contribute
+Anchors of Anchor disposition case 5 (table ∉ include_tables,
+unreachable) are silently dropped regardless of the flag — they contribute
 no output either way, so there's nothing to warn about.
 
-#### Rule 9: Nested datasets
+#### Nested-dataset anchor enumeration (an anchor-set definition, not a rule)
 
 When constructed from a `Dataset`/`DatasetBag`, the anchor set
 is the dataset's members **recursively**, including all
@@ -558,13 +566,11 @@ fixture-shaped datasets often don't implement it. (RB-06 in
 the 2026-05-26 audit flags this silent-fallback against
 transient network errors as a known robustness gap.)
 
-> **On Rule 10 (`version`).** Earlier drafts treated `version`
-> as a deferred Rule 10. The current implementation accepts a
-> `version` kwarg on `Denormalizer.__init__` (and the
-> Dataset-side sugar methods) and resolves it to a catalog
-> snapshot via `_version_snapshot_catalog`. There is no
-> separate semantic Rule 10 in this design — version-pinning
-> is a constructor-level concern, not a Rule.
+> **On `version`.** Earlier drafts treated `version` as a deferred
+> tenth rule. The current implementation accepts a `version` kwarg on
+> `Denormalizer.__init__` (and the Dataset-side sugar methods) and
+> resolves it to a catalog snapshot via `_version_snapshot_catalog`.
+> Version-pinning is a constructor-level concern, not a semantic rule.
 
 ### 6.3 Anchor classification, nested datasets, and the SQL filter
 
@@ -574,7 +580,7 @@ The Denormalizer's `_run` method partitions the anchor set
 into three buckets via `_classify_anchors`:
 
 - **Scoping** — anchors whose RIDs filter the row_per side.
-  Cases 1, 2, 4 in Rule 7 above.
+  Anchor disposition cases 1, 2, 4 above.
 - **Orphan** — case 3: anchor is in include_tables but has no
   FK path to row_per. Emits LEFT-JOIN-shaped rows via
   `_emit_orphan_rows`.
@@ -769,9 +775,10 @@ cheap validator of `include_tables` before committing to a
 full run.
 
 **Raises:** same planner-rule exceptions as `as_dataframe`
-(Rules 2/5/6) plus the resolver exceptions from §8.4. Rule 7
-and Rule 8 do NOT fire here — anchor classification runs only
-when rows are materialised.
+(Row grain / Downstream-leaf rejection / Path ambiguity) plus the
+resolver exceptions from §8.4. Anchor disposition (orphan + unrelated
+anchors) does NOT fire here — anchor classification runs only when rows
+are materialised.
 
 #### `describe(include_tables, *, row_per=None, via=None) -> dict[str, Any]`
 
@@ -814,7 +821,7 @@ empty default.
 |---|---|---|---|
 | `row_per` | `str \| None` | Resolved leaf table name. | `None` — planner couldn't resolve (multi-leaf, no sink, bad explicit value). |
 | `row_per_source` | `str` | `"explicit"` if the caller passed `row_per`, else `"auto-inferred"`. | Always present. |
-| `row_per_candidates` | `list[str]` | Sink tables from Rule 2 sink-finding (what auto-inference considered). | `[]` — sink-finding raised. |
+| `row_per_candidates` | `list[str]` | Sink tables from Row-grain sink-finding (what auto-inference considered). | `[]` — sink-finding raised. |
 | `columns` | `list[tuple[str, str]]` | `(name, type)` pairs `as_dataframe` would produce. | `[]` — planner raised before columns could be computed. |
 | `include_tables` | `list[str]` | Echo of the caller's input (post feature-name resolution; see §8.4). On resolver failure, falls back to the original input. | Always populated. |
 | `via` | `list[str]` | Echo of the caller's input. | `[]` if not supplied. |
@@ -1061,7 +1068,7 @@ Future engineering on this subsystem should respect:
    `Denormalizer.__init__`, the freshness model in §6, the
    `describe()` envelope shape in §8.3, the
    `_resolve_table_names` algorithm in §8.4, or any of the
-   nine semantic Rules in §6.2.
+   six semantic rules in §6.2.
 3. **Add a test row** to §9 when fixing any denormalize bug.
    The minimum-failing repro becomes the regression test; the
    contract it exposed gets restated in §4–§8. If the test is

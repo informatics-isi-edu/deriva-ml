@@ -3,9 +3,9 @@
 These tests verify the semantic rules independently of any catalog fetching
 or SQL execution. They check the pure model-analysis behavior:
 
-- Rule 2: sink-finding for row_per auto-inference
-- Rule 5: downstream-leaf rejection when row_per is explicit
-- Rule 6: per-pair path ambiguity detection
+- Row grain: sink-finding for row_per auto-inference
+- Downstream-leaf rejection: downstream-leaf rejection when row_per is explicit
+- Path ambiguity: per-pair path ambiguity detection
 
 Most diamond-ambiguity tests use the ``denorm_diamond_deriva_model``
 fixture, which extends the base canned schema with an ``Observation``
@@ -25,7 +25,7 @@ from deriva_ml.core.exceptions import (
 
 
 class TestSinkFinding:
-    """Rule 2: row_per is the unique sink in the FK subgraph on include_tables."""
+    """Row grain: row_per is the unique sink in the FK subgraph on include_tables."""
 
     def test_linear_chain_sink(self, denorm_diamond_deriva_model) -> None:
         """Subject ← Observation ← Image: Image is the sink."""
@@ -55,7 +55,7 @@ class TestSinkFinding:
 
 
 class TestDownstreamLeafRejection:
-    """Rule 5: explicit row_per with downstream table in include_tables → error."""
+    """Downstream-leaf rejection: explicit row_per with downstream table in include_tables → error."""
 
     def test_downstream_leaf_rejected(self, denorm_deriva_model) -> None:
         """row_per=Subject with Image (downstream) → error."""
@@ -81,7 +81,7 @@ class TestDownstreamLeafRejection:
 
 
 class TestPathAmbiguity:
-    """Rule 6: multiple FK paths between row_per and a requested table → error."""
+    """Path ambiguity: multiple FK paths between row_per and a requested table → error."""
 
     def test_no_ambiguity_single_path(self, denorm_deriva_model) -> None:
         """Simple chain without diamond: no ambiguity.
@@ -143,7 +143,7 @@ class TestPathAmbiguity:
 
         A direction reversal at an interior vertex signals a
         common-neighbor shortcut, not a genuine FK join alternative.
-        Rule 6 should NOT flag this as ambiguity: the direct FK is the
+        Path ambiguity should NOT flag this as ambiguity: the direct FK is the
         only valid monotonic-downstream path from Image to Observation.
 
         Without this filter, the planner spuriously reports Image↔
@@ -163,7 +163,7 @@ class TestPathAmbiguity:
 
 
 class TestPrepareWideTableIntegration:
-    """Integration: _prepare_wide_table should raise on ambiguity (Rule 6).
+    """Integration: _prepare_wide_table should raise on ambiguity (Path ambiguity).
 
     This confirms the guards are wired into the public planner entry point.
     We only check the guard behavior — full plan validation is covered by
@@ -198,15 +198,15 @@ class TestPrepareWideTableIntegration:
 
 
 class TestFeatureBridgeDiamond:
-    """Rule 6 over the diamond-with-feature-bridge shape (finding 09 §7.1).
+    """Path ambiguity over the diamond-with-feature-bridge shape (finding 09 §7.1).
 
     This pins the one *intentional behavior change* of the Option E2
     predicate fix. When a target and a value table are connected by
     BOTH a transparent feature bridge AND a second independent FK path,
     the now-transparent bridge hops in ``_is_downstream_chain`` and
-    registers as a competing downstream chain. Rule 6 must therefore
+    registers as a competing downstream chain. Path ambiguity must therefore
     raise ``DerivaMLDenormalizeAmbiguousPath`` — behavior that did NOT
-    fire under the old predicate (the bridge was opaque, so Rule 6 saw
+    fire under the old predicate (the bridge was opaque, so Path ambiguity saw
     only the direct path and planned silently). Raising here is the
     *correct* outcome: there really are two ways to relate the tables,
     so the planner asks the caller to pick.
@@ -270,7 +270,7 @@ class TestFeatureBridgeDiamond:
         Consequently the feature bridge cannot be used to pick the
         bridged path: the ambiguity stands, and the caller must instead
         narrow ``include_tables`` (drop one endpoint). This pins the
-        interaction between transparency and Rule 6's signaling rule.
+        interaction between transparency and Path ambiguity's signaling rule.
         """
         model = denorm_feature_diamond_deriva_model
         result = model._planner._find_path_ambiguities(
@@ -449,7 +449,7 @@ class TestTransparencyPredicates:
     def test_determine_row_per_explicit_image_succeeds(self, denorm_feature_deriva_model) -> None:
         """row_per='Image' is accepted with the feature-assoc bridge.
 
-        With strict-downstream Rule 5, Image_Classification is NOT
+        With strict-downstream Downstream-leaf rejection, Image_Classification is NOT
         considered downstream of Image — the bridge sits between them
         but doesn't produce a fan-out from Image's perspective.
         Explicit ``row_per=Image`` is therefore accepted, and the

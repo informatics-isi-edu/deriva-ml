@@ -159,7 +159,7 @@ class DenormalizeResult:
         """Return a new :class:`DenormalizeResult` with additional rows appended.
 
         Used when combining phases of denormalization — specifically,
-        :meth:`Denormalizer._run` appends orphan rows (Rule 7 case 3)
+        :meth:`Denormalizer._run` appends orphan rows (Anchor disposition case 3)
         emitted by :meth:`Denormalizer._emit_orphan_rows` to the main
         JOIN result.
 
@@ -231,12 +231,12 @@ def _denormalize_impl(
         paged_client: Required when ``source="catalog"``. The client used to
             fetch rows from a live ERMrest catalog.
         row_per: Optional leaf table override. When None (default),
-            auto-inferred by Rule 2 from sinks in ``include_tables``. See
+            auto-inferred by Row grain from sinks in ``include_tables``. See
             :class:`~deriva_ml.local_db.denormalizer.Denormalizer` for
             semantic details.
         via: Optional list of tables forced into the join chain without
             contributing columns. Used to disambiguate path ambiguity
-            (Rule 6).
+            (Path ambiguity).
         selector: Optional callable
             ``(list[FeatureRecord]) -> FeatureRecord | None`` used to reduce
             multi-row feature groups after materialization. When provided,
@@ -283,8 +283,8 @@ def _denormalize_impl(
             include_tables=["Image", "Subject"],
             source="catalog",
             paged_client=ErmrestPagedClient(catalog),
-            row_per="Image",                 # Rule 2 override
-            via=["Observation"],             # Rule 6 disambiguation
+            row_per="Image",                 # Row grain override
+            via=["Observation"],             # Path ambiguity disambiguation
         )
 
     Note:
