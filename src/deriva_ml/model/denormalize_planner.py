@@ -1806,6 +1806,15 @@ class DenormalizePlanner:
                 prefix = route[: elem_pos + 1]
 
                 path_names: list[str] = [t.name for t in prefix]
+                # Tables positioned by the prefix (Dataset -> ... -> element).
+                # Each is joined at its prefix position with the prefix edge's
+                # ON clause, which references the PRECEDING prefix table (already
+                # joined). The subtree edges below must NOT overwrite these — a
+                # subtree edge references the element (joined at/after the prefix
+                # end), so applying it to a table that sits earlier in the prefix
+                # would reference a not-yet-joined table (#320). See the
+                # join-order invariant in test_planner_rules.TestJoinOrderValidity.
+                prefix_names = set(path_names)
                 join_conditions: dict[str, set[tuple]] = {}
                 join_types: dict[str, str] = {}
 
@@ -1830,9 +1839,15 @@ class DenormalizePlanner:
                     if node.table_name not in path_names:
                         path_names.append(node.table_name)
 
-                # Add join conditions from the subtree edges (root has no parent
-                # edge; its condition comes from the prefix walk above).
+                # Add join conditions from the subtree edges, but ONLY for tables
+                # the subtree genuinely appends. A table already positioned by the
+                # prefix keeps its prefix-edge condition (valid for its position);
+                # the subtree edge references the element (joined at/after the
+                # prefix end) and would be invalid at an earlier prefix position
+                # (#320). The root (element) has no parent edge in walk_edges().
                 for _parent_node, child_node in tree.walk_edges():
+                    if child_node.table_name in prefix_names:
+                        continue
                     if child_node.fk_columns:
                         join_conditions[child_node.table_name] = set(child_node.fk_columns)
                         join_types[child_node.table_name] = child_node.join_type
