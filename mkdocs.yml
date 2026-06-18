@@ -56,6 +56,9 @@ nav:
       - Bag Export: reference/bag-export.md
       - Denormalization (formal): reference/denormalization.md
       - Schema: reference/schema.md
+  - Design & Implementation:
+      - Denormalization (implementation contract): design/denormalization-contract.md
+      - Bag-based upload engine: design/bag-based-upload-engine.md
   - Configuration:
       - Overview: configuration/overview.md
       - Configuration Groups: configuration/groups.md

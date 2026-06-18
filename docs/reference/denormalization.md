@@ -111,6 +111,22 @@ the dataset's members define which rows are in scope) and
 [**return shapes**](#return-shapes) (what each of the four methods hands
 back). Both follow the rules table.
 
+## Terminology
+
+These terms are used precisely and consistently across this page, the
+[tutorial](../user-guide/denormalization.md), and the
+[contract](../design/denormalization-contract.md):
+
+| Term | Meaning |
+|---|---|
+| **`row_per` table** / **grain** / **sink** / **leaf** | The table whose rows become output rows — one row per instance of it. "Sink" and "leaf" name the same table from the FK-graph side (it has no outbound FK to another requested table). |
+| **upstream / downstream** | Relative to FK direction. In `Subject ◄── Observation ◄── Image` (Image references Observation references Subject), `Image` is **downstream**, `Subject` is **upstream**. A table is downstream of another if you reach it by following FKs *outward* (`A.fk → B.RID`). |
+| **anchor** | A dataset member — a specific row of a member table — that scopes the output. The anchor *set* is the dataset's members, taken recursively across nested datasets. (Used interchangeably with "member"; "anchor" is the precise term once it's serving as a scope.) |
+| **in scope** | A `row_per` row is in scope if it is **FK-reachable from some anchor**, in either direction — not necessarily a direct dataset member. |
+| **transparent intermediate** | An association table on a join path between two requested tables. It is joined *through* but contributes **no columns** (a "bridge"). Feature-association tables are transparent intermediates too. |
+| **orphan row** | A row produced for an anchor that is in `include_tables` but reaches no `row_per` row: its own columns are populated, the `row_per`-side columns are `NULL` (a LEFT-JOIN-shaped row). |
+| **route** vs **path** | A **route** is a `Dataset → … → element` chain (one of possibly several ways the dataset reaches an element); routes to the *same* element are unioned ([FK-reachable scoping](#fk-reachable-scoping)). A **path** is a `row_per → … → table` FK chain between two requested tables; *distinct* paths to the same table are an error ([Path ambiguity](#path-ambiguity)). They are different concepts — see each rule. |
+
 ## Formal rules
 
 <a id="row-grain"></a>
@@ -120,14 +136,27 @@ back). Both follow the rules table.
 `row_per` defaults to the furthest-downstream requested table.**
 
 "In scope" means **FK-reachable from a dataset member**, not *member-of*
-(see [FK-reachable scoping](#fk-reachable-scoping)). By default `row_per`
-is **auto-inferred**: among `include_tables`, the one that no other
-requested table points to via FK — the "deepest" / furthest-downstream
-table — becomes the grain. Auto-inference **raises** if two candidates
-tie (`DerivaMLDenormalizeMultiLeaf`) or the FK subgraph has a cycle with
-no sink (`DerivaMLDenormalizeNoSink`); pass `row_per=` explicitly to
-resolve. (Setting `row_per` to a table *downstream* of another requested
-table is rejected — see [Downstream-leaf rejection](#downstream-leaf-rejection).)
+(see [FK-reachable scoping](#fk-reachable-scoping)).
+
+**Auto-inference (the default).** Build a directed graph over
+`include_tables ∪ via` whose edges are **direct** FK references between
+domain tables (`A.fk_col → B.RID`). Association tables — M:N bridges and
+feature-association tables — are **not** edges here: two tables linked
+only *through* an association establish no downstream direction between
+them (the bridge is a 1:1:1 hop, not a fan-out). The **sinks** of this
+graph (tables with no outbound edge) are the `row_per` candidates,
+restricted to `include_tables` — a `via` table participates in the graph
+but can never be the grain, since its columns aren't projected. Then:
+
+- **exactly one sink** → that table is `row_per`;
+- **two or more sinks** → `DerivaMLDenormalizeMultiLeaf` (pass `row_per=`
+  to pick one);
+- **no sink** (an FK cycle) → `DerivaMLDenormalizeNoSink`.
+
+**Explicit `row_per`.** Must name a table in `include_tables` (it has no
+meaning if its columns aren't in the output) — otherwise `ValueError`.
+Setting it to a table *downstream* of another requested table is
+rejected — see [Downstream-leaf rejection](#downstream-leaf-rejection).
 `[deriva-ml]`
 `src/deriva_ml/local_db/denormalizer.py::Denormalizer.as_dataframe`
 (`row_per` argument; sink-finding is
@@ -161,6 +190,14 @@ star-schema shape. A table reached through an N-to-N link produces one
 output row per `(row_per, linked-row)` combination, so the `row_per`
 count can grow. Output columns use `Table.column` notation (e.g.
 `Subject.Name`).
+
+**Join type follows FK nullability.** Each hop to an upstream table is an
+`INNER JOIN` when the FK column is `NOT NULL` and a `LEFT OUTER JOIN`
+when the FK column is nullable. This matters: a `row_per` row with a
+`NULL` FK survives the join (its columns for that upstream table come
+back `NULL`) rather than being dropped — so a nullable FK never reduces
+the `row_per` row count. An `INNER JOIN` is safe only because the
+`NOT NULL` constraint guarantees a matching upstream row.
 
 This is also where a **feature `selector`** acts: when `include_tables`
 contains **exactly one** feature-association table, the optional
@@ -216,7 +253,16 @@ same element and never raises.)
 ### Anchor disposition
 
 **Every dataset member (anchor) contributes in exactly one way,
-determined by its table and reachability.** The six cases:
+determined by its table and reachability.**
+
+**"Reaches a `row_per` row" is direction-agnostic.** An anchor reaches
+`row_per` if there is *any* FK chain connecting the anchor's table and
+`row_per`, **in either direction** — the anchor either sits upstream of
+`row_per` (its columns get hoisted onto the `row_per` rows it points to)
+or downstream (it points *at* `row_per`, scoping which `row_per` rows are
+in play). Both serve as a filter on the output. A reader who assumes
+"reaches" means strictly-downstream-only would wrongly drop the upstream
+case. The six cases:
 
 | Case | Anchor table | Reaches a `row_per` row? | Contribution |
 |---|---|---|---|
@@ -367,10 +413,15 @@ table to hoist ([Column hoisting](#column-hoisting)).
 
 ### A multi-table star-schema flatten (illustrative)
 
-*Illustrative* — described on a small hand-drawn schema; the real demo
-catalog wasn't captured for this multi-table shape. With the FK chain
-`Subject ◄── Observation ◄── Image` (Image references Observation,
-Observation references Subject):
+!!! note "Illustrative — not captured output"
+    The schema and the result table below are **hand-drawn** to show the
+    star-schema *shape*; they are not pasted from a real catalog capture
+    (unlike the single-table example above, which is verified against demo
+    catalog `106`). Treat the row counts and values as schematic, not as
+    ground truth — verify against your own schema before relying on them.
+
+With the FK chain `Subject ◄── Observation ◄── Image` (Image references
+Observation, Observation references Subject):
 
 ```python
 bag.get_denormalized_as_dataframe(["Subject", "Observation", "Image"])

@@ -437,6 +437,13 @@ For each `row_per` row R:
   (R, T-row) combination. The `row_per` count grows accordingly
   — the output then has `|row_per × (average T-links per
   row_per)|` rows.
+- **Each hop's join type is `LEFT OUTER JOIN` when the FK column is
+  nullable, `INNER JOIN` when it is `NOT NULL`** (`_build_join_tree`
+  sets `join_type="left"` iff `fk_col.nullok`; `_denormalize_impl`
+  emits `outerjoin` vs `join` accordingly). A nullable FK therefore
+  never drops a `row_per` row — the row survives with `NULL` columns
+  for that upstream table. An `INNER JOIN` is correct only because the
+  `NOT NULL` constraint guarantees a match.
 
 #### Downstream-leaf rejection (explicit `row_per` with downstream table → error)
 

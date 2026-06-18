@@ -421,8 +421,9 @@ a dataset member**, not member-of — see
 [Dataset membership scopes by FK-reachability](#dataset-membership-scopes-by-fk-reachability-not-by-direct-membership).
 
 **Column projection.** Columns come from `include_tables`. Tables in
-`via`, and association tables that only bridge two requested tables, are
-joined *through* but contribute no columns.
+`via`, and the association tables that only bridge two requested tables
+(*transparent intermediates*), are joined *through* but contribute no
+columns.
 
 **Column hoisting.** For each `row_per` row, upstream columns are hoisted
 from the FK graph and **repeated verbatim** across rows sharing the same
