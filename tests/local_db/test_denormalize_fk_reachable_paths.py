@@ -28,6 +28,47 @@ def test_prepare_wide_table_emits_membership_and_fk_routes(demo_catalog_planner)
     assert "Dataset_Subject" in all_path_tables, f"FK-reachable route missing: {all_path_tables}"
 
 
+def test_only_row_per_element_drives_routes(demo_catalog_planner):
+    """Multi-element requests must emit row-driving routes for the ``row_per``
+    element ONLY — never for the hoisted upstream elements.
+
+    Regression for the wide-table cartesian bug (#322): after #318 retained
+    every ``Dataset -> ... -> endpoint`` route, ``_prepare_wide_table`` keyed
+    one ``join_tables`` entry per *endpoint* — including non-``row_per``
+    include-tables. The consumer SELECTs the full column set for every route,
+    so a ``Subject#*`` route (which never joins ``Image``) cross-joins
+    ``Image``'s columns and produces a cartesian product.
+
+    For ``[Image, Subject]`` the sink auto-infers to ``Image`` (Image is
+    downstream of Subject via ``Image.Subject``). ``Subject``'s columns must be
+    HOISTED into the ``Image#*`` routes' shared subtree, not emitted as their
+    own row-driving routes. So every ``join_tables`` key must name the
+    ``row_per`` element ``Image`` — zero ``Subject#`` routes.
+
+    (The live-catalog analog is ``[Image, Observation]`` on the demo catalog,
+    where ``Image.Observation`` plays the role ``Image.Subject`` plays here;
+    pinned end-to-end in ``tests/dataset/test_denormalize.py``.)
+    """
+    planner, dataset_stub, dataset_rid = demo_catalog_planner
+    # row_per auto-infers to Image (furthest-downstream of the pair, via Image.Subject).
+    join_tables, _cols, _multi = planner._prepare_wide_table(
+        dataset_stub, dataset_rid, ["Image", "Subject"]
+    )
+    # Keys are "{element}#{route_index}"; the element prefix is the part before "#".
+    elements = {key.split("#", 1)[0] for key in join_tables}
+    assert elements == {"Image"}, (
+        "only the row_per element (Image) may drive rows; a non-row_per route "
+        f"would cross-join the full column set. Got route elements: {sorted(elements)}"
+    )
+    # Every retained Image route must still cover Subject (so its columns are
+    # hoisted, not dropped) — the FK-reachable union must not lose data.
+    for key, (path, _jc, _jt) in join_tables.items():
+        assert "Subject" in path, (
+            f"route {key} dropped Subject from its join path {path}; "
+            "Subject columns would be NULL instead of hoisted"
+        )
+
+
 def test_genuine_column_ambiguity_still_raises(denorm_diamond_deriva_model):
     """Multiple Dataset->element ROUTES are unioned (not an error), but a genuine
     row_per<->include-table COLUMN ambiguity must still raise after the multi-route change.
