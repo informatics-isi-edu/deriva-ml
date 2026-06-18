@@ -13,12 +13,11 @@ bag.get_denormalized_as_dataframe(["file", "biosample"]) to return 0 rows becaus
 3. Denormalization can't join through an empty table
 """
 
-import pytest
 from deriva.core.typed import BuiltinType, ColumnDef, ForeignKeyDef, KeyDef, TableDef
 
 from deriva_ml import DerivaML
-from deriva_ml.execution.execution import ExecutionConfiguration
 from deriva_ml.core.definitions import MLVocab
+from deriva_ml.execution.execution import ExecutionConfiguration
 
 
 class TestCompositeFKDenormalize:
@@ -98,6 +97,14 @@ class TestCompositeFKDenormalize:
                 ],
             )
         )
+
+        # The tables above were created on a fresh getCatalogModel(), which
+        # is a different object than the held model that ml.pathBuilder()
+        # builds from (and caches by model identity). Without a refresh, the
+        # subsequent _populate step's pathBuilder can't see the new tables
+        # (KeyError 'Group'). Rebind the held model + invalidate the
+        # path-builder cache so the new schema is visible.
+        ml.refresh_schema(force=True)
 
     def _populate_composite_fk_data(self, ml: DerivaML) -> dict:
         """Insert test data into composite FK tables.

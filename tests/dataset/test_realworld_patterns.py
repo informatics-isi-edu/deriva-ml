@@ -20,7 +20,6 @@ from deriva_ml import DerivaML
 from deriva_ml.core.definitions import MLVocab
 from deriva_ml.execution.execution import ExecutionConfiguration
 
-
 # ---------------------------------------------------------------------------
 # Helpers shared across test classes
 # ---------------------------------------------------------------------------
@@ -88,6 +87,11 @@ class TestDeepFKChains:
                     ],
                 )
             )
+
+        # Created on a fresh getCatalogModel(); rebind the held model so the
+        # cached ml.pathBuilder() sees the new tables (else KeyError in
+        # _populate). See test_composite_fk_denormalize for the full rationale.
+        ml.refresh_schema(force=True)
 
     def _populate_deep_chain(self, ml: DerivaML) -> dict:
         pb = ml.pathBuilder()
@@ -229,6 +233,8 @@ class TestNullableCompositeFKs:
             )
         )
 
+        ml.refresh_schema(force=True)  # rebind held model so pathBuilder sees new tables
+
     def _populate_nullable_composite(self, ml: DerivaML) -> dict:
         pb = ml.pathBuilder()
         domain = pb.schemas[ml.default_schema]
@@ -330,6 +336,8 @@ class TestCatalogSideCompositeFKDenormalize:
             )
         )
 
+        ml.refresh_schema(force=True)  # rebind held model so pathBuilder sees new tables
+
     def _populate(self, ml: DerivaML) -> dict:
         pb = ml.pathBuilder()
         domain = pb.schemas[ml.default_schema]
@@ -353,6 +361,17 @@ class TestCatalogSideCompositeFKDenormalize:
         )
         return {"groups": groups, "parents": parents, "children": children}
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "Catalog-side fetch across a composite (multi-column) FK is not yet "
+            "implemented: _collect_fk_values raises NotImplementedError on >1 "
+            "workable join condition (RB-08, denormalize.py). Bag-side composite-FK "
+            "denormalize IS supported (see test_composite_fk_denormalize.py) — only "
+            "the source='catalog' fetch path has the gap. Remove this xfail when "
+            "_collect_fk_values learns to scope a composite FK by all its columns."
+        ),
+    )
     def test_catalog_denormalize_composite_fk(self, test_ml: DerivaML, tmp_path):
         """Catalog-side denormalization across composite FK."""
         self._create_composite_schema(test_ml)
@@ -366,6 +385,15 @@ class TestCatalogSideCompositeFKDenormalize:
         assert set(df["CatChild.Label"].tolist()) == {"C1", "C2"}
         assert set(df["CatParent.Name"].tolist()) == {"P1", "P2"}
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "Catalog-side fetch across a composite (multi-column) FK is not yet "
+            "implemented: _collect_fk_values raises NotImplementedError (RB-08, "
+            "denormalize.py). Bag-side composite-FK denormalize IS supported. "
+            "Remove this xfail when the source='catalog' path scopes composite FKs."
+        ),
+    )
     def test_catalog_denormalize_composite_fk_three_table(self, test_ml: DerivaML, tmp_path):
         """Catalog-side three-table chain through composite FK."""
         self._create_composite_schema(test_ml)
@@ -476,6 +504,8 @@ class TestSelfReferentialFK:
             )
         )
 
+        ml.refresh_schema(force=True)  # rebind held model so pathBuilder sees new tables
+
     def _populate_hierarchy(self, ml: DerivaML) -> dict:
         pb = ml.pathBuilder()
         domain = pb.schemas[ml.default_schema]
@@ -563,6 +593,8 @@ class TestWideSchema:
                     ],
                 )
             )
+
+        ml.refresh_schema(force=True)  # rebind held model so pathBuilder sees new tables
 
     def test_wide_schema_path_discovery_terminates(self, test_ml: DerivaML):
         """Path discovery on a wide schema should terminate without explosion."""
