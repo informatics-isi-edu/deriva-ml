@@ -1533,6 +1533,7 @@ def _base_schema_doc() -> dict:
 
 # Absolute path to the demo catalog schema shipped with the dataset tests.
 _DEMO_CATALOG_SCHEMA = Path(__file__).resolve().parents[1] / "dataset" / "demo-catalog-schema.json"
+_EYE_AI_CATALOG_SCHEMA = Path(__file__).resolve().parents[1] / "dataset" / "eye-ai-catalog-schema.json"
 
 
 class _DenormDatasetStub:
@@ -1591,6 +1592,35 @@ def demo_catalog_planner() -> tuple[Any, _DenormDatasetStub, str]:
     # RIDs are opaque: synthesize a unique placeholder rather than embedding a
     # literal. The planner never treats this as a live catalog RID in the
     # catalog-free path; it only flows through the join plan as an identifier.
+    dataset_rid = f"1-{uuid.uuid4().hex[:8].upper()}"
+    dataset_stub = _DenormDatasetStub(dataset_rid)
+    return deriva_model._planner, dataset_stub, dataset_rid
+
+
+@pytest.fixture
+def eye_ai_planner() -> tuple[Any, _DenormDatasetStub, str]:
+    """Catalog-free planner over the committed eye-ai schema fixture.
+
+    The eye-ai schema has the multi-route topology that exposed the #320
+    JOIN-order regression: ``Subject`` and ``Observation`` are reachable from
+    ``Dataset`` via membership associations (e.g. ``Subject_Dataset``), while
+    ``Image`` is FK-reachable through ``Observation`` (``Image.Observation``).
+    A request over ``[Subject, Observation, Image]`` therefore yields routes
+    whose ``Dataset -> ... -> Image`` prefix places ``Observation``/``Subject``
+    *before* ``Image`` — the shape that makes a subtree edge's ON clause
+    reference a not-yet-joined table.
+
+    Returns ``(planner, dataset_stub, dataset_rid)`` mirroring
+    :func:`demo_catalog_planner`.
+    """
+    model = Model.fromfile("file-system", _EYE_AI_CATALOG_SCHEMA)
+    ml_schema = "deriva-ml"
+    domain_schemas = {s for s in model.schemas.keys() if s != ml_schema}
+    deriva_model = DerivaModel(
+        model=model,
+        ml_schema=ml_schema,
+        domain_schemas=domain_schemas,
+    )
     dataset_rid = f"1-{uuid.uuid4().hex[:8].upper()}"
     dataset_stub = _DenormDatasetStub(dataset_rid)
     return deriva_model._planner, dataset_stub, dataset_rid

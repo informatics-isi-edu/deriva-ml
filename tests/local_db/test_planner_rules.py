@@ -574,3 +574,55 @@ class TestTransparencyPredicates:
         assert broad == {"Image_Classification"}, (
             f"bidirectional reach should still see Image_Classification through the bridge, got {broad}"
         )
+
+
+class TestJoinOrderValidity:
+    """Every emitted route must order its JOINs so that no ON clause references
+    a table joined later (#320 regression).
+
+    The consumer (``_denormalize_impl``) joins the tables of each route in
+    ``path_names`` order, using ``join_conditions[table]`` for the ON clause.
+    SQLite (and any SQL engine) rejects ``... JOIN B ON A.x = B.y ...`` when
+    ``A`` is joined *after* ``B`` ("ON clause references tables to its right").
+
+    #318 introduced multi-hop ``Dataset -> ... -> element`` route prefixes. On a
+    multi-route topology (a table reachable via a membership association while
+    another requested table is FK-reachable through it), the prefix can place a
+    subtree table *before* the element, yet the subtree edge's ON clause
+    references the element — producing an invalid join order. This pins the
+    invariant that prevented it.
+    """
+
+    @staticmethod
+    def _on_clause_tables(col_pairs) -> set[str]:
+        """Tables referenced by an ON clause (both sides of each fk/pk pair)."""
+        tables: set[str] = set()
+        for fk_col, pk_col in col_pairs:
+            tables.add(fk_col.table.name)
+            tables.add(pk_col.table.name)
+        return tables
+
+    def test_no_join_references_a_later_table(self, eye_ai_planner) -> None:
+        """For the [Subject, Observation, Image] request on the eye-ai schema,
+        no route emits a JOIN whose ON clause references a not-yet-joined table.
+        """
+        planner, stub, dataset_rid = eye_ai_planner
+        element_tables, _cols, _multi = planner._prepare_wide_table(
+            stub, dataset_rid, ["Subject", "Observation", "Image"]
+        )
+        assert element_tables, "planner produced no routes"
+
+        violations: list[str] = []
+        for key, (path, join_conditions, _join_types) in element_tables.items():
+            for i, table_name in enumerate(path):
+                col_pairs = join_conditions.get(table_name)
+                if not col_pairs:
+                    continue  # root/Dataset or no condition
+                later_tables = set(path[i + 1 :])
+                refs_later = self._on_clause_tables(col_pairs) & later_tables
+                if refs_later:
+                    violations.append(
+                        f"route '{key}': JOIN {table_name} ON references "
+                        f"not-yet-joined {sorted(refs_later)} (path={path})"
+                    )
+        assert not violations, "invalid JOIN order (#320):\n" + "\n".join(violations)
