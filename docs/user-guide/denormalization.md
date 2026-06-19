@@ -317,7 +317,15 @@ ds.get_denormalized_as_dataframe(
     ["Image", "Image_Class"],
     row_per="Image",
 )
-# OK: one row per Image, Image_Class.Name projected.
+# Image_Class.Name is projected onto Image rows — BUT this is "one row
+# per Image" ONLY when each Image has exactly ONE feature value. The
+# join still passes through the (hidden) feature-association table, which
+# has one row per (Image, Execution) annotation. If an Image was
+# annotated by N executions/annotators, that Image appears N times, each
+# with its own Image_Class.Name. Denormalize does NOT aggregate. To force
+# one row per Image, reduce the feature group with a `selector=` (see the
+# "Feature values on images" example) — that collapses the N annotations
+# to one BEFORE projection.
 
 # Intent B: "one row per feature observation." Let auto-inference
 # pick the feature-association table as row_per (the default
