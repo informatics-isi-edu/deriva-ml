@@ -218,3 +218,73 @@ class AssetSpecConfig:
 
     rid: str
     cache: bool = False
+
+
+class LocalFile(BaseModel):
+    """Specification for a local file consumed as an input to an execution.
+
+    Declares a file on the local filesystem (or an external URL) that the
+    execution consumes. Used in ``ExecutionConfiguration.assets`` alongside
+    :class:`AssetSpec`: an ``AssetSpec`` names a *catalog-resident* asset by
+    RID, while a ``LocalFile`` names a file by **path**, which the framework
+    registers in the ``File`` table on the caller's behalf (computing its MD5,
+    minting a ``File`` RID) during input resolution.
+
+    Role is **Input by context** — a file declared in ``assets=`` is consumed,
+    so it is an input. There is no role field (the same rule as ``AssetSpec``);
+    files a run *produces* are Hatrac-backed execution assets, not
+    ``LocalFile`` declarations. The model forbids extra fields, so a stray
+    ``asset_role=`` is rejected.
+
+    Attributes:
+        path: Local filesystem path (or URL) of the file to register and
+            consume. A bare string is accepted as shorthand.
+        cache: If True, cache by MD5 checksum in the DerivaML cache directory
+            (mirrors ``AssetSpec.cache``).
+
+    Example:
+        >>> spec = LocalFile(path="/data/labels.csv")
+        >>> spec = LocalFile(path="/data/labels.csv", cache=True)
+        >>> # Bare-string shorthand works inside ``assets=`` lists (where the
+        >>> # value is validated), routing on shape — a ``{"path": ...}`` entry
+        >>> # becomes a LocalFile, a bare RID string an AssetSpec.
+    """
+
+    path: str
+    cache: bool = False
+
+    model_config = ConfigDict(**VALIDATION_CONFIG, extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _check_bare_path(cls, data: Any) -> Any:
+        """Allow a bare path string as shorthand."""
+        return {"path": data} if isinstance(data, str) else data
+
+
+# Interface for hydra-zen
+@hydrated_dataclass(LocalFile)
+class LocalFileConfig:
+    """Hydra-zen configuration interface for ``LocalFile``.
+
+    Lets a ``.yaml`` experiment declare a local-file input by path. Plain
+    scalar fields only (``path``, ``cache``) — no ``Literal`` fields, which
+    omegaconf < 2.4 cannot serialize. Role is not configurable (a declared
+    file is an input by context).
+
+    Use in hydra-zen store definitions::
+
+        >>> from hydra_zen import store  # doctest: +SKIP
+        >>> asset_store = store(group="assets")  # doctest: +SKIP
+        >>> asset_store(  # doctest: +SKIP
+        ...     [LocalFileConfig(path="/data/labels.csv")],
+        ...     name="external_labels",
+        ... )
+
+    Attributes:
+        path: Local filesystem path (or URL). Mirrors ``LocalFile.path``.
+        cache: Mirrors ``LocalFile.cache``.
+    """
+
+    path: str
+    cache: bool = False

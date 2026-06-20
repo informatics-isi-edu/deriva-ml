@@ -11,8 +11,8 @@ This module provides classes for managing assets (files) in a Deriva catalog:
 
 from .asset import Asset
 from .asset_record import AssetRecord, asset_record_class
-from .aux_classes import AssetFilePath, AssetSpec, AssetSpecConfig
-from .manifest import AssetManifest, AssetEntry
+from .aux_classes import AssetFilePath, AssetSpec, AssetSpecConfig, LocalFile, LocalFileConfig
+from .manifest import AssetEntry, AssetManifest
 
 __all__ = [
     "Asset",
@@ -22,5 +22,7 @@ __all__ = [
     "AssetRecord",
     "AssetSpec",
     "AssetSpecConfig",
+    "LocalFile",
+    "LocalFileConfig",
     "asset_record_class",
 ]
