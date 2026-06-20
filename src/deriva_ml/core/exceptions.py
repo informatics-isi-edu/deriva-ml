@@ -681,23 +681,48 @@ class DerivaMLDenormalizeMultiLeaf(DerivaMLDenormalizeError):
         candidates: list of table names that all qualify as sinks.
         include_tables: the ``include_tables`` argument that triggered
             the ambiguity, for reference.
+        bridge_suggestions: table names **not** in ``include_tables`` that
+            lie on an FK path connecting two of the candidates. Adding one
+            of these to ``include_tables`` joins the otherwise-disconnected
+            candidates into a single chain (so auto-inference resolves to a
+            single grain). Empty when the candidates share no connecting
+            path — they are genuinely disjoint and only an explicit
+            ``row_per`` will resolve them.
 
     Example:
         >>> try:  # doctest: +SKIP
-        ...     d.as_dataframe(["Dataset", "Subject"])
+        ...     d.as_dataframe(["Subject", "Clinical_Records"])
         ... except DerivaMLDenormalizeMultiLeaf as e:
-        ...     print(f"Pick one of {e.candidates} as row_per")
-        ...     # Then retry: d.as_dataframe(..., row_per="Subject")
+        ...     if e.bridge_suggestions:
+        ...         # add a bridge to connect them, e.g. ["Subject", "Visit", "Clinical_Records"]
+        ...         print(f"add one of {e.bridge_suggestions} to include_tables")
+        ...     else:
+        ...         print(f"pick one of {e.candidates} as row_per")
     """
 
-    def __init__(self, candidates: list[str], include_tables: list[str]) -> None:
+    def __init__(
+        self,
+        candidates: list[str],
+        include_tables: list[str],
+        bridge_suggestions: list[str] | None = None,
+    ) -> None:
         self.candidates = list(candidates)
         self.include_tables = list(include_tables)
-        super().__init__(
+        self.bridge_suggestions = list(bridge_suggestions or [])
+        msg = (
             f"Multiple candidates for row_per: {candidates}. "
-            f"Specify row_per=... explicitly. "
-            f"(include_tables={include_tables})"
+            f"They are not on a single foreign-key chain within "
+            f"include_tables={include_tables}. "
         )
+        if self.bridge_suggestions:
+            msg += (
+                f"Add a connecting table to include_tables to join them — "
+                f"e.g. one of {self.bridge_suggestions} — or specify "
+                f"row_per=... explicitly to pick a grain."
+            )
+        else:
+            msg += "Specify row_per=... explicitly to pick a grain."
+        super().__init__(msg)
 
 
 class DerivaMLDenormalizeNoSink(DerivaMLDenormalizeError):
