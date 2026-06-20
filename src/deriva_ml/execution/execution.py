@@ -37,7 +37,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Literal
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
@@ -2040,6 +2040,7 @@ class Execution:
         files: Iterable[FileSpec],
         dataset_types: str | list[str] | None = None,
         description: str = "",
+        asset_role: Literal["Input", "Output"] = "Output",
     ) -> "Dataset":
         """Adds files to the catalog with their metadata.
 
@@ -2050,6 +2051,8 @@ class Execution:
             files: File specifications containing MD5 checksum, length, and URL.
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
+            asset_role: ``"Input"`` (file consumed by this execution) or
+                ``"Output"`` (file produced by it). Defaults to ``"Output"``.
 
         Returns:
             RID: Dataset  that identifies newly added files. Will be nested to mirror original directory structure
@@ -2074,6 +2077,7 @@ class Execution:
             execution_rid=self.execution_rid,
             dataset_types=dataset_types,
             description=description,
+            asset_role=asset_role,
         )
 
     # =========================================================================
