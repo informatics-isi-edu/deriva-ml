@@ -124,3 +124,29 @@ class TestGetExecutionEnvironment:
             json.dumps(env, default=str)
         except TypeError as e:
             pytest.fail(f"get_execution_environment is not JSON-serializable: {e}")
+
+
+class TestGetGpuInfo:
+    """Provenance contract I6 — best-effort GPU capture.
+
+    ``get_gpu_info`` does not exist yet; these are the executable spec for it
+    (xfail until it lands). Per the contract it must be best-effort and
+    dependency-free: probe ``nvidia-smi`` / guarded ``torch.cuda``, and
+    degrade to ``{"available": False}`` (never raise) when neither is present.
+    """
+
+    @pytest.mark.xfail(reason="get_gpu_info not implemented", strict=True)
+    def test_returns_dict_and_degrades_gracefully(self):
+        from deriva_ml.execution.environment import get_gpu_info
+
+        info = get_gpu_info()
+        assert isinstance(info, dict)
+        # On a host with no GPU and no torch, it must report absence
+        # explicitly rather than raise or omit.
+        if not info.get("available", False):
+            assert info.get("available") is False
+
+    @pytest.mark.xfail(reason="get_gpu_info not wired into get_execution_environment", strict=True)
+    def test_gpu_section_in_aggregate(self):
+        env = get_execution_environment()
+        assert "gpu" in env, f"expected a 'gpu' section in the env snapshot: keys = {sorted(env.keys())}"
