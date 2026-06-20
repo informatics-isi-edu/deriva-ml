@@ -18,6 +18,7 @@ from __future__ import annotations
 import pytest
 
 from deriva_ml import MLVocab as vc
+from deriva_ml.core.constants import ML_SCHEMA
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.state_store import ExecutionStatus
@@ -217,6 +218,31 @@ def test_F1_new_dataset_version_has_a_producer(test_ml):
     )
 
 
+@pytest.mark.integration
+def test_F0_sentinels_seeded_at_catalog_init(test_ml):
+    """F0 — A freshly initialized catalog has the three unknown-provenance
+    sentinels (Workflow, File, Execution), reachable via the accessors.
+
+    Seeded by initialize_ml_schema, so EVERY catalog-creation path (prod,
+    demo, and the test fixtures) gets them. The accessors resolve them by
+    their reserved identifiers.
+    """
+    ml = test_ml
+
+    file_rid = ml.unknown_provenance_file_rid()
+    exec_rid = ml.unknown_provenance_execution_rid()
+    assert file_rid and exec_rid
+
+    # Idempotent: a second call returns the same RIDs (no duplicate seeding).
+    assert ml.unknown_provenance_file_rid() == file_rid
+    assert ml.unknown_provenance_execution_rid() == exec_rid
+
+    # The sentinel Execution is a real, resolvable Execution row.
+    assert ml.resolve_rid(exec_rid).table.name == "Execution"
+    # The sentinel File is a real File row.
+    assert ml.resolve_rid(file_rid).table.name == "File"
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # H. Lineage (data-flow, per ADR-0001)
 # ─────────────────────────────────────────────────────────────────────────
@@ -380,24 +406,44 @@ def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
 
 @pytest.mark.integration
 @pytest.mark.xfail(
-    reason="Unknown-provenance Execution sentinel not implemented. An artifact "
-    "with no real producer must attribute to the seeded unknown-provenance "
-    "Execution sentinel so lineage returns 'unknown origin', never null.",
+    reason="Producerless-artifact attribution not implemented. A dataset with "
+    "no producing execution must attribute to the seeded unknown-provenance "
+    "Execution sentinel so get_lineage() returns 'unknown origin', never a "
+    "null dead-end. The sentinel + its accessor exist (covered by F0); what is "
+    "unbuilt is the attribution that routes a producerless artifact to it.",
     strict=True,
 )
 def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
-    """F4 — An artifact inserted with no real producer attributes to the
-    unknown-provenance Execution sentinel; lineage from it terminates at the
-    sentinel ('unknown origin'), never a null dead-end."""
-    ml = test_ml
+    """F4 — An artifact with no real producer attributes to the
+    unknown-provenance Execution sentinel; ``get_lineage`` from it terminates
+    at the sentinel ('unknown origin'), never a null dead-end.
 
-    # Simulate a producerless artifact (e.g. a directly-inserted dataset
-    # version). The intended behavior: its producer is the sentinel execution.
-    sentinel_exec_rid = ml.unknown_provenance_execution_rid()  # noqa: F821 — not yet implemented
-    # An orphan dataset's producer must be the sentinel, not None.
-    # (Construction of the orphan + the producer lookup are part of the
-    # unbuilt feature; this documents the required end state.)
-    assert sentinel_exec_rid is not None
+    The producerless case can only arise from a write that bypasses the
+    execution-context API (a script inserting rows directly — the
+    ``lac_chartlabel_ingest.py`` flow that motivated this contract) or from
+    legacy data. We reproduce that bypass with a direct insert, then assert the
+    attribution feature routes its lineage to the sentinel rather than leaving
+    a null producer.
+    """
+    ml = test_ml
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+
+    # Bypass the API: insert a Dataset + Dataset_Version with a null Execution,
+    # exactly as a script that skips the execution context manager would.
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+    orphan_rid = pb.tables["Dataset"].insert([{"Description": "Producerless orphan", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "orphan version"}]
+    )
+
+    # The required end state: lineage resolves the producer to the sentinel,
+    # not None. Today the producer is null, so the walk is empty — this is the
+    # gap the attribution feature must close.
+    lineage = ml.get_lineage(orphan_rid)
+    assert lineage.lineage is not None, "Producerless artifact must not yield a null-producer lineage."
+    assert lineage.lineage.execution.rid == sentinel_exec_rid, (
+        "A producerless artifact's lineage must terminate at the unknown-provenance Execution sentinel."
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────

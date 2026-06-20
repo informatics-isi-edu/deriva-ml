@@ -46,6 +46,34 @@ ML_SCHEMA = "deriva-ml"
 # Special RID value used for dry-run operations that don't modify the database
 DRY_RUN_RID = "0000"
 
+# =============================================================================
+# Unknown-provenance sentinels
+# =============================================================================
+# Three rows seeded at catalog initialization (``initialize_ml_schema``) that
+# represent "provenance is explicitly unknown" rather than null. They are
+# *bootstrap substrate* — exempt from the provenance contract's producer /
+# completeness obligations and from the audit's violation checks.
+#
+# - The unknown-provenance Workflow backs the sentinel Execution (Execution
+#   requires a Workflow FK).
+# - The sentinel Execution is what a producerless artifact attributes to, so
+#   lineage from such an artifact terminates at "unknown origin" instead of a
+#   null dead-end.
+# - The unknown-provenance File is linked as an Input to an artifact-producer
+#   that committed with no declared input (the no-input commit check).
+#
+# Each is identified idempotently by a reserved ``tag:`` URI / marker so that
+# re-running ``initialize_ml_schema`` never duplicates them. ``tag:`` URIs are
+# non-dereferenceable by design (RFC 4151) — exactly right for a marker that
+# names a concept, not a fetchable resource.
+SENTINEL_WORKFLOW_URL = "tag:deriva-ml,unknown-provenance:workflow"
+SENTINEL_WORKFLOW_CHECKSUM = "0" * 40  # marker; not a real content hash
+SENTINEL_FILE_URL = "tag:deriva-ml,unknown-provenance:file"
+SENTINEL_FILE_MD5 = "0" * 32  # marker; not computed from bytes (see contract exemption)
+# The sentinel Execution carries this exact Description so it can be located
+# idempotently (Execution has no natural unique key like URL).
+SENTINEL_EXECUTION_DESCRIPTION = "deriva-ml unknown-provenance sentinel execution"
+
 # System schemas that are part of Deriva infrastructure (not user domain schemas)
 # These are excluded when auto-detecting domain schemas
 SYSTEM_SCHEMAS: frozenset[str] = frozenset({"public", "www", "WWW"})

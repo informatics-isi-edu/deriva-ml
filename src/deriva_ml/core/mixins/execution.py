@@ -71,6 +71,64 @@ class ExecutionMixin:
     _retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
 
+    def unknown_provenance_execution_rid(self) -> RID:
+        """RID of the seeded unknown-provenance Execution sentinel.
+
+        A producerless artifact attributes to this execution so lineage from
+        it reports "unknown origin" rather than dead-ending on a null
+        producer. Seeded by ``initialize_ml_schema``.
+
+        Returns:
+            The sentinel Execution's RID.
+
+        Raises:
+            DerivaMLException: If the sentinel is not present (catalog not
+                initialized by a contract-aware deriva-ml).
+
+        Example:
+            >>> rid = ml.unknown_provenance_execution_rid()  # doctest: +SKIP
+        """
+        from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
+
+        pb = self.pathBuilder()
+        exe = pb.schemas[self.ml_schema].Execution
+        rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
+        if not rows:
+            raise DerivaMLException(
+                "Unknown-provenance Execution sentinel not found; catalog was not "
+                "initialized with provenance-contract sentinels."
+            )
+        return rows[0]["RID"]
+
+    def unknown_provenance_file_rid(self) -> RID:
+        """RID of the seeded unknown-provenance File sentinel.
+
+        Linked as an Input to an artifact-producer that committed with no
+        declared input (the no-input commit check), so the gap is recorded as
+        an explicit "unknown input" edge rather than absent. Seeded by
+        ``initialize_ml_schema``.
+
+        Returns:
+            The sentinel File's RID.
+
+        Raises:
+            DerivaMLException: If the sentinel is not present.
+
+        Example:
+            >>> rid = ml.unknown_provenance_file_rid()  # doctest: +SKIP
+        """
+        from deriva_ml.core.constants import SENTINEL_FILE_URL
+
+        pb = self.pathBuilder()
+        file_table = pb.schemas[self.ml_schema].File
+        rows = list(file_table.filter(file_table.URL == SENTINEL_FILE_URL).entities())
+        if not rows:
+            raise DerivaMLException(
+                "Unknown-provenance File sentinel not found; catalog was not "
+                "initialized with provenance-contract sentinels."
+            )
+        return rows[0]["RID"]
+
     def create_execution(
         self,
         configuration: "ExecutionConfiguration | None" = None,
