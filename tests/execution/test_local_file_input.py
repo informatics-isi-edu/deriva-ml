@@ -83,3 +83,46 @@ def test_E5_localfile_wrapper_is_the_only_path_entry_point():
     # to declare a path.
     with pytest.raises(ValidationError):
         ExecutionConfiguration(assets=["/data/labels.csv"])
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# E4 — live: a LocalFile input is registered as a File and linked as Input,
+# and is NOT downloaded (it is a reference, not a Hatrac asset).
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.integration
+def test_E4_localfile_input_registered_and_linked_as_input(test_ml, tmp_path):
+    """E4 — A LocalFile in assets= is registered as a File row and linked to
+    the execution as an Input (File_Execution Asset_Role="Input"), by context.
+
+    The file is referenced, not uploaded; its role comes from being declared
+    in assets=, never from a flag.
+    """
+    from deriva_ml import MLVocab as vc
+    from deriva_ml.asset.aux_classes import LocalFile
+
+    ml = test_ml
+    ml.add_term(vc.workflow_type, "LocalFile Test Workflow", description="local-file input test")
+    workflow = ml.create_workflow(name="localfile_test", workflow_type="LocalFile Test Workflow")
+
+    # A real local file on disk.
+    src = tmp_path / "labels.csv"
+    src.write_text("RID_Subject,glc_dx\n1-AAAA,0\n")
+
+    config = ExecutionConfiguration(
+        description="Consumes a local file",
+        workflow=workflow,
+        assets=[LocalFile(path=str(src))],
+    )
+
+    exe = ml.create_execution(config)
+
+    # A File_Execution row with Asset_Role="Input" must exist for this run.
+    pb = ml.pathBuilder()
+    fe = pb.schemas[ml.ml_schema].File_Execution
+    rows = [r for r in fe.entities().fetch() if r["Execution"] == exe.execution_rid]
+    assert rows, "expected a File_Execution row for the LocalFile input"
+    assert {r["Asset_Role"] for r in rows} == {"Input"}, (
+        "a LocalFile declared in assets= must be linked as Input (role from context)"
+    )
