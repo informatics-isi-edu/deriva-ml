@@ -122,28 +122,49 @@ class TestFile:
                 ds = subdir.list_dataset_members()
                 assert len(ds["File"]) == 5
 
-    def test_add_files_input_role(self, file_table_setup):
-        """add_files(asset_role="Input") records File_Execution edges with
-        Asset_Role="Input" (provenance contract: external files can be
-        consumed inputs, not only produced outputs).
+    def test_add_files_links_as_input(self, file_table_setup):
+        """add_files registers an external File reference and links it as an
+        INPUT — intrinsically, with no role parameter.
 
-        Default behavior remains Output; this pins the new Input capability.
+        The File table holds references to bytes the catalog does NOT host
+        (URL + MD5, no Hatrac upload). Registering such a reference means
+        "name an external file so I have a catalog handle to it" — which is
+        consuming/referencing it, never producing it. A produced file is a
+        Hatrac-backed execution asset via asset_file_path/commit, not a File
+        reference. So add_files is the input-reference mechanism: role is not
+        a variable, it is always Input.
         """
         ml_instance = file_table_setup.ml_instance
         test_dir = file_table_setup.test_dir
         execution = file_table_setup.execution
 
         with execution.execute() as exe:
-            filespecs = list(FileSpec.create_filespecs(test_dir, "Input files"))
-            exe.add_files(filespecs, asset_role="Input")
+            filespecs = list(FileSpec.create_filespecs(test_dir, "Referenced files"))
+            exe.add_files(filespecs)  # no role argument — Input by nature
 
-        # Read File_Execution rows for this execution and check the role.
         pb = ml_instance.pathBuilder()
         fe = pb.schemas[ml_instance.ml_schema].File_Execution
         rows = [r for r in fe.entities().fetch() if r["Execution"] == execution.execution_rid]
         assert rows, "expected File_Execution rows for the execution"
         roles = {r["Asset_Role"] for r in rows}
-        assert roles == {"Input"}, f"expected all Input-role edges, got {roles}"
+        assert roles == {"Input"}, f"add_files must link File references as Input, got {roles}"
+
+    def test_add_files_has_no_role_parameter(self, file_table_setup):
+        """add_files must NOT expose a role parameter — role is not a user
+        choice (provenance contract: role is derived from context, and a File
+        reference is intrinsically an input).
+
+        ``Execution.add_files`` is ``@validate_call``-wrapped, so an unknown
+        kwarg is rejected as a pydantic ``ValidationError`` (a subclass-free
+        ``TypeError`` would come from a plain function); accept either.
+        """
+        from pydantic import ValidationError
+
+        execution = file_table_setup.execution
+        with execution.execute() as exe:
+            filespecs = list(FileSpec.create_filespecs(file_table_setup.test_dir, "x"))
+            with pytest.raises((TypeError, ValidationError)):
+                exe.add_files(filespecs, asset_role="Output")  # role param must not exist
 
     def test_list_files(self, file_table_setup):
         ml_instance = file_table_setup.ml_instance

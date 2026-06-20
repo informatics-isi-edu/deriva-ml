@@ -37,7 +37,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Literal
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset import Asset
@@ -2040,19 +2040,20 @@ class Execution:
         files: Iterable[FileSpec],
         dataset_types: str | list[str] | None = None,
         description: str = "",
-        asset_role: Literal["Input", "Output"] = "Output",
     ) -> "Dataset":
-        """Adds files to the catalog with their metadata.
+        """Register external file *references* and link them as execution inputs.
 
-        Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
-        specified file types.
+        Inserts a ``File``-table row per file (a reference to externally-hosted
+        bytes — URL + MD5, not uploaded to Hatrac) and links each as an
+        **input** of this execution. Role is intrinsic, not a parameter: a
+        ``File`` reference names a file the run consumed, so it is always an
+        Input. Files the run *produced* are Hatrac-backed execution assets —
+        use ``asset_file_path`` + ``commit_output_assets`` for those.
 
         Args:
             files: File specifications containing MD5 checksum, length, and URL.
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
-            asset_role: ``"Input"`` (file consumed by this execution) or
-                ``"Output"`` (file produced by it). Defaults to ``"Output"``.
 
         Returns:
             RID: Dataset  that identifies newly added files. Will be nested to mirror original directory structure
@@ -2062,22 +2063,15 @@ class Execution:
             DerivaMLInvalidTerm: If file_types are invalid or execution_rid is not an execution record.
 
         Examples:
-            Add a single file type:
+            Register external files as inputs:
                 >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]  # doctest: +SKIP
                 >>> rids = exe.add_files(files, dataset_types="text")  # doctest: +SKIP
-
-            Add multiple file types:
-                >>> rids = exe.add_files(  # doctest: +SKIP
-                ...     files=[FileSpec(url="image.png", md5="def456", length=2000)],  # doctest: +SKIP
-                ...     dataset_types=["image", "png"],  # doctest: +SKIP
-                ... )  # doctest: +SKIP
         """
         return self._ml_object.add_files(
             files=files,
             execution_rid=self.execution_rid,
             dataset_types=dataset_types,
             description=description,
-            asset_role=asset_role,
         )
 
     # =========================================================================
