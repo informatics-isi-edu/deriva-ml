@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from deriva_ml.local_db.manifest_store import ManifestStore
 from pydantic import validate_call
 
-from deriva_ml.asset.aux_classes import AssetFilePath
+from deriva_ml.asset.aux_classes import AssetFilePath, LocalFile
 from deriva_ml.asset.manifest import AssetManifest
 from deriva_ml.core.base import DerivaML
 from deriva_ml.core.connection_mode import ConnectionMode
@@ -359,7 +359,13 @@ class Execution:
                 raise DerivaMLException("Dataset specified in execution configuration is not a dataset")
 
         for a in self.configuration.assets:
-            if not self._model.is_asset(self._ml_object.resolve_rid(a.rid).table.name):
+            if isinstance(a, LocalFile):
+                # A LocalFile references a not-yet-registered local file; it has
+                # no catalog RID to resolve. Validate the file exists instead —
+                # it is registered (File row + Input edge) during resolution.
+                if not Path(a.path).is_file():
+                    raise DerivaMLException(f"LocalFile input not found on disk: {a.path}")
+            elif not self._model.is_asset(self._ml_object.resolve_rid(a.rid).table.name):
                 raise DerivaMLException("Asset specified in execution configuration is not an asset table")
 
         schema_path = self._ml_object.pathBuilder().schemas[self._ml_object.ml_schema]
@@ -692,11 +698,29 @@ class Execution:
         """
         self._logger.info("Downloading assets ...")
         self.asset_paths = {}
-        # Batch-resolve every asset RID up front (one query per
+
+        # LocalFile inputs are *references* to local files, not catalog assets:
+        # register each as a File row and link it to the execution as an Input
+        # (role from context — a declared input is consumed). They are NOT
+        # downloaded (a File reference has no Hatrac bytes to fetch); the local
+        # path is recorded as-is. Handle these first, then fall through to the
+        # RID-based AssetSpec download path below.
+        local_files = [s for s in self.configuration.assets if isinstance(s, LocalFile)]
+        if local_files and not (reload or self._dry_run):
+            from deriva_ml.core.definitions import FileSpec
+
+            specs: list[FileSpec] = []
+            for lf in local_files:
+                specs.extend(FileSpec.create_filespecs(lf.path, description="Execution input file"))
+            # add_files registers the File rows and links them as Input
+            # (File_Execution Asset_Role="Input") — role from context.
+            self._ml_object.add_files(specs, execution_rid=self.execution_rid)
+
+        # Batch-resolve every catalog asset RID up front (one query per
         # candidate table) instead of one resolve_rid round-trip per
         # asset. Skip cleanly when there are no asset specs so an
         # empty configuration doesn't fire a no-op resolve_rids call.
-        asset_specs = list(self.configuration.assets)
+        asset_specs = [s for s in self.configuration.assets if not isinstance(s, LocalFile)]
         if asset_specs:
             asset_rids = [spec.rid for spec in asset_specs]
             rid_results = self._ml_object.resolve_rids(asset_rids)
