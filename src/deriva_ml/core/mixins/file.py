@@ -11,7 +11,7 @@ import importlib
 from collections import defaultdict
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal
 from urllib.parse import urlsplit
 
 datapath = importlib.import_module("deriva.core.datapath")
@@ -66,6 +66,7 @@ class FileMixin:
         execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
+        asset_role: Literal["Input", "Output"] = "Output",
     ) -> "Dataset":
         """Adds files to the catalog with their metadata.
 
@@ -77,6 +78,12 @@ class FileMixin:
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
+            asset_role: Whether the files are an ``"Input"`` to or an
+                ``"Output"`` of the execution. Recorded on the
+                ``File_Execution`` association row's ``Asset_Role``. Defaults
+                to ``"Output"`` (files produced by the run). Pass ``"Input"``
+                to register a file the run *consumed* (e.g. an external data
+                file ingested into the catalog).
 
         Returns:
             Dataset: Dataset that represents the newly added files.
@@ -143,7 +150,7 @@ class FileMixin:
         # Link files to the execution for provenance tracking.
         pb.schemas[self.ml_schema].File_Execution.insert(
             [
-                {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Output"}
+                {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": asset_role}
                 for file_record in file_records
             ]
         )

@@ -122,6 +122,29 @@ class TestFile:
                 ds = subdir.list_dataset_members()
                 assert len(ds["File"]) == 5
 
+    def test_add_files_input_role(self, file_table_setup):
+        """add_files(asset_role="Input") records File_Execution edges with
+        Asset_Role="Input" (provenance contract: external files can be
+        consumed inputs, not only produced outputs).
+
+        Default behavior remains Output; this pins the new Input capability.
+        """
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = list(FileSpec.create_filespecs(test_dir, "Input files"))
+            exe.add_files(filespecs, asset_role="Input")
+
+        # Read File_Execution rows for this execution and check the role.
+        pb = ml_instance.pathBuilder()
+        fe = pb.schemas[ml_instance.ml_schema].File_Execution
+        rows = [r for r in fe.entities().fetch() if r["Execution"] == execution.execution_rid]
+        assert rows, "expected File_Execution rows for the execution"
+        roles = {r["Asset_Role"] for r in rows}
+        assert roles == {"Input"}, f"expected all Input-role edges, got {roles}"
+
     def test_list_files(self, file_table_setup):
         ml_instance = file_table_setup.ml_instance
         test_dir = file_table_setup.test_dir
