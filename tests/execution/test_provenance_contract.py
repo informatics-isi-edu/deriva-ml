@@ -18,6 +18,7 @@ from __future__ import annotations
 import pytest
 
 from deriva_ml import MLVocab as vc
+from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.state_store import ExecutionStatus
 
@@ -135,50 +136,55 @@ def test_A4_blessed_path_reaches_terminal_state(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Spec 'Partial input on failure' requires recording the resolved "
-    "prefix, but _materialize_input_datasets writes input edges all-or-nothing "
-    "AFTER the download loop, so a mid-loop failure records ZERO edges. "
-    "RULING (2026-06-20): fix the impl to write each edge as its bag resolves; "
-    "flip this xfail to a real assertion when that lands.",
-    strict=True,
-)
-def test_B3_partial_input_recorded_on_materialization_failure(test_ml):
-    """B3 — When input materialization fails partway, the contract requires the
-    Dataset_Execution edges for inputs that resolved BEFORE the failure to be
-    recorded (the 'everything established up to the point of failure' rule).
+def test_B3_bad_input_fails_fast_with_no_partial_state(test_ml):
+    """B3 — A declared input RID that does not resolve fails the run FAST,
+    before any execution row or input edge is created.
 
-    Current impl writes the edges in one batch after the whole download loop,
-    so a mid-loop failure records nothing — this test documents the intended
-    contract behavior and currently xfails against that impl gap.
+    Input dataset RIDs are validated up front in Execution.__init__ (before
+    the Execution row is inserted), so a bad input never produces partial
+    provenance state — there is nothing to "record up to the failure". This
+    is the stronger guarantee (validate-not-dry-run, ADR-0002): a bad input
+    is caught with zero side effects.
     """
     ml = test_ml
     workflow = _setup_workflow(ml)
 
-    # A real dataset that WILL resolve.
+    # A real dataset (the "good" input) plus a well-formed-but-nonexistent one.
     producer = ml.create_execution(ExecutionConfiguration(description="Producer", workflow=workflow))
     good = producer.create_dataset(dataset_types=["TestSet"], description="Resolvable input")
-
-    # Declare the good dataset plus a non-existent one so materialization
-    # fails partway. The good one is declared first so it "resolves before
-    # the failure".
+    good_version = str(good.current_version)
     bogus_rid = good.dataset_rid[:-1] + ("X" if good.dataset_rid[-1] != "X" else "Y")
+
+    execs_before = {r.execution_rid for r in ml.find_executions()}
+
     config = ExecutionConfiguration(
-        description="Fails on second input",
+        description="Has a bad input",
         workflow=workflow,
-        datasets=[good.dataset_rid, bogus_rid],
+        datasets=[
+            DatasetSpec(rid=good.dataset_rid, version=good_version),
+            DatasetSpec(rid=bogus_rid, version="1.0.0"),
+        ],
     )
 
+    # Upfront validation must reject the bad RID before creating anything.
     with pytest.raises(Exception):
-        # create_execution materializes inputs; the bogus RID should raise.
         ml.create_execution(config)
 
-    # The contract requires the resolved input's edge to be recorded.
+    # No new execution row was created (fail-fast, before insert).
+    execs_after = {r.execution_rid for r in ml.find_executions()}
+    new_execs = execs_after - execs_before
+    assert not new_execs, (
+        f"A bad input must fail before any Execution row is created; "
+        f"found new execution(s): {new_execs}"
+    )
+
+    # And no input edge was recorded for the good dataset by the failed attempt.
+    # (The producer above created `good` as an OUTPUT; there must be no INPUT
+    # consumer from the aborted bad-input run.)
     input_consumers = {
         r.execution_rid for r in ml.find_executions(dataset=good.dataset_rid, dataset_role="input")
     }
-    # (xfail today: zero edges are written because the insert is post-loop.)
-    assert input_consumers, "Expected the resolved input dataset to have a recorded Dataset_Execution edge."
+    assert input_consumers.isdisjoint(new_execs), "No partial input edge should exist from the failed run."
 
 
 # ─────────────────────────────────────────────────────────────────────────

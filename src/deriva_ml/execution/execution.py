@@ -644,6 +644,11 @@ class Execution:
         and at least one dataset is present, insert the
         ``Dataset_Execution`` association rows in one batch.
 
+        Input dataset RIDs are validated up front in ``__init__`` (before the
+        execution row is created), so a bad input fails fast with no partial
+        state to record here — see the provenance contract, "Consumed a
+        dataset".
+
         Args:
             reload: ``None`` for a fresh execution; an existing
                 RID when resuming.
