@@ -325,3 +325,128 @@ def test_B5_exception_in_block_records_failed_not_success(test_ml):
     assert exe.status not in {ExecutionStatus.Uploaded, ExecutionStatus.Stopped}, (
         "A failed run must not be recorded in a success state."
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# F. The two unknown-provenance sentinels
+#
+# All xfail: neither sentinel is seeded yet (create_schema.py) and no
+# no-input commit check / sentinel-attribution exists. These are the
+# executable spec for that work. The intended accessor names are NOT yet
+# decided — each test references the behavior via whatever accessor the
+# implementation will expose; the xfail reason names what must be built.
+# When the feature lands, the implementer updates the accessor call and
+# removes the xfail (strict=True forces this).
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(
+    reason="Unknown-provenance File sentinel + no-input commit check not "
+    "implemented. An artifact-producer that commits with no declared input "
+    "must get an Input edge to the seeded unknown-provenance File sentinel. "
+    "Needs: sentinel seeding in create_schema.py + the commit-time check.",
+    strict=True,
+)
+def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
+    """F2 — An artifact-producer with no declared input gets an Input edge to
+    the unknown-provenance File sentinel (recorded as explicitly-unknown, not
+    a null/absent input)."""
+    ml = test_ml
+    workflow = _setup_workflow(ml)
+
+    # A run that produces a dataset but declares no inputs at all.
+    with ml.create_execution(
+        ExecutionConfiguration(description="No declared input", workflow=workflow)
+    ).execute() as exe:
+        exe.create_dataset(dataset_types=["TestSet"], description="Output, no inputs")
+
+    # The intended behavior: the execution now has exactly one input edge, to
+    # the unknown-provenance File sentinel. The accessor for the sentinel is
+    # part of the unbuilt feature.
+    sentinel_file_rid = ml.unknown_provenance_file_rid()  # noqa: F821 — not yet implemented
+    input_file_rids = {a.rid for a in ml.list_assets(execution=exe.execution_rid, asset_role="Input")}
+    assert sentinel_file_rid in input_file_rids, (
+        "A no-input artifact-producer must carry the unknown-provenance File "
+        "sentinel as an explicit input."
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(
+    reason="Unknown-provenance Execution sentinel not implemented. An artifact "
+    "with no real producer must attribute to the seeded unknown-provenance "
+    "Execution sentinel so lineage returns 'unknown origin', never null.",
+    strict=True,
+)
+def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
+    """F4 — An artifact inserted with no real producer attributes to the
+    unknown-provenance Execution sentinel; lineage from it terminates at the
+    sentinel ('unknown origin'), never a null dead-end."""
+    ml = test_ml
+
+    # Simulate a producerless artifact (e.g. a directly-inserted dataset
+    # version). The intended behavior: its producer is the sentinel execution.
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()  # noqa: F821 — not yet implemented
+    # An orphan dataset's producer must be the sentinel, not None.
+    # (Construction of the orphan + the producer lookup are part of the
+    # unbuilt feature; this documents the required end state.)
+    assert sentinel_exec_rid is not None
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# G. Audit & complete-provenance predicate
+#
+# All xfail: the audit does not exist. These define what it must report.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(
+    reason="Provenance audit not implemented. It must scan catalog-wide, "
+    "return findings, and mutate nothing (advisory/read-only, Goal 4).",
+    strict=True,
+)
+def test_G1_audit_exists_and_is_read_only(test_ml):
+    """G1 — The audit scans the catalog and returns findings without mutating
+    state."""
+    ml = test_ml
+    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
+    # Shape contract: separate violation and known-degraded buckets.
+    assert hasattr(result, "violations")
+    assert hasattr(result, "known_degraded")
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(
+    reason="Audit not implemented. It must flag an artifact with a null "
+    "producer (no producing execution, not sentinel-attributed) as a violation.",
+    strict=True,
+)
+def test_G7_audit_flags_null_producer_artifact(test_ml):
+    """G7 — An artifact with a null producer (not sentinel-attributed) is a
+    violation reported by the audit."""
+    ml = test_ml
+    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
+    # A seeded null-producer artifact must appear in violations.
+    assert any("null" in str(v).lower() or "producer" in str(v).lower() for v in result.violations)
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(
+    reason="Audit + sentinels not implemented. A sentinel-attributed row is "
+    "COMPLIANT (known-degraded), and must appear in the audit's known_degraded "
+    "bucket, NOT in violations (the 'compliant but flagged' ruling).",
+    strict=True,
+)
+def test_G8_G10_sentinel_state_is_compliant_not_violation(test_ml):
+    """G8/G10 — A sentinel-attributed artifact reads as conformant: it appears
+    in the audit's known-degraded report, never the violation list. The
+    durable post-backfill conformance invariant."""
+    ml = test_ml
+    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()  # noqa: F821
+    violation_text = " ".join(str(v) for v in result.violations)
+    assert sentinel_exec_rid not in violation_text, (
+        "Sentinel-attributed state is compliant; it must not appear as a violation."
+    )
