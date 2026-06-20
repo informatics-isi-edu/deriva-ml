@@ -11,7 +11,7 @@ import importlib
 from collections import defaultdict
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Iterable
 from urllib.parse import urlsplit
 
 datapath = importlib.import_module("deriva.core.datapath")
@@ -66,24 +66,26 @@ class FileMixin:
         execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
-        asset_role: Literal["Input", "Output"] = "Output",
     ) -> "Dataset":
-        """Adds files to the catalog with their metadata.
+        """Register external file *references* and link them as execution inputs.
 
-        Registers files in the catalog along with their metadata (MD5, length, URL) and associates them with
-        specified file types. Links files to the specified execution record for provenance tracking.
+        Inserts a ``File``-table row per file (URL + MD5 + length) — a
+        *reference* to bytes the catalog does **not** host (no Hatrac upload).
+        Each file is linked to the execution as an **input**
+        (``File_Execution.Asset_Role="Input"``).
+
+        Role is intrinsic, not a choice: referencing an external file means
+        *naming* a file the run consumed/depended on, so it is always an
+        Input. A file the run *produced* is a Hatrac-backed execution asset —
+        register those via ``asset_file_path`` + ``commit_output_assets``,
+        never here. (Provenance contract: asset role is derived from context;
+        a ``File`` reference is an input by its nature.)
 
         Args:
             files: File specifications containing MD5 checksum, length, and URL.
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
-            asset_role: Whether the files are an ``"Input"`` to or an
-                ``"Output"`` of the execution. Recorded on the
-                ``File_Execution`` association row's ``Asset_Role``. Defaults
-                to ``"Output"`` (files produced by the run). Pass ``"Input"``
-                to register a file the run *consumed* (e.g. an external data
-                file ingested into the catalog).
 
         Returns:
             Dataset: Dataset that represents the newly added files.
@@ -147,10 +149,12 @@ class FileMixin:
         ]
         pb.schemas[self.ml_schema].tables[atable].insert(file_type_records)
 
-        # Link files to the execution for provenance tracking.
+        # Link each file to the execution as an INPUT. A File-table row is a
+        # reference to externally-hosted bytes — naming a file the run
+        # consumed — so its role is intrinsically Input (never a parameter).
         pb.schemas[self.ml_schema].File_Execution.insert(
             [
-                {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": asset_role}
+                {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Input"}
                 for file_record in file_records
             ]
         )

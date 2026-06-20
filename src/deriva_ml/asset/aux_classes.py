@@ -9,14 +9,14 @@ This module defines helper classes for asset operations including:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from hydra_zen import hydrated_dataclass
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from deriva_ml.core.definitions import RID
-from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.core.logging_config import get_logger
+from deriva_ml.core.validation import VALIDATION_CONFIG
 
 if TYPE_CHECKING:
     from deriva_ml.asset.asset_record import AssetRecord
@@ -151,22 +151,22 @@ class AssetFilePath(Path):
 
 
 class AssetSpec(BaseModel):
-    """Specification for an asset in execution configurations.
+    """Specification for an asset consumed as an input to an execution.
 
     Used to reference assets as inputs to executions, similar to how
     DatasetSpec is used for datasets. Supports optional checksum-based
     caching for large assets like model weights.
 
+    An asset's **role is determined by context, never by this spec**: an asset
+    referenced here (in an execution's input configuration) is an *input*;
+    assets a run *produces* are written via ``commit_output_assets`` as
+    *outputs*. There is intentionally no ``asset_role`` field — role is not a
+    caller choice (the same rule as datasets, whose role is structural). The
+    model forbids extra fields, so a stray ``asset_role=`` is rejected rather
+    than silently ignored.
+
     Attributes:
         rid: Resource Identifier of the asset.
-        asset_role: Role of the asset (``"Input"`` or ``"Output"``).
-            Defaults to ``"Input"``. ``Literal``-typed so a typo
-            (``"Imput"``) or case mismatch (``"input"``) is
-            rejected by Pydantic validation rather than silently
-            flowing through to the catalog as a free-form string
-            and either no-op'ing or failing on FK lookup. The two
-            values match the ``Asset_Role`` controlled-vocabulary
-            terms seeded by ``initialize_ml_schema``.
         cache: If True, cache the downloaded asset by MD5 checksum in the
             DerivaML cache directory. Cached assets are reused across executions
             when the checksum matches, avoiding repeated downloads of large files.
@@ -174,14 +174,12 @@ class AssetSpec(BaseModel):
     Example:
         >>> spec = AssetSpec(rid="3JSE")
         >>> spec = AssetSpec(rid="3JSE", cache=True)  # enable caching
-        >>> spec = AssetSpec(rid="3JSE", asset_role="Output")  # mark as output
     """
 
     rid: RID
-    asset_role: Literal["Input", "Output"] = "Input"
     cache: bool = False
 
-    model_config = VALIDATION_CONFIG
+    model_config = ConfigDict(**VALIDATION_CONFIG, extra="forbid")
 
     @model_validator(mode="before")
     @classmethod
@@ -196,18 +194,12 @@ class AssetSpecConfig:
     """Hydra-zen configuration interface for ``AssetSpec``.
 
     Exposes the asset attributes that are meaningful to *configure*: the
-    asset ``rid`` and whether to ``cache`` it. It deliberately does **not**
-    expose ``asset_role`` — an asset's role (``Input`` / ``Output``) is
-    determined by **context**, not by configuration: an asset referenced in
-    an execution's input configuration is an *input*, and assets written via
-    ``commit_output_assets`` are *outputs*. ``AssetSpec.asset_role`` therefore
-    keeps its ``"Input"`` default here and is set by the producing/consuming
-    operation, never by the config author.
-
-    (Exposing ``asset_role`` as a configurable, ``Literal``-typed field also
-    broke structured-config registration under omegaconf < 2.4, which cannot
-    serialize ``Literal`` annotations — another reason it does not belong on
-    this interface.)
+    asset ``rid`` and whether to ``cache`` it. There is no role to configure —
+    asset role is determined by **context**, never specified: an asset
+    referenced in an execution's input configuration is an *input*, and assets
+    written via ``commit_output_assets`` are *outputs*. (``AssetSpec`` carries
+    no ``asset_role`` field at all, so the config has nothing to mirror; full
+    field parity holds.)
 
     Use in hydra-zen store definitions to specify assets, optionally cached:
 

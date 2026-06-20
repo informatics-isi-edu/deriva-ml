@@ -1404,27 +1404,20 @@ class DatasetMixin:
                     )
                 )
 
-        # Assets: group by RID, then by role.
-        as_by_rid: dict[str, list[str]] = {}
+        # Assets: an asset's role is context-derived (inputs by virtue of
+        # being in the config), not carried on the spec, so there is no
+        # role-conflict to detect — only a duplicate RID listed more than once.
+        as_counts: dict[str, int] = {}
         for s in asset_specs:
-            as_by_rid.setdefault(s.rid, []).append(s.asset_role)
+            as_counts[s.rid] = as_counts.get(s.rid, 0) + 1
 
-        for rid, roles in as_by_rid.items():
-            distinct = set(roles)
-            if len(distinct) > 1:
-                issues.append(
-                    CrossSpecIssue(
-                        issue="role_conflict",
-                        rids=[rid],
-                        detail=(f"Asset {rid} listed with conflicting roles: {sorted(distinct)}."),
-                    )
-                )
-            elif len(roles) > 1:
+        for rid, count in as_counts.items():
+            if count > 1:
                 issues.append(
                     CrossSpecIssue(
                         issue="duplicate_rid",
                         rids=[rid],
-                        detail=(f"Asset {rid} listed {len(roles)} times with role {roles[0]!r}."),
+                        detail=(f"Asset {rid} listed {count} times in the configuration."),
                     )
                 )
 

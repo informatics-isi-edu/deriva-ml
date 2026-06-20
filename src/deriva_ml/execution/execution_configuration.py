@@ -92,16 +92,24 @@ class ExecutionConfiguration(BaseModel):
         Accepts plain RID strings, DictConfig from Hydra, AssetSpec objects,
         or dicts with 'rid' and optional 'cache' keys.
         """
+        def _drop_legacy_role(d: dict) -> dict:
+            # ``AssetSpec`` no longer has an ``asset_role`` field (role is
+            # context-derived, never specified) and now forbids extra fields.
+            # A persisted config from before the removal may still carry an
+            # ``asset_role`` key — drop it so old configs still load (the field
+            # was always a no-op) rather than failing deserialization.
+            return {k: val for k, val in d.items() if k != "asset_role"}
+
         result = []
         for v in value:
             if isinstance(v, AssetSpec):
                 result.append(v)
             elif isinstance(v, dict):
                 # Dict with rid/cache keys (e.g., from JSON config)
-                result.append(AssetSpec(**v))
+                result.append(AssetSpec(**_drop_legacy_role(v)))
             elif isinstance(v, DictConfig):
                 # OmegaConf DictConfig from Hydra — may have rid+cache or just rid
-                d = dict(v)
+                d = _drop_legacy_role(dict(v))
                 if "rid" in d:
                     result.append(AssetSpec(**d))
                 else:

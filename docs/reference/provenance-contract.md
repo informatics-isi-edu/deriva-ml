@@ -435,9 +435,27 @@ For every **driven** execution the catalog records:
    - **Assets** — via `<Asset>_Execution` with `Asset_Role="Output"` and an
      `Output_File` Asset_Type tag.
    - **Feature values** — written with this execution's provenance.
-5. **Role is unambiguous.** Input lives in `Dataset_Execution` /
-   `Asset_Role="Input"`; output lives in `Dataset_Version.Execution` /
-   `Asset_Role="Output"`. A single artifact is never silently both.
+5. **Role is unambiguous, and is always derived from context — never
+   specified by the caller.** Where the role is *recorded* differs by
+   artifact kind, but in every case it follows from *what the execution did*,
+   not from a user-supplied flag:
+   - **Datasets** — role is **structural**: an input is a row in
+     `Dataset_Execution`; an output is `Dataset_Version.Execution`
+     authorship. Different tables, so role cannot be misstated and there is
+     nothing to specify.
+   - **Assets / files** — role is the **`Asset_Role` column** on the
+     `<Asset>_Execution` / `File_Execution` association row, set by the
+     **operation**: materializing a declared input (download at execution
+     start, or a `LocalFile`/asset declared in `assets=`) writes
+     `Asset_Role="Input"`; producing a file (the commit / output-staging
+     path, including `add_files` in the execution body) writes
+     `Asset_Role="Output"`. The framework assigns the role from the call
+     context; the user never passes it.
+
+   A single artifact is never silently both. **The contract requirement: an
+   asset's role is determined by context (consume ⇒ Input, produce ⇒
+   Output), exactly as for datasets. APIs must not ask the caller to name a
+   role.**
 
 Per [ADR-0001](../adr/0001-lineage-walks-data-flow-not-orchestration.md),
 data-flow lineage is *derived* by walking these edges
@@ -702,23 +720,23 @@ deliberate safety boundary, not just style:
 This mirrors the dataset rule (Goal 2: declare, don't infer): intent is
 declared by *type*, never recovered by inspecting a string's shape.
 
-For a `LocalFile`, deriva-ml does the rest — computes the checksum, mints the
-`File` row, and writes the `<File>_Execution` input edge, reusing existing
-helpers (`FileSpec.create_filespecs` + `add_files`). Inside the run, the file
-is read through the **same `asset_paths` surface** as any input asset. An
-imperative form exists too — `exe.add_files(FileSpec.create_filespecs(path,
-…), asset_role="Input")` — for code that registers a file directly. The
+For a `LocalFile`, deriva-ml does the rest — computes the checksum (reusing
+`FileSpec.create_filespecs`), mints the `File` row, and writes the
+`<File>_Execution` edge with **`Asset_Role="Input"` derived from context**:
+because the file is declared in `assets=`, it is a consumed input, so the
+Input edge is written by the same input-edge mechanism the asset *download*
+path already uses. The caller never names the role. Inside the run, the file
+is read through the **same `asset_paths` surface** as any input asset. The
 *implementation model* (the thin config spec, the on-the-fly registration
-hook, the download-skip for references, and the `add_files` `asset_role`
-fix) is in *Implementation notes*; no user-side checksum work is imposed
-(Goal 5).
+hook, the input-edge write, the download-skip for references) is in
+*Implementation notes*; no user-side checksum work and no role flag is
+imposed (Goal 5; role-from-context).
 
 **Rule:** an external file consumed by an execution MUST be declared as an
-input asset — a `File`-table row (mandatory `MD5`) linked via
-`<File>_Execution` with `Asset_Role="Input"`, registered through
-`add_files(..., asset_role="Input")` (with `FileSpec.create_filespecs`
-building the spec from the path). Only an **un-declared loose file** — read
-off disk with no `File` row at all — violates the rule.
+input — a `File`-table row (mandatory `MD5`) linked via `<File>_Execution`
+with `Asset_Role="Input"`. The role is assigned by context (the file is in
+`assets=`), not specified by the caller. Only an **un-declared loose file** —
+read off disk with no `File` row at all — violates the rule.
 
 #### What minting a `File` RID records
 
@@ -811,9 +829,9 @@ recorded as "unknown input." The residual, unavoidable limit is narrow: the
 check cannot distinguish a *legitimately* input-less run (a schema extension)
 from one that *forgot* to register its file — both warn, and a human
 reading the description distinguishes them. What no machine can do is
-reconstruct *which* file a forgetful run should have named. The one-call
-`add_files(..., asset_role="Input")` path keeps the "forgot" case rare by
-making registration trivial.
+reconstruct *which* file a forgetful run should have named. Declaring the
+file as a `LocalFile` in `assets=` (Input by context) is a one-liner, which
+keeps the "forgot" case rare by making declaration trivial.
 
 ### The two unknown-provenance sentinels
 
@@ -929,8 +947,9 @@ No single mechanism is sufficient; the guarantee is the stack. The
 zero-input check is hard (an artifact-producer that declares nothing is
 caught); what no machine can do is reconstruct *which* undeclared file a run
 should have named — that is recorded as explicitly unknown and resolved by a
-human. The one-call `add_files(..., asset_role="Input")` path keeps the
-"forgot to declare" case rare by making registration the easy path.
+human. Declaring an input is a one-liner — a `LocalFile` (or RID) in
+`assets=` — which keeps the "forgot to declare" case rare by making the
+honest path the easy one.
 
 ## Reproducibility: what the graph does and does not give you
 
@@ -1101,12 +1120,14 @@ contract version*.
      any other.)
   4. **The framework registers it; an already-registered file works by RID.**
      Two entry points to the same input:
-     - **By `LocalFile(path)` (general case):** the framework registers it —
-       minting the `File` RID via the existing `FileSpec.create_filespecs(path,
-       …)` (which computes `MD5`/length and the `tag:` URI) + the `add_files`
-       registration — **during input resolution**, then proceeds as a normal
-       File-RID input. The user does **not** register it by hand and computes
-       nothing.
+     - **By `LocalFile(path)` (general case):** the framework registers it
+       **during input resolution** — minting the `File` row via the existing
+       `FileSpec.create_filespecs(path, …)` (which computes `MD5`/length and
+       the `tag:` URI), then writing the `File_Execution` Input edge with the
+       role assigned **by context** (it is in `assets=`, so it is consumed),
+       using the same input-edge mechanism the asset download path uses. The
+       user does **not** register it by hand, computes nothing, and never
+       names a role.
      - **By RID (already registered):** an existing `File` row is named by its
        RID (a bare string) and used directly — this is just
        `AssetSpec(rid=<file_rid>)`, since `File` is an asset table whose RID
@@ -1159,20 +1180,21 @@ contract version*.
   - **`validate_assets` shape-routing** (`execution_configuration.py:87`) so
     `path`-keyed entries become `LocalFile` and bare strings / `rid`-keyed
     entries stay `AssetSpec` — the hydra seam and the safety chokepoint;
-  - a **resolution hook** that registers a `LocalFile` path→`File` RID on the
-    fly before download (point 4-general);
+  - a **resolution hook** that, for a `LocalFile`, mints the `File` row and
+    writes its `File_Execution` Input edge — the role assigned by context (in
+    `assets=` ⇒ Input), via the same input-edge write the asset download path
+    uses (`_update_asset_execution_table(..., asset_role="Input")`). **No
+    `add_files` change and no role parameter** — `add_files` stays
+    Output-by-context (it registers files the run *produced*); the input case
+    is the `assets=`/`LocalFile` path. The unknown-provenance `File` sentinel
+    reuses this same context-assigned Input edge.
   - a **download skip** for `File`-table / `tag:`-URI inputs — a `File`
     reference has no Hatrac bytes to fetch, so `download_asset` no-ops the
-    fetch and records the path/reference (the "not downloaded" exception);
-  - the **`add_files` `asset_role` parameter** — it currently hardcodes
-    `Asset_Role="Output"` (`core/mixins/file.py`), so a file cannot yet be
-    linked as an `Input`; `AssetSpec` already carries the
-    `Literal["Input","Output"]` field, so this just brings `add_files` into
-    line. The on-the-fly registration and the unknown-provenance sentinel
-    both use this `Asset_Role="Input"` `File_Execution` edge.
+    fetch and records the path/reference (the "not downloaded" exception).
 
-  No user-side checksum work and no special use-time API: the file is an
-  asset everywhere it matters.
+  No user-side checksum work, no role flag, and no special use-time API: the
+  file is an asset everywhere it matters, and its role is derived from
+  context.
 
 - **Seed the two sentinels at catalog initialization.** The platform-defaults
   block of `create_ml_schema` (`schema/create_schema.py`, alongside the
@@ -1262,8 +1284,9 @@ violations:
 
 - **Undeclared input asset.** The correct shape is
   `File (the CSV) → Execution → Dataset (6-05M4)`: the CSV is an input
-  *asset* (registered via `add_files(..., asset_role="Input")`), and
-  `6-05M4` is the output. The run declared neither, so no input edge exists.
+  *asset* (declared as a `LocalFile` in `assets=`, where context makes it an
+  Input), and `6-05M4` is the output. The run declared neither, so no input
+  edge exists.
   (A tempting mis-reading is that the run "consumed dataset `6-05M4`" because
   the CSV's RIDs match its members — but the RIDs are file *contents*, not a
   provenance edge; the dataset is the run's output, not its input.)
@@ -1272,9 +1295,9 @@ violations:
   workflow with an empty checksum.
 
 Under this contract the correct remedy is to re-create the work via the
-blessed path — a committed, checksummed workflow that registers the CSV as
-an input file (`add_files(..., asset_role="Input")`) and produces `6-05M4`
-as output — not to hand-edit catalog edges. (The sibling run `6-09Z8`, which
+blessed path — a committed, checksummed workflow that declares the CSV as a
+`LocalFile` input in `assets=` (Input by context) and produces `6-05M4` as
+output — not to hand-edit catalog edges. (The sibling run `6-09Z8`, which
 later wrote the 470 glaucoma labels for the same cohort, consumed the same
 CSV and is the same shape: its source file should likewise be registered as
 an input asset.)

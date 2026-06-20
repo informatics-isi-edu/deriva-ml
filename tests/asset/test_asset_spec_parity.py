@@ -5,18 +5,16 @@ reference. ``AssetSpecConfig`` (hydra-zen dataclass interface) is its
 *configuration* surface — it exposes only the attributes that are meaningful
 to configure.
 
-The two are intentionally **not** field-for-field identical. ``AssetSpec``
-carries ``asset_role`` (``Input`` / ``Output``), but that role is determined
-by **context**, never configured:
+Asset **role is determined by context, never specified** (the same rule as
+datasets, whose role is structural):
 
 - An asset referenced in an execution's input configuration is an *input*.
 - Assets written via ``commit_output_assets`` are *outputs*.
 
-So ``asset_role`` must NOT appear on ``AssetSpecConfig``: there is no scenario
-where a config author legitimately marks a config-declared asset as an Output,
-and exposing it as a configurable ``Literal``-typed field additionally broke
-structured-config registration under omegaconf < 2.4 (which cannot serialize
-``Literal`` annotations). This test pins that contract as a CI gate.
+So neither ``AssetSpec`` nor ``AssetSpecConfig`` carries an ``asset_role``
+field — it was removed entirely (it had been a no-op runtime field never read
+to set the edge). The two are now full-parity on configurable fields. This
+test pins that contract as a CI gate.
 """
 
 from __future__ import annotations
@@ -26,9 +24,10 @@ import dataclasses
 from deriva_ml.asset.aux_classes import AssetSpec, AssetSpecConfig
 
 # Fields that exist on AssetSpec but are intentionally NOT configurable.
-# asset_role is set by context (input config vs. commit_output_assets), so it
-# is excluded from the hydra-zen configuration surface by design.
-CONTEXT_DETERMINED_FIELDS = {"asset_role"}
+# (Empty: asset_role was removed entirely — role is context-derived, never a
+# field on either AssetSpec or AssetSpecConfig. AssetSpec and AssetSpecConfig
+# are now full-parity on configurable fields.)
+CONTEXT_DETERMINED_FIELDS: set[str] = set()
 
 
 def test_config_exposes_configurable_fields_with_matching_defaults() -> None:
@@ -77,13 +76,36 @@ def test_config_exposes_configurable_fields_with_matching_defaults() -> None:
     )
 
 
+def test_assetspec_has_no_asset_role_field() -> None:
+    """``AssetSpec`` must NOT carry an ``asset_role`` field at all.
+
+    Asset role is determined by context (consuming an input vs. producing via
+    ``commit_output_assets``) and is never specified by the caller — the same
+    rule as datasets, whose role is structural. ``asset_role`` was previously a
+    no-op runtime field (never read to set the edge), which only invited
+    callers to set something the system ignores. Removed entirely.
+    """
+    assert "asset_role" not in AssetSpec.model_fields, (
+        "AssetSpec must not declare ``asset_role`` — role is context-derived, "
+        "never user-specified."
+    )
+
+
+def test_assetspec_rejects_asset_role_kwarg() -> None:
+    """Passing ``asset_role`` to ``AssetSpec`` is rejected (not silently
+    ignored) — a typo or a stale call that names a role fails loudly."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AssetSpec(rid="1-ABCD", asset_role="Output")
+
+
 def test_config_does_not_expose_asset_role() -> None:
     """``AssetSpecConfig`` must NOT expose ``asset_role`` (context-determined).
 
     Direct regression guard: asset role is set by where the asset is used
     (input config vs. ``commit_output_assets``), not by the config author.
-    Re-adding ``asset_role`` here would also reintroduce the omegaconf
-    ``Literal`` structured-config break.
     """
     config_field_names = {f.name for f in dataclasses.fields(AssetSpecConfig)}
     assert "asset_role" not in config_field_names, (
@@ -93,12 +115,11 @@ def test_config_does_not_expose_asset_role() -> None:
     )
 
 
-def test_config_instantiates_to_assetspec_with_input_default() -> None:
-    """A configured asset instantiates to an AssetSpec defaulting to Input.
+def test_config_instantiates_to_assetspec() -> None:
+    """A configured asset instantiates to an AssetSpec.
 
-    ``rid`` + ``cache`` round-trip; the runtime ``asset_role`` takes its
-    ``"Input"`` default (the role is then set by the consuming/producing
-    operation).
+    ``rid`` + ``cache`` round-trip. There is no ``asset_role`` field — role is
+    set by the consuming/producing operation, never carried on the spec.
     """
     from hydra_zen import instantiate
 
@@ -106,4 +127,4 @@ def test_config_instantiates_to_assetspec_with_input_default() -> None:
     assert isinstance(spec, AssetSpec)
     assert spec.rid == "3JSE"
     assert spec.cache is True
-    assert spec.asset_role == "Input"
+    assert not hasattr(spec, "asset_role")
