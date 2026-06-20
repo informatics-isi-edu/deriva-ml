@@ -38,6 +38,16 @@ member" (scope is FK-reachable, not membership —
 aggregated (N feature rows per image stay N rows unless a `selector`
 collapses them — [Column hoisting](#column-hoisting)).
 
+**Scope: deriva-ml catalogs only.** Denormalization is anchored on a
+deriva-ml **`Dataset`** — it reads a dataset's members and walks the FK
+graph from there. It therefore runs only on a catalog that has the
+deriva-ml `Dataset` machinery (e.g. eye-ai). A plain Deriva catalog
+without it (e.g. facebase, whose `isa.dataset` is an ordinary domain
+table, not the deriva-ml membership model) is **not** a denormalize
+target — there is no dataset to anchor the walk. The *rules* below
+(grain, hoisting, ambiguity) are general FK-graph logic, but the entry
+points require a `Dataset`.
+
 The four entry points are methods on `DatasetBag`:
 
 | Method | Returns | Fetches data? |
@@ -177,8 +187,14 @@ restricted to `include_tables` — a `via` table participates in the graph
 but can never be the grain, since its columns aren't projected. Then:
 
 - **exactly one sink** → that table is `row_per`;
-- **two or more sinks** → `DerivaMLDenormalizeMultiLeaf` (pass `row_per=`
-  to pick one);
+- **two or more sinks** → `DerivaMLDenormalizeMultiLeaf`. The requested
+  tables aren't on one FK chain. Either pass `row_per=` to pick a grain,
+  **or add a connecting table** so they form a chain — the exception's
+  `bridge_suggestions` field (and message) names the intermediate table(s)
+  on a path between the candidates, when one exists. (e.g. on eye-ai,
+  `["Subject", "Clinical_Records"]` suggests adding `Observation` /
+  `Clinical_Records_Observation` — the tables that bridge them.) Empty when
+  the candidates share no path.
 - **no sink** (an FK cycle) → `DerivaMLDenormalizeNoSink`.
 
 **Explicit `row_per`.** Must name a table in `include_tables` (it has no
