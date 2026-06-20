@@ -18,9 +18,12 @@ Typical usage example:
 """
 
 import importlib.metadata
+import importlib.util
 import os
 import platform
+import shutil
 import site
+import subprocess
 import sys
 from typing import Any, Dict
 
@@ -52,7 +55,91 @@ def get_execution_environment() -> Dict[str, Any]:
         sys_path=sys.path,
         site=get_site_info(),
         platform=get_platform_info(),
+        gpu=get_gpu_info(),
     )
+
+
+def get_gpu_info() -> Dict[str, Any]:
+    """Best-effort, dependency-free GPU / accelerator snapshot.
+
+    The CPU and architecture are already captured by ``get_platform_info``;
+    ``platform`` does not see the GPU. This probes for GPU details without
+    adding a hard dependency and without ever raising — a failed probe must
+    never break the environment snapshot.
+
+    Probe order:
+      1. ``nvidia-smi`` via subprocess (no Python dependency) — model(s),
+         count, total memory, driver version.
+      2. ``torch.cuda`` *only if torch is importable* (guarded by
+         ``importlib.util.find_spec`` so torch is never imported into a
+         non-ML process) — device names plus the CUDA / cuDNN versions torch
+         was built against, which ``nvidia-smi`` does not report.
+
+    Returns:
+        Dict[str, Any]: Always contains ``available`` (bool). When a GPU is
+        found, also carries ``source`` and probe-specific fields. When
+        nothing succeeds, ``{"available": False}`` (optionally with a
+        ``probe_error``). Never raises.
+
+    Example:
+        >>> info = get_gpu_info()  # doctest: +SKIP
+        >>> info["available"]  # doctest: +SKIP
+        True
+    """
+    info: Dict[str, Any] = {"available": False}
+
+    # --- Probe 1: nvidia-smi (no added dependency) ---------------------
+    try:
+        smi = shutil.which("nvidia-smi")
+        if smi:
+            result = subprocess.run(
+                [
+                    smi,
+                    "--query-gpu=name,memory.total,driver_version",
+                    "--format=csv,noheader",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                gpus = []
+                for line in result.stdout.strip().splitlines():
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 3:
+                        gpus.append({"name": parts[0], "memory_total": parts[1], "driver_version": parts[2]})
+                if gpus:
+                    info = {
+                        "available": True,
+                        "source": "nvidia-smi",
+                        "count": len(gpus),
+                        "devices": gpus,
+                    }
+    except Exception as exc:  # noqa: BLE001 — best-effort, never raise
+        info.setdefault("probe_error", f"nvidia-smi: {exc}")
+
+    # --- Probe 2: torch.cuda (only if torch is already installed) ------
+    # Adds the CUDA/cuDNN build versions, which nvidia-smi does not report.
+    try:
+        if importlib.util.find_spec("torch") is not None:
+            import torch  # local import — never pulled into a non-ML process
+
+            if torch.cuda.is_available():
+                names = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
+                info["available"] = True
+                info.setdefault("source", "torch.cuda")
+                info["torch"] = {
+                    "device_count": torch.cuda.device_count(),
+                    "device_names": names,
+                    "cuda_version": torch.version.cuda,
+                    "cudnn_version": (
+                        torch.backends.cudnn.version() if torch.backends.cudnn.is_available() else None
+                    ),
+                }
+    except Exception as exc:  # noqa: BLE001 — best-effort, never raise
+        info.setdefault("probe_error", f"torch: {exc}")
+
+    return info
 
 
 def get_loaded_modules() -> Dict[str, str]:
