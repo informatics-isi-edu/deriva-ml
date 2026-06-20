@@ -550,18 +550,19 @@ This yields a hard, airtight runtime invariant:
 > `datasets=` ⟹ no input edge. An author cannot declare a dataset input and
 > have the edge dropped, nor obtain an input edge without declaring it.
 
-**Partial input on failure.** Input edges are written as the declared
-datasets are materialized (during `Created → Running`). If materialization
-fails partway — e.g. dataset 3 of 5 will not resolve — the execution
-transitions to `Failed` with a reason naming the unresolved dataset, and
-records `Dataset_Execution` edges **for the datasets that successfully
-materialized before the failure**. On the failure path the recorded edges
-therefore reflect *inputs successfully consumed*, not the raw `datasets=`
-list. This is deliberate: a partial record is more diagnostically useful
-than none (you can see how far the run got), and it is the failure-section
-rule ("everything established up to the point of failure") applied to
-inputs. The total `datasets= ⟺ edges` equivalence holds for successful runs;
-for failed runs the edges are a prefix of the declared set.
+**Bad input fails fast — no partial state.** A declared input RID is
+**validated up front**, in `Execution.__init__`, *before* the Execution row
+is created and before any dataset is materialized. If any declared input does
+not resolve, the run fails immediately with **no Execution row and no input
+edges written at all** — there is no partial-input state to record, because
+nothing was created. This is the stronger guarantee (validate-not-dry-run,
+[ADR-0002](../adr/0002-validate-not-dryrun-pre-flight.md)): a bad input is
+caught with zero side effects, rather than leaving a half-recorded run to
+clean up. Consequently the `datasets= ⟺ input-edges` equivalence is total —
+either all declared inputs resolve and all edges are written, or the run
+never starts. (This supersedes an earlier "record the resolved prefix on a
+mid-materialization failure" draft: upfront validation makes a partial
+materialization of *declared* inputs unreachable.)
 
 The author's obligation — *not* machine-enforceable — is to express a
 dataset-shaped input *as* a dataset (in `datasets=`) rather than as, say, a
