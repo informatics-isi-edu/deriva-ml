@@ -53,17 +53,10 @@ def test_E6_rid_keyed_dict_routes_to_assetspec():
 # ─────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(
-    reason="LocalFile + validate_assets shape-routing not implemented. A "
-    "{'path': ...} entry must route to a LocalFile spec; today the validator "
-    "only knows rid-keyed/bare-string entries and would mishandle a path key. "
-    "Flip to a real assertion when LocalFile lands.",
-    strict=True,
-)
 def test_E6_path_keyed_dict_routes_to_localfile():
     """A {'path': ...} entry (from a hydra .yaml) routes to a LocalFile spec,
     not an AssetSpec — the path is an explicit local-file input declaration."""
-    from deriva_ml.asset.aux_classes import LocalFile  # noqa: F401 — not yet implemented
+    from deriva_ml.asset.aux_classes import LocalFile
 
     config = ExecutionConfiguration(assets=[{"path": "/data/labels.csv"}])
     spec = config.assets[0]
@@ -71,22 +64,22 @@ def test_E6_path_keyed_dict_routes_to_localfile():
     assert str(spec.path) == "/data/labels.csv"
 
 
-@pytest.mark.xfail(
-    reason="LocalFile not implemented. A bare path string must NOT be sniffed "
-    "into a path — it stays a RID (safety). A local file requires the explicit "
-    "LocalFile wrapper. This pins that the wrapper is the only path entry point.",
-    strict=True,
-)
 def test_E5_localfile_wrapper_is_the_only_path_entry_point():
-    """A local file is declared via LocalFile('/path'); a bare path string is
-    still treated as a RID, never sniffed into a filesystem read."""
+    """A local file is declared via an explicit LocalFile; a bare string is
+    NEVER sniffed into a path — it is treated only as a RID."""
+    import pytest
+    from pydantic import ValidationError
+
     from deriva_ml.asset.aux_classes import LocalFile
 
-    config = ExecutionConfiguration(assets=[LocalFile("/data/labels.csv")])
+    config = ExecutionConfiguration(assets=[LocalFile(path="/data/labels.csv")])
     spec = config.assets[0]
     assert isinstance(spec, LocalFile)
+    assert str(spec.path) == "/data/labels.csv"
 
-    # A bare path-looking string is NOT a LocalFile — it is a RID.
-    config2 = ExecutionConfiguration(assets=["/data/labels.csv"])
-    assert isinstance(config2.assets[0], AssetSpec)
-    assert config2.assets[0].rid == "/data/labels.csv"
+    # A bare path-looking string is NOT routed to a LocalFile. It is treated
+    # only as a RID — and since it is not a valid RID, it is rejected outright
+    # (never silently read as a filesystem path). The wrapper is the ONLY way
+    # to declare a path.
+    with pytest.raises(ValidationError):
+        ExecutionConfiguration(assets=["/data/labels.csv"])

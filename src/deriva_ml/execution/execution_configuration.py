@@ -30,7 +30,7 @@ from typing import Any
 from omegaconf import DictConfig
 from pydantic import BaseModel, Field, field_validator
 
-from deriva_ml.asset.aux_classes import AssetSpec
+from deriva_ml.asset.aux_classes import AssetSpec, LocalFile
 from deriva_ml.core.validation import VALIDATION_CONFIG
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.workflow import Workflow
@@ -76,7 +76,7 @@ class ExecutionConfiguration(BaseModel):
     """
 
     datasets: list[DatasetSpec] = []
-    assets: list[AssetSpec] = []
+    assets: list[AssetSpec | LocalFile] = []
     workflow: Workflow | None = None
     description: str = ""
     argv: list[str] = Field(default_factory=lambda: sys.argv)
@@ -87,10 +87,18 @@ class ExecutionConfiguration(BaseModel):
     @field_validator("assets", mode="before")
     @classmethod
     def validate_assets(cls, value: Any) -> Any:
-        """Normalize asset entries to AssetSpec objects.
+        """Normalize asset entries, routing on shape (the safety chokepoint).
 
-        Accepts plain RID strings, DictConfig from Hydra, AssetSpec objects,
-        or dicts with 'rid' and optional 'cache' keys.
+        Routing rule:
+          - a ``LocalFile`` instance, or a mapping with a ``path`` key → a
+            ``LocalFile`` (a local-file input, registered during resolution);
+          - an ``AssetSpec`` instance, a mapping with a ``rid`` key, or a
+            **bare string** → an ``AssetSpec`` (a catalog asset, by RID).
+
+        A bare string is *always* a RID — never type-sniffed into a path. A
+        filesystem read happens only for an explicitly-typed ``LocalFile``
+        (or a ``{path: ...}`` mapping), never for an arbitrary (possibly
+        injected) string. This is the abuse-surface boundary.
         """
         def _drop_legacy_role(d: dict) -> dict:
             # ``AssetSpec`` no longer has an ``asset_role`` field (role is
@@ -102,23 +110,22 @@ class ExecutionConfiguration(BaseModel):
 
         result = []
         for v in value:
-            if isinstance(v, AssetSpec):
+            if isinstance(v, (AssetSpec, LocalFile)):
                 result.append(v)
-            elif isinstance(v, dict):
-                # Dict with rid/cache keys (e.g., from JSON config)
-                result.append(AssetSpec(**_drop_legacy_role(v)))
-            elif isinstance(v, DictConfig):
-                # OmegaConf DictConfig from Hydra — may have rid+cache or just rid
+            elif isinstance(v, (dict, DictConfig)):
+                # A mapping (plain dict from JSON, or a Hydra DictConfig).
+                # Route on shape: a ``path`` key is a local-file input; a
+                # ``rid`` key (the default) is a catalog asset.
                 d = _drop_legacy_role(dict(v))
-                if "rid" in d:
-                    result.append(AssetSpec(**d))
+                if "path" in d:
+                    result.append(LocalFile(**d))
                 else:
-                    # Bare DictConfig with just a .rid attribute.
-                    result.append(AssetSpec(rid=v.rid, cache=getattr(v, "cache", False)))
+                    result.append(AssetSpec(**d))
             elif isinstance(v, str):
+                # A bare string is ALWAYS a RID — never sniffed into a path.
                 result.append(AssetSpec(rid=v))
             else:
-                # Unknown type — try string coercion
+                # Unknown type — coerce to a RID string (never a path).
                 result.append(AssetSpec(rid=str(v)))
         return result
 
