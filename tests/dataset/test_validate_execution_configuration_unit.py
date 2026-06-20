@@ -273,17 +273,19 @@ def test_version_conflict_same_rid_two_versions():
     assert report.all_valid is False
 
 
-def test_role_conflict_input_and_output():
+def test_duplicate_asset_rid_flagged():
+    """The same asset RID listed twice is a duplicate (role is not on the
+    spec, so there is no role-conflict to detect — only duplication)."""
     ml = _FakeML()
     ml.add_asset("3JSE", asset_table="Image", filename="x.jpg")
     config = ExecutionConfiguration(
         assets=[
-            AssetSpec(rid="3JSE", asset_role="Input"),
-            AssetSpec(rid="3JSE", asset_role="Output"),
+            AssetSpec(rid="3JSE"),
+            AssetSpec(rid="3JSE"),
         ],
     )
     report = ml.validate_execution_configuration(config)
-    issues = [i for i in report.cross_spec_issues if i.issue == "role_conflict"]
+    issues = [i for i in report.cross_spec_issues if i.issue == "duplicate_rid"]
     assert len(issues) == 1
     assert report.all_valid is False
 
