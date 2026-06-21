@@ -1308,6 +1308,13 @@ class DerivaML(
         # so the identity hasn't changed, but the cached wrapper is stale.
         self._path_builder_cache = None
 
+        # Curate the vocabulary's Chaise presentation (row-name, compact columns,
+        # Name facet) so a runtime-created vocab is annotated consistently with
+        # asset/feature tables rather than left on raw Chaise defaults.
+        from deriva_ml.schema.annotations import vocabulary_annotation
+
+        vocabulary_annotation(vocab_table)
+
         # Update navbar to include the new vocabulary table
         if update_navbar:
             self.apply_catalog_annotations()
