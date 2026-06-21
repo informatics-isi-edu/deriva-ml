@@ -3,20 +3,52 @@
 > Verified against a populated demo catalog
 > (`create_demo_catalog(create_features=True, create_datasets=True)`,
 > deriva-ml v1.46.x, catalog `106`, captured 2026-06-13). Every rule on
-> this page is tagged `[deriva-ml]` — denormalization is **pure local
-> computation** inside deriva-ml's own code, with no deriva-py engine
-> involvement and no catalog access. The "Worked examples" section
-> pastes verified excerpts from `docs/reference/.examples/denorm.txt`.
+> this page is tagged `[deriva-ml]` — the denormalization **rules and
+> SQL shaping** are pure local computation inside deriva-ml's own code,
+> with no deriva-py engine involvement. (The *shaping* is always local;
+> a live `Dataset` additionally **fetches its rows from the catalog**
+> into local SQLite first — see [Mental model](#mental-model). A
+> `DatasetBag` reads only the bag's local SQLite and touches no
+> catalog.) The "Worked
+> examples" section pastes verified excerpts from
+> `docs/reference/.examples/denorm.txt`.
 >
 > **For a gentle, example-led introduction**, read the
 > [denormalization tutorial](../user-guide/denormalization.md) first.
 > This page is the formal counterpart — it states the rules precisely
 > and names the code locations, but does not re-teach the concepts.
 
-Denormalization turns an **already-downloaded** dataset bag into a
-single **wide table** — one row per ML observation, with columns pulled
-side-by-side from related tables along the bag's foreign-key graph. The
-four entry points are methods on `DatasetBag`:
+## What denormalization returns (the goal)
+
+Denormalization flattens a dataset (a downloaded `DatasetBag`, or a live
+`Dataset`) into a single **wide table**. Precisely, it returns:
+
+> **One row per `row_per`-table instance that is FK-reachable from the
+> dataset's (recursive) members, with the requested columns projected and
+> upstream context duplicated across rows that share it. It does no
+> aggregation; an explicitly-requested upstream table that reaches no
+> `row_per` row contributes a NULL-filled orphan row.**
+
+That is the contract to hold the result against. "One row per ML
+observation" is the *intuition* — but the observation is whatever table
+becomes `row_per` ([Row grain](#row-grain)): `Image`, `Observation`, a
+`file`, or a feature-association row. It is **not** "one row per dataset
+member" (scope is FK-reachable, not membership —
+[FK-reachable scoping](#fk-reachable-scoping)) and it is **not**
+aggregated (N feature rows per image stay N rows unless a `selector`
+collapses them — [Column hoisting](#column-hoisting)).
+
+**Scope: deriva-ml catalogs only.** Denormalization is anchored on a
+deriva-ml **`Dataset`** — it reads a dataset's members and walks the FK
+graph from there. It therefore runs only on a catalog that has the
+deriva-ml `Dataset` machinery (e.g. eye-ai). A plain Deriva catalog
+without it (e.g. facebase, whose `isa.dataset` is an ordinary domain
+table, not the deriva-ml membership model) is **not** a denormalize
+target — there is no dataset to anchor the walk. The *rules* below
+(grain, hoisting, ambiguity) are general FK-graph logic, but the entry
+points require a `Dataset`.
+
+The four entry points are methods on `DatasetBag`:
 
 | Method | Returns | Fetches data? |
 |---|---|---|
@@ -140,17 +172,29 @@ These terms are used precisely and consistently across this page, the
 
 **Auto-inference (the default).** Build a directed graph over
 `include_tables ∪ via` whose edges are **direct** FK references between
-domain tables (`A.fk_col → B.RID`). Association tables — M:N bridges and
-feature-association tables — are **not** edges here: two tables linked
-only *through* an association establish no downstream direction between
-them (the bridge is a 1:1:1 hop, not a fan-out). The **sinks** of this
-graph (tables with no outbound edge) are the `row_per` candidates,
+domain tables (`A.fk_col → B.RID`). **Read the arrow as "A holds the FK,
+so A is *downstream* of B"** — the edge points from the table that *has*
+the foreign key toward the table it *references*. (e.g. `Image.Subject →
+Subject.RID` means `Image` is downstream of `Subject`; in
+`Subject ◄ Observation ◄ Image`, `Image` is the most-downstream table.)
+Association tables — M:N bridges and feature-association tables — are
+**not** edges here: two tables linked only *through* an association
+establish no downstream direction between them (the bridge is a 1:1:1
+hop, not a fan-out). The **sinks** of this graph (tables with **no
+outbound edge** — i.e. they hold no FK to another requested table, so
+nothing is downstream of them) are the `row_per` candidates,
 restricted to `include_tables` — a `via` table participates in the graph
 but can never be the grain, since its columns aren't projected. Then:
 
 - **exactly one sink** → that table is `row_per`;
-- **two or more sinks** → `DerivaMLDenormalizeMultiLeaf` (pass `row_per=`
-  to pick one);
+- **two or more sinks** → `DerivaMLDenormalizeMultiLeaf`. The requested
+  tables aren't on one FK chain. Either pass `row_per=` to pick a grain,
+  **or add a connecting table** so they form a chain — the exception's
+  `bridge_suggestions` field (and message) names the intermediate table(s)
+  on a path between the candidates, when one exists. (e.g. on eye-ai,
+  `["Subject", "Clinical_Records"]` suggests adding `Observation` /
+  `Clinical_Records_Observation` — the tables that bridge them.) Empty when
+  the candidates share no path.
 - **no sink** (an FK cycle) → `DerivaMLDenormalizeNoSink`.
 
 **Explicit `row_per`.** Must name a table in `include_tables` (it has no
@@ -176,6 +220,21 @@ to resolve a [path ambiguity](#path-ambiguity) without cluttering the
 output. Feature names (e.g. `"Image_Classification"`) in `include_tables`
 are resolved to the underlying feature-association table before
 projection (see [the contract §8.4](../design/denormalization-contract.md)).
+
+**"Transparent" is a topology heuristic, not a purity judgment — and you
+can override it.** A table is treated as a transparent intermediate when
+it has **exactly two domain FKs** (`_is_topological_association`) — *not*
+when it is "pure." This is the right default (it skips `Dataset_Image`-style
+link tables), but it has a real-catalog edge: a two-FK table that *also*
+carries meaningful columns (a `Role`, `Ordinal`, `Comment`, or — on
+catalogs like **facebase** — a genuine domain entity that happens to have
+two FKs) is **still treated as transparent and its columns are dropped**
+unless you opt in. **The escape hatch:** name that table explicitly in
+`include_tables` and its columns appear (it loses transparent status for
+that call). So the rule is: *two-FK tables are hidden by default; request
+them by name to project their columns.* (Feature-association tables are a
+separate, marker-based case — one FK to `Feature_Name` + one to
+`Execution` — and are always transparent unless named; see the contract.)
 `[deriva-ml]` `src/deriva_ml/local_db/denormalizer.py` (`include_tables`
 / `via` arguments; transparent-intermediate detection in the planner).
 
@@ -202,8 +261,13 @@ the `row_per` row count. An `INNER JOIN` is safe only because the
 This is also where a **feature `selector`** acts: when `include_tables`
 contains **exactly one** feature-association table, the optional
 `selector` callable reduces each feature's multi-row group (e.g. several
-annotators' labels for one image) to a single chosen row before
-hoisting. Its signature is
+annotators' labels for one image) to a single chosen row. The reduction
+runs **after the SQL join materializes** — the full N-row-per-anchor
+frame is produced first, then grouped by the feature's target RID and
+collapsed in Python. (So without a `selector` the result is *not* one
+row per `row_per` instance when features fan out; *with* one it is. This
+is also why `describe_denormalized`'s pre-run row estimate counts the
+un-collapsed rows.) Its signature is
 `Callable[[list[FeatureRecord]], FeatureRecord | None]` — identical to
 `DerivaML.feature_values`'s `selector`; built-ins on `FeatureRecord`
 include `select_newest`, `select_first`, `select_by_workflow`, and a
@@ -262,16 +326,23 @@ determined by its table and reachability.**
 or downstream (it points *at* `row_per`, scoping which `row_per` rows are
 in play). Both serve as a filter on the output. A reader who assumes
 "reaches" means strictly-downstream-only would wrongly drop the upstream
-case. The six cases:
+case. In the table below, **"FK-connected to `row_per`"** means exactly
+this either-direction relationship — the anchor sits upstream of
+`row_per`, downstream of it, or *is* it. The six cases:
 
 | Case | Anchor table | Reaches a `row_per` row? | Contribution |
 |---|---|---|---|
 | 1 | `== row_per` | — | one output row (itself, upstream hoisted) |
-| 2 | `∈ include_tables`, upstream of `row_per` | yes | filter-only (appears via the `row_per` row that hoists it) |
-| 3 | `∈ include_tables`, upstream of `row_per` | no | one **orphan** row — its columns populated, `row_per`-side columns `NULL` (LEFT-JOIN shape) |
-| 4 | `∉ include_tables`, upstream of `row_per` | yes | filter-only (no row of its own — its columns aren't projected) |
-| 5 | `∉ include_tables`, upstream of `row_per` | no | silently dropped (would not affect output) |
+| 2 | `∈ include_tables`, FK-connected to `row_per` | yes | filter-only (appears via the `row_per` row that hoists or points at it) |
+| 3 | `∈ include_tables`, FK-connected to `row_per` | no | one **orphan** row — its columns populated, `row_per`-side columns `NULL` (LEFT-JOIN shape) |
+| 4 | `∉ include_tables`, FK-connected to `row_per` | yes | filter-only (no row of its own — its columns aren't projected) |
+| 5 | `∉ include_tables`, FK-connected to `row_per` | no | silently dropped (would not affect output) |
 | 6 | no FK path to any `include_tables ∪ via` table | — | raises `DerivaMLDenormalizeUnrelatedAnchor` unless `ignore_unrelated_anchors=True` (then silently dropped) |
+
+(An orphan row — case 3 — only arises for an anchor that is *upstream*
+of `row_per` and reaches none; a *downstream* anchor that reaches no
+`row_per` row simply scopes nothing and falls under case 5. "Connected
+but unreached" is the orphan trigger only on the upstream side.)
 
 `ignore_unrelated_anchors` (default `False`) controls **only** case 6;
 it does **not** affect orphan (case 3) emission. Empty anchor sets are
@@ -529,6 +600,36 @@ bag.get_denormalized_as_dataframe(["Image"])
 bag.get_denormalized_as_dataframe(["Image"], ignore_unrelated_anchors=True)
 # OK — the File members are silently dropped.
 ```
+
+## Known limitations (FK shapes)
+
+The rules above assume the **single-column, RID-targeted FKs** that
+DerivaML schemas in active use (CSA, CFDE, GPCR, eye-ai) rely on. Two FK
+shapes found on other Deriva catalogs are not fully supported:
+
+- **Composite (multi-column) FKs, catalog-side.** A FK spanning several
+  columns — e.g. facebase's `file(biosample, dataset) → biosample(RID,
+  dataset)` — is handled on the **bag** path (the local SQL emits a
+  multi-column `AND` join) but **not** on the live-`Dataset` (catalog
+  fetch) path: `_collect_fk_values` raises `NotImplementedError` rather
+  than under-scoping the fetch (RB-08). So `Dataset.get_denormalized_*`
+  across a composite FK fails loudly; `DatasetBag.get_denormalized_*` on
+  a downloaded bag works. Tracked in
+  [issue #327](https://github.com/informatics-isi-edu/deriva-ml/issues/327).
+
+- **Self-referential FKs (a table referencing itself).** A hierarchy like
+  `HierNode.Parent_Node → HierNode.RID` is **not** denormalized as a
+  parent/child relationship. The planner deduplicates join paths by table
+  *name* and labels output columns `Table.column`, so it cannot alias the
+  same table in two roles — parent-`HierNode.*` and child-`HierNode.*`
+  would collide. Single-table requests (`["HierNode"]`) work and path
+  discovery terminates without looping; but you **cannot** project a
+  node's parent columns alongside its own in one call. To flatten a
+  hierarchy, denormalize the single table and resolve the parent links in
+  pandas.
+
+Both are about FK *shape*, not dataset content; a schema with only
+single-column RID FKs (the common case) hits neither.
 
 ## See also
 

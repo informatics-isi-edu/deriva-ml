@@ -1114,8 +1114,80 @@ class DenormalizePlanner:
             raise DerivaMLDenormalizeMultiLeaf(
                 candidates=sinks,
                 include_tables=list(include_tables),
+                bridge_suggestions=self._bridge_suggestions(sinks, all_tables),
             )
         return sinks[0]
+
+    def _bridge_suggestions(self, sinks: list[str], requested: set[str]) -> list[str]:
+        """Intermediate tables that would connect disconnected sinks.
+
+        When auto-inference finds multiple sinks, they are tables with no
+        downstream FK to another *requested* table — i.e. the requested set
+        doesn't put them on one chain. But the schema may still connect two
+        sinks through tables the caller didn't name. This returns those
+        connecting tables so the caller can add one to ``include_tables``
+        and collapse the multi-leaf into a single grain (the eye-ai
+        ``["Subject", "Clinical_Records"]`` case, bridged by ``Visit`` /
+        ``Observation``).
+
+        For each unordered pair of sinks, find a shortest **undirected** FK
+        path (the FK-neighbor graph is walked direction-agnostically, since
+        two sinks typically connect through a common upstream ancestor or an
+        M:N association — e.g. eye-ai's ``Subject`` and ``Clinical_Records``
+        connect via ``Subject ◄ Observation ◄ Clinical_Records_Observation ►
+        Clinical_Records``). The interior tables of that path, minus any the
+        caller already requested, are the suggestions. Returns a sorted,
+        de-duplicated list; empty when a pair shares no path.
+
+        Uses :meth:`_fk_neighbors` (undirected, no ``Dataset`` dependency),
+        not :meth:`_enumerate_paths` — the latter is coupled to the
+        deriva-ml ``Dataset`` model and would not run here.
+
+        Args:
+            sinks: the tied ``row_per`` candidates.
+            requested: ``include_tables ∪ via`` — tables already named, which
+                are not themselves suggestions.
+
+        Returns:
+            Sorted list of connecting intermediate table names (possibly
+            empty).
+        """
+        from collections import deque
+
+        suggestions: set[str] = set()
+        max_hops = 6  # bound the search; deep bridges are rarely actionable
+        for i, a in enumerate(sinks):
+            for b in sinks[i + 1 :]:
+                # BFS on the undirected FK-neighbor graph from a to b.
+                prev: dict[str, str | None] = {a: None}
+                q: deque[tuple[str, int]] = deque([(a, 0)])
+                found = False
+                while q and not found:
+                    cur, depth = q.popleft()
+                    if depth >= max_hops:
+                        continue
+                    try:
+                        neighbors = self._fk_neighbors(cur)
+                    except Exception:
+                        continue
+                    for nbr in neighbors:
+                        name = nbr.name
+                        if name in prev:
+                            continue
+                        prev[name] = cur
+                        if name == b:
+                            found = True
+                            break
+                        q.append((name, depth + 1))
+                if not found:
+                    continue
+                # Reconstruct the path b <- ... <- a; collect interior nodes.
+                node: str | None = b
+                while node is not None and node != a:
+                    if node not in (a, b) and node not in requested:
+                        suggestions.add(node)
+                    node = prev.get(node)
+        return sorted(suggestions)
 
     def _enumerate_paths(
         self,
