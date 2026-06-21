@@ -8,8 +8,16 @@ full provenance tracking.
 
 from typing import TYPE_CHECKING
 
-# Re-export AssetSpec and AssetSpecConfig from their canonical location
-from deriva_ml.asset.aux_classes import AssetSpec, AssetSpecConfig
+# Re-export the input-spec types from their canonical location. AssetSpec names
+# a catalog-resident asset by RID; LocalFile names a local file by path (the
+# framework registers it in the File table on input resolution). Both are used
+# in ``ExecutionConfiguration.assets``, so both belong on the execution surface.
+from deriva_ml.asset.aux_classes import (
+    AssetSpec,
+    AssetSpecConfig,
+    LocalFile,
+    LocalFileConfig,
+)
 
 # Safe imports - no circular dependencies
 from deriva_ml.execution.base_config import (
@@ -66,6 +74,8 @@ __all__ = [
     "Workflow",
     "AssetSpec",
     "AssetSpecConfig",
+    "LocalFile",
+    "LocalFileConfig",
     "run_model",
     "create_model_config",
     "reset_multirun_state",

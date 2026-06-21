@@ -17,7 +17,6 @@ import pytest
 from deriva_ml.asset.aux_classes import AssetSpec
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 
-
 # ─────────────────────────────────────────────────────────────────────────
 # E5/E6 safety boundary — a bare string in assets= is ALWAYS a RID.
 # (Characterization: the existing validator already does this; pin it so the
@@ -126,3 +125,29 @@ def test_E4_localfile_input_registered_and_linked_as_input(test_ml, tmp_path):
     assert {r["Asset_Role"] for r in rows} == {"Input"}, (
         "a LocalFile declared in assets= must be linked as Input (role from context)"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Public export surface — LocalFile/LocalFileConfig are usable from the same
+# place as AssetSpec (deriva_ml.execution), so consumers (e.g. data-curation's
+# hydra-zen configs) have a stable public import, not an internal module path.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def test_localfile_is_exported_from_execution_package():
+    """``LocalFile``/``LocalFileConfig`` re-export from ``deriva_ml.execution``.
+
+    They live canonically in ``deriva_ml.asset.aux_classes`` but, like
+    ``AssetSpec``, are used in ``ExecutionConfiguration.assets`` — so they must
+    be reachable from the execution surface that consumers import from. Pins the
+    public path so it can't silently regress to an internal-only import.
+    """
+    from deriva_ml.asset.aux_classes import LocalFile as _CanonicalLocalFile
+    from deriva_ml.execution import LocalFile, LocalFileConfig
+
+    # Same object as the canonical definition (a true re-export, not a shadow).
+    assert LocalFile is _CanonicalLocalFile
+    # Constructs as documented (keyword form; bare-string shorthand is only for
+    # inside an assets= list, where the validator coerces it).
+    assert LocalFile(path="/data/labels.csv").path == "/data/labels.csv"
+    assert LocalFileConfig is not None
