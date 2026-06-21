@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import pytest
 
+from deriva_ml import MLAsset
 from deriva_ml import MLVocab as vc
 from deriva_ml.core.constants import ML_SCHEMA
 from deriva_ml.dataset.aux_classes import DatasetSpec
@@ -373,13 +374,6 @@ def test_B5_exception_in_block_records_failed_not_success(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Unknown-provenance File sentinel + no-input commit check not "
-    "implemented. An artifact-producer that commits with no declared input "
-    "must get an Input edge to the seeded unknown-provenance File sentinel. "
-    "Needs: sentinel seeding in create_schema.py + the commit-time check.",
-    strict=True,
-)
 def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
     """F2 — An artifact-producer with no declared input gets an Input edge to
     the unknown-provenance File sentinel (recorded as explicitly-unknown, not
@@ -396,10 +390,38 @@ def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
     # The intended behavior: the execution now has exactly one input edge, to
     # the unknown-provenance File sentinel. The accessor for the sentinel is
     # part of the unbuilt feature.
-    sentinel_file_rid = ml.unknown_provenance_file_rid()  # noqa: F821 — not yet implemented
-    input_file_rids = {a.rid for a in ml.list_assets(execution=exe.execution_rid, asset_role="Input")}
+    sentinel_file_rid = ml.unknown_provenance_file_rid()
+    input_file_rids = {a.asset_rid for a in ml.list_execution_assets(exe.execution_rid, asset_role="Input")}
     assert sentinel_file_rid in input_file_rids, (
         "A no-input artifact-producer must carry the unknown-provenance File "
+        "sentinel as an explicit input."
+    )
+
+
+@pytest.mark.integration
+def test_F2b_no_input_asset_producer_gets_unknown_file_sentinel(test_ml):
+    """F2b — The no-input check also fires for an *asset-producing* run (the
+    second write path): a run that uploads an asset but declares no input gets
+    the unknown-provenance File sentinel as an explicit Input edge.
+
+    F2 covers the dataset-authorship write path; this covers the asset-commit
+    write path. The contract requires the check at every durable-artifact path,
+    not only at dataset authorship.
+    """
+    ml = test_ml
+    workflow = _setup_workflow(ml)
+
+    producer = ml.create_execution(ExecutionConfiguration(description="Asset producer, no input", workflow=workflow))
+    with producer.execute() as exe:
+        asset_path = exe.asset_file_path(MLAsset.execution_asset, "NoInput/out.txt")
+        with asset_path.open("w") as fp:
+            fp.write("output content")
+    producer.commit_output_assets()
+
+    sentinel_file_rid = ml.unknown_provenance_file_rid()
+    input_file_rids = {a.asset_rid for a in ml.list_execution_assets(producer.execution_rid, asset_role="Input")}
+    assert sentinel_file_rid in input_file_rids, (
+        "A no-input asset-producer must carry the unknown-provenance File "
         "sentinel as an explicit input."
     )
 

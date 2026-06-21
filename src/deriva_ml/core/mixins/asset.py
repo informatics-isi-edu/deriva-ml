@@ -253,6 +253,38 @@ class AssetMixin:
             for asset_record in asset_path.entities().fetch()
         ]
 
+    def list_execution_assets(self, execution_rid: str, asset_role: str | None = None) -> list["Asset"]:
+        """List the assets linked to an execution.
+
+        Enumerates every asset associated with ``execution_rid`` across all
+        ``{Asset}_Execution`` association tables, optionally filtered by role.
+        This is the DerivaML-instance analog of
+        :meth:`Execution.list_assets` — same scope, same optional ``asset_role``
+        filter — for callers holding an execution RID rather than a live
+        :class:`~deriva_ml.execution.execution.Execution` object.
+
+        Args:
+            execution_rid: RID of the execution whose assets to list.
+            asset_role: Optional filter — ``"Input"`` or ``"Output"`` from the
+                ``Asset_Role`` vocabulary. ``None`` returns assets of any role.
+
+        Returns:
+            list[Asset]: Asset objects linked to the execution. Empty if none
+                match.
+
+        Example:
+            >>> inputs = ml.list_execution_assets(exe_rid, asset_role="Input")  # doctest: +SKIP
+            >>> for a in inputs:  # doctest: +SKIP
+            ...     print(a.asset_rid, a.filename)
+        """
+        from deriva_ml.execution._helpers import list_assets as _list_assets
+
+        return _list_assets(
+            ml_instance=self,
+            execution_rid=execution_rid,
+            asset_role=asset_role,
+        )
+
     def list_asset_executions(self, asset_rid: str, asset_role: str | None = None) -> list["ExecutionRecord"]:
         """List all executions associated with an asset.
 

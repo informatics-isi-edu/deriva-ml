@@ -2551,6 +2551,20 @@ class Dataset:
             [{"RID": v["RID"], "Dataset": v["Dataset"], "Snapshot": snap} for v in version_records]
         )
 
+        # Provenance no-input check (contract §Timing of the artifact-producer
+        # rules): authoring a dataset version makes ``execution_rid`` an
+        # artifact-producer. If it declared no input, link the unknown-provenance
+        # File sentinel as an explicit Input edge. Skipped for the sentinel
+        # execution itself (exempt bootstrap substrate) and for producerless
+        # authorship (execution_rid is None — handled by producerless attribution,
+        # not the no-input check).
+        if execution_rid is not None:
+            from deriva_ml.execution.provenance_enforcement import (
+                ensure_artifact_producer_has_input,
+            )
+
+            ensure_artifact_producer_has_input(ml_instance, execution_rid)
+
     @validate_call(config=VALIDATION_CONFIG)
     def download_dataset_bag(
         self,
