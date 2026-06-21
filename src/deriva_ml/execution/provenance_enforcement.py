@@ -91,10 +91,10 @@ def _link_file_sentinel_as_input(ml_instance: Any, execution_rid: str) -> "RID":
     )
 
     # Directional Input_File tag on the sentinel (queryable as "ever an input").
-    type_assoc, _, _ = ml_instance.model.find_association("File", "Asset_Type")
+    type_assoc, type_file_fk, _ = ml_instance.model.find_association("File", "Asset_Type")
     type_path = pb.schemas[type_assoc.schema.name].tables[type_assoc.name]
     type_path.insert(
-        [{"File": sentinel_file_rid, "Asset_Type": ExecAssetType.input_file.value}],
+        [{type_file_fk: sentinel_file_rid, "Asset_Type": ExecAssetType.input_file.value}],
         on_conflict_skip=True,
     )
 
