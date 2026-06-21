@@ -192,6 +192,14 @@ class FeatureMixin:
             atable.columns[c].alter(nullok=True)
         atable.columns["Feature_Name"].alter(default=feature_name_term.name)
 
+        # Curate the Chaise presentation of the new feature table — feature
+        # values are the ML data users explore, so give them a sensible row
+        # name, value/term columns, the producing Execution, and facets (rather
+        # than the raw Chaise default view). Mutates + applies the model.
+        from deriva_ml.schema.annotations import feature_annotation
+
+        feature_annotation(atable, target_table.name)
+
         # Update navbar to include the new feature table
         if update_navbar:
             self.apply_catalog_annotations()
