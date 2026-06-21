@@ -164,6 +164,14 @@ def build_navbar_menu(model: DerivaModel) -> dict:
                         "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:Dataset_Version",
                         "name": "Dataset Version",
                     },
+                    {
+                        # File: reference-only assets (external inputs declared
+                        # via LocalFile land here). A first-class provenance
+                        # table, so surface it at the top level — not only under
+                        # the generic Assets submenu.
+                        "url": f"/chaise/recordset/#{catalog_id}/{ml_schema}:File",
+                        "name": "File",
+                    },
                 ],
             },
             {
@@ -305,21 +313,41 @@ def asset_annotation(asset_table: Table) -> None:
         "markdown_name": "Asset Types",
     }
 
+    # "Produced By": the run that created this asset (the Output-role link in the
+    # {Asset}_Execution association). Functionally single-valued — an asset has
+    # exactly one producer — so it is shown INLINE as a visible column. An
+    # inbound-through-association path is an entity set, which a non-`detailed`
+    # context requires to be aggregated; `array_d` over the single Output link
+    # renders as one execution. (Consumed-By, which is genuinely many-valued,
+    # stays a related-entity in visible-foreign-keys below.)
+    produced_by_source = {
+        "source": [
+            {"inbound": [schema, f"{asset_name}_Execution_{asset_name}_fkey"]},
+            {"and": [{"filter": "Asset_Role", "operand_pattern": "Output", "operator": "="}]},
+            {"outbound": [schema, f"{asset_name}_Execution_Execution_fkey"]},
+            "RID",
+        ],
+        "aggregate": "array_d",
+        "markdown_name": "Produced By",
+    }
+
     annotations = {
         deriva_tags.table_display: {"row_name": {"row_markdown_pattern": "{{{Filename}}}"}},
         deriva_tags.visible_columns: {
+            # Assets are write-once (uploaded, not edited), so RMT always equals
+            # RCT — showing both in the compact view is redundant. RMT is kept in
+            # `detailed` for a complete audit record.
             "*": [
                 "RID",
-                "RCT",
-                "RMT",
-                [schema, f"{asset_name}_RCB_fkey"],
-                [schema, f"{asset_name}_RMB_fkey"],
-                "URL",
                 "Filename",
                 "Description",
+                asset_type_source,
+                produced_by_source,
+                "URL",
                 "Length",
                 "MD5",
-                asset_type_source,
+                "RCT",
+                [schema, f"{asset_name}_RCB_fkey"],
             ]
             # ``asset_metadata`` is a set; sort by column name for
             # deterministic output. Without the sort, the visible-
@@ -333,6 +361,7 @@ def asset_annotation(asset_table: Table) -> None:
                 "Filename",
                 "Description",
                 asset_type_source,
+                produced_by_source,
                 "URL",
                 "Length",
                 "MD5",
@@ -358,6 +387,24 @@ def asset_annotation(asset_table: Table) -> None:
                     },
                 ]
             },
+        },
+        # Consumed By: the run(s) that took this asset as an INPUT — genuinely
+        # many-valued, so it stays a related-entity (visible FK). Filtered to the
+        # Input role in the {Asset}_Execution association. The producer side
+        # ("Produced By") is single-valued and shown inline as a visible column
+        # above, not here.
+        deriva_tags.visible_foreign_keys: {
+            "detailed": [
+                {
+                    "source": [
+                        {"inbound": [schema, f"{asset_name}_Execution_{asset_name}_fkey"]},
+                        {"and": [{"filter": "Asset_Role", "operand_pattern": "Input", "operator": "="}]},
+                        {"outbound": [schema, f"{asset_name}_Execution_Execution_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Consumed By",
+                },
+            ]
         },
     }
     asset_table.annotations.update(annotations)
@@ -472,6 +519,59 @@ def feature_annotation(feature_table: Table, target_table_name: str) -> None:
     feature_table.schema.model.apply()
 
 
+def vocabulary_annotation(vocab_table: Table) -> None:
+    """Attach a light Chaise display annotation to a controlled-vocabulary table.
+
+    Vocabularies (``Name``/``Description``/``Synonyms``/``ID``/``URI`` + audit)
+    render acceptably on Chaise defaults, but a small curated annotation keeps
+    them consistent with the other dynamically-created tables: the term ``Name``
+    is the row identity, the compact view leads with Name + Description, and the
+    curie/ID columns move to the detail view. A ``Name`` facet is added for
+    "jump to a term" navigation.
+
+    Mutates ``vocab_table.annotations`` and applies the model. Wired into
+    :meth:`DerivaML.create_vocabulary` so runtime-created vocabularies get it
+    automatically.
+
+    Args:
+        vocab_table: The controlled-vocabulary table to annotate.
+    """
+    schema = vocab_table.schema.name
+    vname = vocab_table.name
+
+    vocab_table.annotations.update(
+        {
+            deriva_tags.table_display: {"row_name": {"row_markdown_pattern": "{{{Name}}}"}},
+            deriva_tags.visible_columns: {
+                "*": [
+                    "Name",
+                    "Description",
+                    "Synonyms",
+                    "RID",
+                ],
+                "detailed": [
+                    "RID",
+                    "Name",
+                    "Description",
+                    "Synonyms",
+                    "ID",
+                    "URI",
+                    "RCT",
+                    [schema, f"{vname}_RCB_fkey"],
+                ],
+                "filter": {
+                    "and": [
+                        {"source": "Name"},
+                        {"source": "Description"},
+                        {"source": "RID"},
+                    ]
+                },
+            },
+        }
+    )
+    vocab_table.schema.model.apply()
+
+
 def generate_annotation(model: Model, schema: str) -> dict:
     """Build the Chaise annotation bundles for the canonical ML tables.
 
@@ -583,6 +683,21 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 ],
             },
         },
+        # Runs of this workflow — the inbound Execution_Workflow_fkey. Curated
+        # explicitly (rather than left to Chaise defaults) so it carries a clear
+        # label: "what executions used this workflow?" is the natural provenance
+        # question from a Workflow row.
+        deriva_tags.visible_foreign_keys: {
+            "detailed": [
+                {
+                    "source": [
+                        {"inbound": [schema, "Execution_Workflow_fkey"]},
+                        "RID",
+                    ],
+                    "markdown_name": "Executions",
+                },
+            ]
+        },
     }
 
     # Status is a FK to the Execution_Status vocabulary. Surfaced as the resolved
@@ -690,13 +805,6 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 },
                 {
                     "source": [
-                        {"inbound": [schema, "Dataset_Version_Execution_fkey"]},
-                        "RID",
-                    ],
-                    "markdown_name": "Output Dataset Versions",
-                },
-                {
-                    "source": [
                         {"inbound": [schema, "Execution_Asset_Execution_Execution_fkey"]},
                         {"outbound": [schema, "Execution_Asset_Execution_Execution_Asset_fkey"]},
                         "RID",
@@ -754,16 +862,22 @@ def generate_annotation(model: Model, schema: str) -> dict:
         "source": [{"outbound": [schema, "Dataset_Version_fkey"]}, "Version"],
         "markdown_name": "Current Version",
     }
-    # "Produced by": the execution that authored the dataset's CURRENT version,
-    # reached by hopping Dataset → current Dataset_Version → its Execution. This
-    # is the provenance answer "what run made this dataset?".
+    # The execution that authored the dataset's CURRENT version, via
+    # Dataset → current Dataset_Version → its Execution. NOTE the label is
+    # deliberately "Current Version Produced By", not a bare "Produced By":
+    # Dataset.Version points at whatever version is current, which is often a
+    # *dev* row (post-release drift, ADR-0003) carrying no producing Execution —
+    # so this is empty on a drifted dataset even though earlier released versions
+    # do have producers. Per-version provenance lives on each Dataset_Version
+    # record (see the "Versions" related-entity section); this column reflects
+    # only the current version, and its label says so.
     dataset_producer_source = {
         "source": [
             {"outbound": [schema, "Dataset_Version_fkey"]},
             {"outbound": [schema, "Dataset_Version_Execution_fkey"]},
             "RID",
         ],
-        "markdown_name": "Produced By",
+        "markdown_name": "Current Version Produced By",
     }
     dataset_annotation = {
         deriva_tags.table_display: {
@@ -855,41 +969,59 @@ def generate_annotation(model: Model, schema: str) -> dict:
         "name_style": {"underline_space": True},
     }
 
+    # The producing execution (provenance) for a version. A value pointing at
+    # the unknown-provenance sentinel means "origin unknown" (backfilled); NULL
+    # on a dev row is expected (dev versions have no producer); NULL on a
+    # released row is a contract gap.
+    dataset_version_producer_source = {
+        "source": [
+            {"outbound": [schema, "Dataset_Version_Execution_fkey"]},
+            "RID",
+        ],
+        "markdown_name": "Produced By",
+    }
+    dataset_version_dataset_source = {
+        "source": [
+            {"outbound": [schema, "Dataset_Version_Dataset_fkey"]},
+            "RID",
+        ],
+        "markdown_name": "Dataset",
+    }
+    dataset_version_label_source = {
+        "display": {
+            "template_engine": "handlebars",
+            "markdown_pattern": "[{{{Version}}}](https://{{{$location.host}}}/id/{{{$catalog.id}}}/{{{Dataset}}}@{{{Snapshot}}})",
+        },
+        "markdown_name": "Version",
+    }
     dataset_version_annotation = {
+        # Lead with the meaningful columns (Dataset, Version, provenance), then
+        # the audit trail — matching the Dataset / asset column ordering.
         deriva_tags.visible_columns: {
             "*": [
                 "RID",
+                dataset_version_dataset_source,
+                dataset_version_label_source,
+                "Description",
+                "Minid",
+                dataset_version_producer_source,
+                "RCT",
+                "RMT",
+                [schema, "Dataset_Version_RCB_fkey"],
+            ],
+            "detailed": [
+                "RID",
+                dataset_version_dataset_source,
+                dataset_version_label_source,
+                "Description",
+                "Minid",
+                "Snapshot",
+                dataset_version_producer_source,
                 "RCT",
                 "RMT",
                 [schema, "Dataset_Version_RCB_fkey"],
                 [schema, "Dataset_Version_RMB_fkey"],
-                {
-                    "source": [
-                        {"outbound": [schema, "Dataset_Version_Dataset_fkey"]},
-                        "RID",
-                    ],
-                    "markdown_name": "Dataset",
-                },
-                "Description",
-                {
-                    "display": {
-                        "template_engine": "handlebars",
-                        "markdown_pattern": "[{{{Version}}}](https://{{{$location.host}}}/id/{{{$catalog.id}}}/{{{Dataset}}}@{{{Snapshot}}})",
-                    },
-                    "markdown_name": "Version",
-                },
-                "Minid",
-                {
-                    # The execution that produced this version (provenance). A
-                    # value here pointing at the unknown-provenance sentinel means
-                    # "origin unknown" (backfilled); NULL means a contract gap.
-                    "source": [
-                        {"outbound": [schema, "Dataset_Version_Execution_fkey"]},
-                        "RID",
-                    ],
-                    "markdown_name": "Produced By",
-                },
-            ]
+            ],
         },
         # Surface which executions CONSUMED this exact version (the input edge).
         # Previously hidden entirely (`{"*": []}`), which dead-ended the
@@ -926,4 +1058,5 @@ __all__ = [
     "catalog_annotation",
     "feature_annotation",
     "generate_annotation",
+    "vocabulary_annotation",
 ]
