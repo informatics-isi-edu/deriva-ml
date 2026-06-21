@@ -524,6 +524,76 @@ def test_F4b_backfill_dry_run_does_not_mutate_and_is_idempotent(test_ml):
     )
 
 
+@pytest.mark.integration
+def test_F4c_backfill_unifies_prior_blackbox_convention_onto_sentinel(test_ml):
+    """F4c — The backfill unifies a PRIOR 'BlackBox' backfill onto the single
+    sentinel: re-points BlackBox-attributed dataset versions to the
+    unknown-provenance Execution sentinel, then deletes the now-unreferenced
+    BlackBox execution and workflow.
+
+    Reproduces the eye-ai prior convention: a placeholder workflow
+    (UnknownDatasetProducer) + a per-legacy-dataset BlackBox execution that a
+    Dataset_Version points at. Detection is by marker text (not RID), so the
+    backfill finds these on any catalog.
+    """
+    from deriva_ml.execution.provenance_backfill import backfill_provenance
+
+    ml = test_ml
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+
+    # Seed the prior BlackBox convention via direct inserts.
+    bb_wf_rid = pb.tables["Workflow"].insert(
+        [
+            {
+                "Name": "UnknownDatasetProducer",
+                "Description": "BlackBox workflow for legacy datasets of unknown origin.",
+                "URL": "tag:test,blackbox:dataset",
+                "Checksum": "0" * 40,
+            }
+        ]
+    )[0]["RID"]
+    bb_exec_rid = pb.tables["Execution"].insert(
+        [
+            {
+                "Workflow": bb_wf_rid,
+                "Description": "BlackBox: reconstructed provenance for legacy dataset (test).",
+                "Status": "Uploaded",
+            }
+        ]
+    )[0]["RID"]
+    ds_rid = pb.tables["Dataset"].insert([{"Description": "Legacy BlackBox dataset", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": ds_rid, "Version": "0.1.0", "Execution": bb_exec_rid, "Description": "v"}]
+    )
+
+    # Dry-run: the BlackBox footprint is reported (re-point + delete), nothing written.
+    dry = backfill_provenance(ml, apply=False)
+    assert ds_rid in dry.repointed_blackbox_datasets
+    assert bb_exec_rid in dry.deleted_blackbox_executions
+    assert bb_wf_rid in dry.deleted_blackbox_workflows
+
+    # Apply: re-point + delete.
+    backfill_provenance(ml, apply=True)
+
+    # The dataset version now points at the sentinel, not the BlackBox exec.
+    vp = pb.tables["Dataset_Version"]
+    producers = {r.get("Execution") for r in vp.filter(vp.Dataset == ds_rid).entities().fetch()}
+    assert sentinel_exec_rid in producers, "Re-pointed version must point at the sentinel."
+    assert bb_exec_rid not in producers, "No version may still point at the deleted BlackBox exec."
+
+    # The BlackBox exec and workflow are gone.
+    ep = pb.tables["Execution"]
+    assert not list(ep.filter(ep.RID == bb_exec_rid).entities().fetch()), "BlackBox exec must be deleted."
+    wp = pb.tables["Workflow"]
+    assert not list(wp.filter(wp.RID == bb_wf_rid).entities().fetch()), "BlackBox workflow must be deleted."
+
+    # The dataset is now compliant (sentinel-attributed), not a violation.
+    after = ml.audit_provenance()
+    assert any(f.rid == ds_rid and f.category == "sentinel_producer" for f in after.known_degraded)
+    assert not any(v.rid == ds_rid for v in after.violations)
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # G. Audit & complete-provenance predicate
 #

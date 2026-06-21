@@ -84,9 +84,17 @@ def main() -> None:
         return head + more
 
     if result.orphan_datasets:
-        print(f"  orphan dataset sample: {_sample(result.orphan_datasets)}")
+        print(f"  orphan dataset sample:         {_sample(result.orphan_datasets)}")
     if result.stranded_executions:
         print(f"  stranded execution sample:     {_sample(result.stranded_executions)}")
+    if result.repointed_blackbox_datasets:
+        print(f"  BlackBox dataset re-point:     {_sample(result.repointed_blackbox_datasets)}")
+    if result.deleted_blackbox_executions:
+        print(f"  BlackBox exec delete:          {_sample(result.deleted_blackbox_executions)}")
+    if result.deleted_blackbox_workflows:
+        print(f"  BlackBox workflow delete:      {_sample(result.deleted_blackbox_workflows)}")
+    if result.retained_blackbox_executions:
+        print(f"  BlackBox exec RETAINED (still referenced): {_sample(result.retained_blackbox_executions)}")
     for note in result.notes:
         print(f"  NOTE: {note}")
 
