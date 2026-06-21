@@ -32,9 +32,17 @@ of the contract maps to at least one test, with its substrate and status.
 - **NEW-UNIT** — new test, pure-Python.
 - **XFAIL** — new test, written now, `xfail(strict=True)` until the
   implementation lands.
+- **DONE** — implemented and passing in the suite (the feature landed; the
+  test's `xfail` was removed).
+- **PARTIAL** — the test's feature is implemented for the cases it asserts, but
+  the spec clause has documented remaining extensions (named in the row's note).
+- **TODO** — a spec clause with no test yet; a planned extension of an
+  already-landed mechanism (e.g. an additional `audit_provenance` query).
 
 Existing coverage was surveyed 2026-06-20; file references are to the current
-test suite.
+test suite. Implementation status last updated 2026-06-20 after landing the
+sentinel-seeding, no-input-check, and read-only-audit layers (F0, F2/F2b, G1,
+G7, G8/G10).
 
 ---
 
@@ -100,10 +108,11 @@ test suite.
 
 | # | Clause | Assertion | Substrate | Status | Notes |
 |---|---|---|---|---|---|
+| F0 | Sentinels seeded at catalog init | a fresh catalog carries the 3 sentinels; accessors resolve them idempotently; they survive `reset()` | live | **DONE** | `test_F0…`; seeded in `initialize_ml_schema._ensure_sentinels`, re-seeded by `CatalogManager.reset()` |
 | F1 | New dataset version has a producer | `create_dataset` / new version sets a non-null `Dataset_Version.Execution` | live | EXISTS (partial) | implied by write-path tests; **NEW**: assert non-null explicitly |
-| F2 | No-input artifact-producer → unknown-File sentinel input | an artifact-producer committing with no declared input gets an Input edge to the unknown-provenance File sentinel | live | XFAIL | depends on sentinel seeding + no-input check |
-| F3 | Sentinel input is compliant, reported as known-degraded | the F2 exec satisfies the predicate (compliant) AND appears in the audit's known-degraded report (not violations) | live | XFAIL | the "compliant but flagged" ruling |
-| F4 | Producerless artifact → unknown-Execution sentinel | an artifact with no real producer attributes to the unknown-Execution sentinel; lineage from it returns "unknown origin", never null | live | XFAIL | depends on sentinel seeding |
+| F2 | No-input artifact-producer → unknown-File sentinel input | an artifact-producer committing with no declared input gets an Input edge to the unknown-provenance File sentinel | live | **DONE** | `test_F2…` (dataset path) + `test_F2b…` (asset path); `provenance_enforcement.ensure_artifact_producer_has_input` wired at both write paths |
+| F3 | Sentinel input is compliant, reported as known-degraded | the F2 exec satisfies the predicate (compliant) AND appears in the audit's known-degraded report (not violations) | live | PARTIAL | the audit's File-sentinel-only-input known-degraded clause is a documented remaining extension of `audit_provenance` |
+| F4 | Producerless artifact → unknown-Execution sentinel | an artifact with no real producer attributes to the unknown-Execution sentinel; lineage from it returns "unknown origin", never null | live | XFAIL | deferred to the one-time adoption **backfill** (writes the sentinel onto null producers); flips when the backfill lands + is invoked here |
 | F5 | Sentinels are exempt bootstrap rows | the two sentinels are not themselves flagged as artifact-producers / null-producer artifacts by the audit | live | XFAIL | the exemption clause |
 | F6 | Sentinel File MD5 exemption | the unknown-File sentinel's marker MD5 is accepted (not subject to computed-from-bytes) | unit | XFAIL | |
 | F7 | Orphan dataset lineage (pre-sentinel) | a dataset with no producer returns an orphan lineage node | live+unit | EXISTS | `test_lookup_lineage_*` — current behavior; F4 supersedes once sentinels land |
@@ -112,16 +121,16 @@ test suite.
 
 | # | Clause | Assertion | Substrate | Status | Notes |
 |---|---|---|---|---|---|
-| G1 | Audit exists & is read-only | the audit scans catalog-wide, returns findings, mutates nothing | live | XFAIL | depends on audit impl |
-| G2 | Predicate clause 1 — terminal state | audit flags an artifact-producer not in a terminal state | live | XFAIL | |
-| G3 | Predicate clause 2 — workflow URL+checksum | audit flags an artifact-producer with degenerate workflow | live | XFAIL | shared with D3 |
-| G4 | Predicate clause 3 — ≥1 input or sentinel | audit flags an artifact-producer with zero inputs (no sentinel) | live | XFAIL | |
-| G5 | Predicate — output role-tagged | audit flags an artifact-producer with an untagged output | live | XFAIL | |
-| G6 | Predicate — Failed has reason | audit flags a `Failed` row with empty reason | live | XFAIL | shared with B1 |
-| G7 | Null-producer artifact flagged | audit flags an artifact with a null producer (not sentinel-attributed) | live | XFAIL | |
-| G8 | Known-degraded reported separately from violations | sentinel-attributed rows appear in a *separate* known-degraded list, not the violation list | live | XFAIL | the F3 distinction |
-| G9 | Conformance is whole-catalog & falsifiable | a clean catalog → zero violations; introduce one violation → audit count increments | live | XFAIL | |
-| G10 | Sentinel-attributed state reads as conformant | a catalog whose orphan artifacts point at the unknown-Execution sentinel and whose stranded execs are Aborted → audit reports **zero violations** (sentinel/aborted state is compliant, known-degraded) | live | XFAIL | the durable conformance invariant; reachable by seeding sentinel-attributed + aborted rows. Permanent regression guard — distinct from the one-off migration that *produces* this state |
+| G1 | Audit exists & is read-only | the audit scans catalog-wide, returns findings, mutates nothing | live | **DONE** | `test_G1…`; `ml.audit_provenance()` → `ProvenanceAuditReport` (`provenance_audit.py`) |
+| G2 | Predicate clause 1 — terminal state | audit flags an artifact-producer not in a terminal state | live | TODO | documented remaining clause; extends `audit_provenance` |
+| G3 | Predicate clause 2 — workflow URL+checksum | audit flags an artifact-producer with degenerate workflow | live | TODO | shared with D3; remaining clause |
+| G4 | Predicate clause 3 — ≥1 input or sentinel | audit flags an artifact-producer with zero inputs (no sentinel) | live | TODO | remaining clause |
+| G5 | Predicate — output role-tagged | audit flags an artifact-producer with an untagged output | live | TODO | remaining clause |
+| G6 | Predicate — Failed has reason | audit flags a `Failed` row with empty reason | live | TODO | shared with B1; remaining clause |
+| G7 | Null-producer artifact flagged | audit flags an artifact with a null producer (not sentinel-attributed) | live | **DONE** | `test_G7…`; `category="null_producer"` |
+| G8 | Known-degraded reported separately from violations | sentinel-attributed rows appear in a *separate* known-degraded list, not the violation list | live | **DONE** | `test_G8_G10…`; `category="sentinel_producer"` in `known_degraded` |
+| G9 | Conformance is whole-catalog & falsifiable | a clean catalog → zero violations; introduce one violation → audit count increments | live | PARTIAL | falsifiability proven for the null-producer clause (G7); full whole-catalog guarantee tracks the remaining clauses |
+| G10 | Sentinel-attributed state reads as conformant | a catalog whose orphan artifacts point at the unknown-Execution sentinel and whose stranded execs are Aborted → audit reports **zero violations** (sentinel/aborted state is compliant, known-degraded) | live | **DONE** (producer side) | `test_G8_G10…` covers the sentinel-attributed-producer half; the stranded-→-Aborted half tracks G2 |
 
 ## H. Lineage (data-flow, per ADR-0001)
 
