@@ -38,6 +38,7 @@ if TYPE_CHECKING:
         WorkflowSummary,
     )
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+    from deriva_ml.execution.provenance_audit import ProvenanceAuditReport
     from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
@@ -70,6 +71,89 @@ class ExecutionMixin:
     pathBuilder: Callable[[], Any]
     _retrieve_rid: Callable[[RID], dict[str, Any]]
     _execution: "Execution"
+
+    def unknown_provenance_execution_rid(self) -> RID:
+        """RID of the seeded unknown-provenance Execution sentinel.
+
+        A producerless artifact attributes to this execution so lineage from
+        it reports "unknown origin" rather than dead-ending on a null
+        producer. Seeded by ``initialize_ml_schema``.
+
+        Returns:
+            The sentinel Execution's RID.
+
+        Raises:
+            DerivaMLException: If the sentinel is not present (catalog not
+                initialized by a contract-aware deriva-ml).
+
+        Example:
+            >>> rid = ml.unknown_provenance_execution_rid()  # doctest: +SKIP
+        """
+        from deriva_ml.core.constants import SENTINEL_EXECUTION_DESCRIPTION
+
+        pb = self.pathBuilder()
+        exe = pb.schemas[self.ml_schema].Execution
+        rows = list(exe.filter(exe.Description == SENTINEL_EXECUTION_DESCRIPTION).entities())
+        if not rows:
+            raise DerivaMLException(
+                "Unknown-provenance Execution sentinel not found; catalog was not "
+                "initialized with provenance-contract sentinels."
+            )
+        return rows[0]["RID"]
+
+    def unknown_provenance_file_rid(self) -> RID:
+        """RID of the seeded unknown-provenance File sentinel.
+
+        Linked as an Input to an artifact-producer that committed with no
+        declared input (the no-input commit check), so the gap is recorded as
+        an explicit "unknown input" edge rather than absent. Seeded by
+        ``initialize_ml_schema``.
+
+        Returns:
+            The sentinel File's RID.
+
+        Raises:
+            DerivaMLException: If the sentinel is not present.
+
+        Example:
+            >>> rid = ml.unknown_provenance_file_rid()  # doctest: +SKIP
+        """
+        from deriva_ml.core.constants import SENTINEL_FILE_URL
+
+        pb = self.pathBuilder()
+        file_table = pb.schemas[self.ml_schema].File
+        rows = list(file_table.filter(file_table.URL == SENTINEL_FILE_URL).entities())
+        if not rows:
+            raise DerivaMLException(
+                "Unknown-provenance File sentinel not found; catalog was not "
+                "initialized with provenance-contract sentinels."
+            )
+        return rows[0]["RID"]
+
+    def audit_provenance(self) -> "ProvenanceAuditReport":
+        """Run the read-only provenance audit over the whole catalog.
+
+        Surfaces every violation of the complete-provenance predicate, plus a
+        separate *known-degraded* report of compliant-but-thin provenance
+        (sentinel attributions). It is **advisory and read-only** — it detects;
+        it never mutates state, fails a build, or blocks a commit (provenance
+        contract §Audit, Goal 4). Run it on demand or on a schedule as a
+        per-catalog health report.
+
+        Returns:
+            :class:`~deriva_ml.execution.provenance_audit.ProvenanceAuditReport`
+            with ``violations`` (must-fix) and ``known_degraded`` (compliant,
+            surfaced for visibility) finding lists.
+
+        Example:
+            >>> report = ml.audit_provenance()  # doctest: +SKIP
+            >>> print(report.summary())  # doctest: +SKIP
+            >>> for v in report.violations:  # doctest: +SKIP
+            ...     print(v)
+        """
+        from deriva_ml.execution.provenance_audit import audit_provenance as _audit
+
+        return _audit(self)
 
     def create_execution(
         self,

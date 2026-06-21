@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import pytest
 
+from deriva_ml import MLAsset
 from deriva_ml import MLVocab as vc
+from deriva_ml.core.constants import ML_SCHEMA
 from deriva_ml.dataset.aux_classes import DatasetSpec
 from deriva_ml.execution.execution_configuration import ExecutionConfiguration
 from deriva_ml.execution.state_store import ExecutionStatus
@@ -217,6 +219,31 @@ def test_F1_new_dataset_version_has_a_producer(test_ml):
     )
 
 
+@pytest.mark.integration
+def test_F0_sentinels_seeded_at_catalog_init(test_ml):
+    """F0 — A freshly initialized catalog has the three unknown-provenance
+    sentinels (Workflow, File, Execution), reachable via the accessors.
+
+    Seeded by initialize_ml_schema, so EVERY catalog-creation path (prod,
+    demo, and the test fixtures) gets them. The accessors resolve them by
+    their reserved identifiers.
+    """
+    ml = test_ml
+
+    file_rid = ml.unknown_provenance_file_rid()
+    exec_rid = ml.unknown_provenance_execution_rid()
+    assert file_rid and exec_rid
+
+    # Idempotent: a second call returns the same RIDs (no duplicate seeding).
+    assert ml.unknown_provenance_file_rid() == file_rid
+    assert ml.unknown_provenance_execution_rid() == exec_rid
+
+    # The sentinel Execution is a real, resolvable Execution row.
+    assert ml.resolve_rid(exec_rid).table.name == "Execution"
+    # The sentinel File is a real File row.
+    assert ml.resolve_rid(file_rid).table.name == "File"
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # H. Lineage (data-flow, per ADR-0001)
 # ─────────────────────────────────────────────────────────────────────────
@@ -347,13 +374,6 @@ def test_B5_exception_in_block_records_failed_not_success(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Unknown-provenance File sentinel + no-input commit check not "
-    "implemented. An artifact-producer that commits with no declared input "
-    "must get an Input edge to the seeded unknown-provenance File sentinel. "
-    "Needs: sentinel seeding in create_schema.py + the commit-time check.",
-    strict=True,
-)
 def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
     """F2 — An artifact-producer with no declared input gets an Input edge to
     the unknown-provenance File sentinel (recorded as explicitly-unknown, not
@@ -370,8 +390,8 @@ def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
     # The intended behavior: the execution now has exactly one input edge, to
     # the unknown-provenance File sentinel. The accessor for the sentinel is
     # part of the unbuilt feature.
-    sentinel_file_rid = ml.unknown_provenance_file_rid()  # noqa: F821 — not yet implemented
-    input_file_rids = {a.rid for a in ml.list_assets(execution=exe.execution_rid, asset_role="Input")}
+    sentinel_file_rid = ml.unknown_provenance_file_rid()
+    input_file_rids = {a.asset_rid for a in ml.list_execution_assets(exe.execution_rid, asset_role="Input")}
     assert sentinel_file_rid in input_file_rids, (
         "A no-input artifact-producer must carry the unknown-provenance File "
         "sentinel as an explicit input."
@@ -379,25 +399,199 @@ def test_F2_no_input_artifact_producer_gets_unknown_file_sentinel(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Unknown-provenance Execution sentinel not implemented. An artifact "
-    "with no real producer must attribute to the seeded unknown-provenance "
-    "Execution sentinel so lineage returns 'unknown origin', never null.",
-    strict=True,
-)
-def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
-    """F4 — An artifact inserted with no real producer attributes to the
-    unknown-provenance Execution sentinel; lineage from it terminates at the
-    sentinel ('unknown origin'), never a null dead-end."""
-    ml = test_ml
+def test_F2b_no_input_asset_producer_gets_unknown_file_sentinel(test_ml):
+    """F2b — The no-input check also fires for an *asset-producing* run (the
+    second write path): a run that uploads an asset but declares no input gets
+    the unknown-provenance File sentinel as an explicit Input edge.
 
-    # Simulate a producerless artifact (e.g. a directly-inserted dataset
-    # version). The intended behavior: its producer is the sentinel execution.
-    sentinel_exec_rid = ml.unknown_provenance_execution_rid()  # noqa: F821 — not yet implemented
-    # An orphan dataset's producer must be the sentinel, not None.
-    # (Construction of the orphan + the producer lookup are part of the
-    # unbuilt feature; this documents the required end state.)
-    assert sentinel_exec_rid is not None
+    F2 covers the dataset-authorship write path; this covers the asset-commit
+    write path. The contract requires the check at every durable-artifact path,
+    not only at dataset authorship.
+    """
+    ml = test_ml
+    workflow = _setup_workflow(ml)
+
+    producer = ml.create_execution(ExecutionConfiguration(description="Asset producer, no input", workflow=workflow))
+    with producer.execute() as exe:
+        asset_path = exe.asset_file_path(MLAsset.execution_asset, "NoInput/out.txt")
+        with asset_path.open("w") as fp:
+            fp.write("output content")
+    producer.commit_output_assets()
+
+    sentinel_file_rid = ml.unknown_provenance_file_rid()
+    input_file_rids = {a.asset_rid for a in ml.list_execution_assets(producer.execution_rid, asset_role="Input")}
+    assert sentinel_file_rid in input_file_rids, (
+        "A no-input asset-producer must carry the unknown-provenance File "
+        "sentinel as an explicit input."
+    )
+
+
+@pytest.mark.integration
+def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
+    """F4 — After the adoption backfill, an artifact with no real producer
+    attributes to the unknown-provenance Execution sentinel; ``lookup_lineage``
+    from it terminates at the sentinel ('unknown origin'), never a null
+    dead-end.
+
+    The producerless case can only arise from a write that bypasses the
+    execution-context API (a script inserting rows directly — the
+    ``lac_chartlabel_ingest.py`` flow that motivated this contract) or from
+    legacy data. We reproduce that bypass with a direct insert, run the
+    one-time adoption backfill (the conformance-restoring migration), then
+    assert the orphan's lineage now routes to the sentinel.
+    """
+    from deriva_ml.execution.provenance_backfill import backfill_provenance
+
+    ml = test_ml
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+
+    # Bypass the API: insert a Dataset + Dataset_Version with a null Execution,
+    # exactly as a script that skips the execution context manager would.
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+    orphan_rid = pb.tables["Dataset"].insert([{"Description": "Producerless orphan", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "orphan version"}]
+    )
+
+    # Dry-run first: the orphan must be reported as a candidate, nothing written.
+    preview = backfill_provenance(ml, apply=False)
+    assert orphan_rid in preview.orphan_datasets, (
+        "The producerless orphan must be reported by the backfill dry-run."
+    )
+
+    # Apply: attribute orphans to the sentinel.
+    backfill_provenance(ml, apply=True)
+
+    # The required end state: lineage resolves the producer to the sentinel,
+    # not None — no null dead-end.
+    lineage = ml.lookup_lineage(orphan_rid)
+    assert lineage.lineage is not None, "Producerless artifact must not yield a null-producer lineage after backfill."
+    assert lineage.lineage.execution.rid == sentinel_exec_rid, (
+        "A backfilled producerless artifact's lineage must terminate at the unknown-provenance Execution sentinel."
+    )
+
+
+@pytest.mark.integration
+def test_F4b_backfill_dry_run_does_not_mutate_and_is_idempotent(test_ml):
+    """F4b — The backfill is dry-run-safe and idempotent.
+
+    A dry-run reports the orphan but writes nothing (the null persists). After
+    apply, the orphan is sentinel-attributed and the audit shows it as
+    known-degraded (not a violation). A second apply is a no-op (no orphans
+    left), proving idempotency.
+    """
+    from deriva_ml.execution.provenance_backfill import backfill_provenance
+
+    ml = test_ml
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+
+    orphan_rid = pb.tables["Dataset"].insert([{"Description": "Backfill orphan", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "v"}]
+    )
+
+    # Dry-run: reports the orphan, writes nothing.
+    dry = backfill_provenance(ml, apply=False)
+    assert orphan_rid in dry.orphan_datasets
+    assert dry.applied is False
+    # Verify nothing was written — the version row's Execution is still null.
+    vp = pb.tables["Dataset_Version"]
+    still_null = [
+        r for r in vp.filter(vp.Dataset == orphan_rid).entities().fetch() if not r.get("Execution")
+    ]
+    assert still_null, "Dry-run must not write the producer — the null must persist."
+
+    # The audit (pre-apply) reports it as a null-producer violation.
+    assert any(v.rid == orphan_rid and v.category == "null_producer" for v in ml.audit_provenance().violations)
+
+    # Apply: attribute orphans to the sentinel.
+    applied = backfill_provenance(ml, apply=True)
+    assert orphan_rid in applied.orphan_datasets
+    assert applied.applied is True
+
+    # Post-apply: the row now points at the sentinel; the audit reclassifies it
+    # as known-degraded (compliant), no longer a violation.
+    after = ml.audit_provenance()
+    assert any(f.rid == orphan_rid and f.category == "sentinel_producer" for f in after.known_degraded)
+    assert not any(v.rid == orphan_rid for v in after.violations)
+    _ = sentinel_exec_rid  # documented target; asserted via lineage in F4
+
+    # Idempotent: a second apply finds no orphan to attribute (this one is done).
+    second = backfill_provenance(ml, apply=True)
+    assert orphan_rid not in second.orphan_datasets, (
+        "A second backfill must not re-process an already-attributed orphan."
+    )
+
+
+@pytest.mark.integration
+def test_F4c_backfill_unifies_prior_blackbox_convention_onto_sentinel(test_ml):
+    """F4c — The backfill unifies a PRIOR 'BlackBox' backfill onto the single
+    sentinel: re-points BlackBox-attributed dataset versions to the
+    unknown-provenance Execution sentinel, then deletes the now-unreferenced
+    BlackBox execution and workflow.
+
+    Reproduces the eye-ai prior convention: a placeholder workflow
+    (UnknownDatasetProducer) + a per-legacy-dataset BlackBox execution that a
+    Dataset_Version points at. Detection is by marker text (not RID), so the
+    backfill finds these on any catalog.
+    """
+    from deriva_ml.execution.provenance_backfill import backfill_provenance
+
+    ml = test_ml
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+
+    # Seed the prior BlackBox convention via direct inserts.
+    bb_wf_rid = pb.tables["Workflow"].insert(
+        [
+            {
+                "Name": "UnknownDatasetProducer",
+                "Description": "BlackBox workflow for legacy datasets of unknown origin.",
+                "URL": "tag:test,blackbox:dataset",
+                "Checksum": "0" * 40,
+            }
+        ]
+    )[0]["RID"]
+    bb_exec_rid = pb.tables["Execution"].insert(
+        [
+            {
+                "Workflow": bb_wf_rid,
+                "Description": "BlackBox: reconstructed provenance for legacy dataset (test).",
+                "Status": "Uploaded",
+            }
+        ]
+    )[0]["RID"]
+    ds_rid = pb.tables["Dataset"].insert([{"Description": "Legacy BlackBox dataset", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": ds_rid, "Version": "0.1.0", "Execution": bb_exec_rid, "Description": "v"}]
+    )
+
+    # Dry-run: the BlackBox footprint is reported (re-point + delete), nothing written.
+    dry = backfill_provenance(ml, apply=False)
+    assert ds_rid in dry.repointed_blackbox_datasets
+    assert bb_exec_rid in dry.deleted_blackbox_executions
+    assert bb_wf_rid in dry.deleted_blackbox_workflows
+
+    # Apply: re-point + delete.
+    backfill_provenance(ml, apply=True)
+
+    # The dataset version now points at the sentinel, not the BlackBox exec.
+    vp = pb.tables["Dataset_Version"]
+    producers = {r.get("Execution") for r in vp.filter(vp.Dataset == ds_rid).entities().fetch()}
+    assert sentinel_exec_rid in producers, "Re-pointed version must point at the sentinel."
+    assert bb_exec_rid not in producers, "No version may still point at the deleted BlackBox exec."
+
+    # The BlackBox exec and workflow are gone.
+    ep = pb.tables["Execution"]
+    assert not list(ep.filter(ep.RID == bb_exec_rid).entities().fetch()), "BlackBox exec must be deleted."
+    wp = pb.tables["Workflow"]
+    assert not list(wp.filter(wp.RID == bb_wf_rid).entities().fetch()), "BlackBox workflow must be deleted."
+
+    # The dataset is now compliant (sentinel-attributed), not a violation.
+    after = ml.audit_provenance()
+    assert any(f.rid == ds_rid and f.category == "sentinel_producer" for f in after.known_degraded)
+    assert not any(v.rid == ds_rid for v in after.violations)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -408,11 +602,6 @@ def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Provenance audit not implemented. It must scan catalog-wide, "
-    "return findings, and mutate nothing (advisory/read-only, Goal 4).",
-    strict=True,
-)
 def test_G1_audit_exists_and_is_read_only(test_ml):
     """G1 — The audit scans the catalog and returns findings without mutating
     state."""
@@ -424,35 +613,51 @@ def test_G1_audit_exists_and_is_read_only(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Audit not implemented. It must flag an artifact with a null "
-    "producer (no producing execution, not sentinel-attributed) as a violation.",
-    strict=True,
-)
 def test_G7_audit_flags_null_producer_artifact(test_ml):
     """G7 — An artifact with a null producer (not sentinel-attributed) is a
     violation reported by the audit."""
     ml = test_ml
-    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
-    # A seeded null-producer artifact must appear in violations.
-    assert any("null" in str(v).lower() or "producer" in str(v).lower() for v in result.violations)
+
+    # Seed a producerless orphan via an API bypass (raw insert, null Execution)
+    # — the only way to create a null producer, since the API always records
+    # one. This is what the audit must flag.
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+    orphan_rid = pb.tables["Dataset"].insert([{"Description": "Null-producer orphan", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "orphan version"}]
+    )
+
+    result = ml.audit_provenance()
+    # The orphan must appear among the null-producer violations.
+    assert any(
+        v.rid == orphan_rid and v.category == "null_producer" for v in result.violations
+    ), f"Expected a null_producer violation for {orphan_rid}; got {[str(v) for v in result.violations]}"
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Audit + sentinels not implemented. A sentinel-attributed row is "
-    "COMPLIANT (known-degraded), and must appear in the audit's known_degraded "
-    "bucket, NOT in violations (the 'compliant but flagged' ruling).",
-    strict=True,
-)
 def test_G8_G10_sentinel_state_is_compliant_not_violation(test_ml):
     """G8/G10 — A sentinel-attributed artifact reads as conformant: it appears
     in the audit's known-degraded report, never the violation list. The
     durable post-backfill conformance invariant."""
     ml = test_ml
-    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
-    sentinel_exec_rid = ml.unknown_provenance_execution_rid()  # noqa: F821
-    violation_text = " ".join(str(v) for v in result.violations)
-    assert sentinel_exec_rid not in violation_text, (
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+
+    # Seed a dataset whose current version is attributed to the unknown-provenance
+    # Execution sentinel — the post-backfill conformant state for a once-orphan
+    # artifact. (Raw insert: the sentinel is written as the producing execution.)
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+    ds_rid = pb.tables["Dataset"].insert([{"Description": "Sentinel-attributed", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": ds_rid, "Version": "0.1.0", "Execution": sentinel_exec_rid, "Description": "v"}]
+    )
+
+    result = ml.audit_provenance()
+
+    # It is compliant: in known_degraded, never in violations.
+    assert any(f.rid == ds_rid and f.category == "sentinel_producer" for f in result.known_degraded), (
+        f"Sentinel-attributed {ds_rid} must be reported as known-degraded; "
+        f"got {[str(f) for f in result.known_degraded]}"
+    )
+    assert not any(f.rid == ds_rid for f in result.violations), (
         "Sentinel-attributed state is compliant; it must not appear as a violation."
     )

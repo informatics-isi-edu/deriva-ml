@@ -1219,6 +1219,12 @@ def commit_output_assets(
     # status transition so the state-machine PUT that follows
     # carries the measurement.
     _upload_start = datetime.now(timezone.utc)
+    # Capture whether features are pending BEFORE the commit — the commit marks
+    # them uploaded, so this is the only point we can tell that this run is a
+    # feature-producer. Used by the provenance no-input check below, which must
+    # fire for a feature-only producer (no uploaded assets), per the contract's
+    # "more than one write path" rule.
+    _had_pending_features = bool(execution._manifest_store.list_pending_feature_records(execution.execution_rid))
     try:
         # ``_bag_commit_upload`` returns the per-call subset of
         # uploaded assets. External callers depend on this
@@ -1236,6 +1242,19 @@ def commit_output_assets(
         # Successful end of upload: Pending_Upload → Uploaded.
         if execution.status is pending_upload_status:
             execution.update_status(uploaded_status)
+        # Provenance no-input check (contract §Timing of the artifact-producer
+        # rules): if any asset was committed OR any feature was written, this
+        # execution is an artifact-producer. If it declared no input, link the
+        # unknown-provenance File sentinel as an explicit Input edge. The check
+        # is idempotent (a run that also authored a dataset already ran it
+        # there); it fires here too so an asset-only or feature-only producer is
+        # not missed.
+        if uploaded or _had_pending_features:
+            from deriva_ml.execution.provenance_enforcement import (
+                ensure_artifact_producer_has_input,
+            )
+
+            ensure_artifact_producer_has_input(execution._ml_object, execution.execution_rid)
         if clean_folder:
             execution._clean_folder_contents(execution._execution_root)
         return uploaded

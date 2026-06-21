@@ -945,6 +945,82 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         ],
     )
 
+    _ensure_sentinels(pb)
+
+
+def _ensure_sentinels(pb) -> None:
+    """Idempotently seed the three unknown-provenance sentinels.
+
+    Seeds a Workflow, a File, and an Execution row that represent "provenance
+    is explicitly unknown" (see ``deriva_ml.core.constants``). They are
+    bootstrap substrate — exempt from the provenance contract's producer /
+    completeness obligations. Safe to re-run: each is located by its reserved
+    identifier and inserted only when absent.
+
+    Order matters: the Workflow must exist before the Execution (which has a
+    Workflow FK).
+
+    Args:
+        pb: The deriva-ml schema path-builder (``catalog.getPathBuilder().schemas[schema_name]``).
+    """
+    from deriva_ml.core.constants import (
+        SENTINEL_EXECUTION_DESCRIPTION,
+        SENTINEL_FILE_MD5,
+        SENTINEL_FILE_URL,
+        SENTINEL_WORKFLOW_CHECKSUM,
+        SENTINEL_WORKFLOW_URL,
+    )
+
+    # --- Workflow sentinel (located by reserved URL) ---
+    wf_table = pb.tables["Workflow"]
+    wf_existing = [r for r in wf_table.filter(wf_table.URL == SENTINEL_WORKFLOW_URL).entities()]
+    if wf_existing:
+        sentinel_workflow_rid = wf_existing[0]["RID"]
+    else:
+        sentinel_workflow_rid = wf_table.insert(
+            [
+                {
+                    "Name": "Unknown Provenance",
+                    "Description": "Sentinel workflow for artifacts/executions of unknown provenance.",
+                    "URL": SENTINEL_WORKFLOW_URL,
+                    "Checksum": SENTINEL_WORKFLOW_CHECKSUM,
+                }
+            ]
+        )[0]["RID"]
+
+    # --- File sentinel (located by reserved URL) ---
+    file_table = pb.tables["File"]
+    file_existing = [r for r in file_table.filter(file_table.URL == SENTINEL_FILE_URL).entities()]
+    if not file_existing:
+        file_table.insert(
+            [
+                {
+                    "URL": SENTINEL_FILE_URL,
+                    "MD5": SENTINEL_FILE_MD5,
+                    "Description": "Sentinel file representing an unknown / unrecorded input.",
+                    "Length": 0,
+                }
+            ]
+        )
+
+    # --- Execution sentinel (located by reserved Description; needs the
+    #     Workflow FK above). Status=Aborted — it is not a real run. ---
+    exe_table = pb.tables["Execution"]
+    exe_existing = [
+        r for r in exe_table.filter(exe_table.Description == SENTINEL_EXECUTION_DESCRIPTION).entities()
+    ]
+    if not exe_existing:
+        exe_table.insert(
+            [
+                {
+                    "Workflow": sentinel_workflow_rid,
+                    "Description": SENTINEL_EXECUTION_DESCRIPTION,
+                    "Status": "Aborted",
+                    "Status_Detail": "Bootstrap sentinel: artifacts attributed here have no real producing execution.",
+                }
+            ]
+        )
+
 
 def create_ml_catalog(
     hostname: str,

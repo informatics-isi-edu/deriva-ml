@@ -221,6 +221,17 @@ class CatalogManager:
         # Clear catalog history snapshots
         self._clear_history()
 
+        # Re-seed the unknown-provenance sentinels. ``reset()`` deletes the
+        # Execution and Workflow data above, which wipes the sentinel rows that
+        # ``initialize_ml_schema`` seeds at catalog creation. The sentinels are
+        # required baseline state for the provenance contract — the same
+        # category as the system-required vocabulary terms this method
+        # deliberately preserves (see note above) — so an "empty" catalog must
+        # still carry them. ``_ensure_sentinels`` is idempotent.
+        from deriva_ml.schema.create_schema import _ensure_sentinels
+
+        _ensure_sentinels(ml_path)
+
         self.state = CatalogState.EMPTY
         self._dataset_description = None
 
