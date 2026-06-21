@@ -38,6 +38,7 @@ if TYPE_CHECKING:
         WorkflowSummary,
     )
     from deriva_ml.execution.pending_summary import WorkspacePendingSummary
+    from deriva_ml.execution.provenance_audit import ProvenanceAuditReport
     from deriva_ml.execution.upload_report import UploadReport
     from deriva_ml.execution.workflow import Workflow
     from deriva_ml.experiment.experiment import Experiment
@@ -128,6 +129,31 @@ class ExecutionMixin:
                 "initialized with provenance-contract sentinels."
             )
         return rows[0]["RID"]
+
+    def audit_provenance(self) -> "ProvenanceAuditReport":
+        """Run the read-only provenance audit over the whole catalog.
+
+        Surfaces every violation of the complete-provenance predicate, plus a
+        separate *known-degraded* report of compliant-but-thin provenance
+        (sentinel attributions). It is **advisory and read-only** — it detects;
+        it never mutates state, fails a build, or blocks a commit (provenance
+        contract §Audit, Goal 4). Run it on demand or on a schedule as a
+        per-catalog health report.
+
+        Returns:
+            :class:`~deriva_ml.execution.provenance_audit.ProvenanceAuditReport`
+            with ``violations`` (must-fix) and ``known_degraded`` (compliant,
+            surfaced for visibility) finding lists.
+
+        Example:
+            >>> report = ml.audit_provenance()  # doctest: +SKIP
+            >>> print(report.summary())  # doctest: +SKIP
+            >>> for v in report.violations:  # doctest: +SKIP
+            ...     print(v)
+        """
+        from deriva_ml.execution.provenance_audit import audit_provenance as _audit
+
+        return _audit(self)
 
     def create_execution(
         self,

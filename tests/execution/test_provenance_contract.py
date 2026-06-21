@@ -428,11 +428,14 @@ def test_F2b_no_input_asset_producer_gets_unknown_file_sentinel(test_ml):
 
 @pytest.mark.integration
 @pytest.mark.xfail(
-    reason="Producerless-artifact attribution not implemented. A dataset with "
-    "no producing execution must attribute to the seeded unknown-provenance "
-    "Execution sentinel so get_lineage() returns 'unknown origin', never a "
-    "null dead-end. The sentinel + its accessor exist (covered by F0); what is "
-    "unbuilt is the attribution that routes a producerless artifact to it.",
+    reason="Producerless-artifact attribution is delivered by the one-time "
+    "adoption backfill (a separate task), not a runtime API-path feature: the "
+    "normal API already gives every version a real producer by construction, so "
+    "a null producer can only come from an API bypass or legacy data, which the "
+    "backfill attributes to the unknown-provenance Execution sentinel by writing "
+    "Dataset_Version.Execution. Until the backfill lands, a raw-inserted null "
+    "stays a null (an audit violation) and get_lineage() finds no producer. This "
+    "test flips green when the backfill is implemented and invoked here.",
     strict=True,
 )
 def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
@@ -476,11 +479,6 @@ def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Provenance audit not implemented. It must scan catalog-wide, "
-    "return findings, and mutate nothing (advisory/read-only, Goal 4).",
-    strict=True,
-)
 def test_G1_audit_exists_and_is_read_only(test_ml):
     """G1 — The audit scans the catalog and returns findings without mutating
     state."""
@@ -492,35 +490,51 @@ def test_G1_audit_exists_and_is_read_only(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Audit not implemented. It must flag an artifact with a null "
-    "producer (no producing execution, not sentinel-attributed) as a violation.",
-    strict=True,
-)
 def test_G7_audit_flags_null_producer_artifact(test_ml):
     """G7 — An artifact with a null producer (not sentinel-attributed) is a
     violation reported by the audit."""
     ml = test_ml
-    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
-    # A seeded null-producer artifact must appear in violations.
-    assert any("null" in str(v).lower() or "producer" in str(v).lower() for v in result.violations)
+
+    # Seed a producerless orphan via an API bypass (raw insert, null Execution)
+    # — the only way to create a null producer, since the API always records
+    # one. This is what the audit must flag.
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+    orphan_rid = pb.tables["Dataset"].insert([{"Description": "Null-producer orphan", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "orphan version"}]
+    )
+
+    result = ml.audit_provenance()
+    # The orphan must appear among the null-producer violations.
+    assert any(
+        v.rid == orphan_rid and v.category == "null_producer" for v in result.violations
+    ), f"Expected a null_producer violation for {orphan_rid}; got {[str(v) for v in result.violations]}"
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Audit + sentinels not implemented. A sentinel-attributed row is "
-    "COMPLIANT (known-degraded), and must appear in the audit's known_degraded "
-    "bucket, NOT in violations (the 'compliant but flagged' ruling).",
-    strict=True,
-)
 def test_G8_G10_sentinel_state_is_compliant_not_violation(test_ml):
     """G8/G10 — A sentinel-attributed artifact reads as conformant: it appears
     in the audit's known-degraded report, never the violation list. The
     durable post-backfill conformance invariant."""
     ml = test_ml
-    result = ml.audit_provenance()  # noqa: F821 — not yet implemented
-    sentinel_exec_rid = ml.unknown_provenance_execution_rid()  # noqa: F821
-    violation_text = " ".join(str(v) for v in result.violations)
-    assert sentinel_exec_rid not in violation_text, (
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+
+    # Seed a dataset whose current version is attributed to the unknown-provenance
+    # Execution sentinel — the post-backfill conformant state for a once-orphan
+    # artifact. (Raw insert: the sentinel is written as the producing execution.)
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+    ds_rid = pb.tables["Dataset"].insert([{"Description": "Sentinel-attributed", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": ds_rid, "Version": "0.1.0", "Execution": sentinel_exec_rid, "Description": "v"}]
+    )
+
+    result = ml.audit_provenance()
+
+    # It is compliant: in known_degraded, never in violations.
+    assert any(f.rid == ds_rid and f.category == "sentinel_producer" for f in result.known_degraded), (
+        f"Sentinel-attributed {ds_rid} must be reported as known-degraded; "
+        f"got {[str(f) for f in result.known_degraded]}"
+    )
+    assert not any(f.rid == ds_rid for f in result.violations), (
         "Sentinel-attributed state is compliant; it must not appear as a violation."
     )
