@@ -427,29 +427,21 @@ def test_F2b_no_input_asset_producer_gets_unknown_file_sentinel(test_ml):
 
 
 @pytest.mark.integration
-@pytest.mark.xfail(
-    reason="Producerless-artifact attribution is delivered by the one-time "
-    "adoption backfill (a separate task), not a runtime API-path feature: the "
-    "normal API already gives every version a real producer by construction, so "
-    "a null producer can only come from an API bypass or legacy data, which the "
-    "backfill attributes to the unknown-provenance Execution sentinel by writing "
-    "Dataset_Version.Execution. Until the backfill lands, a raw-inserted null "
-    "stays a null (an audit violation) and get_lineage() finds no producer. This "
-    "test flips green when the backfill is implemented and invoked here.",
-    strict=True,
-)
 def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
-    """F4 — An artifact with no real producer attributes to the
-    unknown-provenance Execution sentinel; ``get_lineage`` from it terminates
-    at the sentinel ('unknown origin'), never a null dead-end.
+    """F4 — After the adoption backfill, an artifact with no real producer
+    attributes to the unknown-provenance Execution sentinel; ``lookup_lineage``
+    from it terminates at the sentinel ('unknown origin'), never a null
+    dead-end.
 
     The producerless case can only arise from a write that bypasses the
     execution-context API (a script inserting rows directly — the
     ``lac_chartlabel_ingest.py`` flow that motivated this contract) or from
-    legacy data. We reproduce that bypass with a direct insert, then assert the
-    attribution feature routes its lineage to the sentinel rather than leaving
-    a null producer.
+    legacy data. We reproduce that bypass with a direct insert, run the
+    one-time adoption backfill (the conformance-restoring migration), then
+    assert the orphan's lineage now routes to the sentinel.
     """
+    from deriva_ml.execution.provenance_backfill import backfill_provenance
+
     ml = test_ml
     sentinel_exec_rid = ml.unknown_provenance_execution_rid()
 
@@ -461,13 +453,74 @@ def test_F4_producerless_artifact_attributes_to_unknown_execution(test_ml):
         [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "orphan version"}]
     )
 
+    # Dry-run first: the orphan must be reported as a candidate, nothing written.
+    preview = backfill_provenance(ml, apply=False)
+    assert orphan_rid in preview.orphan_datasets, (
+        "The producerless orphan must be reported by the backfill dry-run."
+    )
+
+    # Apply: attribute orphans to the sentinel.
+    backfill_provenance(ml, apply=True)
+
     # The required end state: lineage resolves the producer to the sentinel,
-    # not None. Today the producer is null, so the walk is empty — this is the
-    # gap the attribution feature must close.
-    lineage = ml.get_lineage(orphan_rid)
-    assert lineage.lineage is not None, "Producerless artifact must not yield a null-producer lineage."
+    # not None — no null dead-end.
+    lineage = ml.lookup_lineage(orphan_rid)
+    assert lineage.lineage is not None, "Producerless artifact must not yield a null-producer lineage after backfill."
     assert lineage.lineage.execution.rid == sentinel_exec_rid, (
-        "A producerless artifact's lineage must terminate at the unknown-provenance Execution sentinel."
+        "A backfilled producerless artifact's lineage must terminate at the unknown-provenance Execution sentinel."
+    )
+
+
+@pytest.mark.integration
+def test_F4b_backfill_dry_run_does_not_mutate_and_is_idempotent(test_ml):
+    """F4b — The backfill is dry-run-safe and idempotent.
+
+    A dry-run reports the orphan but writes nothing (the null persists). After
+    apply, the orphan is sentinel-attributed and the audit shows it as
+    known-degraded (not a violation). A second apply is a no-op (no orphans
+    left), proving idempotency.
+    """
+    from deriva_ml.execution.provenance_backfill import backfill_provenance
+
+    ml = test_ml
+    sentinel_exec_rid = ml.unknown_provenance_execution_rid()
+    pb = ml.pathBuilder().schemas[ML_SCHEMA]
+
+    orphan_rid = pb.tables["Dataset"].insert([{"Description": "Backfill orphan", "Deleted": False}])[0]["RID"]
+    pb.tables["Dataset_Version"].insert(
+        [{"Dataset": orphan_rid, "Version": "0.1.0", "Execution": None, "Description": "v"}]
+    )
+
+    # Dry-run: reports the orphan, writes nothing.
+    dry = backfill_provenance(ml, apply=False)
+    assert orphan_rid in dry.orphan_datasets
+    assert dry.applied is False
+    # Verify nothing was written — the version row's Execution is still null.
+    vp = pb.tables["Dataset_Version"]
+    still_null = [
+        r for r in vp.filter(vp.Dataset == orphan_rid).entities().fetch() if not r.get("Execution")
+    ]
+    assert still_null, "Dry-run must not write the producer — the null must persist."
+
+    # The audit (pre-apply) reports it as a null-producer violation.
+    assert any(v.rid == orphan_rid and v.category == "null_producer" for v in ml.audit_provenance().violations)
+
+    # Apply: attribute orphans to the sentinel.
+    applied = backfill_provenance(ml, apply=True)
+    assert orphan_rid in applied.orphan_datasets
+    assert applied.applied is True
+
+    # Post-apply: the row now points at the sentinel; the audit reclassifies it
+    # as known-degraded (compliant), no longer a violation.
+    after = ml.audit_provenance()
+    assert any(f.rid == orphan_rid and f.category == "sentinel_producer" for f in after.known_degraded)
+    assert not any(v.rid == orphan_rid for v in after.violations)
+    _ = sentinel_exec_rid  # documented target; asserted via lineage in F4
+
+    # Idempotent: a second apply finds no orphan to attribute (this one is done).
+    second = backfill_provenance(ml, apply=True)
+    assert orphan_rid not in second.orphan_datasets, (
+        "A second backfill must not re-process an already-attributed orphan."
     )
 
 
