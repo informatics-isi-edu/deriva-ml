@@ -525,11 +525,16 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 "RID",
                 "Name",
                 {
+                    # Workflow_Type is multi-valued (an inbound entity set through
+                    # the association table). In the compact context that must be
+                    # aggregated (array_d → distinct row-names); the full entity
+                    # set is only valid in `detailed` (annotation spec).
                     "source": [
                         {"inbound": [schema, "Workflow_Workflow_Type_Workflow_fkey"]},
                         {"outbound": [schema, "Workflow_Workflow_Type_Workflow_Type_fkey"]},
                         "RID",
                     ],
+                    "aggregate": "array_d",
                     "markdown_name": "Workflow Types",
                 },
                 "Version",
@@ -727,13 +732,22 @@ def generate_annotation(model: Model, schema: str) -> dict:
         },
     }
 
-    # Reusable sources for the Dataset table.
+    # Reusable sources for the Dataset table. Dataset_Type is multi-valued (an
+    # inbound entity set). The full entity set is valid in `detailed`/`filter`;
+    # the compact context needs the aggregated form (array_d → distinct
+    # row-names) per the annotation spec.
+    _dataset_types_path = [
+        {"inbound": [schema, "Dataset_Dataset_Type_Dataset_fkey"]},
+        {"outbound": [schema, "Dataset_Dataset_Type_Dataset_Type_fkey"]},
+        "RID",
+    ]
     dataset_types_source = {
-        "source": [
-            {"inbound": [schema, "Dataset_Dataset_Type_Dataset_fkey"]},
-            {"outbound": [schema, "Dataset_Dataset_Type_Dataset_Type_fkey"]},
-            "RID",
-        ],
+        "source": _dataset_types_path,
+        "markdown_name": "Dataset Types",
+    }
+    dataset_types_compact = {
+        "source": _dataset_types_path,
+        "aggregate": "array_d",
         "markdown_name": "Dataset Types",
     }
     dataset_version_source = {
@@ -759,7 +773,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
             "*": [
                 "RID",
                 "Description",
-                dataset_types_source,
+                dataset_types_compact,
                 dataset_version_source,
                 [schema, "Dataset_RCB_fkey"],
                 "RCT",
