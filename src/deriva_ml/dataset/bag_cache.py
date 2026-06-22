@@ -191,6 +191,17 @@ class BagCache:
         for row in self._index.list_bags():
             checksum = row["checksum"]
             version = (row.get("anchor_summary") or {}).get("version")
+            # ``size_bytes`` is persisted on the index row at download time
+            # (see ``_extract_archive_to_cache``). For bags recorded before
+            # that landed the column is NULL — walk the content-addressed bag
+            # directory once and write the result back, so the O(N-files) walk
+            # is amortized to at most one listing per stale bag rather than
+            # repeating on every call.
+            size_bytes = row.get("size_bytes")
+            if size_bytes is None:
+                size_bytes = _dir_size(self._index.bag_dir_for(checksum)) or None
+                if size_bytes is not None:
+                    self._backfill_size_bytes(checksum, row, size_bytes)
             for rid in anchors.get(checksum, []):
                 bag_dir = self._index.bag_dir_for(checksum) / f"Dataset_{rid}"
                 status = self._determine_index_status(checksum, bag_dir)
@@ -201,11 +212,40 @@ class BagCache:
                         checksum=checksum,
                         status=status,
                         built_at=_utc(datetime.fromisoformat(row["built_at"])),
-                        size_bytes=row.get("size_bytes") or _dir_size(bag_dir) or None,
+                        size_bytes=size_bytes,
                         path=bag_dir,
                     )
                 )
         return bags
+
+    def _backfill_size_bytes(self, checksum: str, row: dict[str, Any], size_bytes: int) -> None:
+        """Persist a just-computed ``size_bytes`` onto an existing index row.
+
+        Re-records the bag (an upsert keyed on ``checksum``) with its size so
+        the next ``list_bags`` reads it from the index instead of re-walking.
+        The metadata fields (``profile_id``, ``anchor_summary``, ``built_at``)
+        are passed through unchanged because ``record`` overwrites them from
+        its arguments — omitting one would null it. ``anchors`` is left empty:
+        ``record`` accumulates anchors, so the existing reverse-index rows are
+        preserved. Best-effort: a read-only or otherwise unwritable index is
+        logged and ignored — listing still returns the freshly-computed size,
+        it just won't be cached.
+
+        Args:
+            checksum: The bag's content-addressed checksum (index key).
+            row: The index row as returned by ``BagCacheIndex.list_bags``.
+            size_bytes: The on-disk size to persist, in bytes.
+        """
+        try:
+            self._index.record(
+                checksum=checksum,
+                profile_id=row.get("profile_id"),
+                anchor_summary=row.get("anchor_summary"),
+                size_bytes=size_bytes,
+                built_at=_utc(datetime.fromisoformat(row["built_at"])),
+            )
+        except Exception as e:  # read-only index, locked DB, schema drift
+            logger.debug("Could not persist size_bytes for bag %s: %s", checksum, e)
 
     def purge_dataset(self, dataset_rid: str, version: str | None = None) -> dict[str, int]:
         """Delete cached bags for a dataset (all versions, or one).

@@ -134,6 +134,49 @@ def _dir_size(path: Path) -> int:
     return total
 
 
+def _dir_stats(path: Path) -> tuple[int, int, int]:
+    """Total bytes, file count, and dir count under ``path``.
+
+    The error-tolerant counterpart of :func:`_dir_size`, for callers
+    that also need the file/dir tallies (``get_cache_size``). Like
+    ``_dir_size`` it walks with ``os.walk(onerror=...)`` so a single
+    unreadable subdirectory is skipped rather than aborting the whole
+    walk, and guards each per-file ``stat`` against entries that vanish
+    or are unreadable mid-walk. ``rglob`` would propagate the first
+    ``PermissionError`` and crash the caller — which is exactly what
+    made ``get_cache_size`` fail on a cache containing one
+    permission-denied file.
+
+    Args:
+        path: Directory to measure.
+
+    Returns:
+        ``(total_bytes, file_count, dir_count)``; ``(0, 0, 0)`` when
+        ``path`` does not exist.
+
+    Example:
+        >>> from pathlib import Path
+        >>> _dir_stats(Path("/nonexistent/anywhere"))
+        (0, 0, 0)
+    """
+    if not path.exists():
+        return 0, 0, 0
+    total = file_count = dir_count = 0
+    for dirpath, dirnames, filenames in os.walk(path, onerror=lambda _e: None):
+        dir_count += len(dirnames)
+        base = Path(dirpath)
+        for name in filenames:
+            fp = base / name
+            try:
+                if fp.is_file():
+                    total += fp.stat().st_size
+                    file_count += 1
+            except (OSError, PermissionError):
+                # Entry vanished or is unreadable — skip it, keep counting.
+                continue
+    return total, file_count, dir_count
+
+
 def _parse_asset_dir_name(name: str) -> tuple[str, str] | None:
     """Split ``{rid}_{md5}`` (last underscore, md5 = 32 hex chars)."""
     rid, sep, md5 = name.rpartition("_")

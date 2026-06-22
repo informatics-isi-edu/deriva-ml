@@ -1640,20 +1640,19 @@ class DerivaML(
             >>> size = ml.get_cache_size()  # doctest: +SKIP
             >>> print(f"Cache size: {size['total_mb']:.1f} MB ({size['file_count']} files)")  # doctest: +SKIP
         """
-        stats = {"total_bytes": 0, "total_mb": 0.0, "file_count": 0, "dir_count": 0}
+        # Walk with the error-tolerant helper: a single unreadable file
+        # (e.g. a permission-denied file in a stale execution dir under the
+        # cache root) must not crash the whole size computation, which a bare
+        # ``Path.rglob`` would do on the first ``PermissionError``.
+        from deriva_ml.core.storage import _dir_stats
 
-        if not self.cache_dir.exists():
-            return stats
-
-        for entry in self.cache_dir.rglob("*"):
-            if entry.is_file():
-                stats["total_bytes"] += entry.stat().st_size
-                stats["file_count"] += 1
-            elif entry.is_dir():
-                stats["dir_count"] += 1
-
-        stats["total_mb"] = stats["total_bytes"] / (1024 * 1024)
-        return stats
+        total_bytes, file_count, dir_count = _dir_stats(self.cache_dir)
+        return {
+            "total_bytes": total_bytes,
+            "total_mb": total_bytes / (1024 * 1024),
+            "file_count": file_count,
+            "dir_count": dir_count,
+        }
 
     def list_execution_dirs(self) -> list[dict[str, Any]]:
         """List execution working directories.
@@ -1678,6 +1677,7 @@ class DerivaML(
         """
         from datetime import datetime
 
+        from deriva_ml.core.storage import _dir_stats
         from deriva_ml.core.upload_layout import upload_root
 
         results = []
@@ -1688,8 +1688,11 @@ class DerivaML(
 
         for entry in exec_root.iterdir():
             if entry.is_dir():
-                size_bytes = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
-                file_count = sum(1 for f in entry.rglob("*") if f.is_file())
+                # Error-tolerant walk: a single unreadable/permission-denied
+                # file in one execution dir must not crash the whole listing
+                # (which a bare ``rglob`` + ``stat`` would do). One walk yields
+                # both size and file count.
+                size_bytes, file_count, _ = _dir_stats(entry)
                 mtime = datetime.fromtimestamp(entry.stat().st_mtime)
 
                 results.append(
@@ -1879,7 +1882,10 @@ class DerivaML(
             Note: ``bag_size_mb`` and ``asset_size_mb`` break down
             ``cache_size_mb`` by species — they are subsets of it, not
             additive with it; ``total_size_mb`` remains
-            ``cache_size_mb + execution_size_mb``.
+            ``cache_size_mb + execution_size_mb``. ``cache_file_count``
+            counts only files outside the ``bags/`` subtree (bag file
+            counts are not tracked in the index); it is a floor, not a
+            full tally.
 
         Example:
             >>> ml = DerivaML('deriva.example.org', 'my_catalog')  # doctest: +SKIP
@@ -1888,9 +1894,9 @@ class DerivaML(
             >>> print(f"  Cache: {summary['cache_size_mb']:.1f} MB")  # doctest: +SKIP
             >>> print(f"  Executions: {summary['execution_size_mb']:.1f} MB")  # doctest: +SKIP
         """
-        cache_stats = self.get_cache_size()
-        exec_dirs = self.list_execution_dirs()
+        from deriva_ml.core.storage import _PROTECTED_CACHE_ENTRIES, _dir_stats
 
+        exec_dirs = self.list_execution_dirs()
         exec_size_mb = sum(d["size_mb"] for d in exec_dirs)
 
         bags = self.list_cached_bags()
@@ -1906,14 +1912,44 @@ class DerivaML(
         bag_bytes = sum(sizes_by_checksum.values())
         asset_bytes = sum(a.size_bytes for a in assets)
 
+        # Cache total = index-known bag bytes (O(1), no re-walk) + asset bytes
+        # (from the asset listing) + any stray content under the cache root
+        # that is neither ``bags/``, ``assets/``, nor the bag-index SQLite
+        # files. The "other" slice is tiny, so walking it is cheap; this avoids
+        # the full-tree ``get_cache_size`` walk that re-measured the multi-GB
+        # ``bags/`` subtree on every call. The index files are cache machinery,
+        # not cached content, so they are excluded — matching the
+        # ``_PROTECTED_CACHE_ENTRIES`` set ``clear_cache`` uses, and keeping the
+        # total stable whether or not a listing has lazily created the index.
+        other_bytes = other_files = 0
+        if self.cache_dir.exists():
+            for entry in self.cache_dir.iterdir():
+                if entry.name in _PROTECTED_CACHE_ENTRIES:
+                    continue
+                if entry.is_dir():
+                    sub_bytes, sub_files, _ = _dir_stats(entry)
+                    other_bytes += sub_bytes
+                    other_files += sub_files
+                else:
+                    try:
+                        other_bytes += entry.stat().st_size
+                        other_files += 1
+                    except (OSError, PermissionError):
+                        continue
+        cache_bytes = bag_bytes + asset_bytes + other_bytes
+        cache_size_mb = cache_bytes / (1024 * 1024)
+        # File count excludes the bags/ subtree (not tracked per-bag in the
+        # index); assets/ + everything else is counted.
+        cache_file_count = sum(a.file_count for a in assets) + other_files
+
         return {
             "working_dir": str(self.working_dir),
             "cache_dir": str(self.cache_dir),
-            "cache_size_mb": cache_stats["total_mb"],
-            "cache_file_count": cache_stats["file_count"],
+            "cache_size_mb": cache_size_mb,
+            "cache_file_count": cache_file_count,
             "execution_dir_count": len(exec_dirs),
             "execution_size_mb": exec_size_mb,
-            "total_size_mb": cache_stats["total_mb"] + exec_size_mb,
+            "total_size_mb": cache_size_mb + exec_size_mb,
             # Per-species breakdown (spec 2026-06-11)
             "bag_count": len(bags),
             "bag_size_mb": bag_bytes / (1024 * 1024),
