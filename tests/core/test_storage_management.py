@@ -301,6 +301,35 @@ def test_get_storage_summary_tallies_cache_and_executions(tmp_path):
     assert summary["cache_dir"] == str(h.cache_dir)
 
 
+def test_get_storage_summary_counts_stray_dirs_and_files(tmp_path):
+    """Cache content that is neither bags/ nor assets/ — stray top-level files
+    AND stray top-level directories — is still counted in cache_size_mb /
+    cache_file_count.
+
+    The bag-index SQLite machinery (index.sqlite*) is the only thing excluded;
+    that exclusion is covered separately by ``test_get_storage_summary_empty``
+    (which only ever creates the real, lazily-built index and still reports 0).
+    Here we focus on the inclusion of stray content and deliberately do not
+    fabricate an index file — a real index is a valid DB, not arbitrary bytes.
+    """
+    from deriva_ml.core.base import DerivaML
+
+    h = _make_harness(tmp_path)
+    # A stray top-level file …
+    (h.cache_dir / "leftover.tmp").write_bytes(b"x" * 100)
+    # … and a stray top-level directory with nested content.
+    junk = h.cache_dir / "oldjunk"
+    junk.mkdir()
+    (junk / "a.bin").write_bytes(b"y" * 200)
+    (junk / "nested").mkdir()
+    (junk / "nested" / "b.bin").write_bytes(b"z" * 300)
+
+    summary = DerivaML.get_storage_summary(h)  # type: ignore[arg-type]
+    # 100 + 200 + 300 = 600 bytes of stray content, all counted.
+    assert summary["cache_size_mb"] == pytest.approx(600 / (1024 * 1024))
+    assert summary["cache_file_count"] == 3  # leftover.tmp, a.bin, b.bin
+
+
 # ---------------------------------------------------------------------------
 # _dir_size resilience to PermissionError (regression: it caught only
 # FileNotFoundError, so a permission-denied subdir crashed list_cached_bags
