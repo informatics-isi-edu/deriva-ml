@@ -331,66 +331,67 @@ def test_get_storage_summary_counts_stray_dirs_and_files(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# _dir_size resilience to PermissionError (regression: it caught only
-# FileNotFoundError, so a permission-denied subdir crashed list_cached_bags
-# instead of returning the readable bags).
+# _dir_size / _dir_stats walk the tree with ``os.scandir`` (not ``os.walk`` +
+# per-file ``Path.stat``). These tests pin BEHAVIOR through real filesystem
+# conditions (``os.chmod``), not by patching the walk mechanism, so they stay
+# valid across the scandir rewrite.
+#
+# Behavior contract:
+#   * A permission-denied SUBDIRECTORY is skipped and the walk continues across
+#     readable siblings (error-tolerance — a single locked bag must not crash
+#     ``list_cached_bags`` / ``get_cache_size``).
+#   * A permission-denied FILE is COUNTED: its size is read from the directory
+#     entry's cached metadata (``DirEntry.stat``), which needs no read access to
+#     the file itself. This is a deliberate, documented change from the previous
+#     os.walk+Path.stat() implementation (which raised on the explicit stat and
+#     therefore skipped such files) — and it is arguably more correct for a size
+#     tally, since the size is known regardless of file read permission.
 # ---------------------------------------------------------------------------
 
+# chmod-based denial does not constrain root, so these tests are meaningless as
+# root (CI containers often run as root).
+_skip_as_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="chmod-based permission denial does not apply to root",
+)
 
-def test_dir_size_skips_permission_denied_file(monkeypatch, tmp_path):
-    """A file whose size lookup raises PermissionError is skipped, not fatal."""
+
+@_skip_as_root
+def test_dir_size_survives_permission_denied_subdir(tmp_path):
+    """A real unreadable subdirectory is skipped, not fatal; the walk continues
+    across readable siblings."""
+    from deriva_ml.core import storage
+
+    (tmp_path / "a.txt").write_text("hi")  # 2 bytes, readable top-level
+    denied = tmp_path / "denied"
+    denied.mkdir()
+    (denied / "b.txt").write_text("hidden")  # inside the denied subtree
+    denied.chmod(0o000)
+    try:
+        # Must not raise; counts the readable file, skips the unreadable subdir.
+        assert storage._dir_size(tmp_path) == 2
+    finally:
+        denied.chmod(0o755)  # restore so tmp_path cleanup succeeds
+
+
+@_skip_as_root
+def test_dir_size_counts_permission_denied_file(tmp_path):
+    """A permission-denied file's size comes from the directory entry (no read
+    access needed), so it is COUNTED — the deliberate scandir behavior."""
     from deriva_ml.core import storage
 
     (tmp_path / "ok.txt").write_text("hello")  # 5 bytes
-    (tmp_path / "locked.txt").write_text("secret")
-
-    real_stat = Path.stat
-
-    def fake_stat(self, *a, **k):
-        if self.name == "locked.txt":
-            raise PermissionError(13, "Permission denied", str(self))
-        return real_stat(self, *a, **k)
-
-    monkeypatch.setattr(Path, "stat", fake_stat)
-    # Must not raise; counts only the readable file.
-    assert storage._dir_size(tmp_path) == 5
-
-
-def test_dir_size_survives_permission_denied_subdir(monkeypatch, tmp_path):
-    """os.walk hitting a PermissionError traversing a subdir (perm-denied dir on
-    a non-owner process / stricter platform) is skipped, not fatal — and the
-    walk continues across readable siblings via os.walk's onerror callback."""
-    from deriva_ml.core import storage
-
-    # Two readable files plus a (would-be) denied subtree. os.walk's onerror
-    # makes a denied dir non-fatal; assert the readable bytes are still counted.
-    (tmp_path / "a.txt").write_text("hi")  # 2 bytes
-    sub = tmp_path / "sub"
-    sub.mkdir()
-    (sub / "b.txt").write_text("yo")  # 2 bytes
-
-    real_walk = os.walk
-
-    def walk_with_denied_dir(top, **kw):
-        # Drive the real walk but inject an onerror trigger: simulate the
-        # scandir on `sub` raising PermissionError by skipping it and invoking
-        # the caller's onerror, exactly as os.walk does on a real denial.
-        onerror = kw.get("onerror")
-        for dirpath, dirnames, filenames in real_walk(top):
-            if Path(dirpath) == sub:
-                if onerror:
-                    onerror(PermissionError(13, "Permission denied", str(sub)))
-                continue  # denied dir contributes nothing, walk continues
-            yield dirpath, dirnames, filenames
-
-    monkeypatch.setattr(os, "walk", walk_with_denied_dir)
-    # Must not raise; counts the readable top-level file, skips the denied subdir.
-    assert storage._dir_size(tmp_path) == 2
+    locked = tmp_path / "locked.txt"
+    locked.write_text("secret")  # 6 bytes
+    locked.chmod(0o000)
+    try:
+        assert storage._dir_size(tmp_path) == 11  # 5 + 6, both counted
+    finally:
+        locked.chmod(0o644)
 
 
 # ---------------------------------------------------------------------------
-# _dir_stats — the (bytes, files, dirs) counterpart of _dir_size, used by
-# get_cache_size / list_execution_dirs. Same os.walk(onerror=...) resilience.
+# _dir_stats — the (bytes, files, dirs) counterpart of _dir_size.
 # ---------------------------------------------------------------------------
 
 
@@ -414,51 +415,43 @@ def test_dir_stats_tallies_bytes_files_dirs(tmp_path):
     total, files, dirs = storage._dir_stats(tmp_path)
     assert total == 6
     assert files == 2
-    assert dirs == 1  # one subdirectory, matching rglob("*") semantics
+    assert dirs == 1  # one subdirectory
 
 
-def test_dir_stats_skips_permission_denied_file(monkeypatch, tmp_path):
-    """A file whose stat raises PermissionError is skipped, not fatal."""
+@_skip_as_root
+def test_dir_stats_counts_permission_denied_file(tmp_path):
+    """A permission-denied file is counted (size from the directory entry)."""
     from deriva_ml.core import storage
 
     (tmp_path / "ok.txt").write_text("hello")  # 5 bytes
-    (tmp_path / "locked.txt").write_text("secret")
-
-    real_stat = Path.stat
-
-    def fake_stat(self, *a, **k):
-        if self.name == "locked.txt":
-            raise PermissionError(13, "Permission denied", str(self))
-        return real_stat(self, *a, **k)
-
-    monkeypatch.setattr(Path, "stat", fake_stat)
-    total, files, _dirs = storage._dir_stats(tmp_path)
-    assert total == 5  # only the readable file counted
-    assert files == 1
+    locked = tmp_path / "locked.txt"
+    locked.write_text("secret")  # 6 bytes
+    locked.chmod(0o000)
+    try:
+        total, files, _dirs = storage._dir_stats(tmp_path)
+        assert total == 11  # both files counted
+        assert files == 2
+    finally:
+        locked.chmod(0o644)
 
 
-def test_get_cache_size_survives_permission_denied_file(monkeypatch, tmp_path):
-    """get_cache_size must not crash on a permission-denied file in the cache.
-
-    Regression: the old implementation used a bare ``Path.rglob('*')`` +
-    ``stat()`` which propagated the first ``PermissionError`` (e.g. a locked
-    file in a stale execution dir under the cache root), aborting the whole
-    size computation. It now walks via the error-tolerant ``_dir_stats``.
+@_skip_as_root
+def test_get_cache_size_survives_permission_denied_subdir(tmp_path):
+    """get_cache_size must not crash on a permission-denied subdir in the cache
+    (e.g. a stale execution dir locked by another user); readable content is
+    still tallied.
     """
     from deriva_ml.core.base import DerivaML
 
     h = _make_harness(tmp_path)
     (h.cache_dir / "readable.dat").write_bytes(b"x" * 100)
-    (h.cache_dir / "denied.dat").write_bytes(b"y" * 50)
-
-    real_stat = Path.stat
-
-    def fake_stat(self, *a, **k):
-        if self.name == "denied.dat":
-            raise PermissionError(13, "Permission denied", str(self))
-        return real_stat(self, *a, **k)
-
-    monkeypatch.setattr(Path, "stat", fake_stat)
-    stats = DerivaML.get_cache_size(h)  # type: ignore[arg-type]
-    assert stats["total_bytes"] == 100  # readable file only; no crash
-    assert stats["file_count"] == 1
+    denied = h.cache_dir / "denied_subdir"
+    denied.mkdir()
+    (denied / "inner.dat").write_bytes(b"y" * 50)
+    denied.chmod(0o000)
+    try:
+        stats = DerivaML.get_cache_size(h)  # type: ignore[arg-type]
+        assert stats["total_bytes"] == 100  # readable file only; denied subdir skipped, no crash
+        assert stats["file_count"] == 1
+    finally:
+        denied.chmod(0o755)
