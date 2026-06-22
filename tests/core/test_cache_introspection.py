@@ -50,7 +50,10 @@ def _record_bag(
 
     Mirrors the production record() call in
     ``dataset/bag_download.py`` — anchors ``[("Dataset", rid)]``,
-    ``anchor_summary={"version": ...}``.
+    ``anchor_summary={"version": ...}`` — but deliberately omits
+    ``size_bytes`` (which production now persists), leaving the index
+    column NULL. That exercises the lazy back-fill path in
+    ``BagCache.list_bags`` for pre-existing caches.
 
     Returns the bag directory path (``bags/{checksum}/Dataset_{rid}``).
     """
@@ -657,3 +660,124 @@ class TestListBagsOrdering:
             bags = cache.list_bags()
 
         assert [b.dataset_rid for b in bags] == ["RID-NEWER", "RID-OLDER"]
+
+
+class TestBagSizePersistence:
+    """``size_bytes`` is persisted to the index, not re-walked every call.
+
+    Regression: ``list_bags`` read ``row.get('size_bytes') or _dir_size(...)``
+    but the column was never written, so every call re-walked the bag — making
+    ``get_storage_summary`` / storage inspection O(cache size) on each run.
+    Now download persists the size, and a NULL column (pre-existing cache) is
+    back-filled on the first listing.
+    """
+
+    def _index_size(self, cache_dir: Path, checksum: str) -> int | None:
+        from deriva.bag.cache_index import BagCacheIndex
+
+        index = BagCacheIndex(cache_dir)
+        try:
+            return (index.get(checksum) or {}).get("size_bytes")
+        finally:
+            index.dispose()
+
+    def test_list_bags_backfills_null_size_to_index(self, tmp_path: Path):
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        # _record_bag leaves size_bytes NULL (mirrors a pre-existing cache).
+        _record_bag(cache_dir, checksum="sz1", dataset_rid="RID-SZ")
+        assert self._index_size(cache_dir, "sz1") is None
+
+        with BagCache(cache_dir) as cache:
+            bags = cache.list_bags()
+        assert len(bags) == 1
+        assert bags[0].size_bytes is not None
+        assert bags[0].size_bytes > 0
+
+        # The walked size is now persisted on the index row.
+        persisted = self._index_size(cache_dir, "sz1")
+        assert persisted == bags[0].size_bytes
+
+    def test_backfill_does_not_re_walk_on_second_call(self, monkeypatch, tmp_path: Path):
+        from deriva_ml.core import storage
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="sz2", dataset_rid="RID-SZ2")
+
+        calls = {"n": 0}
+        real_dir_size = storage._dir_size
+
+        def counting_dir_size(path):
+            calls["n"] += 1
+            return real_dir_size(path)
+
+        monkeypatch.setattr(storage, "_dir_size", counting_dir_size)
+
+        # First listing walks once (NULL column) and back-fills.
+        with BagCache(cache_dir) as cache:
+            cache.list_bags()
+        first = calls["n"]
+        assert first >= 1
+
+        # Second listing reads size_bytes from the index — no further walk.
+        with BagCache(cache_dir) as cache:
+            cache.list_bags()
+        assert calls["n"] == first, "size_bytes should be read from the index, not re-walked"
+
+    def test_backfill_preserves_anchors_and_summary(self, tmp_path: Path):
+        """Re-recording to persist size must not drop anchors or version."""
+        from deriva.bag.cache_index import BagCacheIndex
+
+        from deriva_ml.dataset.bag_cache import BagCache
+
+        cache_dir = tmp_path / "cache"
+        _record_bag(cache_dir, checksum="sz3", dataset_rid="RID-A3", version="2.1.0")
+        # Second dataset anchors the same content-addressed bag.
+        index = BagCacheIndex(cache_dir)
+        try:
+            index.record(checksum="sz3", anchors=[("Dataset", "RID-B3")])
+        finally:
+            index.dispose()
+
+        with BagCache(cache_dir) as cache:
+            cache.list_bags()  # triggers back-fill
+
+        # Both anchors survive the back-fill upsert.
+        index = BagCacheIndex(cache_dir)
+        try:
+            assert set(index.find_bags_for_rid(table="Dataset", rid="RID-A3")) == {"sz3"}
+            assert set(index.find_bags_for_rid(table="Dataset", rid="RID-B3")) == {"sz3"}
+        finally:
+            index.dispose()
+
+
+class TestStorageSummaryNoFullWalk:
+    """``get_storage_summary`` derives the cache total from the index +
+    asset listing + stray entries, never re-walking the bags/ subtree.
+    """
+
+    def test_summary_does_not_call_get_cache_size(self, harness, monkeypatch):
+        from deriva_ml.core.base import DerivaML
+
+        harness.list_execution_dirs = lambda: DerivaML.list_execution_dirs(harness)
+        harness.list_cached_bags = lambda: DerivaML.list_cached_bags(harness)
+        harness.list_cached_assets = lambda: DerivaML.list_cached_assets(harness)
+
+        # If the summary still routed through the full-tree walker, this would
+        # fire. It must not — bag size comes from the index.
+        def boom():
+            raise AssertionError("get_storage_summary must not call get_cache_size")
+
+        harness.get_cache_size = boom
+
+        _record_bag(harness.cache_dir, checksum="nw1", dataset_rid="RID-NW")
+        _make_cached_asset(harness.cache_dir, "RID-NWA", MD5_A)
+
+        summary = DerivaML.get_storage_summary(harness)
+        assert summary["bag_count"] == 1
+        assert summary["bag_size_mb"] > 0
+        assert summary["asset_count"] == 1
+        # cache total includes bags + assets.
+        assert summary["cache_size_mb"] >= summary["bag_size_mb"] + summary["asset_size_mb"]

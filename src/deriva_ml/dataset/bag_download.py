@@ -188,10 +188,19 @@ def _extract_archive_to_cache(
     staging_dir.rename(bag_root)
 
     # Record the bag in the index so the next Tier-1 lookup finds it.
+    # Compute and persist ``size_bytes`` now, while the just-extracted
+    # files are still warm in the page cache — the walk is nearly free
+    # here. Without it the index column stays NULL and every later
+    # ``BagCache.list_bags`` (hence every ``get_storage_summary`` /
+    # storage-inspection run) re-walks the whole bag with ``_dir_size``,
+    # which is what makes those calls slow on a multi-GB cache.
+    from deriva_ml.core.storage import _dir_size
+
     index.record(
         checksum=checksum,
         anchors=[("Dataset", dataset_rid)],
         anchor_summary={"version": str(dataset_version)},
+        size_bytes=_dir_size(bag_root),
     )
     return bag_dir
 

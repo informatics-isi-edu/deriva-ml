@@ -357,3 +357,79 @@ def test_dir_size_survives_permission_denied_subdir(monkeypatch, tmp_path):
     monkeypatch.setattr(os, "walk", walk_with_denied_dir)
     # Must not raise; counts the readable top-level file, skips the denied subdir.
     assert storage._dir_size(tmp_path) == 2
+
+
+# ---------------------------------------------------------------------------
+# _dir_stats — the (bytes, files, dirs) counterpart of _dir_size, used by
+# get_cache_size / list_execution_dirs. Same os.walk(onerror=...) resilience.
+# ---------------------------------------------------------------------------
+
+
+def test_dir_stats_empty_and_missing(tmp_path):
+    """Missing dir → all zeros; empty dir → all zeros."""
+    from deriva_ml.core import storage
+
+    assert storage._dir_stats(tmp_path / "nope") == (0, 0, 0)
+    (tmp_path / "empty").mkdir()
+    assert storage._dir_stats(tmp_path / "empty") == (0, 0, 0)
+
+
+def test_dir_stats_tallies_bytes_files_dirs(tmp_path):
+    """Bytes, file count, and dir count are all reported."""
+    from deriva_ml.core import storage
+
+    (tmp_path / "a.txt").write_text("hi")  # 2 bytes
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "b.txt").write_text("yoyo")  # 4 bytes
+    total, files, dirs = storage._dir_stats(tmp_path)
+    assert total == 6
+    assert files == 2
+    assert dirs == 1  # one subdirectory, matching rglob("*") semantics
+
+
+def test_dir_stats_skips_permission_denied_file(monkeypatch, tmp_path):
+    """A file whose stat raises PermissionError is skipped, not fatal."""
+    from deriva_ml.core import storage
+
+    (tmp_path / "ok.txt").write_text("hello")  # 5 bytes
+    (tmp_path / "locked.txt").write_text("secret")
+
+    real_stat = Path.stat
+
+    def fake_stat(self, *a, **k):
+        if self.name == "locked.txt":
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_stat(self, *a, **k)
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+    total, files, _dirs = storage._dir_stats(tmp_path)
+    assert total == 5  # only the readable file counted
+    assert files == 1
+
+
+def test_get_cache_size_survives_permission_denied_file(monkeypatch, tmp_path):
+    """get_cache_size must not crash on a permission-denied file in the cache.
+
+    Regression: the old implementation used a bare ``Path.rglob('*')`` +
+    ``stat()`` which propagated the first ``PermissionError`` (e.g. a locked
+    file in a stale execution dir under the cache root), aborting the whole
+    size computation. It now walks via the error-tolerant ``_dir_stats``.
+    """
+    from deriva_ml.core.base import DerivaML
+
+    h = _make_harness(tmp_path)
+    (h.cache_dir / "readable.dat").write_bytes(b"x" * 100)
+    (h.cache_dir / "denied.dat").write_bytes(b"y" * 50)
+
+    real_stat = Path.stat
+
+    def fake_stat(self, *a, **k):
+        if self.name == "denied.dat":
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_stat(self, *a, **k)
+
+    monkeypatch.setattr(Path, "stat", fake_stat)
+    stats = DerivaML.get_cache_size(h)  # type: ignore[arg-type]
+    assert stats["total_bytes"] == 100  # readable file only; no crash
+    assert stats["file_count"] == 1
