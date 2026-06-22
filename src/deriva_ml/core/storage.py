@@ -111,26 +111,7 @@ def _dir_size(path: Path) -> int:
     """
     if not path.exists():
         return 0
-    total = 0
-    # Walk with ``os.walk`` (not ``Path.rglob``) so a single unreadable
-    # subdirectory is *skipped* and the walk *continues* across its siblings,
-    # rather than aborting. ``onerror`` swallows the per-directory
-    # PermissionError/OSError that traversal raises (e.g. a bag dir owned by
-    # another user, or a stricter filesystem); the per-file ``stat`` is also
-    # guarded for entries that vanish or are unreadable mid-walk. Without this,
-    # one denied bag crashes ``list_cached_bags`` instead of returning the
-    # readable ones.
-    for dirpath, _dirnames, filenames in os.walk(path, onerror=lambda _e: None):
-        base = Path(dirpath)
-        for name in filenames:
-            fp = base / name
-            try:
-                if fp.is_file():
-                    total += fp.stat().st_size
-            except (OSError, PermissionError):
-                # Entry vanished (FileNotFoundError) or is unreadable
-                # (PermissionError) — skip it, keep counting the rest.
-                continue
+    total, _files, _dirs = _scandir_tally(path)
     return total
 
 
@@ -161,19 +142,51 @@ def _dir_stats(path: Path) -> tuple[int, int, int]:
     """
     if not path.exists():
         return 0, 0, 0
+    return _scandir_tally(path)
+
+
+def _scandir_tally(path: Path) -> tuple[int, int, int]:
+    """Recursively tally ``(total_bytes, file_count, dir_count)`` under ``path``.
+
+    Uses ``os.scandir`` rather than ``os.walk`` + per-file ``Path.stat``: each
+    ``DirEntry`` carries the ``stat`` data from the directory read, so
+    ``entry.is_dir`` / ``entry.is_file`` / ``entry.stat`` are served without an
+    extra syscall per entry (vs. the ~2-3 syscalls/file the old path incurred).
+
+    Error-tolerant, matching the previous behavior: an unreadable subdirectory
+    (``os.scandir`` raises) is skipped and the walk continues across siblings;
+    an entry that vanishes or whose ``stat`` fails mid-walk is skipped. Symlinks
+    are not followed (``follow_symlinks=False``), so the tally counts the tree's
+    own bytes and never loops on a symlink cycle.
+
+    Args:
+        path: Directory to measure (assumed to exist; callers guard).
+
+    Returns:
+        ``(total_bytes, file_count, dir_count)``.
+    """
     total = file_count = dir_count = 0
-    for dirpath, dirnames, filenames in os.walk(path, onerror=lambda _e: None):
-        dir_count += len(dirnames)
-        base = Path(dirpath)
-        for name in filenames:
-            fp = base / name
-            try:
-                if fp.is_file():
-                    total += fp.stat().st_size
-                    file_count += 1
-            except (OSError, PermissionError):
-                # Entry vanished or is unreadable — skip it, keep counting.
-                continue
+    stack = [path]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            dir_count += 1
+                            stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            total += entry.stat(follow_symlinks=False).st_size
+                            file_count += 1
+                    except OSError:
+                        # Entry vanished or is unreadable — skip, keep tallying.
+                        continue
+        except OSError:
+            # Unreadable directory (e.g. a bag owned by another user) — skip it
+            # and continue across readable siblings, as the old os.walk(onerror=)
+            # path did. Without this, one denied bag would crash list_cached_bags.
+            continue
     return total, file_count, dir_count
 
 
