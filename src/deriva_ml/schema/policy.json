@@ -76,6 +76,14 @@
       "acl_bindings": [
         "row_owner_guard"
       ]
+    },
+    {
+      "schema": "public",
+      "table": "ERMrest_RID_Lease",
+      "acl": "self_serve",
+      "acl_bindings": [
+        "row_owner_guard"
+      ]
     }
   ]
 }
