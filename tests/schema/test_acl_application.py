@@ -86,3 +86,50 @@ def test_create_ml_catalog_applies_row_owner_guard() -> None:
         )
     finally:
         catalog.delete_ermrest_catalog(really=True)
+
+
+@pytest.mark.integration
+def test_create_ml_catalog_grants_rid_lease_write_policy() -> None:
+    """public.ERMrest_RID_Lease gets the SAME write policy as deriva-ml tables.
+
+    Regression: RID_Lease lives in the ``public`` schema, which policy.json sets
+    to ``read_only`` (insert/update/delete=empty), and the per-table
+    ``row_owner_guard`` rule deliberately excludes ``public``. So a new catalog
+    left RID_Lease effectively read-only for regular users — they could not
+    create or manage their own RID leases. The fix is an exact-match table_acls
+    entry giving RID_Lease the ``self_serve`` ACL + ``row_owner_guard`` binding,
+    matching a deriva-ml table (and the ERMrest RID-lease default-policy doc:
+    insert allowed, RCB-projection row guard for select/update/delete).
+    """
+    from deriva_ml.schema.create_schema import create_ml_catalog
+
+    # Premise check: the policy must declare the RID_Lease override.
+    policy_file = files("deriva_ml.schema").joinpath("policy.json")
+    policy = json.loads(policy_file.read_text())
+    rid_lease_specs = [
+        e for e in policy["table_acls"] if e.get("schema") == "public" and e.get("table") == "ERMrest_RID_Lease"
+    ]
+    assert rid_lease_specs, "policy.json has no exact-match table_acls entry for public.ERMrest_RID_Lease."
+
+    catalog = create_ml_catalog(hostname="localhost", project_name="ridlease_acl_test")
+    try:
+        model = catalog.getCatalogModel()
+        rid_lease = model.schemas["public"].tables["ERMrest_RID_Lease"]
+
+        # 1. The row-owner guard is applied (same binding deriva-ml tables get).
+        assert "row_owner_guard" in (rid_lease.acl_bindings or {}), (
+            "ERMrest_RID_Lease is missing the row_owner_guard binding — a user "
+            "cannot update/delete the leases they created."
+        )
+
+        # 2. The static ACL grants insert to writers_and_curators (self_serve),
+        #    overriding the public schema's read_only. Compare against the
+        #    catalog-level self_serve insert group so this stays correct if the
+        #    group membership is retuned later.
+        insert_acl = (rid_lease.acls or {}).get("insert")
+        assert insert_acl, (
+            f"ERMrest_RID_Lease has no insert ACL (acls={dict(rid_lease.acls or {})}); it is still inheriting the "
+            f"public schema's read_only policy — users cannot create RID leases."
+        )
+    finally:
+        catalog.delete_ermrest_catalog(really=True)
