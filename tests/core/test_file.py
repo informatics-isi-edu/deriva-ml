@@ -122,6 +122,26 @@ class TestFile:
                 ds = subdir.list_dataset_members()
                 assert len(ds["File"]) == 5
 
+    def test_add_files_tags_datasets_as_directory(self, file_table_setup):
+        """Every dataset add_files creates carries the built-in ``Directory``
+        type (force-included like ``File``), marking it as an auto-created
+        directory-structure dataset — distinguishing these byproduct datasets
+        from curated ones. A caller-supplied dataset_type is additive."""
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            file_dataset = exe.add_files(filespecs, dataset_types="Complete")
+
+        # The returned (top) dataset and every nested child must be tagged
+        # Directory + File, plus the caller's "Complete".
+        assert "Directory" in file_dataset.dataset_types
+        assert "File" in file_dataset.dataset_types
+        assert "Complete" in file_dataset.dataset_types
+        for subdir in file_dataset.list_dataset_children():
+            assert "Directory" in subdir.dataset_types
+
     def test_add_files_links_as_input(self, file_table_setup):
         """add_files registers an external File reference and links it as an
         INPUT — intrinsically, with no role parameter.

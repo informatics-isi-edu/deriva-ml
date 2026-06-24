@@ -161,6 +161,7 @@ kind: vocabulary
 terms:
 - name: Complete
 - name: File
+- name: Directory
 - name: Training
 - name: Testing
 - name: Validation

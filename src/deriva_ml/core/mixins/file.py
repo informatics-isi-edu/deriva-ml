@@ -16,10 +16,11 @@ from urllib.parse import urlsplit
 
 datapath = importlib.import_module("deriva.core.datapath")
 
+from deriva.core.ermrest_model import timestamptz_to_snaptime
+
 from deriva_ml.core.definitions import RID, FileSpec, MLTable, MLVocab, VocabularyTerm
 from deriva_ml.core.exceptions import DerivaMLInvalidTerm, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import DatasetVersion
-from deriva.core.ermrest_model import timestamptz_to_snaptime
 
 if TYPE_CHECKING:
     from deriva.core.ermrest_catalog import ResolveRidResult
@@ -121,11 +122,15 @@ class FileMixin:
         if spec_types - defined_types:
             raise DerivaMLInvalidTerm(MLVocab.asset_type.name, f"{spec_types - defined_types}")
 
-        # Normalize dataset_types, make sure File type is included.
-        if isinstance(dataset_types, list):
-            dataset_types = ["File"] + dataset_types if "File" not in dataset_types else dataset_types
-        else:
-            dataset_types = ["File", dataset_types] if dataset_types else ["File"]
+        # Normalize dataset_types. Two types are force-included on every dataset
+        # this routine creates, in addition to any caller-supplied types:
+        #   - "File": the datasets hold File-asset members.
+        #   - "Directory": marks the dataset as an auto-created directory-structure
+        #     dataset, distinguishing these byproducts from curated datasets so a
+        #     query can find (or exclude) them.
+        caller_types = [dataset_types] if isinstance(dataset_types, str) else list(dataset_types or [])
+        builtin_types = ["File", "Directory"]
+        dataset_types = builtin_types + [t for t in caller_types if t not in builtin_types]
         for ds_type in dataset_types:
             self.lookup_term(MLVocab.dataset_type, ds_type)
 

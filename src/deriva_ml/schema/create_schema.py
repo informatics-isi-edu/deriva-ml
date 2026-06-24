@@ -881,6 +881,13 @@ def initialize_ml_schema(model: Model, schema_name: str = "deriva-ml"):
         [
             {"Name": "Complete", "Description": "A dataset containing all available records of a given type."},
             {"Name": "File", "Description": "A dataset that contains file assets."},
+            {
+                "Name": "Directory",
+                "Description": (
+                    "A dataset auto-created by add_files to mirror an ingested source directory "
+                    "structure; nested Directory datasets reflect the source folder hierarchy."
+                ),
+            },
             {"Name": "Training", "Description": "A dataset subset used for model training."},
             {"Name": "Testing", "Description": "A dataset subset used for model testing/evaluation."},
             {"Name": "Validation", "Description": "A dataset subset used for model validation during training."},
