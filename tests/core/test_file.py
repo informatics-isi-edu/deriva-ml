@@ -369,6 +369,16 @@ class TestFile:
         for subdir in file_dataset.list_dataset_children():
             assert len(subdir.list_dataset_members()["File"]) == FILE_COUNT
 
+    def test_add_files_empty_raises_clear_error(self, file_table_setup):
+        """add_files with no files raises a clear DerivaMLException, not an
+        obscure ValueError from os.path.commonpath([])."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        execution = file_table_setup.execution
+        with execution.execute() as exe:
+            with pytest.raises(DerivaMLException):
+                exe.add_files([], description="empty")
+
     def test_file_spec_read_write(self, tmp_path):
         """Test reading and writing FileSpecs to JSONL."""
         # Create test files

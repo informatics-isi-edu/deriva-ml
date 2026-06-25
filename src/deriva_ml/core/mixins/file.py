@@ -20,7 +20,7 @@ datapath = importlib.import_module("deriva.core.datapath")
 from deriva.core.ermrest_model import timestamptz_to_snaptime
 
 from deriva_ml.core.definitions import RID, FileSpec, MLTable, MLVocab, VocabularyTerm
-from deriva_ml.core.exceptions import DerivaMLInvalidTerm, DerivaMLTableTypeError
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import DatasetVersion
 
 if TYPE_CHECKING:
@@ -202,6 +202,8 @@ class FileMixin:
         # ``os.path.commonpath`` gives the ingest root (the common ancestor of
         # every file-bearing directory). For a single directory it is that
         # directory itself.
+        if not dir_rid_map:
+            raise DerivaMLException("add_files received no files to add.")
         ingest_root = Path(os.path.commonpath([str(d) for d in dir_rid_map]))
 
         # The tree's nodes are every file-bearing directory PLUS every
