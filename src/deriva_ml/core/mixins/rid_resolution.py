@@ -151,21 +151,36 @@ class RidResolutionMixin:
     ) -> dict[RID, BatchRidResult]:
         """Batch resolve multiple RIDs efficiently.
 
-        Resolves multiple RIDs in batched queries, significantly faster than
-        calling resolve_rid() for each RID individually. Instead of N network
-        calls for N RIDs, this makes one query per candidate table.
+        Resolves multiple RIDs in batched queries, far faster than calling
+        ``resolve_rid`` once per RID. RIDs are matched against a table with a
+        single chunked ``RID = Any(...)`` query rather than N per-RID lookups.
+
+        Two strategies depending on ``candidate_tables``:
+
+        - **Explicit candidate tables** (e.g. dataset element types): each
+          listed table is bulk-matched in turn until every RID is resolved.
+        - **No candidate tables** (``None``): instead of scanning *every* table
+          in the domain + ML schemas (a wasted zero-row query per table that
+          holds none of the RIDs), the server is asked which table a sample RID
+          lives in via ``resolve_rid`` (one ``/entity_rid`` call, catalog-wide),
+          the rest are bulk-matched in that table, and the process repeats for
+          any RIDs in other tables. Cost is ~one probe per distinct table the
+          RIDs actually span, independent of catalog size.
 
         Args:
             rids: Set or list of RIDs to resolve.
             candidate_tables: Optional list of Table objects to search in.
-                If not provided, searches all tables in domain and ML schemas.
+                If not provided, the server resolves each RID's table directly
+                (probe strategy above) — note this resolves catalog-wide, so a
+                RID in any schema is found, not only domain/ML schemas.
 
         Returns:
             dict[RID, BatchRidResult]: Mapping from each resolved RID to its
                 BatchRidResult containing table information.
 
         Raises:
-            DerivaMLException: If any RID cannot be resolved.
+            DerivaMLRidsNotFound: If any RID cannot be resolved; the unresolved
+                set is available as ``e.missing_rids``.
 
         Example:
             >>> results = ml.resolve_rids(["1-ABC", "2-DEF", "3-GHI"])  # doctest: +SKIP
@@ -178,32 +193,25 @@ class RidResolutionMixin:
 
         results: dict[RID, BatchRidResult] = {}
         remaining_rids = set(rids)
-
-        # Determine which tables to search
-        if candidate_tables is None:
-            # Search all tables in domain and ML schemas
-            candidate_tables = []
-            for schema_name in [*self.model.domain_schemas, self.model.ml_schema]:
-                schema = self.model.model.schemas.get(schema_name)
-                if schema:
-                    candidate_tables.extend(schema.tables.values())
-
+        # RIDs the probe strategy proves don't exist anywhere in the catalog.
+        # Tracked separately because they're removed from ``remaining_rids`` to
+        # keep the probe loop progressing, but must still surface in the final
+        # DerivaMLRidsNotFound.
+        missing_rids: set[RID] = set()
         pb = self.pathBuilder()
 
-        # Query each candidate table for matching RIDs
-        for table in candidate_tables:
-            if not remaining_rids:
-                break
+        def match_in_table(table: Table) -> None:
+            """Bulk-match ``remaining_rids`` against one table, recording hits.
 
+            The ``RID = Any(...)`` filter renders into the GET URL path, so a
+            single query over hundreds of RIDs overflows the server's request
+            URL limit. Chunk into URL-safe batches (``_MAX_RIDS_PER_QUERY``) and
+            union the matches; every matched RID is recorded and dropped from
+            ``remaining_rids``.
+            """
             schema_name = table.schema.name
             table_name = table.name
             table_path = pb.schemas[schema_name].tables[table_name]
-
-            # The ``RID = Any(...)`` filter renders into the GET URL path, so a
-            # single query over hundreds of RIDs overflows the server's request
-            # URL limit and fails. Chunk the remaining RIDs into URL-safe
-            # batches (``_MAX_RIDS_PER_QUERY``) and union the matches. Snapshot
-            # the RID list first because ``remaining_rids`` is mutated below.
             for rid_chunk in batched(list(remaining_rids), _MAX_RIDS_PER_QUERY):
                 # Filter: RID = any(rid1, rid2, ...) — ERMrest's IN clause.
                 # Query only the RID column to minimize data transfer.
@@ -214,18 +222,16 @@ class RidResolutionMixin:
                         .fetch()
                     )
                 except Exception as e:
-                    # Resilience across heterogeneous candidate tables: a query
-                    # that errors on one table shouldn't abort the whole scan —
-                    # the RIDs simply stay in ``remaining_rids`` and surface as a
-                    # legitimate DerivaMLRidsNotFound if no table matched them.
-                    # This is narrow now: the oversized-URL failure that used to
-                    # land here (and get masked into a spurious not-found) is
-                    # prevented by the chunking above, so an error reaching this
-                    # point is a genuine per-table condition, logged loudly.
+                    # Resilience: a query that errors on one candidate table
+                    # shouldn't abort the whole resolution — the RIDs stay in
+                    # ``remaining_rids`` and surface as a legitimate
+                    # DerivaMLRidsNotFound if nothing matches them. Narrow now:
+                    # the oversized-URL failure that used to land here (and get
+                    # masked into a spurious not-found) is prevented by the
+                    # chunking above, so an error here is a genuine per-table
+                    # condition, logged loudly.
                     logger.warning(f"RID resolution query failed for {schema_name}.{table_name}: {e}")
                     continue
-
-                # Process found RIDs
                 for entity in found_entities:
                     rid = entity["RID"]
                     if rid in remaining_rids:
@@ -237,13 +243,56 @@ class RidResolutionMixin:
                         )
                         remaining_rids.remove(rid)
 
-        # Check if any RIDs were not found. Raise the typed
-        # ``DerivaMLRidsNotFound`` so callers can pull the unresolved
-        # set off ``e.missing_rids`` without string-parsing the
-        # message — see ``DerivaML.validate_rids``, which previously
-        # had to grep the message for ``"Invalid RIDs:"`` because
-        # this raise site emitted a bare ``DerivaMLException``.
-        if remaining_rids:
-            raise DerivaMLRidsNotFound(remaining_rids)
+        if candidate_tables is not None:
+            # Caller already narrowed the search (e.g. dataset element types).
+            # Scan exactly those tables, bulk-matching in each.
+            for table in candidate_tables:
+                if not remaining_rids:
+                    break
+                match_in_table(table)
+        else:
+            # No candidate tables given. Rather than scan EVERY table in the
+            # domain + ML schemas (firing a zero-row query at each table that
+            # holds none of the RIDs), ask the server which table a sample RID
+            # lives in — ``resolve_rid`` hits ``/entity_rid`` and resolves
+            # catalog-wide in one cheap call — then bulk-match the rest there,
+            # and repeat. Cost is ~one probe per distinct table the RIDs span
+            # plus the chunk queries, independent of catalog size.
+            while remaining_rids:
+                probe_rid = next(iter(remaining_rids))
+                try:
+                    probe_table = self.resolve_rid(probe_rid).table
+                except DerivaMLException:
+                    # The probe RID doesn't exist anywhere in the catalog. Move
+                    # it to ``missing_rids`` (out of the working set so the loop
+                    # progresses) — it surfaces in the final
+                    # DerivaMLRidsNotFound. Don't abort: other RIDs may be valid
+                    # and in other tables.
+                    remaining_rids.discard(probe_rid)
+                    missing_rids.add(probe_rid)
+                    continue
+                before = len(remaining_rids)
+                match_in_table(probe_table)
+                # ``match_in_table`` removed every RID it found in
+                # ``probe_table``; ``probe_rid`` itself is guaranteed gone (the
+                # server placed it there), so progress is guaranteed and the
+                # loop terminates.
+                if len(remaining_rids) == before:  # pragma: no cover - defensive
+                    # Server resolved probe_rid to a table that the bulk match
+                    # didn't return it from (should not happen). Treat it as
+                    # unresolved to guarantee termination.
+                    remaining_rids.discard(probe_rid)
+                    missing_rids.add(probe_rid)
+
+        # Check if any RIDs were not found. ``remaining_rids`` holds anything no
+        # candidate table matched; ``missing_rids`` holds probes the server said
+        # don't exist. Raise the typed ``DerivaMLRidsNotFound`` so callers can
+        # pull the unresolved set off ``e.missing_rids`` without string-parsing
+        # the message — see ``DerivaML.validate_rids``, which previously had to
+        # grep the message for ``"Invalid RIDs:"`` because this raise site
+        # emitted a bare ``DerivaMLException``.
+        unresolved = remaining_rids | missing_rids
+        if unresolved:
+            raise DerivaMLRidsNotFound(unresolved)
 
         return results

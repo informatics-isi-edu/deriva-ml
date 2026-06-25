@@ -115,6 +115,96 @@ class TestRidResolution:
         assert result.rid == dataset_rid
         assert result.table.name == "Dataset"
 
+    def test_resolve_rids_default_candidates_probes_not_scans(self, test_ml):
+        """With candidate_tables=None, resolve_rids discovers each RID's table
+        via the server (resolve_rid / /entity_rid) instead of scanning every
+        table in the catalog.
+
+        Pre-optimization, the default path looped over ALL tables in the domain
+        and ML schemas, firing a RID=any() query at each until the RIDs were
+        found — wasting a query per table that holds none of them. The probe
+        approach asks the server which table a sample RID lives in, then
+        bulk-matches the rest there, and repeats; so resolving RIDs that all
+        live in ONE table costs ~1 probe + the chunk queries, regardless of how
+        many tables the catalog has.
+
+        We count server round-trips (catalog.get) and require the resolve to
+        cost far fewer than the number of candidate tables it would otherwise
+        scan. RIDs come from freshly-inserted catalog rows, never literals.
+        """
+        ml_instance = test_ml
+
+        # How many tables the legacy scan would have walked.
+        n_tables = sum(
+            len(ml_instance.model.model.schemas[s].tables)
+            for s in [*ml_instance.model.domain_schemas, ml_instance.model.ml_schema]
+            if s in ml_instance.model.model.schemas
+        )
+        assert n_tables >= 5, "need a catalog with several tables to show scan avoidance"
+
+        pb = ml_instance.pathBuilder()
+        file_path = pb.schemas[ml_instance.ml_schema].tables["File"]
+        rows = [
+            {"URL": f"tag://probe,2026-06-24:file:///p/f{i}.txt", "MD5": f"{i:032x}", "Length": 1}
+            for i in range(50)
+        ]
+        rids = [r["RID"] for r in file_path.insert(rows)]
+
+        # Count server round-trips during the resolve.
+        get_calls = {"n": 0}
+        real_get = ml_instance.catalog.get
+
+        def counting_get(*args, **kwargs):
+            get_calls["n"] += 1
+            return real_get(*args, **kwargs)
+
+        ml_instance.catalog.get = counting_get
+        try:
+            results = ml_instance.resolve_rids(rids)  # candidate_tables=None → probe path
+        finally:
+            ml_instance.catalog.get = real_get
+
+        assert len(results) == len(rids)
+        assert all(r.table_name == "File" for r in results.values())
+        # All 50 RIDs are in ONE table (File), which sorts late in the scan
+        # order. The legacy scan fired a zero-row RID=any() query at every
+        # earlier table first (~22 requests on a stock catalog). The probe
+        # path costs ~1 server resolve + 1 chunk query = a small constant,
+        # independent of catalog size. Require that small constant — a bound
+        # the table-scan cannot meet.
+        assert get_calls["n"] <= 4, (
+            f"resolve_rids made {get_calls['n']} requests for 50 RIDs in a single table; "
+            f"the probe path should need ~2 (one /entity_rid resolve + one chunk query), "
+            f"not a per-table scan of up to {n_tables} tables."
+        )
+
+    def test_resolve_rids_probe_path_mixes_valid_and_invalid(self, test_ml):
+        """The probe (candidate_tables=None) path resolves valid RIDs and routes
+        an invalid one into the not-found set rather than aborting.
+
+        The probe loop samples a RID and resolves its table via the server. If
+        that sample happens to be the invalid RID, the server lookup fails — the
+        code must drop it into ``missing_rids`` and keep going so the valid RIDs
+        still resolve. This guards the regression introduced by the probe
+        rewrite (an unhandled invalid probe could either crash or, worse,
+        silently return without raising).
+        """
+        from deriva_ml.core.exceptions import DerivaMLRidsNotFound
+
+        ml_instance = test_ml
+        pb = ml_instance.pathBuilder()
+        file_path = pb.schemas[ml_instance.ml_schema].tables["File"]
+        rows = [
+            {"URL": f"tag://mix,2026-06-24:file:///m/f{i}.txt", "MD5": f"{i:032x}", "Length": 1}
+            for i in range(3)
+        ]
+        valid_rids = [r["RID"] for r in file_path.insert(rows)]
+
+        with pytest.raises(DerivaMLRidsNotFound) as exc_info:
+            ml_instance.resolve_rids(valid_rids + ["INVALID-RID-999"])
+        # Only the invalid RID is reported missing; the valid ones resolved.
+        assert exc_info.value.missing_rids == {"INVALID-RID-999"}
+
     def test_resolve_rids_large_batch_chunks_under_url_limit(self, test_ml):
         """resolve_rids resolves a large RID set by chunking its queries.
 
