@@ -879,6 +879,22 @@ def generate_annotation(model: Model, schema: str) -> dict:
         ],
         "markdown_name": "Current Version Produced By",
     }
+    # Inline column that surfaces the source folder for directory datasets.
+    # The inbound FK walks from Dataset to Directory_Dataset (the satellite
+    # table added in the files work) and reads the Path column.
+    # ``show_null: False`` suppresses the field entirely for non-directory
+    # datasets (whose Path is null) — Chaise has no per-row column
+    # visibility, so null-suppression is the idiomatic way to get
+    # "show only when this dataset is a directory dataset".
+    folder_source = {
+        "source": [
+            {"inbound": [schema, "Directory_Dataset_Dataset_fkey"]},
+            "Path",
+        ],
+        "aggregate": "array_d",
+        "markdown_name": "Folder",
+        "display": {"show_null": False},
+    }
     dataset_annotation = {
         deriva_tags.table_display: {
             "*": {"row_order": [{"column": "RCT", "descending": True}]},
@@ -898,6 +914,7 @@ def generate_annotation(model: Model, schema: str) -> dict:
                 dataset_types_source,
                 dataset_version_source,
                 dataset_producer_source,
+                folder_source,
                 "Deleted",
                 [schema, "Dataset_RCB_fkey"],
                 [schema, "Dataset_RMB_fkey"],

@@ -168,6 +168,53 @@ class Dataset:
         """
         return self._description
 
+    @property
+    def source_directory(self) -> str | None:
+        """Source folder this directory dataset represents, relative to the
+        ingest root.
+
+        Returns the path stored in ``Directory_Dataset`` for this dataset (the
+        ingest root stores ``"."``), or ``None`` if the dataset has no
+        ``Directory_Dataset`` row — i.e. it was not created from a directory
+        tree by :meth:`add_files`.
+
+        Returns:
+            str | None: The relative source folder this directory dataset
+            represents, relative to the ingest root, or None.
+
+        Example:
+            >>> root = exe.add_files(specs, description="ingest")  # doctest: +SKIP
+            >>> root.source_directory  # doctest: +SKIP
+            '.'
+            >>> [c.source_directory for c in root.list_dataset_children()]  # doctest: +SKIP
+            ['d1', 'd2']
+        """
+        pb = self._ml_instance.pathBuilder()
+        dd = pb.schemas[self._ml_instance.ml_schema].tables["Directory_Dataset"]
+        rows = list(dd.filter(dd.Dataset == self.dataset_rid).attributes(dd.Path).fetch())
+        return rows[0]["Path"] if rows else None
+
+    @property
+    def is_directory(self) -> bool:
+        """Whether this dataset represents a source directory.
+
+        ``True`` iff the dataset has a ``Directory_Dataset`` row (equivalently,
+        :attr:`source_directory` is not ``None``) — i.e. it was created by
+        :meth:`add_files` to mirror a folder. This is the authoritative
+        predicate; it deliberately does NOT consult the ``Directory``
+        ``Dataset_Type`` tag, which can diverge from the path row for
+        pre-feature or hand-tagged datasets.
+
+        Returns:
+            bool: True if this is a directory dataset.
+
+        Example:
+            >>> root = exe.add_files(specs, description="ingest")  # doctest: +SKIP
+            >>> root.is_directory  # doctest: +SKIP
+            True
+        """
+        return self.source_directory is not None
+
     @description.setter
     def description(self, value: str) -> None:
         """Update the dataset description in the catalog and in memory.

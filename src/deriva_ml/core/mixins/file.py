@@ -8,6 +8,7 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+import os
 from collections import defaultdict
 from itertools import batched, chain
 from pathlib import Path
@@ -19,7 +20,7 @@ datapath = importlib.import_module("deriva.core.datapath")
 from deriva.core.ermrest_model import timestamptz_to_snaptime
 
 from deriva_ml.core.definitions import RID, FileSpec, MLTable, MLVocab, VocabularyTerm
-from deriva_ml.core.exceptions import DerivaMLInvalidTerm, DerivaMLTableTypeError
+from deriva_ml.core.exceptions import DerivaMLException, DerivaMLInvalidTerm, DerivaMLTableTypeError
 from deriva_ml.dataset.aux_classes import DatasetVersion
 
 if TYPE_CHECKING:
@@ -96,7 +97,9 @@ class FileMixin:
                 May be any iterable, including a generator; it is consumed once.
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
-            description: Description of the files.
+            description: Description of the files. Recorded verbatim on every
+                directory dataset; the source folder each dataset represents is
+                stored structurally in the ``Directory_Dataset`` table.
             chunk_size: Number of File rows inserted per batch. Larger values
                 mean fewer, bigger requests; smaller values bound per-request
                 size and memory. A value at least as large as the input is a
@@ -189,28 +192,75 @@ class FileMixin:
             for e in file_records:
                 dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
 
-        # Now create datasets to capture the original directory structure of the files.
-        nested_datasets = []
-        path_length = 0
-        dataset = None
-        # Start with the longest path so we get subdirectories first.
-        for p, rids in sorted(dir_rid_map.items(), key=lambda kv: len(kv[0].parts), reverse=True):
-            dataset = Dataset.create_dataset(
+        # Now create datasets that mirror the original directory structure, as a
+        # single nested tree rooted at the ingest root. The tree is built from
+        # real path CONTAINMENT (a directory nests into its nearest ancestor
+        # directory), NOT from raw path depth — so sibling branches whose common
+        # ancestor holds no files of its own still converge on one root instead
+        # of being orphaned.
+        #
+        # ``os.path.commonpath`` gives the ingest root (the common ancestor of
+        # every file-bearing directory). For a single directory it is that
+        # directory itself.
+        if not dir_rid_map:
+            raise DerivaMLException("add_files received no files to add.")
+        ingest_root = Path(os.path.commonpath([str(d) for d in dir_rid_map]))
+
+        # The tree's nodes are every file-bearing directory PLUS every
+        # intermediate ancestor up to the ingest root — the intermediates need a
+        # dataset to hold their child-directory datasets even when they contain
+        # no files directly (e.g. ``root/`` over ``root/a/x`` + ``root/b/y``).
+        nodes: set[Path] = set()
+        for directory in dir_rid_map:
+            node = directory
+            nodes.add(node)
+            while node != ingest_root:
+                node = node.parent
+                nodes.add(node)
+
+        # The ingest root keeps the bare caller description; every node dataset
+        # uses the same description. The folder each node represents is recorded
+        # structurally in Directory_Dataset (below), not in the prose Description.
+        node_dataset: dict[Path, "Dataset"] = {
+            directory: Dataset.create_dataset(
                 self,  # type: ignore[arg-type]
                 dataset_types=dataset_types,
                 execution_rid=execution_rid,
                 description=description,
             )
-            members = rids
-            if len(p.parts) < path_length:
-                # Going up one level in directory, so Create nested dataset
-                members = [m.dataset_rid for m in nested_datasets] + rids
-                nested_datasets = []
-            dataset.add_dataset_members(members=members, execution_rid=execution_rid)
-            nested_datasets.append(dataset)
-            path_length = len(p.parts)
+            for directory in nodes
+        }
 
-        return dataset
+        # Record each directory dataset's source folder as a path relative to the
+        # ingest root (the root stores "."). Structured + queryable; consumers
+        # never parse the Description.
+        pb.schemas[self.ml_schema].tables["Directory_Dataset"].insert(
+            [
+                {
+                    "Dataset": ds.dataset_rid,
+                    "Path": "." if directory == ingest_root else directory.relative_to(ingest_root).as_posix(),
+                }
+                for directory, ds in node_dataset.items()
+            ]
+        )
+
+        # Wire membership: each node's dataset gets its own files plus its
+        # immediate child-directory datasets (the nodes whose parent is this
+        # node). Walk deepest-first so children exist before their parent adds
+        # them — though, since all datasets are pre-created above, ordering only
+        # affects readability here.
+        for directory in sorted(nodes, key=lambda d: len(d.parts), reverse=True):
+            members = list(dir_rid_map.get(directory, []))
+            members += [
+                child_ds.dataset_rid
+                for child_dir, child_ds in node_dataset.items()
+                if child_dir != directory and child_dir.parent == directory
+            ]
+            if members:
+                node_dataset[directory].add_dataset_members(members=members, execution_rid=execution_rid)
+
+        # The ingest root's dataset transitively contains every file.
+        return node_dataset[ingest_root]
 
     def _bootstrap_versions(self) -> None:
         """Initialize dataset versions for datasets that don't have versions."""

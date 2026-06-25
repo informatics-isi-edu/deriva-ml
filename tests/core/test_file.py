@@ -142,6 +142,79 @@ class TestFile:
         for subdir in file_dataset.list_dataset_children():
             assert "Directory" in subdir.dataset_types
 
+    def test_add_files_directory_datasets_record_path(self, file_table_setup):
+        """Each directory dataset gets a Directory_Dataset row with its path
+        relative to the ingest root; the ingest root stores '.'. Description is
+        the bare caller string for every node (no path suffix)."""
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            file_dataset = exe.add_files(filespecs, description="Ingest run")
+
+        # Description is the bare caller string everywhere now.
+        assert file_dataset.description == "Ingest run"
+        for child in file_dataset.list_dataset_children():
+            assert child.description == "Ingest run"
+
+        # Directory_Dataset.Path holds the relative folder for each dataset.
+        pb = ml_instance.pathBuilder()
+        rows = list(pb.schemas[ml_instance.ml_schema].tables["Directory_Dataset"].entities().fetch())
+        path_by_dataset = {r["Dataset"]: r["Path"] for r in rows}
+
+        assert path_by_dataset[file_dataset.dataset_rid] == "."
+        child_paths = {path_by_dataset[c.dataset_rid] for c in file_dataset.list_dataset_children()}
+        assert child_paths == {"d1", "d2"}
+
+    def test_add_files_returns_single_root_for_forest(self, file_table_setup):
+        """add_files always returns ONE dataset that transitively contains every
+        file, even when the source dirs form a forest (sibling branches whose
+        common ancestor holds no files of its own).
+
+        Tree: ``base/a/x/f.txt`` and ``base/b/y/g.txt`` — two leaf dirs at the
+        same depth, common ancestor ``base`` (and ``base/a``, ``base/b``) holding
+        no files. The old loop nested purely on decreasing path-depth, so the two
+        same-depth leaves never nested into a shared parent: it returned one leaf
+        and orphaned the other. The fix builds nesting from real path containment
+        and synthesizes the intermediate directory datasets, so the returned root
+        reaches all files with no orphaned directory datasets.
+        """
+        ml_instance = file_table_setup.ml_instance
+        execution = file_table_setup.execution
+
+        base = file_table_setup.tmp_dir / "forest"
+        (base / "a" / "x").mkdir(parents=True, exist_ok=True)
+        (base / "b" / "y").mkdir(parents=True, exist_ok=True)
+        (base / "a" / "x" / "f.txt").write_text("f")
+        (base / "b" / "y" / "g.txt").write_text("g")
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(base, "Forest ingest")
+            root = exe.add_files(filespecs, description="Forest")
+
+        # Collect every File RID reachable from the returned root, walking the
+        # full nested-dataset subtree.
+        def all_file_rids(ds):
+            rids = {m["RID"] for m in ds.list_dataset_members().get("File", [])}
+            for child in ds.list_dataset_children(recurse=True):
+                rids |= {m["RID"] for m in child.list_dataset_members().get("File", [])}
+            return rids
+
+        reachable_files = all_file_rids(root)
+        # Both files (one per branch) must be reachable from the single returned root.
+        assert len(reachable_files) == 2, (
+            f"returned root reaches {len(reachable_files)} files; both branches' files "
+            f"must be transitively contained — no orphaned directory datasets"
+        )
+
+        # And no Directory dataset created this run is unreachable from the root.
+        reachable_ds = {root.dataset_rid} | {c.dataset_rid for c in root.list_dataset_children(recurse=True)}
+        directory_ds = [d.dataset_rid for d in ml_instance.find_datasets() if "Directory" in d.dataset_types]
+        orphans = [rid for rid in directory_ds if rid not in reachable_ds]
+        assert not orphans, f"orphaned directory datasets not reachable from root: {orphans}"
+
     def test_add_files_chunked_streaming_matches_single_batch(self, file_table_setup):
         """add_files streams a generator in chunks of ``chunk_size`` and the
         result is identical to a single-batch insert.
@@ -181,6 +254,29 @@ class TestFile:
             sub_members = subdir.list_dataset_members()
             assert len(sub_members["File"]) == 5
             assert "Directory" in subdir.dataset_types
+
+    def test_dataset_source_directory_and_is_directory_accessor(self, file_table_setup):
+        """Dataset.source_directory returns the directory dataset's relative folder and
+        is_directory is True for those datasets; both reflect the
+        Directory_Dataset row."""
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            root = exe.add_files(filespecs, description="Ingest run")
+            # A non-directory dataset (created directly, not via add_files) has no
+            # Directory_Dataset row: source_directory is None and is_directory is False.
+            plain = exe.create_dataset(dataset_types="Complete", description="not a dir")
+
+        assert root.source_directory == "."
+        assert root.is_directory is True
+        child_paths = {child.source_directory for child in root.list_dataset_children()}
+        assert child_paths == {"d1", "d2"}
+        assert all(child.is_directory for child in root.list_dataset_children())
+
+        assert plain.source_directory is None
+        assert plain.is_directory is False
 
     def test_add_files_links_as_input(self, file_table_setup):
         """add_files registers an external File reference and links it as an
@@ -272,6 +368,16 @@ class TestFile:
         assert len(file_dataset.list_dataset_members()["File"]) == FILE_COUNT
         for subdir in file_dataset.list_dataset_children():
             assert len(subdir.list_dataset_members()["File"]) == FILE_COUNT
+
+    def test_add_files_empty_raises_clear_error(self, file_table_setup):
+        """add_files with no files raises a clear DerivaMLException, not an
+        obscure ValueError from os.path.commonpath([])."""
+        from deriva_ml.core.exceptions import DerivaMLException
+
+        execution = file_table_setup.execution
+        with execution.execute() as exe:
+            with pytest.raises(DerivaMLException):
+                exe.add_files([], description="empty")
 
     def test_file_spec_read_write(self, tmp_path):
         """Test reading and writing FileSpecs to JSONL."""

@@ -224,6 +224,64 @@ class DatasetBag:
         """
         return self.model.bag_path
 
+    @property
+    def source_directory(self) -> str | None:
+        """Source folder this directory dataset represents, relative to the
+        ingest root.
+
+        Returns the path stored in ``Directory_Dataset`` for this dataset (the
+        ingest root stores ``"."``), or ``None`` if the dataset has no
+        ``Directory_Dataset`` row — i.e. it was not created from a directory
+        tree by :meth:`~deriva_ml.execution.execution.Execution.add_files`.
+
+        The bag is offline — this reads the bag's local SQLite mirror of the
+        ``Directory_Dataset`` table; no catalog connection is used.
+
+        Returns:
+            str | None: The relative source folder this directory dataset
+            represents, relative to the ingest root, or None.
+
+        Example:
+            >>> root_bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            >>> root_bag.source_directory  # doctest: +SKIP
+            '.'
+            >>> [c.source_directory for c in root_bag.list_dataset_children()]  # doctest: +SKIP
+            ['d1', 'd2']
+        """
+        try:
+            rows = [
+                r for r in self.model.get_table_contents("Directory_Dataset")
+                if r["Dataset"] == self.dataset_rid
+            ]
+        except KeyError:
+            # Directory_Dataset table absent from this bag (e.g. a pre-feature bag)
+            return None
+        return rows[0]["Path"] if rows else None
+
+    @property
+    def is_directory(self) -> bool:
+        """Whether this dataset represents a source directory.
+
+        ``True`` iff the dataset has a ``Directory_Dataset`` row (equivalently,
+        :attr:`source_directory` is not ``None``) — i.e. it was created by
+        :meth:`~deriva_ml.execution.execution.Execution.add_files` to mirror a
+        folder. This is the authoritative predicate; it deliberately does NOT
+        consult the ``Directory`` ``Dataset_Type`` tag, which can diverge from
+        the path row for pre-feature or hand-tagged datasets.
+
+        The bag is offline — this reads the bag's local SQLite mirror; no
+        catalog connection is used.
+
+        Returns:
+            bool: True if this is a directory dataset.
+
+        Example:
+            >>> root_bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
+            >>> root_bag.is_directory  # doctest: +SKIP
+            True
+        """
+        return self.source_directory is not None
+
     def materialize(self, *, fetch_concurrency: int = 8) -> Self:
         """Fetch any not-yet-downloaded files for this bag, in place.
 

@@ -127,6 +127,17 @@ class DatasetLike(Protocol):
         """Get the current version of the dataset."""
         ...
 
+    @property
+    def source_directory(self) -> str | None:
+        """Source folder this directory dataset represents, relative to the
+        ingest root, or ``None`` if not a directory dataset."""
+        ...
+
+    @property
+    def is_directory(self) -> bool:
+        """Whether this dataset was created from a directory tree by add_files."""
+        ...
+
     def dataset_history(self) -> list[DatasetHistory]:
         """Get the version history of the dataset."""
         ...

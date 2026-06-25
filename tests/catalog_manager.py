@@ -142,6 +142,7 @@ class CatalogManager:
         # Clear ML schema tables in dependency order
         ml_tables = [
             "Dataset_Execution",
+            "Directory_Dataset",  # Clear before Dataset: non-cascading FK blocks Dataset deletion.
             "Dataset_Version",
             "Dataset_Dataset",
             "Dataset",

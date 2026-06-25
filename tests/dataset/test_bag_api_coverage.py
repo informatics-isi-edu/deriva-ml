@@ -15,13 +15,17 @@ Fills gaps identified in coverage analysis:
 from __future__ import annotations
 
 import shutil
+import string
 from pathlib import Path
+from random import choices
 
 import pandas as pd
 import pytest
 
+from deriva_ml import FileSpec, MLVocab
 from deriva_ml.dataset.aux_classes import DatasetVersion
 from deriva_ml.dataset.bag_cache import BagCache, CacheStatus
+from deriva_ml.execution import ExecutionConfiguration
 from tests.catalog_manager import CatalogManager
 
 
@@ -449,3 +453,90 @@ class TestBagMaterializeInPlace:
         result = bag.materialize()
         assert result is bag
         assert BagCache._is_fully_materialized(bag.path)
+
+
+class TestDirectoryDatasetSourceDirectory:
+    """Tests for DatasetBag.source_directory / .is_directory on directory datasets.
+
+    Verifies that ``Directory_Dataset`` rows written by ``add_files`` export
+    into the BDBag and are readable offline via ``DatasetBag.source_directory``
+    and ``DatasetBag.is_directory``.
+    """
+
+    def _make_test_tree(self, base: Path) -> Path:
+        """Create a two-level directory tree with files in each directory.
+
+        Returns the root directory ``base/test_dir`` containing ``d1/`` and
+        ``d2/`` subdirectories, each with a small text file.
+        """
+        test_dir = base / "test_dir"
+        d1 = test_dir / "d1"
+        d2 = test_dir / "d2"
+        d1.mkdir(parents=True, exist_ok=True)
+        d2.mkdir(parents=True, exist_ok=True)
+
+        def rand_str(n=8) -> str:
+            return "".join(choices(string.ascii_lowercase, k=n))
+
+        for d in [test_dir, d1, d2]:
+            (d / f"{rand_str()}.txt").write_text(rand_str(20))
+        return test_dir
+
+    def test_dataset_bag_source_directory_and_is_directory(
+        self, catalog_manager: CatalogManager, tmp_path: Path
+    ):
+        """DatasetBag.source_directory / .is_directory work offline from the materialized bag.
+
+        Builds a directory dataset via add_files, downloads and materializes it
+        as a bag, and asserts:
+        - root bag has source_directory == "." and is_directory is True
+        - child bags have source_directory values {"d1", "d2"} and is_directory is True
+        - a non-directory dataset has source_directory is None and is_directory is False
+
+        If this test fails because ``Directory_Dataset`` is absent from the bag
+        (KeyError / empty rows rather than AttributeError), that signals Task 4
+        (bag-export traversal) is needed before this test can pass.
+        """
+        catalog_manager.reset()
+        ml = catalog_manager.get_ml_instance(tmp_path / "work")
+
+        # Ensure the workflow type and asset type terms exist.
+        ml.add_term(MLVocab.workflow_type, "Dir Bag Test Workflow", description="For directory bag test")
+        ml.add_term(MLVocab.asset_type, "txt", description="Text file")
+
+        test_dir = self._make_test_tree(tmp_path)
+
+        workflow = ml.create_workflow(name="Dir Bag Test", workflow_type="Dir Bag Test Workflow")
+        execution = ml.create_execution(
+            ExecutionConfiguration(workflow=workflow, description="Dir bag test run")
+        )
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Dir Bag Ingest")
+            root_dataset = exe.add_files(filespecs, description="Dir Bag Ingest")
+
+        # Live assertions — sanity-check before downloading the bag.
+        assert root_dataset.source_directory == ".", "live: root Dataset.source_directory must be '.'"
+        assert root_dataset.is_directory is True, "live: root Dataset.is_directory must be True"
+
+        # Download the root directory dataset as a bag (metadata only; the File
+        # records reference tag:// URIs that are not in Hatrac, so full
+        # materialization is not needed to test the source_directory accessor).
+        bag = root_dataset.download_dataset_bag(
+            version=root_dataset.current_version, use_minid=False, materialize=False
+        )
+
+        # Offline assertions on the root bag.
+        assert bag.source_directory == ".", (
+            f"bag root .source_directory should be '.', got {bag.source_directory!r}"
+        )
+        assert bag.is_directory is True, "bag root .is_directory should be True"
+
+        # Child bags must report the relative subfolder names.
+        child_dirs = {child.source_directory for child in bag.list_dataset_children()}
+        assert child_dirs == {"d1", "d2"}, (
+            f"bag child source_directory values should be {{'d1','d2'}}, got {child_dirs!r}"
+        )
+        assert all(child.is_directory for child in bag.list_dataset_children()), (
+            "all child bags must have is_directory == True"
+        )
