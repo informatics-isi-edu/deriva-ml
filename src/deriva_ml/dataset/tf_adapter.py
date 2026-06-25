@@ -221,4 +221,4 @@ def _resolve_asset_path(bag: "DatasetBag", element_type: str, rid: str, row: dic
     layout reference in the restructure path.
     """
     filename = row.get("Filename") or f"{rid}.bin"
-    return bag.path / "data" / "asset" / rid / element_type / filename
+    return bag.bag_path / "data" / "asset" / rid / element_type / filename

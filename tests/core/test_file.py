@@ -255,6 +255,29 @@ class TestFile:
             assert len(sub_members["File"]) == 5
             assert "Directory" in subdir.dataset_types
 
+    def test_dataset_path_and_is_directory_accessor(self, file_table_setup):
+        """Dataset.path returns the directory dataset's relative folder and
+        is_directory is True for those datasets; both reflect the
+        Directory_Dataset row."""
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            root = exe.add_files(filespecs, description="Ingest run")
+            # A non-directory dataset (created directly, not via add_files) has no
+            # Directory_Dataset row: path is None and is_directory is False.
+            plain = exe.create_dataset(dataset_types="Complete", description="not a dir")
+
+        assert root.path == "."
+        assert root.is_directory is True
+        child_paths = {child.path for child in root.list_dataset_children()}
+        assert child_paths == {"d1", "d2"}
+        assert all(child.is_directory for child in root.list_dataset_children())
+
+        assert plain.path is None
+        assert plain.is_directory is False
+
     def test_add_files_links_as_input(self, file_table_setup):
         """add_files registers an external File reference and links it as an
         INPUT — intrinsically, with no role parameter.

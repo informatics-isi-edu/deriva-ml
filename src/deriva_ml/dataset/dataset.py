@@ -168,6 +168,51 @@ class Dataset:
         """
         return self._description
 
+    @property
+    def path(self) -> str | None:
+        """Source folder this directory dataset represents, relative to the
+        ingest root.
+
+        Returns the path stored in ``Directory_Dataset`` for this dataset (the
+        ingest root stores ``"."``), or ``None`` if the dataset has no
+        ``Directory_Dataset`` row — i.e. it was not created from a directory
+        tree by :meth:`add_files`.
+
+        Returns:
+            str | None: The relative source folder, or None.
+
+        Example:
+            >>> root = exe.add_files(specs, description="ingest")  # doctest: +SKIP
+            >>> root.path  # doctest: +SKIP
+            '.'
+            >>> [c.path for c in root.list_dataset_children()]  # doctest: +SKIP
+            ['d1', 'd2']
+        """
+        pb = self._ml_instance.pathBuilder()
+        dd = pb.schemas[self._ml_instance.ml_schema].tables["Directory_Dataset"]
+        rows = list(dd.filter(dd.Dataset == self.dataset_rid).attributes(dd.Path).fetch())
+        return rows[0]["Path"] if rows else None
+
+    @property
+    def is_directory(self) -> bool:
+        """Whether this dataset represents a source directory.
+
+        ``True`` iff the dataset has a ``Directory_Dataset`` row (equivalently,
+        :attr:`path` is not ``None``) — i.e. it was created by :meth:`add_files`
+        to mirror a folder. This is the authoritative predicate; it deliberately
+        does NOT consult the ``Directory`` ``Dataset_Type`` tag, which can
+        diverge from the path row for pre-feature or hand-tagged datasets.
+
+        Returns:
+            bool: True if this is a directory dataset.
+
+        Example:
+            >>> root = exe.add_files(specs, description="ingest")  # doctest: +SKIP
+            >>> root.is_directory  # doctest: +SKIP
+            True
+        """
+        return self.path is not None
+
     @description.setter
     def description(self, value: str) -> None:
         """Update the dataset description in the catalog and in memory.
@@ -2608,7 +2653,7 @@ class Dataset:
 
         Returns:
             DatasetBag: A ``DatasetBag`` instance wrapping the downloaded bag. Key attributes:
-                ``bag.path`` (``Path``) — local directory containing the bag;
+                ``bag.bag_path`` (``Path``) — local directory containing the bag;
                 ``bag.dataset_rid`` (str) — RID of the dataset;
                 ``bag.current_version`` (``DatasetVersion``) — version downloaded.
 
@@ -2621,7 +2666,7 @@ class Dataset:
         Examples:
             Download without MINID (default):
                 >>> bag = dataset.download_dataset_bag(version="1.0.0")  # doctest: +SKIP
-                >>> print(f"Downloaded to {bag.path}")  # doctest: +SKIP
+                >>> print(f"Downloaded to {bag.bag_path}")  # doctest: +SKIP
 
             Download with MINID (requires s3_bucket configured):
                 >>> # Catalog must be created with s3_bucket="s3://my-bucket"
