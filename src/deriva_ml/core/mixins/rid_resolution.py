@@ -40,15 +40,21 @@ __all__ = [
 # Maximum number of RIDs placed in a single ``RID = Any(...)`` filter.
 #
 # That filter renders into the GET URL *path* (deriva-py datapath builds
-# ``base_uri + str(path_expression)`` and issues ``catalog.get(path)``), so the
-# request line grows ~13 bytes per RID (a 12-char RID + comma + urlquoting).
-# The front Apache rejects a request line over its ``LimitRequestLine`` (~4 KB
-# measured on localhost: 994 three-char RIDs succeed, 995 fail) *before ERMrest
-# sees it*. A cap of 200 keeps the filter ~2.6 KB even with worst-case 12-char
-# RIDs, leaving headroom for the path prefix. Without this, resolving a few
-# hundred+ RIDs in one shot overflowed the URL and the failure was silently
-# turned into a spurious "RIDs not found".
-_MAX_RIDS_PER_QUERY = 200
+# ``base_uri + str(path_expression)`` and issues ``catalog.get(path)``), so over
+# enough RIDs the request line exceeds the server's URI length limit and the
+# query fails (a 10k-RID URL is ~70 KB → HTTP 414). Without chunking, resolving
+# a few hundred+ RIDs in one shot overflowed the URL and the failure was
+# silently turned into a spurious "RIDs not found".
+#
+# 500 matches deriva-py's ``RID_SET_CHUNK_SIZE`` (its URL-safe batch size for
+# the bulk ``get_as_file(rid_set=...)`` path) — proven in production against
+# www.eye-ai.org's long-form RIDs (20 chunks of 500 fetched cleanly, no 414).
+# Kept in lockstep deliberately: both place ``RID=any(...)`` chunks in a GET URL
+# and share the same limit. (A stricter localhost Apache caps ~4 KB ≈ 994
+# three-char RIDs; production allows more, which is why 500 long RIDs is safe
+# there. The test environment uses short RIDs, so 500 is well under even the
+# localhost limit.)
+_MAX_RIDS_PER_QUERY = 500
 
 
 @dataclass

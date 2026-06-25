@@ -126,15 +126,21 @@ class TestRidResolution:
         the rows exist. The fix chunks the query into URL-safe batches.
 
         We insert well over the short-RID URL boundary (~994 three-char RIDs
-        ~= 4 KB) so the single-query path is guaranteed to overflow, then
-        resolve them all and require every one to come back. RIDs come from
-        the freshly-inserted catalog rows, never literals.
+        ~= 4 KB on the localhost test server) so the pre-fix single-query path
+        is guaranteed to overflow, then resolve them all and require every one
+        to come back. The count is also > the chunk cap, so the fixed path is
+        forced to issue more than one query. RIDs come from the freshly-inserted
+        catalog rows, never literals.
         """
+        from deriva_ml.core.mixins.rid_resolution import _MAX_RIDS_PER_QUERY
+
         ml_instance = test_ml
         pb = ml_instance.pathBuilder()
         file_path = pb.schemas[ml_instance.ml_schema].tables["File"]
 
-        n = 1100  # comfortably past the ~994 short-RID single-query boundary
+        # Past BOTH the ~994 short-RID single-query overflow boundary (so the
+        # pre-fix path fails) AND the chunk cap (so the fix must split).
+        n = max(1100, _MAX_RIDS_PER_QUERY * 2 + 1)
         rows = [
             {"URL": f"tag://chunktest,2026-06-24:file:///c/f{i}.txt", "MD5": f"{i:032x}", "Length": 1}
             for i in range(n)
