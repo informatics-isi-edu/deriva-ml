@@ -9,7 +9,7 @@ from __future__ import annotations
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
 from collections import defaultdict
-from itertools import chain
+from itertools import batched, chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 from urllib.parse import urlsplit
@@ -67,6 +67,7 @@ class FileMixin:
         execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
+        chunk_size: int = 500,
     ) -> "Dataset":
         """Register external file *references* and link them as execution inputs.
 
@@ -82,11 +83,24 @@ class FileMixin:
         never here. (Provenance contract: asset role is derived from context;
         a ``File`` reference is an input by its nature.)
 
+        ``files`` is consumed lazily in batches of ``chunk_size`` — the inserts
+        are streamed, so a generator source (e.g.
+        ``FileSpec.create_filespecs`` over a large directory tree) never has to
+        be fully materialized in memory. Only the directory→RID map used to
+        build the directory-structure datasets is retained across the stream,
+        and it grows with the number of distinct directories, not the number
+        of files.
+
         Args:
             files: File specifications containing MD5 checksum, length, and URL.
+                May be any iterable, including a generator; it is consumed once.
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
+            chunk_size: Number of File rows inserted per batch. Larger values
+                mean fewer, bigger requests; smaller values bound per-request
+                size and memory. A value at least as large as the input is a
+                single batch (the historical behavior).
 
         Returns:
             Dataset: Dataset that represents the newly added files.
@@ -106,22 +120,6 @@ class FileMixin:
         if self.resolve_rid(execution_rid).table.name != "Execution":
             raise DerivaMLTableTypeError("Execution", execution_rid)
 
-        filespec_list = list(files)
-
-        # Get a list of all defined file types and their synonyms.
-        defined_types = set(
-            chain.from_iterable(
-                [[t.name] + list(t.synonyms or []) for t in self.list_vocabulary_terms(MLVocab.asset_type)]
-            )
-        )
-
-        # Get a list of all of the file types used in the filespec_list
-        spec_types = set(chain.from_iterable(filespec.file_types for filespec in filespec_list))
-
-        # Now make sure that all of the file types and dataset_types in the spec list are defined.
-        if spec_types - defined_types:
-            raise DerivaMLInvalidTerm(MLVocab.asset_type.name, f"{spec_types - defined_types}")
-
         # Normalize dataset_types. Two types are force-included on every dataset
         # this routine creates, in addition to any caller-supplied types:
         #   - "File": the datasets hold File-asset members.
@@ -134,41 +132,64 @@ class FileMixin:
         for ds_type in dataset_types:
             self.lookup_term(MLVocab.dataset_type, ds_type)
 
-        # Add files to the file table, and collect up the resulting entries by directory name.
-        pb = self.pathBuilder()
-        file_records = list(
-            pb.schemas[self.ml_schema].tables["File"].insert([f.model_dump(by_alias=True) for f in filespec_list])
+        # Resolve the vocab/association lookups ONCE — they do not vary per
+        # chunk. ``defined_types`` is the set of valid Asset_Type names (plus
+        # synonyms); ``atable`` is the File↔Asset_Type association table name.
+        defined_types = set(
+            chain.from_iterable(
+                [[t.name] + list(t.synonyms or []) for t in self.list_vocabulary_terms(MLVocab.asset_type)]
+            )
         )
-
-        # Get the name of the association table between file_table and file_type and add file_type records
         atable = self.model.find_association(MLTable.file, MLVocab.asset_type)[0].name
-        # Need to get a link between file record and file_types.
-        type_map = {
-            file_spec.md5: file_spec.file_types + ([] if "File" in file_spec.file_types else [])
-            for file_spec in filespec_list
-        }
-        file_type_records = [
-            {MLVocab.asset_type.value: file_type, "File": file_record["RID"]}
-            for file_record in file_records
-            for file_type in type_map[file_record["MD5"]]
-        ]
-        pb.schemas[self.ml_schema].tables[atable].insert(file_type_records)
 
-        # Link each file to the execution as an INPUT. A File-table row is a
-        # reference to externally-hosted bytes — naming a file the run
-        # consumed — so its role is intrinsically Input (never a parameter).
-        pb.schemas[self.ml_schema].File_Execution.insert(
-            [
-                {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Input"}
+        pb = self.pathBuilder()
+        file_path = pb.schemas[self.ml_schema].tables["File"]
+        atable_path = pb.schemas[self.ml_schema].tables[atable]
+        file_execution_path = pb.schemas[self.ml_schema].File_Execution
+
+        # Stream ``files`` in batches of ``chunk_size``. Each batch is validated,
+        # inserted, tagged, and linked to the execution before the next batch is
+        # pulled — so a generator source is never fully materialized. The only
+        # state retained across batches is ``dir_rid_map`` (directory → File
+        # RIDs), used afterward to build the directory-structure datasets; it
+        # grows with the number of distinct directories, not the number of files.
+        dir_rid_map = defaultdict(list)
+        for batch in batched(files, chunk_size):
+            # Validate this batch's file types against the defined vocabulary.
+            spec_types = set(chain.from_iterable(filespec.file_types for filespec in batch))
+            if spec_types - defined_types:
+                raise DerivaMLInvalidTerm(MLVocab.asset_type.name, f"{spec_types - defined_types}")
+
+            # Insert the File rows; the returned records carry the new RIDs.
+            file_records = list(file_path.insert([f.model_dump(by_alias=True) for f in batch]))
+
+            # Tag each File row with its Asset_Type terms (keyed by MD5).
+            type_map = {
+                filespec.md5: filespec.file_types + ([] if "File" in filespec.file_types else []) for filespec in batch
+            }
+            file_type_records = [
+                {MLVocab.asset_type.value: file_type, "File": file_record["RID"]}
                 for file_record in file_records
+                for file_type in type_map[file_record["MD5"]]
             ]
-        )
+            if file_type_records:
+                atable_path.insert(file_type_records)
+
+            # Link each file to the execution as an INPUT. A File-table row is a
+            # reference to externally-hosted bytes — naming a file the run
+            # consumed — so its role is intrinsically Input (never a parameter).
+            file_execution_path.insert(
+                [
+                    {"File": file_record["RID"], "Execution": execution_rid, "Asset_Role": "Input"}
+                    for file_record in file_records
+                ]
+            )
+
+            # Group this batch's RIDs by source directory for dataset building.
+            for e in file_records:
+                dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
 
         # Now create datasets to capture the original directory structure of the files.
-        dir_rid_map = defaultdict(list)
-        for e in file_records:
-            dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
-
         nested_datasets = []
         path_length = 0
         dataset = None

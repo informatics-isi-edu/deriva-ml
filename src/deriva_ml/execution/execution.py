@@ -2069,6 +2069,7 @@ class Execution:
         files: Iterable[FileSpec],
         dataset_types: str | list[str] | None = None,
         description: str = "",
+        chunk_size: int = 500,
     ) -> "Dataset":
         """Register external file *references* and link them as execution inputs.
 
@@ -2079,10 +2080,16 @@ class Execution:
         Input. Files the run *produced* are Hatrac-backed execution assets —
         use ``asset_file_path`` + ``commit_output_assets`` for those.
 
+        ``files`` is consumed lazily in batches of ``chunk_size`` — a generator
+        source (e.g. ``FileSpec.create_filespecs`` over a large directory tree)
+        is never fully materialized in memory.
+
         Args:
             files: File specifications containing MD5 checksum, length, and URL.
+                May be any iterable, including a generator; consumed once.
             dataset_types: One or more dataset type terms from File_Type vocabulary.
             description: Description of the files.
+            chunk_size: Number of File rows inserted per batch (default 500).
 
         Returns:
             RID: Dataset  that identifies newly added files. Will be nested to mirror original directory structure
@@ -2101,6 +2108,7 @@ class Execution:
             execution_rid=self.execution_rid,
             dataset_types=dataset_types,
             description=description,
+            chunk_size=chunk_size,
         )
 
     # =========================================================================
