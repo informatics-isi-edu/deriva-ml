@@ -166,6 +166,53 @@ class TestFile:
         child_descriptions = {child.description for child in file_dataset.list_dataset_children()}
         assert child_descriptions == {"Ingest run — d1", "Ingest run — d2"}
 
+    def test_add_files_returns_single_root_for_forest(self, file_table_setup):
+        """add_files always returns ONE dataset that transitively contains every
+        file, even when the source dirs form a forest (sibling branches whose
+        common ancestor holds no files of its own).
+
+        Tree: ``base/a/x/f.txt`` and ``base/b/y/g.txt`` — two leaf dirs at the
+        same depth, common ancestor ``base`` (and ``base/a``, ``base/b``) holding
+        no files. The old loop nested purely on decreasing path-depth, so the two
+        same-depth leaves never nested into a shared parent: it returned one leaf
+        and orphaned the other. The fix builds nesting from real path containment
+        and synthesizes the intermediate directory datasets, so the returned root
+        reaches all files with no orphaned directory datasets.
+        """
+        ml_instance = file_table_setup.ml_instance
+        execution = file_table_setup.execution
+
+        base = file_table_setup.tmp_dir / "forest"
+        (base / "a" / "x").mkdir(parents=True, exist_ok=True)
+        (base / "b" / "y").mkdir(parents=True, exist_ok=True)
+        (base / "a" / "x" / "f.txt").write_text("f")
+        (base / "b" / "y" / "g.txt").write_text("g")
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(base, "Forest ingest")
+            root = exe.add_files(filespecs, description="Forest")
+
+        # Collect every File RID reachable from the returned root, walking the
+        # full nested-dataset subtree.
+        def all_file_rids(ds):
+            rids = {m["RID"] for m in ds.list_dataset_members().get("File", [])}
+            for child in ds.list_dataset_children(recurse=True):
+                rids |= {m["RID"] for m in child.list_dataset_members().get("File", [])}
+            return rids
+
+        reachable_files = all_file_rids(root)
+        # Both files (one per branch) must be reachable from the single returned root.
+        assert len(reachable_files) == 2, (
+            f"returned root reaches {len(reachable_files)} files; both branches' files "
+            f"must be transitively contained — no orphaned directory datasets"
+        )
+
+        # And no Directory dataset created this run is unreachable from the root.
+        reachable_ds = {root.dataset_rid} | {c.dataset_rid for c in root.list_dataset_children(recurse=True)}
+        directory_ds = [d.dataset_rid for d in ml_instance.find_datasets() if "Directory" in d.dataset_types]
+        orphans = [rid for rid in directory_ds if rid not in reachable_ds]
+        assert not orphans, f"orphaned directory datasets not reachable from root: {orphans}"
+
     def test_add_files_chunked_streaming_matches_single_batch(self, file_table_setup):
         """add_files streams a generator in chunks of ``chunk_size`` and the
         result is identical to a single-batch insert.

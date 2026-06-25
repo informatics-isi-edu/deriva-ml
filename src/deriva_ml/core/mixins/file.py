@@ -195,44 +195,65 @@ class FileMixin:
             for e in file_records:
                 dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
 
-        # Now create datasets to capture the original directory structure of the
-        # files. Each directory dataset records its own source folder so the
-        # nested datasets are distinguishable: the ingest root (the common
-        # ancestor of every file's directory) keeps the bare caller description,
-        # and each deeper directory appends its path relative to that root,
-        # e.g. "Ingest run — d1/sub". ``os.path.commonpath`` gives the root; for
-        # a single directory it is that directory itself (relative path ".").
+        # Now create datasets that mirror the original directory structure, as a
+        # single nested tree rooted at the ingest root. The tree is built from
+        # real path CONTAINMENT (a directory nests into its nearest ancestor
+        # directory), NOT from raw path depth — so sibling branches whose common
+        # ancestor holds no files of its own still converge on one root instead
+        # of being orphaned.
+        #
+        # ``os.path.commonpath`` gives the ingest root (the common ancestor of
+        # every file-bearing directory). For a single directory it is that
+        # directory itself.
         ingest_root = Path(os.path.commonpath([str(d) for d in dir_rid_map]))
 
+        # The tree's nodes are every file-bearing directory PLUS every
+        # intermediate ancestor up to the ingest root — the intermediates need a
+        # dataset to hold their child-directory datasets even when they contain
+        # no files directly (e.g. ``root/`` over ``root/a/x`` + ``root/b/y``).
+        nodes: set[Path] = set()
+        for directory in dir_rid_map:
+            node = directory
+            nodes.add(node)
+            while node != ingest_root:
+                node = node.parent
+                nodes.add(node)
+
         def dir_description(directory: Path) -> str:
-            # The ingest root itself keeps the bare description; deeper
-            # directories append their path relative to the root. ``relative_to``
-            # of the root against itself yields ``.`` (no parts).
+            # The ingest root keeps the bare caller description; deeper
+            # directories append their path relative to the root.
             if directory == ingest_root:
                 return description
             return f"{description} — {directory.relative_to(ingest_root).as_posix()}"
 
-        nested_datasets = []
-        path_length = 0
-        dataset = None
-        # Start with the longest path so we get subdirectories first.
-        for p, rids in sorted(dir_rid_map.items(), key=lambda kv: len(kv[0].parts), reverse=True):
-            dataset = Dataset.create_dataset(
+        # Create one dataset per node.
+        node_dataset: dict[Path, "Dataset"] = {
+            directory: Dataset.create_dataset(
                 self,  # type: ignore[arg-type]
                 dataset_types=dataset_types,
                 execution_rid=execution_rid,
-                description=dir_description(p),
+                description=dir_description(directory),
             )
-            members = rids
-            if len(p.parts) < path_length:
-                # Going up one level in directory, so Create nested dataset
-                members = [m.dataset_rid for m in nested_datasets] + rids
-                nested_datasets = []
-            dataset.add_dataset_members(members=members, execution_rid=execution_rid)
-            nested_datasets.append(dataset)
-            path_length = len(p.parts)
+            for directory in nodes
+        }
 
-        return dataset
+        # Wire membership: each node's dataset gets its own files plus its
+        # immediate child-directory datasets (the nodes whose parent is this
+        # node). Walk deepest-first so children exist before their parent adds
+        # them — though, since all datasets are pre-created above, ordering only
+        # affects readability here.
+        for directory in sorted(nodes, key=lambda d: len(d.parts), reverse=True):
+            members = list(dir_rid_map.get(directory, []))
+            members += [
+                child_ds.dataset_rid
+                for child_dir, child_ds in node_dataset.items()
+                if child_dir != directory and child_dir.parent == directory
+            ]
+            if members:
+                node_dataset[directory].add_dataset_members(members=members, execution_rid=execution_rid)
+
+        # The ingest root's dataset transitively contains every file.
+        return node_dataset[ingest_root]
 
     def _bootstrap_versions(self) -> None:
         """Initialize dataset versions for datasets that don't have versions."""
