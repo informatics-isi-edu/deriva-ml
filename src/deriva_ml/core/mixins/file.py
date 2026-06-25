@@ -97,12 +97,9 @@ class FileMixin:
                 May be any iterable, including a generator; it is consumed once.
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
-            description: Description of the files. Each directory dataset records
-                its own source folder: the ingest root (the common ancestor of
-                every file's directory) gets this string verbatim, and each
-                deeper directory appends its path relative to the root, e.g.
-                ``"<description> — d1/sub"``, so the nested datasets are
-                distinguishable.
+            description: Description of the files. Recorded verbatim on every
+                directory dataset; the source folder each dataset represents is
+                stored structurally in the ``Directory_Dataset`` table.
             chunk_size: Number of File rows inserted per batch. Larger values
                 mean fewer, bigger requests; smaller values bound per-request
                 size and memory. A value at least as large as the input is a
@@ -219,23 +216,31 @@ class FileMixin:
                 node = node.parent
                 nodes.add(node)
 
-        def dir_description(directory: Path) -> str:
-            # The ingest root keeps the bare caller description; deeper
-            # directories append their path relative to the root.
-            if directory == ingest_root:
-                return description
-            return f"{description} — {directory.relative_to(ingest_root).as_posix()}"
-
-        # Create one dataset per node.
+        # The ingest root keeps the bare caller description; every node dataset
+        # uses the same description. The folder each node represents is recorded
+        # structurally in Directory_Dataset (below), not in the prose Description.
         node_dataset: dict[Path, "Dataset"] = {
             directory: Dataset.create_dataset(
                 self,  # type: ignore[arg-type]
                 dataset_types=dataset_types,
                 execution_rid=execution_rid,
-                description=dir_description(directory),
+                description=description,
             )
             for directory in nodes
         }
+
+        # Record each directory dataset's source folder as a path relative to the
+        # ingest root (the root stores "."). Structured + queryable; consumers
+        # never parse the Description.
+        pb.schemas[self.ml_schema].tables["Directory_Dataset"].insert(
+            [
+                {
+                    "Dataset": ds.dataset_rid,
+                    "Path": "." if directory == ingest_root else directory.relative_to(ingest_root).as_posix(),
+                }
+                for directory, ds in node_dataset.items()
+            ]
+        )
 
         # Wire membership: each node's dataset gets its own files plus its
         # immediate child-directory datasets (the nodes whose parent is this

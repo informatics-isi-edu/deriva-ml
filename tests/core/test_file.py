@@ -142,16 +142,11 @@ class TestFile:
         for subdir in file_dataset.list_dataset_children():
             assert "Directory" in subdir.dataset_types
 
-    def test_add_files_directory_datasets_describe_their_path(self, file_table_setup):
-        """Each directory dataset's description records its source folder, so the
-        nested datasets are distinguishable in Chaise instead of all sharing one
-        string.
-
-        The ingest root (the common ancestor of every file's directory) keeps the
-        bare caller description; each nested subdirectory dataset appends its path
-        relative to that root, e.g. "Test Directory — d1". The fixture tree is
-        ``test_dir/`` with files plus subdirectories ``d1/`` and ``d2/``.
-        """
+    def test_add_files_directory_datasets_record_path(self, file_table_setup):
+        """Each directory dataset gets a Directory_Dataset row with its path
+        relative to the ingest root; the ingest root stores '.'. Description is
+        the bare caller string for every node (no path suffix)."""
+        ml_instance = file_table_setup.ml_instance
         test_dir = file_table_setup.test_dir
         execution = file_table_setup.execution
 
@@ -159,12 +154,19 @@ class TestFile:
             filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
             file_dataset = exe.add_files(filespecs, description="Ingest run")
 
-        # Root dataset (relative path ".") keeps the plain caller description.
+        # Description is the bare caller string everywhere now.
         assert file_dataset.description == "Ingest run"
+        for child in file_dataset.list_dataset_children():
+            assert child.description == "Ingest run"
 
-        # Each child subdirectory dataset appends its relative path.
-        child_descriptions = {child.description for child in file_dataset.list_dataset_children()}
-        assert child_descriptions == {"Ingest run — d1", "Ingest run — d2"}
+        # Directory_Dataset.Path holds the relative folder for each dataset.
+        pb = ml_instance.pathBuilder()
+        rows = list(pb.schemas[ml_instance.ml_schema].tables["Directory_Dataset"].entities().fetch())
+        path_by_dataset = {r["Dataset"]: r["Path"] for r in rows}
+
+        assert path_by_dataset[file_dataset.dataset_rid] == "."
+        child_paths = {path_by_dataset[c.dataset_rid] for c in file_dataset.list_dataset_children()}
+        assert child_paths == {"d1", "d2"}
 
     def test_add_files_returns_single_root_for_forest(self, file_table_setup):
         """add_files always returns ONE dataset that transitively contains every

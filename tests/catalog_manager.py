@@ -142,7 +142,8 @@ class CatalogManager:
         # Clear ML schema tables in dependency order
         ml_tables = [
             "Dataset_Execution",
-            "Dataset_Version",
+            "Directory_Dataset",  # must precede Dataset_Version: Dataset_Version CASCADE-deletes Dataset rows,
+            "Dataset_Version",    # which are blocked by Directory_Dataset FK; clear Directory_Dataset first.
             "Dataset_Dataset",
             "Dataset",
             "Workflow_Execution",
