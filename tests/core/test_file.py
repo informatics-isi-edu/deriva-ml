@@ -142,6 +142,30 @@ class TestFile:
         for subdir in file_dataset.list_dataset_children():
             assert "Directory" in subdir.dataset_types
 
+    def test_add_files_directory_datasets_describe_their_path(self, file_table_setup):
+        """Each directory dataset's description records its source folder, so the
+        nested datasets are distinguishable in Chaise instead of all sharing one
+        string.
+
+        The ingest root (the common ancestor of every file's directory) keeps the
+        bare caller description; each nested subdirectory dataset appends its path
+        relative to that root, e.g. "Test Directory — d1". The fixture tree is
+        ``test_dir/`` with files plus subdirectories ``d1/`` and ``d2/``.
+        """
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            filespecs = FileSpec.create_filespecs(test_dir, "Test Directory")
+            file_dataset = exe.add_files(filespecs, description="Ingest run")
+
+        # Root dataset (relative path ".") keeps the plain caller description.
+        assert file_dataset.description == "Ingest run"
+
+        # Each child subdirectory dataset appends its relative path.
+        child_descriptions = {child.description for child in file_dataset.list_dataset_children()}
+        assert child_descriptions == {"Ingest run — d1", "Ingest run — d2"}
+
     def test_add_files_chunked_streaming_matches_single_batch(self, file_table_setup):
         """add_files streams a generator in chunks of ``chunk_size`` and the
         result is identical to a single-batch insert.

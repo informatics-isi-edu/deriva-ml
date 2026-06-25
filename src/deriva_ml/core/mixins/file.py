@@ -8,6 +8,7 @@ from __future__ import annotations
 
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
+import os
 from collections import defaultdict
 from itertools import batched, chain
 from pathlib import Path
@@ -96,7 +97,12 @@ class FileMixin:
                 May be any iterable, including a generator; it is consumed once.
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
-            description: Description of the files.
+            description: Description of the files. Each directory dataset records
+                its own source folder: the ingest root (the common ancestor of
+                every file's directory) gets this string verbatim, and each
+                deeper directory appends its path relative to the root, e.g.
+                ``"<description> — d1/sub"``, so the nested datasets are
+                distinguishable.
             chunk_size: Number of File rows inserted per batch. Larger values
                 mean fewer, bigger requests; smaller values bound per-request
                 size and memory. A value at least as large as the input is a
@@ -189,7 +195,23 @@ class FileMixin:
             for e in file_records:
                 dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
 
-        # Now create datasets to capture the original directory structure of the files.
+        # Now create datasets to capture the original directory structure of the
+        # files. Each directory dataset records its own source folder so the
+        # nested datasets are distinguishable: the ingest root (the common
+        # ancestor of every file's directory) keeps the bare caller description,
+        # and each deeper directory appends its path relative to that root,
+        # e.g. "Ingest run — d1/sub". ``os.path.commonpath`` gives the root; for
+        # a single directory it is that directory itself (relative path ".").
+        ingest_root = Path(os.path.commonpath([str(d) for d in dir_rid_map]))
+
+        def dir_description(directory: Path) -> str:
+            # The ingest root itself keeps the bare description; deeper
+            # directories append their path relative to the root. ``relative_to``
+            # of the root against itself yields ``.`` (no parts).
+            if directory == ingest_root:
+                return description
+            return f"{description} — {directory.relative_to(ingest_root).as_posix()}"
+
         nested_datasets = []
         path_length = 0
         dataset = None
@@ -199,7 +221,7 @@ class FileMixin:
                 self,  # type: ignore[arg-type]
                 dataset_types=dataset_types,
                 execution_rid=execution_rid,
-                description=description,
+                description=dir_description(p),
             )
             members = rids
             if len(p.parts) < path_length:
