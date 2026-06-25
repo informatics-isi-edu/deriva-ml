@@ -27,3 +27,15 @@ class TestDirectoryDatasetTable:
         table = test_ml.model.model.schemas[test_ml.ml_schema].tables["Directory_Dataset"]
         key_colsets = {tuple(sorted(c.name for c in k.unique_columns)) for k in table.keys}
         assert ("Dataset",) in key_colsets, "expected a uniqueness key on the Dataset column"
+
+    def test_add_directory_dataset_table_idempotent(self, test_ml):
+        """The migration is a no-op on a catalog that already has the table
+        (fresh test_ml catalogs already include it via create_schema)."""
+        from deriva_ml.schema.add_directory_dataset_table import add_directory_dataset_table
+
+        # test_ml already has the table (created by create_schema), so the
+        # migration must report 'already present' and not error.
+        added = add_directory_dataset_table(test_ml, apply=True)
+        assert added is False, "table already exists → migration should be a no-op"
+        # Table still present and well-formed.
+        assert "Directory_Dataset" in test_ml.model.model.schemas[test_ml.ml_schema].tables
