@@ -9,6 +9,7 @@ from __future__ import annotations
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
 import os
+import re
 from collections import defaultdict
 from itertools import batched, chain
 from pathlib import Path
@@ -31,6 +32,74 @@ if TYPE_CHECKING:
 
 
 __all__ = ["FileMixin"]
+
+
+def _canonical_dir(path: Path) -> Path:
+    """Canonicalize a source directory so containment math is self-consistent.
+
+    A directory derived from a *relative* file URL parses to a ``//``-prefixed
+    path (e.g. ``Path('//data/a')``). POSIX ``pathlib`` *preserves* a leading
+    double-slash in ``Path.parts`` (``('//', 'data', 'a')``), but
+    ``os.path.commonpath`` *collapses* it to a single slash (``/data``). That
+    asymmetry made the ancestor walk in :meth:`FileMixin.add_files` never reach
+    the common root — an infinite loop on any relative input path.
+
+    Collapsing every run of leading slashes to exactly one makes ``commonpath``,
+    ``Path.parent``, and ``relative_to`` all agree, so the tree always
+    terminates with one connected root. ``os.path.normpath`` first removes
+    ``.``/redundant separators; the regex then normalizes the leading-slash
+    count (normpath alone keeps an exact ``//``).
+
+    Args:
+        path: A source directory path (possibly ``//``-prefixed from a relative
+            file URL).
+
+    Returns:
+        Path: The canonicalized directory.
+
+    Example:
+        >>> _canonical_dir(Path("//data/a")).as_posix()
+        '/data/a'
+        >>> _canonical_dir(Path("/tmp/base/a")).as_posix()
+        '/tmp/base/a'
+    """
+    return Path(re.sub(r"^/+", "/", os.path.normpath(str(path))))
+
+
+def _directory_tree(dirs: Iterable[Path]) -> tuple[Path, set[Path]]:
+    """Build a single-root containment tree from a set of source directories.
+
+    Canonicalizes each directory, finds their common ancestor (the ingest
+    root), and returns every tree node: each file-bearing directory PLUS every
+    intermediate ancestor up to the root (intermediates need a dataset to hold
+    their child-directory datasets even when they hold no files directly). The
+    walk is guaranteed to terminate because canonicalization makes every node's
+    ancestor chain actually reach the ``commonpath`` root.
+
+    Args:
+        dirs: The distinct source directories (as derived from file URLs).
+
+    Returns:
+        tuple[Path, set[Path]]: ``(ingest_root, nodes)`` — the common-ancestor
+            root and the full set of canonicalized tree nodes (including root).
+
+    Example:
+        >>> root, nodes = _directory_tree([Path("//d/a/x"), Path("//d/b/y")])
+        >>> root.as_posix()
+        '/d'
+        >>> sorted(n.relative_to(root).as_posix() for n in nodes if n != root)
+        ['a', 'a/x', 'b', 'b/y']
+    """
+    canon = [_canonical_dir(d) for d in dirs]
+    ingest_root = _canonical_dir(Path(os.path.commonpath([str(d) for d in canon])))
+    nodes: set[Path] = set()
+    for directory in canon:
+        node = directory
+        nodes.add(node)
+        while node != ingest_root:
+            node = node.parent
+            nodes.add(node)
+    return ingest_root, nodes
 
 
 class FileMixin:
@@ -189,34 +258,23 @@ class FileMixin:
             )
 
             # Group this batch's RIDs by source directory for dataset building.
+            # Canonicalize the directory so containment math is self-consistent
+            # for relative paths too (see _canonical_dir): a relative file URL
+            # parses to a ``//``-prefixed path that would otherwise make the
+            # ancestor walk loop forever.
             for e in file_records:
-                dir_rid_map[Path(urlsplit(e["URL"]).path).parent].append(e["RID"])
+                source_dir = _canonical_dir(Path(urlsplit(e["URL"]).path).parent)
+                dir_rid_map[source_dir].append(e["RID"])
 
         # Now create datasets that mirror the original directory structure, as a
-        # single nested tree rooted at the ingest root. The tree is built from
-        # real path CONTAINMENT (a directory nests into its nearest ancestor
-        # directory), NOT from raw path depth — so sibling branches whose common
-        # ancestor holds no files of its own still converge on one root instead
-        # of being orphaned.
-        #
-        # ``os.path.commonpath`` gives the ingest root (the common ancestor of
-        # every file-bearing directory). For a single directory it is that
-        # directory itself.
+        # single nested tree rooted at the ingest root. ``_directory_tree`` builds
+        # the tree from real path CONTAINMENT (a directory nests into its nearest
+        # ancestor) — so sibling branches whose common ancestor holds no files of
+        # its own still converge on one root instead of being orphaned — and
+        # canonicalizes paths so the build terminates for relative inputs too.
         if not dir_rid_map:
             raise DerivaMLException("add_files received no files to add.")
-        ingest_root = Path(os.path.commonpath([str(d) for d in dir_rid_map]))
-
-        # The tree's nodes are every file-bearing directory PLUS every
-        # intermediate ancestor up to the ingest root — the intermediates need a
-        # dataset to hold their child-directory datasets even when they contain
-        # no files directly (e.g. ``root/`` over ``root/a/x`` + ``root/b/y``).
-        nodes: set[Path] = set()
-        for directory in dir_rid_map:
-            node = directory
-            nodes.add(node)
-            while node != ingest_root:
-                node = node.parent
-                nodes.add(node)
+        ingest_root, nodes = _directory_tree(dir_rid_map.keys())
 
         # The ingest root keeps the bare caller description; every node dataset
         # uses the same description. The folder each node represents is recorded
