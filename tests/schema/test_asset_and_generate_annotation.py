@@ -22,7 +22,6 @@ from deriva_ml.schema.annotations import (
     generate_annotation,
 )
 
-
 # ---------------------------------------------------------------------------
 # asset_annotation — Table stand-in
 # ---------------------------------------------------------------------------
@@ -283,10 +282,10 @@ class TestGenerateAnnotationSchemaParameterIsThreaded:
         all_strings = self._flatten_to_strings(result["dataset_annotation"])
         leaked = [s for s in all_strings if s == "deriva-ml"]
         assert not leaked, (
-            f"dataset_annotation leaked the literal 'deriva-ml' under "
-            f"schema='my_custom'. F-01 regression — every FK reference "
-            f"in this bundle must use the schema parameter, not the "
-            f"literal. Pre-fix, six places carried the literal."
+            "dataset_annotation leaked the literal 'deriva-ml' under "
+            "schema='my_custom'. F-01 regression — every FK reference "
+            "in this bundle must use the schema parameter, not the "
+            "literal. Pre-fix, six places carried the literal."
         )
 
     def test_dataset_annotation_references_custom_schema(self):
@@ -315,3 +314,53 @@ class TestGenerateAnnotationSchemaParameterIsThreaded:
         ):
             leaked = [s for s in self._flatten_to_strings(result[key]) if s == "deriva-ml"]
             assert not leaked, f"{key} leaked the literal 'deriva-ml' under schema='my_custom'."
+
+
+class TestDatasetAnnotationFolderColumn:
+    """Pin Task-5: Dataset detailed visible-columns must include a 'Folder'
+    inline source referencing ``Directory_Dataset.Path``, with ``show_null``
+    false so Chaise suppresses the field on non-directory datasets.
+    """
+
+    def test_dataset_annotation_includes_folder_column(self):
+        """'Folder' source is present in detailed, absent from compact (*),
+        walks inbound to Directory_Dataset, reads Path, show_null false.
+        """
+        result = generate_annotation(MagicMock(), "deriva-ml")
+        ann = result["dataset_annotation"]
+        vc = ann[deriva_tags.visible_columns]
+
+        detailed = vc.get("detailed", [])
+        compact = vc.get("*", [])
+
+        # Must be present in detailed.
+        folder_sources = [
+            s for s in detailed
+            if isinstance(s, dict) and s.get("markdown_name") == "Folder"
+        ]
+        assert folder_sources, "Dataset detailed visible-columns must include a 'Folder' source"
+
+        # Must NOT be present in compact (*).
+        assert not any(
+            isinstance(s, dict) and s.get("markdown_name") == "Folder" for s in compact
+        ), "Folder must NOT appear in the compact (*) context"
+
+        folder = folder_sources[0]
+        src_path = folder["source"]
+
+        # Source walks inbound to Directory_Dataset then reads Path.
+        assert any(
+            isinstance(seg, dict)
+            and "inbound" in seg
+            and "Directory_Dataset" in seg["inbound"][1]
+            for seg in src_path
+        ), f"Folder source must walk inbound via Directory_Dataset; got source={src_path!r}"
+        assert src_path[-1] == "Path", (
+            f"Folder source must terminate with 'Path'; got source={src_path!r}"
+        )
+
+        # show_null false → Chaise hides the field when Path is null.
+        assert folder.get("display", {}).get("show_null") is False, (
+            "Folder source must have display.show_null=False so Chaise hides it "
+            "on non-directory datasets"
+        )
