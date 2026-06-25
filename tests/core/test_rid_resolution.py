@@ -2,7 +2,6 @@
 
 import pytest
 
-from deriva_ml import DerivaMLException
 from deriva_ml.core.mixins.rid_resolution import BatchRidResult
 
 
@@ -115,3 +114,39 @@ class TestRidResolution:
         result = ml_instance.resolve_rid(dataset_rid)
         assert result.rid == dataset_rid
         assert result.table.name == "Dataset"
+
+    def test_resolve_rids_large_batch_chunks_under_url_limit(self, test_ml):
+        """resolve_rids resolves a large RID set by chunking its queries.
+
+        A single ``RID = Any(*rids)`` filter goes into the GET URL path, so
+        for enough RIDs the request line exceeds the server's URL limit (the
+        front Apache rejects it before ERMrest sees it). Pre-fix, resolve_rids
+        issued ONE such query and a ``bare except: continue`` swallowed the
+        failure — every RID was reported as DerivaMLRidsNotFound even though
+        the rows exist. The fix chunks the query into URL-safe batches.
+
+        We insert well over the short-RID URL boundary (~994 three-char RIDs
+        ~= 4 KB) so the single-query path is guaranteed to overflow, then
+        resolve them all and require every one to come back. RIDs come from
+        the freshly-inserted catalog rows, never literals.
+        """
+        ml_instance = test_ml
+        pb = ml_instance.pathBuilder()
+        file_path = pb.schemas[ml_instance.ml_schema].tables["File"]
+
+        n = 1100  # comfortably past the ~994 short-RID single-query boundary
+        rows = [
+            {"URL": f"tag://chunktest,2026-06-24:file:///c/f{i}.txt", "MD5": f"{i:032x}", "Length": 1}
+            for i in range(n)
+        ]
+        inserted = list(file_path.insert(rows))
+        rids = [r["RID"] for r in inserted]
+        assert len(rids) == n
+
+        # All RIDs are real File rows — every one must resolve to the File
+        # table. On the pre-fix single-query path this raises
+        # DerivaMLRidsNotFound (the oversized URL fails and is swallowed).
+        candidate = [ml_instance.model.name_to_table("File")]
+        results = ml_instance.resolve_rids(rids, candidate_tables=candidate)
+        assert len(results) == n
+        assert all(r.table_name == "File" for r in results.values())

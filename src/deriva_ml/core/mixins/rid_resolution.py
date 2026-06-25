@@ -9,6 +9,7 @@ from __future__ import annotations
 # Deriva imports - use importlib to avoid shadowing by local 'deriva.py' files
 import importlib
 from dataclasses import dataclass
+from itertools import batched
 from typing import TYPE_CHECKING, Any
 
 _datapath = importlib.import_module("deriva.core.datapath")
@@ -35,6 +36,19 @@ __all__ = [
     "RidResolutionMixin",
     "BatchRidResult",
 ]
+
+# Maximum number of RIDs placed in a single ``RID = Any(...)`` filter.
+#
+# That filter renders into the GET URL *path* (deriva-py datapath builds
+# ``base_uri + str(path_expression)`` and issues ``catalog.get(path)``), so the
+# request line grows ~13 bytes per RID (a 12-char RID + comma + urlquoting).
+# The front Apache rejects a request line over its ``LimitRequestLine`` (~4 KB
+# measured on localhost: 994 three-char RIDs succeed, 995 fail) *before ERMrest
+# sees it*. A cap of 200 keeps the filter ~2.6 KB even with worst-case 12-char
+# RIDs, leaving headroom for the path prefix. Without this, resolving a few
+# hundred+ RIDs in one shot overflowed the URL and the failure was silently
+# turned into a spurious "RIDs not found".
+_MAX_RIDS_PER_QUERY = 200
 
 
 @dataclass
@@ -177,34 +191,45 @@ class RidResolutionMixin:
 
             schema_name = table.schema.name
             table_name = table.name
-
-            # Build a query with RID filter for all remaining RIDs
             table_path = pb.schemas[schema_name].tables[table_name]
 
-            # Use ERMrest's Any quantifier for IN-style query
-            # Query only for RID column to minimize data transfer
-            try:
-                # Filter: RID = any(rid1, rid2, ...) - ERMrest's way of doing IN clause
-                found_entities = list(
-                    table_path.filter(table_path.RID == AnyQuantifier(*remaining_rids))
-                    .attributes(table_path.RID)
-                    .fetch()
-                )
-            except Exception as e:
-                logger.debug(f"RID resolution query failed for {schema_name}.{table_name}: {e}")
-                continue
-
-            # Process found RIDs
-            for entity in found_entities:
-                rid = entity["RID"]
-                if rid in remaining_rids:
-                    results[rid] = BatchRidResult(
-                        rid=rid,
-                        table=table,
-                        table_name=table_name,
-                        schema_name=schema_name,
+            # The ``RID = Any(...)`` filter renders into the GET URL path, so a
+            # single query over hundreds of RIDs overflows the server's request
+            # URL limit and fails. Chunk the remaining RIDs into URL-safe
+            # batches (``_MAX_RIDS_PER_QUERY``) and union the matches. Snapshot
+            # the RID list first because ``remaining_rids`` is mutated below.
+            for rid_chunk in batched(list(remaining_rids), _MAX_RIDS_PER_QUERY):
+                # Filter: RID = any(rid1, rid2, ...) — ERMrest's IN clause.
+                # Query only the RID column to minimize data transfer.
+                try:
+                    found_entities = list(
+                        table_path.filter(table_path.RID == AnyQuantifier(*rid_chunk))
+                        .attributes(table_path.RID)
+                        .fetch()
                     )
-                    remaining_rids.remove(rid)
+                except Exception as e:
+                    # Resilience across heterogeneous candidate tables: a query
+                    # that errors on one table shouldn't abort the whole scan —
+                    # the RIDs simply stay in ``remaining_rids`` and surface as a
+                    # legitimate DerivaMLRidsNotFound if no table matched them.
+                    # This is narrow now: the oversized-URL failure that used to
+                    # land here (and get masked into a spurious not-found) is
+                    # prevented by the chunking above, so an error reaching this
+                    # point is a genuine per-table condition, logged loudly.
+                    logger.warning(f"RID resolution query failed for {schema_name}.{table_name}: {e}")
+                    continue
+
+                # Process found RIDs
+                for entity in found_entities:
+                    rid = entity["RID"]
+                    if rid in remaining_rids:
+                        results[rid] = BatchRidResult(
+                            rid=rid,
+                            table=table,
+                            table_name=table_name,
+                            schema_name=schema_name,
+                        )
+                        remaining_rids.remove(rid)
 
         # Check if any RIDs were not found. Raise the typed
         # ``DerivaMLRidsNotFound`` so callers can pull the unresolved
