@@ -142,6 +142,46 @@ class TestFile:
         for subdir in file_dataset.list_dataset_children():
             assert "Directory" in subdir.dataset_types
 
+    def test_add_files_chunked_streaming_matches_single_batch(self, file_table_setup):
+        """add_files streams a generator in chunks of ``chunk_size`` and the
+        result is identical to a single-batch insert.
+
+        A small chunk_size (< file count) forces several insert batches over
+        the 15-file / 3-directory tree. The resulting dataset must have the
+        same nested structure, the same per-directory member counts, and the
+        same Directory + File tags as the default single-batch path — chunking
+        is an internal performance detail, never a behavior change. The input
+        is a *generator* (FileSpec.create_filespecs), consumed exactly once.
+        """
+        ml_instance = file_table_setup.ml_instance
+        test_dir = file_table_setup.test_dir
+        execution = file_table_setup.execution
+
+        with execution.execute() as exe:
+            # create_filespecs returns a generator — passed straight through,
+            # never pre-materialized by the caller.
+            filespecs = FileSpec.create_filespecs(test_dir, "Chunked Directory")
+            file_dataset = exe.add_files(filespecs, dataset_types="Complete", chunk_size=2)
+
+        # Same top-level shape as test_add_files: 5 files + 2 child datasets.
+        assert file_dataset.dataset_rid in [ds.dataset_rid for ds in ml_instance.find_datasets()]
+        members = file_dataset.list_dataset_members()
+        assert len(members["File"]) == 5
+        assert len(members["Dataset"]) == 2
+
+        # Same tags as the single-batch path.
+        assert "Directory" in file_dataset.dataset_types
+        assert "File" in file_dataset.dataset_types
+        assert "Complete" in file_dataset.dataset_types
+
+        # Each child directory dataset holds its 5 files and is tagged Directory.
+        children = file_dataset.list_dataset_children()
+        assert len(children) == 2
+        for subdir in children:
+            sub_members = subdir.list_dataset_members()
+            assert len(sub_members["File"]) == 5
+            assert "Directory" in subdir.dataset_types
+
     def test_add_files_links_as_input(self, file_table_setup):
         """add_files registers an external File reference and links it as an
         INPUT — intrinsically, with no role parameter.
