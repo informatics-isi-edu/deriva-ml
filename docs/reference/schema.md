@@ -37,7 +37,7 @@ Ordered as: **core entities**, then **vocabularies**, then **association tables*
 
 **Core entities**: [Dataset](#dataset), [Dataset_Version](#dataset_version), [Execution](#execution), [Workflow](#workflow)
 **Vocabularies**: [Dataset_Type](#dataset_type), [Workflow_Type](#workflow_type), [Feature_Name](#feature_name), [Asset_Type](#asset_type), [Asset_Role](#asset_role), [Execution_Status](#execution_status)
-**Associations**: [Dataset_Dataset_Type](#dataset_dataset_type), [Dataset_Nested_Dataset](#dataset_nested_dataset), [Dataset_Execution](#dataset_execution), [Dataset_File](#dataset_file), [Execution_Nested_Execution](#execution_nested_execution), [Workflow_Workflow_Type](#workflow_workflow_type)
+**Associations**: [Dataset_Dataset_Type](#dataset_dataset_type), [Dataset_Nested_Dataset](#dataset_nested_dataset), [Dataset_Execution](#dataset_execution), [Dataset_File](#dataset_file), [Execution_Nested_Execution](#execution_nested_execution), [Workflow_Workflow_Type](#workflow_workflow_type), [Directory_Dataset](#directory_dataset)
 
 ---
 
@@ -89,6 +89,27 @@ foreign_keys:
   - Execution
   referenced_schema: deriva-ml
   referenced_table: Execution
+  referenced_columns:
+  - RID
+```
+
+## Directory_Dataset
+
+Source folder a directory dataset (auto-created by `add_files`) represents, as a path relative to the ingest root. One row per directory dataset; absent for datasets not built from a directory tree.
+
+```yaml
+table: Directory_Dataset
+kind: table
+columns:
+- name: Dataset
+  type: text
+- name: Path
+  type: text
+foreign_keys:
+- columns:
+  - Dataset
+  referenced_schema: deriva-ml
+  referenced_table: Dataset
   referenced_columns:
   - RID
 ```

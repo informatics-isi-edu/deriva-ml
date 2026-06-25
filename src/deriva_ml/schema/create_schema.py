@@ -38,6 +38,50 @@ from deriva_ml.schema.annotations import asset_annotation, generate_annotation
 logger = get_logger(__name__)
 
 
+def directory_dataset_table_def(schema_name: str) -> TableDef:
+    """TableDef for the Directory_Dataset satellite table.
+
+    Shared by ``create_dataset_table`` (fresh catalogs) and the
+    ``add_directory_dataset_table`` migration (existing catalogs) so both
+    produce an identical table.
+
+    Args:
+        schema_name: The deriva-ml schema name (for the FK's referenced_schema).
+
+    Returns:
+        TableDef: definition of the Directory_Dataset table.
+    """
+    return TableDef(
+        name="Directory_Dataset",
+        comment=(
+            "Source folder a directory dataset (auto-created by add_files) "
+            "represents, as a path relative to the ingest root. One row per "
+            "directory dataset; absent for datasets not built from a "
+            "directory tree."
+        ),
+        columns=[
+            ColumnDef("Dataset", BuiltinType.text, comment="RID of the directory dataset."),
+            ColumnDef(
+                "Path",
+                BuiltinType.text,
+                comment=(
+                    "Source directory this dataset represents, relative to "
+                    "the ingest root. The ingest root stores '.'."
+                ),
+            ),
+        ],
+        keys=[KeyDef(columns=["Dataset"])],
+        foreign_keys=[
+            ForeignKeyDef(
+                columns=["Dataset"],
+                referenced_schema=schema_name,
+                referenced_table="Dataset",
+                referenced_columns=["RID"],
+            ),
+        ],
+    )
+
+
 def create_dataset_table(
     schema: Schema,
     execution_table: Table,
@@ -185,6 +229,11 @@ def create_dataset_table(
     # above. NULL means the consumed version is unknown (e.g. legacy rows).
     dv_cols, _ = dataset_execution.create_reference(("Dataset_Version", True, dataset_version))
     dv_cols[0].alter(comment="RID of the Dataset_Version consumed by this input edge (NULL if unknown).")
+
+    # Directory_Dataset: satellite recording the source folder a directory
+    # dataset (created by add_files) represents (see directory_dataset_table_def).
+    schema.create_table(directory_dataset_table_def(schema.name))
+
     return dataset_table
 
 
@@ -1189,4 +1238,5 @@ __all__ = [
     "create_or_retarget_ml_catalog",
     "create_ml_schema",
     "initialize_ml_schema",
+    "directory_dataset_table_def",
 ]
