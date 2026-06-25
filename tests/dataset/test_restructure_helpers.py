@@ -12,7 +12,7 @@ Post-extraction the helpers are:
 - ``_validate_targets`` — reject dotted ``"Feature.column"``.
 - ``_classify_targets`` — feature vs column probe.
 - ``_resolve_source_path`` — locate the on-disk file, using
-  ``bag.bag_path`` (the public API; pre-extraction this site
+  ``bag.path`` (the public API; pre-extraction this site
   reached through two private attributes).
 - ``_resolve_grouping_path`` — per-asset directory components.
 - ``_place_asset`` — symlink / copy / transformer dispatch.
@@ -174,7 +174,7 @@ class TestDefaultDirNameFromTarget:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_source_path — public bag.bag_path fallback
+# _resolve_source_path — public bag.path fallback
 # ---------------------------------------------------------------------------
 
 
@@ -186,7 +186,7 @@ class TestResolveSourcePath:
         assert result == f
 
     def test_falls_back_to_bag_path_layout(self, tmp_path):
-        """When ``Filename`` is a bare basename, looks under ``bag.bag_path``."""
+        """When ``Filename`` is a bare basename, looks under ``bag.path``."""
         bag_root = tmp_path / "bag"
         canonical_dir = bag_root / "data" / "asset" / "ASSET-1" / "Image"
         canonical_dir.mkdir(parents=True)
@@ -194,7 +194,7 @@ class TestResolveSourcePath:
         canonical_file.write_bytes(b"img")
 
         bag = MagicMock()
-        bag.bag_path = bag_root  # public property
+        bag.path = bag_root  # public property
         # ``Filename`` is a bare name (no path) that doesn't exist as-is.
         result = _resolve_source_path({"Filename": "img.jpg", "RID": "ASSET-1"}, "Image", bag)
         assert result == canonical_file
@@ -204,12 +204,12 @@ class TestResolveSourcePath:
 
     def test_neither_location_exists_returns_none(self, tmp_path):
         bag = MagicMock()
-        bag.bag_path = tmp_path / "no-such-bag"
+        bag.path = tmp_path / "no-such-bag"
         result = _resolve_source_path({"Filename": "nope.jpg", "RID": "ASSET-1"}, "Image", bag)
         assert result is None
 
     def test_attribute_error_on_path_is_handled(self, tmp_path):
-        """Bags constructed by test mocks may not have ``.bag_path``.
+        """Bags constructed by test mocks may not have ``.path``.
 
         Pre-extraction this site reached through
         ``bag._catalog._database_model.bag_path`` with the same
@@ -217,8 +217,8 @@ class TestResolveSourcePath:
         truncated mocks.
         """
         bag = MagicMock()
-        del bag.bag_path  # simulate missing attribute
-        type(bag).bag_path = property(lambda self: (_ for _ in ()).throw(AttributeError()))
+        del bag.path  # simulate missing attribute
+        type(bag).path = property(lambda self: (_ for _ in ()).throw(AttributeError()))
 
         result = _resolve_source_path({"Filename": "img.jpg", "RID": "ASSET-1"}, "Image", bag)
         assert result is None

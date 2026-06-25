@@ -128,7 +128,7 @@ class DatasetLike(Protocol):
         ...
 
     @property
-    def path(self) -> str | None:
+    def source_directory(self) -> str | None:
         """Source folder this directory dataset represents, relative to the
         ingest root, or ``None`` if not a directory dataset."""
         ...

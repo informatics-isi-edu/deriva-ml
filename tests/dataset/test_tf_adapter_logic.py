@@ -49,7 +49,7 @@ def _mock_bag_with_labeled_images(rids_and_labels: dict[str, str]):
         A MagicMock DatasetBag.
     """
     bag = MagicMock()
-    bag.bag_path = Path("/tmp/fake_bag")
+    bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
@@ -86,7 +86,7 @@ class _FakeSubjectRecord(FeatureRecord):
 def _mock_non_asset_bag(rids_and_labels: dict[str, str]):
     """Build a MagicMock bag for a non-asset element type (tabular)."""
     bag = MagicMock()
-    bag.bag_path = Path("/tmp/fake_bag")
+    bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Subject": [{"RID": rid} for rid in rids_and_labels]})
 
     def fake_feature_values(element_type, feature_name, selector=None):
@@ -164,7 +164,7 @@ def test_element_count_reflects_all_when_no_skip():
 def test_missing_error_raises_at_construction():
     """missing='error' raises DerivaMLException at construction listing RIDs."""
     bag = MagicMock()
-    bag.bag_path = Path("/tmp/fake_bag")
+    bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}, {"RID": "1-IMG2"}]})
     bag.feature_values = MagicMock(return_value=iter([_FakeRecord(Image="1-IMG1", Grade="Mild")]))
     bag.model = MagicMock()
@@ -273,7 +273,7 @@ def test_single_target_target_transform_receives_featurerecord():
 def test_multi_target_target_transform_receives_dict():
     """Multi-target: target_transform receives dict[str, FeatureRecord]."""
     bag = MagicMock()
-    bag.bag_path = Path("/tmp/fake_bag")
+    bag.path = Path("/tmp/fake_bag")
     bag.list_dataset_members = MagicMock(return_value={"Image": [{"RID": "1-IMG1"}]})
 
     class _FakeGradeRecord(FeatureRecord):

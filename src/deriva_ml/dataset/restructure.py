@@ -347,14 +347,14 @@ def _resolve_source_path(
     doesn't exist on disk (the value may be a bare basename
     stored in the SQLite cache pre-materialization), falls back
     to the canonical BDBag layout
-    ``{bag.bag_path}/data/asset/{RID}/{table}/{filename}``.
+    ``{bag.path}/data/asset/{RID}/{table}/{filename}``.
 
     Args:
         asset: Asset record dict (must have ``Filename``).
         asset_table: Asset table name (used for the bag-layout
             fallback path).
         bag: The bag the asset lives in. Uses the public
-            ``bag.bag_path`` property — pre-Ds-restr this reached
+            ``bag.path`` property — pre-Ds-restr this reached
             through ``bag._catalog._database_model.bag_path``
             (audit P2).
 
@@ -370,7 +370,7 @@ def _resolve_source_path(
         return source_path
 
     # Fall back to the canonical BDBag asset layout.
-    # ``bag.bag_path`` is the public API; pre-extraction this site
+    # ``bag.path`` is the public API; pre-extraction this site
     # reached through two private attributes
     # (``bag._catalog._database_model.bag_path``) wrapped in a
     # try/except AttributeError. The public property exists
@@ -378,7 +378,7 @@ def _resolve_source_path(
     # that build bags with truncated mocks can still hit
     # ``AttributeError``, so keep the guard.
     try:
-        bag_root = bag.bag_path
+        bag_root = bag.path
     except AttributeError:
         return None
     candidate = bag_root / "data" / "asset" / asset.get("RID", "") / asset_table / Path(filename).name
@@ -810,7 +810,7 @@ def restructure_assets(
     # 4. ``_place_asset`` — write the file (symlink / copy / transform).
     #
     # ``_resolve_source_path`` handles the on-disk lookup with the
-    # public ``bag.bag_path`` API (pre-Ds-restr this reached through
+    # public ``bag.path`` API (pre-Ds-restr this reached through
     # ``bag._catalog._database_model.bag_path``).
 
     from deriva_ml.dataset.target_resolution import _resolve_targets

@@ -192,16 +192,16 @@ class DatasetBag:
         return self._current_version
 
     @property
-    def bag_path(self) -> Path:
+    def path(self) -> Path:
         """Filesystem path to this bag's root directory.
 
-        The bag is a self-contained, immutable snapshot on disk. ``bag_path``
+        The bag is a self-contained, immutable snapshot on disk. ``path``
         is the BDBag directory containing ``data/`` (the CSV tables and
         materialized asset files) and ``manifest-md5.txt``. The SQLite
         database that backs queries is **not** inside this directory — it
         lives in a separate ``databases/`` subtree of the cache root
         (the cache is content-addressed by BDBag checksum per ADR-0006).
-        Use ``bag_path`` to:
+        Use ``path`` to:
 
         - Read materialized asset files relative to the bag.
         - Diagnose "which bag is this?" errors in logs.
@@ -218,14 +218,14 @@ class DatasetBag:
         Example:
             >>> spec = DatasetSpec(rid="1-abc123", version="1.2.0")  # doctest: +SKIP
             >>> bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
-            >>> print(f"Bag materialized at {bag.bag_path}")  # doctest: +SKIP
+            >>> print(f"Bag materialized at {bag.path}")  # doctest: +SKIP
             >>> # Read an asset file relative to the bag root
-            >>> manifest = (bag.bag_path / "manifest-md5.txt").read_text()  # doctest: +SKIP
+            >>> manifest = (bag.path / "manifest-md5.txt").read_text()  # doctest: +SKIP
         """
         return self.model.bag_path
 
     @property
-    def path(self) -> str | None:
+    def source_directory(self) -> str | None:
         """Source folder this directory dataset represents, relative to the
         ingest root.
 
@@ -238,13 +238,14 @@ class DatasetBag:
         ``Directory_Dataset`` table; no catalog connection is used.
 
         Returns:
-            str | None: The relative source folder, or None.
+            str | None: The relative source folder this directory dataset
+            represents, relative to the ingest root, or None.
 
         Example:
             >>> root_bag = ml.download_dataset_bag(spec)  # doctest: +SKIP
-            >>> root_bag.path  # doctest: +SKIP
+            >>> root_bag.source_directory  # doctest: +SKIP
             '.'
-            >>> [c.path for c in root_bag.list_dataset_children()]  # doctest: +SKIP
+            >>> [c.source_directory for c in root_bag.list_dataset_children()]  # doctest: +SKIP
             ['d1', 'd2']
         """
         try:
@@ -261,7 +262,7 @@ class DatasetBag:
         """Whether this dataset represents a source directory.
 
         ``True`` iff the dataset has a ``Directory_Dataset`` row (equivalently,
-        :attr:`path` is not ``None``) — i.e. it was created by
+        :attr:`source_directory` is not ``None``) — i.e. it was created by
         :meth:`~deriva_ml.execution.execution.Execution.add_files` to mirror a
         folder. This is the authoritative predicate; it deliberately does NOT
         consult the ``Directory`` ``Dataset_Type`` tag, which can diverge from
@@ -278,7 +279,7 @@ class DatasetBag:
             >>> root_bag.is_directory  # doctest: +SKIP
             True
         """
-        return self.path is not None
+        return self.source_directory is not None
 
     def materialize(self, *, fetch_concurrency: int = 8) -> Self:
         """Fetch any not-yet-downloaded files for this bag, in place.
@@ -326,7 +327,7 @@ class DatasetBag:
         from deriva_ml.dataset.bag_download import materialize_bag_dir
 
         materialize_bag_dir(
-            self.bag_path,
+            self.path,
             fetch_concurrency=fetch_concurrency,
             logger=get_logger(__name__),
         )
@@ -1297,7 +1298,7 @@ class DatasetBag:
                 once per ``__getitem__`` call. Receives:
 
                 - ``Path | None`` — absolute filesystem path under
-                  ``bag.bag_path / "data/asset/<rid>/<element_type>/<filename>"``
+                  ``bag.path / "data/asset/<rid>/<element_type>/<filename>"``
                   (the canonical BDBag asset layout) when
                   ``element_type`` is an asset table; ``None`` otherwise.
                 - ``dict[str, Any]`` — the raw row dict from the element
@@ -1483,7 +1484,7 @@ class DatasetBag:
                 once per generated element. Receives:
 
                 - ``Path | None`` — absolute filesystem path under
-                  ``bag.bag_path / "data/asset/<rid>/<element_type>/<filename>"``
+                  ``bag.path / "data/asset/<rid>/<element_type>/<filename>"``
                   (the canonical BDBag asset layout) when
                   ``element_type`` is an asset table; ``None`` otherwise.
                 - ``dict[str, Any]`` — the raw row dict from the element

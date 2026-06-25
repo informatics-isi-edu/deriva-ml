@@ -269,31 +269,31 @@ class TestBagCurrentVersion:
 
 
 class TestBagPath:
-    """Tests for DatasetBag.bag_path property — filesystem path to the bag root."""
+    """Tests for DatasetBag.path property — filesystem path to the bag root."""
 
     def test_path_returns_pathlib_path(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """bag.bag_path returns a pathlib.Path (not a string)."""
+        """bag.path returns a pathlib.Path (not a string)."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
 
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        assert isinstance(bag.bag_path, Path), f"bag.bag_path should be Path, got {type(bag.bag_path)}"
+        assert isinstance(bag.path, Path), f"bag.path should be Path, got {type(bag.path)}"
 
     def test_path_points_to_existing_directory(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """bag.bag_path points at a directory that exists on disk."""
+        """bag.path points at a directory that exists on disk."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
 
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
-        assert bag.bag_path.exists(), f"bag.bag_path does not exist on disk: {bag.bag_path}"
-        assert bag.bag_path.is_dir(), f"bag.bag_path is not a directory: {bag.bag_path}"
+        assert bag.path.exists(), f"bag.path does not exist on disk: {bag.path}"
+        assert bag.path.is_dir(), f"bag.path is not a directory: {bag.path}"
 
     def test_path_contains_bag_structure(self, catalog_manager: CatalogManager, tmp_path: Path):
-        """bag.bag_path directory contains the expected BDBag structure (data/, manifest)."""
+        """bag.path directory contains the expected BDBag structure (data/, manifest)."""
         catalog_manager.reset()
         ml, dataset_desc = catalog_manager.ensure_datasets(tmp_path / "source")
         dataset = dataset_desc.dataset
@@ -301,9 +301,9 @@ class TestBagPath:
         bag = dataset.download_dataset_bag(version=dataset.current_version, use_minid=False)
 
         # BDBag spec guarantees data/ and at least one manifest-* file.
-        assert (bag.bag_path / "data").is_dir(), "bag should have a data/ subdirectory"
-        manifests = list(bag.bag_path.glob("manifest-*.txt"))
-        assert manifests, f"bag should have at least one manifest-*.txt file in {bag.bag_path}"
+        assert (bag.path / "data").is_dir(), "bag should have a data/ subdirectory"
+        manifests = list(bag.path.glob("manifest-*.txt"))
+        assert manifests, f"bag should have at least one manifest-*.txt file in {bag.path}"
 
 
 class TestBagDatasetProperties:
@@ -428,13 +428,13 @@ class TestBagMaterializeInPlace:
         # Download metadata-only.
         bag = dataset.download_dataset_bag(version=version, use_minid=False, materialize=False)
 
-        if BagCache._is_fully_materialized(bag.bag_path):
+        if BagCache._is_fully_materialized(bag.path):
             pytest.skip("Demo bag has no remote fetch.txt entries; nothing to materialize.")
 
         # Materialize in place; must return the same object.
         result = bag.materialize()
         assert result is bag
-        assert BagCache._is_fully_materialized(bag.bag_path)
+        assert BagCache._is_fully_materialized(bag.path)
 
         # Cache status flips to materialized.
         info = dataset.bag_info(version=version)
@@ -448,19 +448,19 @@ class TestBagMaterializeInPlace:
         version = dataset.current_version
 
         bag = dataset.download_dataset_bag(version=version, use_minid=False)  # materialize=True default
-        assert BagCache._is_fully_materialized(bag.bag_path)
+        assert BagCache._is_fully_materialized(bag.path)
 
         result = bag.materialize()
         assert result is bag
-        assert BagCache._is_fully_materialized(bag.bag_path)
+        assert BagCache._is_fully_materialized(bag.path)
 
 
-class TestDirectoryDatasetBagPath:
-    """Tests for DatasetBag.path / .is_directory on directory datasets.
+class TestDirectoryDatasetSourceDirectory:
+    """Tests for DatasetBag.source_directory / .is_directory on directory datasets.
 
     Verifies that ``Directory_Dataset`` rows written by ``add_files`` export
-    into the BDBag and are readable offline via ``DatasetBag.path`` and
-    ``DatasetBag.is_directory``.
+    into the BDBag and are readable offline via ``DatasetBag.source_directory``
+    and ``DatasetBag.is_directory``.
     """
 
     def _make_test_tree(self, base: Path) -> Path:
@@ -482,16 +482,16 @@ class TestDirectoryDatasetBagPath:
             (d / f"{rand_str()}.txt").write_text(rand_str(20))
         return test_dir
 
-    def test_dataset_bag_path_and_is_directory(
+    def test_dataset_bag_source_directory_and_is_directory(
         self, catalog_manager: CatalogManager, tmp_path: Path
     ):
-        """DatasetBag.path / .is_directory work offline from the materialized bag.
+        """DatasetBag.source_directory / .is_directory work offline from the materialized bag.
 
         Builds a directory dataset via add_files, downloads and materializes it
         as a bag, and asserts:
-        - root bag has path == "." and is_directory is True
-        - child bags have paths {"d1", "d2"} and is_directory is True
-        - a non-directory dataset has path is None and is_directory is False
+        - root bag has source_directory == "." and is_directory is True
+        - child bags have source_directory values {"d1", "d2"} and is_directory is True
+        - a non-directory dataset has source_directory is None and is_directory is False
 
         If this test fails because ``Directory_Dataset`` is absent from the bag
         (KeyError / empty rows rather than AttributeError), that signals Task 4
@@ -516,24 +516,26 @@ class TestDirectoryDatasetBagPath:
             root_dataset = exe.add_files(filespecs, description="Dir Bag Ingest")
 
         # Live assertions — sanity-check before downloading the bag.
-        assert root_dataset.path == ".", "live: root Dataset.path must be '.'"
+        assert root_dataset.source_directory == ".", "live: root Dataset.source_directory must be '.'"
         assert root_dataset.is_directory is True, "live: root Dataset.is_directory must be True"
 
         # Download the root directory dataset as a bag (metadata only; the File
         # records reference tag:// URIs that are not in Hatrac, so full
-        # materialization is not needed to test the path accessor).
+        # materialization is not needed to test the source_directory accessor).
         bag = root_dataset.download_dataset_bag(
             version=root_dataset.current_version, use_minid=False, materialize=False
         )
 
         # Offline assertions on the root bag.
-        assert bag.path == ".", f"bag root .path should be '.', got {bag.path!r}"
+        assert bag.source_directory == ".", (
+            f"bag root .source_directory should be '.', got {bag.source_directory!r}"
+        )
         assert bag.is_directory is True, "bag root .is_directory should be True"
 
         # Child bags must report the relative subfolder names.
-        child_paths = {child.path for child in bag.list_dataset_children()}
-        assert child_paths == {"d1", "d2"}, (
-            f"bag child paths should be {{'d1','d2'}}, got {child_paths!r}"
+        child_dirs = {child.source_directory for child in bag.list_dataset_children()}
+        assert child_dirs == {"d1", "d2"}, (
+            f"bag child source_directory values should be {{'d1','d2'}}, got {child_dirs!r}"
         )
         assert all(child.is_directory for child in bag.list_dataset_children()), (
             "all child bags must have is_directory == True"
