@@ -110,22 +110,38 @@ def _root_description(ingest_root: Path, root_name: str | None, description: str
     overrides. Non-root nodes use ``description`` and are identified
     structurally via ``Directory_Dataset.Path``.
 
+    When the basename is empty (e.g. ``Path("/").name == ""``, which occurs
+    when file specs span top-level directories), falls back to the caller's
+    ``description`` and finally to the sentinel ``"root"`` so the field is
+    never left empty.
+
+    Precedence (first truthy value wins):
+    1. ``root_name``
+    2. ``ingest_root.name`` (basename, if non-empty)
+    3. ``description``
+    4. ``"root"`` (sentinel)
+
     Args:
         ingest_root: The common-ancestor directory of all ingested files.
         root_name: Caller-supplied name for the root dataset, or ``None``
             to fall back to the basename.
-        description: Fallback description used for non-root nodes.
+        description: Caller-supplied description; used when the basename is
+            empty and ``root_name`` was not given.
 
     Returns:
-        str: The description string to record on the root dataset.
+        str: A non-empty description string to record on the root dataset.
 
     Example:
         >>> _root_description(Path("/tmp/abc/cifar10_source"), None, "generic")
         'cifar10_source'
         >>> _root_description(Path("/tmp/abc/cifar10_source"), "CIFAR-10 source", "generic")
         'CIFAR-10 source'
+        >>> _root_description(Path("/"), None, "my files")
+        'my files'
+        >>> _root_description(Path("/"), None, "")
+        'root'
     """
-    return root_name if root_name else ingest_root.name
+    return root_name or ingest_root.name or description or "root"
 
 
 class FileMixin:
