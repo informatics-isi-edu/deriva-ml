@@ -102,6 +102,32 @@ def _directory_tree(dirs: Iterable[Path]) -> tuple[Path, set[Path]]:
     return ingest_root, nodes
 
 
+def _root_description(ingest_root: Path, root_name: str | None, description: str) -> str:
+    """Description for the ingest-root dataset.
+
+    Defaults to the root directory's basename so the root dataset is
+    self-identifying (e.g. ``cifar10_source``); an explicit ``root_name``
+    overrides. Non-root nodes use ``description`` and are identified
+    structurally via ``Directory_Dataset.Path``.
+
+    Args:
+        ingest_root: The common-ancestor directory of all ingested files.
+        root_name: Caller-supplied name for the root dataset, or ``None``
+            to fall back to the basename.
+        description: Fallback description used for non-root nodes.
+
+    Returns:
+        str: The description string to record on the root dataset.
+
+    Example:
+        >>> _root_description(Path("/tmp/abc/cifar10_source"), None, "generic")
+        'cifar10_source'
+        >>> _root_description(Path("/tmp/abc/cifar10_source"), "CIFAR-10 source", "generic")
+        'CIFAR-10 source'
+    """
+    return root_name if root_name else ingest_root.name
+
+
 class FileMixin:
     """Mixin providing file management operations.
 
@@ -137,6 +163,7 @@ class FileMixin:
         execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
+        root_name: str | None = None,
         chunk_size: int = 500,
     ) -> "Dataset":
         """Register external file *references* and link them as execution inputs.
@@ -166,9 +193,15 @@ class FileMixin:
                 May be any iterable, including a generator; it is consumed once.
             execution_rid: Execution RID to associate files with (required for provenance).
             dataset_types: One or more dataset type terms from File_Type vocabulary.
-            description: Description of the files. Recorded verbatim on every
-                directory dataset; the source folder each dataset represents is
-                stored structurally in the ``Directory_Dataset`` table.
+            description: Description applied to every non-root directory dataset.
+                The source folder each dataset represents is stored structurally
+                in the ``Directory_Dataset`` table.
+            root_name: Optional name for the ingest-root dataset. When ``None``
+                (the default), the root dataset's ``Description`` is set to the
+                root directory's basename (e.g. ``cifar10_source``), making it
+                self-identifying. Pass an explicit string to override (e.g.
+                ``"CIFAR-10 source images"``). Non-root nodes always use
+                ``description``.
             chunk_size: Number of File rows inserted per batch. Larger values
                 mean fewer, bigger requests; smaller values bound per-request
                 size and memory. A value at least as large as the input is a
@@ -276,15 +309,17 @@ class FileMixin:
             raise DerivaMLException("add_files received no files to add.")
         ingest_root, nodes = _directory_tree(dir_rid_map.keys())
 
-        # The ingest root keeps the bare caller description; every node dataset
-        # uses the same description. The folder each node represents is recorded
-        # structurally in Directory_Dataset (below), not in the prose Description.
+        # The ingest root gets a self-identifying description (its basename, or
+        # the caller-supplied root_name); non-root nodes use the generic
+        # description. The folder each node represents is recorded structurally
+        # in Directory_Dataset (below), not in the prose Description.
+        root_desc = _root_description(ingest_root, root_name, description)
         node_dataset: dict[Path, "Dataset"] = {
             directory: Dataset.create_dataset(
                 self,  # type: ignore[arg-type]
                 dataset_types=dataset_types,
                 execution_rid=execution_rid,
-                description=description,
+                description=root_desc if directory == ingest_root else description,
             )
             for directory in nodes
         }

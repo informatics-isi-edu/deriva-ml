@@ -1,0 +1,20 @@
+"""Tests for the _root_description helper in FileMixin.add_files.
+
+These tests cover the root-dataset description-selection logic that was
+extracted into a module-level helper so it can be tested without a live
+catalog connection.
+"""
+
+from pathlib import Path
+
+from deriva_ml.core.mixins.file import _root_description
+
+
+def test_root_description_defaults_to_basename():
+    root = Path("/tmp/abc/cifar10_source")
+    assert _root_description(root, root_name=None, description="generic") == "cifar10_source"
+
+
+def test_root_description_uses_explicit_root_name():
+    root = Path("/tmp/abc/cifar10_source")
+    assert _root_description(root, root_name="CIFAR-10 source", description="generic") == "CIFAR-10 source"
