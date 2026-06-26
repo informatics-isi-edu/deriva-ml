@@ -16,7 +16,7 @@ dependencies = [
     # "newer-than" signal, so consumers silently freeze on a stale deriva-py
     # (see CLAUDE.md "Updating the deriva-py pin"). Advance this SHA whenever
     # deriva-ml needs a newer deriva-py — and BEFORE every bump-version.
-    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@7df3e45eeea569c98746acedac8a67b723f21363",
+    "deriva @ git+https://github.com/informatics-isi-edu/deriva-py@943bfa394c8246ae379b4a15b3f7b615d7da1fdd",
     "deepdiff",
     "nbconvert",
     "pandas",
@@ -62,7 +62,7 @@ python-preference = "only-managed"
 # Keep this rev in lockstep with the SHA in project.dependencies above. uv
 # applies this source override locally; pinning the same immutable rev (not the
 # branch) keeps dev resolution identical to what consumers get transitively.
-deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", rev = "7df3e45eeea569c98746acedac8a67b723f21363" }
+deriva = { git = "https://github.com/informatics-isi-edu/deriva-py", rev = "943bfa394c8246ae379b4a15b3f7b615d7da1fdd" }
 
 
 [tool.setuptools.package-data]
