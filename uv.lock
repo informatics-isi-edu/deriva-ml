@@ -320,8 +320,8 @@ wheels = [
 
 [[package]]
 name = "bdbag"
-version = "1.9.0.dev1"
-source = { git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev#8d65512307ddb9ea66f8a2c96115027bfdfb5907" }
+version = "1.9.0.dev2"
+source = { git = "https://github.com/fair-research/bdbag?rev=1.9.0-dev#bebcd1cedf44581e0078bfc97799da841ad38cd7" }
 dependencies = [
     { name = "bagit" },
     { name = "bagit-profile" },
