@@ -163,8 +163,9 @@ class FileMixin:
         execution_rid: RID,
         dataset_types: str | list[str] | None = None,
         description: str = "",
-        root_name: str | None = None,
         chunk_size: int = 500,
+        *,
+        root_name: str | None = None,
     ) -> "Dataset":
         """Register external file *references* and link them as execution inputs.
 

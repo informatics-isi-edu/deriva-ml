@@ -2070,6 +2070,8 @@ class Execution:
         dataset_types: str | list[str] | None = None,
         description: str = "",
         chunk_size: int = 500,
+        *,
+        root_name: str | None = None,
     ) -> "Dataset":
         """Register external file *references* and link them as execution inputs.
 
@@ -2088,12 +2090,18 @@ class Execution:
             files: File specifications containing MD5 checksum, length, and URL.
                 May be any iterable, including a generator; consumed once.
             dataset_types: One or more dataset type terms from File_Type vocabulary.
-            description: Description of the files.
+            description: Description applied to every non-root directory dataset.
             chunk_size: Number of File rows inserted per batch (default 500).
+            root_name: Optional name for the ingest-root dataset. When ``None``
+                (the default), the root dataset's ``Description`` is set to the
+                root directory's basename (e.g. ``cifar10_source``), making it
+                self-identifying. Pass an explicit string to override (e.g.
+                ``"CIFAR-10 source images"``). Non-root nodes always use
+                ``description``.
 
         Returns:
-            RID: Dataset  that identifies newly added files. Will be nested to mirror original directory structure
-            of the files.
+            Dataset: Dataset that identifies newly added files. Will be nested
+            to mirror the original directory structure of the files.
 
         Raises:
             DerivaMLInvalidTerm: If file_types are invalid or execution_rid is not an execution record.
@@ -2102,6 +2110,8 @@ class Execution:
             Register external files as inputs:
                 >>> files = [FileSpec(url="path/to/file.txt", md5="abc123", length=1000)]  # doctest: +SKIP
                 >>> rids = exe.add_files(files, dataset_types="text")  # doctest: +SKIP
+            Override the root dataset name:
+                >>> rids = exe.add_files(files, root_name="CIFAR-10 source images")  # doctest: +SKIP
         """
         return self._ml_object.add_files(
             files=files,
@@ -2109,6 +2119,7 @@ class Execution:
             dataset_types=dataset_types,
             description=description,
             chunk_size=chunk_size,
+            root_name=root_name,
         )
 
     # =========================================================================
